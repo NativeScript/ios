@@ -4,6 +4,7 @@
 #include "Constants.h"
 #include "Helpers.h"
 #include "ModuleBinding.hpp"
+#include "ModuleInternalCallbacks.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
@@ -171,7 +172,15 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     tns::SetValue(isolate, thiz, worker);
     std::shared_ptr<Persistent<Value>> poWorker = ObjectManager::Register(context, thiz);
 
-    std::function<Isolate*()> func([worker, workerPath]() {
+    // The loader vocabulary is per-isolate, so the worker gets a COPY taken
+    // here, on the parent's thread, and installed on the worker's isolate
+    // before it loads anything. Nothing is shared, so nothing needs
+    // synchronizing — and a live worker deliberately does not observe a later
+    // configureLoader on the parent (the dev client restarts workers on
+    // vocabulary updates).
+    tns::LoaderVocabulary inheritedVocabulary = tns::CaptureLoaderVocabulary(isolate);
+
+    std::function<Isolate*()> func([worker, workerPath, inheritedVocabulary]() {
       // Resolve tilde paths before creating the runtime
       std::string resolvedPath = workerPath;
       if (!workerPath.empty() && workerPath[0] == '~') {
@@ -185,6 +194,8 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       Isolate* isolate = runtime->CreateIsolate();
       v8::Locker locker(isolate);
       runtime->Init(isolate, true);
+      // Before any module load runs in this isolate.
+      tns::InstallLoaderVocabulary(isolate, inheritedVocabulary);
       runtime->SetWorkerId(worker->WorkerId());
       int workerId = worker->WorkerId();
       Worker::SetWorkerId(isolate, workerId);
@@ -209,36 +220,59 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
         }
       }
 
-      // Debug: Log worker execution
-      // printf("Worker: About to run module: %s\n", resolvedPath.c_str());
+      try {
+        runtime->RunModule(resolvedPath);
+      } catch (NativeScriptException& ex) {
+        // Re-arm the failure as the pending V8 exception (the original JS
+        // error when one was captured) so the tc.HasCaught() path below
+        // routes it to worker.onerror with full detail.
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+        ex.ReThrowToV8(isolate);
+      }
 
-      // Debug: Check if console exists in worker context
-      //      {
-      //        HandleScope debugScope(isolate);
-      //        Local<Context> workerContext = Caches::Get(isolate)->GetContext();
-      //        Local<Object> global = workerContext->Global();
-      //         if (global->Has(workerContext, tns::ToV8String(isolate,
-      //         "console")).FromMaybe(false)) {
-      //           printf("Worker: console object exists in worker context\n");
-      //         } else {
-      //           printf("Worker: console object NOT found in worker context\n");
-      //         }
-      //      }
-
-      runtime->RunModule(resolvedPath);
+      // WHATWG parity: enable the implicit port's message queue once the
+      // entry has finished evaluating. RunModule returns settled for classic
+      // scripts and pumped HTTP entries; a local top-level-await entry that
+      // outlived the settle window enables when its evaluation promise
+      // settles (fulfilled or rejected — a broken worker just dispatches
+      // into a listenerless global, as on the web).
+      {
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+        Local<Context> context = Caches::Get(isolate)->GetContext();
+        Context::Scope context_scope(context);
+        Local<Promise> pendingEntry;
+        if (!ModuleInternal::PendingEntryEvaluation(isolate, resolvedPath).ToLocal(&pendingEntry)) {
+          worker->EnableMessageQueue();
+        } else {
+          auto enable = [](const FunctionCallbackInfo<Value>& info) {
+            // Resolve the wrapper by id — never capture it across the
+            // settle; the worker may be gone by the time this runs.
+            bool found = false;
+            int lookupId = info.Data().As<v8::Int32>()->Value();
+            auto state = Caches::Workers->Get(lookupId, found);
+            if (found && state != nullptr) {
+              WorkerWrapper* w = static_cast<WorkerWrapper*>(state->UserData());
+              if (w != nullptr) {
+                w->EnableMessageQueue();
+              }
+            }
+          };
+          Local<v8::Function> onSettled;
+          if (v8::Function::New(context, enable, v8::Integer::New(isolate, worker->WorkerId()))
+                  .ToLocal(&onSettled)) {
+            pendingEntry->Then(context, onSettled, onSettled).FromMaybe(Local<Promise>());
+          } else {
+            worker->EnableMessageQueue();
+          }
+        }
+      }
 
       if (tc.HasCaught()) {
         Isolate::Scope isolate_scope(isolate);
         HandleScope handle_scope(isolate);
         Local<Context> context = Caches::Get(isolate)->GetContext();
-
-        // Debug: Log the error
-        // printf("Worker: Error occurred while running module\n");
-        Local<Value> exception = tc.Exception();
-        if (!exception.IsEmpty()) {
-          v8::String::Utf8Value error_str(isolate, exception);
-          // printf("Worker: Exception: %s\n", *error_str);
-        }
 
         // Ensure we dispatch the error asynchronously to the main thread so
         // the caller has a chance to attach `worker.onerror` immediately

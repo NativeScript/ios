@@ -29,8 +29,8 @@
 
 #include <mutex>
 #include <unordered_map>
-#include "DevFlags.h"
-#include "HMRSupport.h"
+#include <vector>
+#include "HttpLoader.h"
 #include "ModuleBinding.hpp"
 #include "ModuleInternalCallbacks.h"
 #include "napi/NapiEnv.h"
@@ -45,48 +45,55 @@ using namespace v8;
 using namespace std;
 
 // Import meta callback to support import.meta.url
+//
+// `g_moduleRegistry` keys are normalized by `CanonicalizeRegistryKey`
+// (in ModuleInternalCallbacks.mm) to one of:
+//
+//   1. HTTP / HTTPS URL — `http://host:port/path` or `https://...`.
+//      The URL IS the module identity;
+//      `import.meta.url` should be the URL verbatim.
+//
+//   2. Custom scheme — `node:fs`, `blob:...`.
+//      Synthetic / built-in modules that aren't backed by the local
+//      filesystem. Their identity is the scheme + body itself;
+//      `import.meta.url` keeps that string unchanged.
+//
+//   3. Absolute filesystem path — `/Users/.../app/src/foo.js`. The
+//      production / non-HMR dev shape. Strip the runtime base dir to
+//      recover the canonical "/app/<rel>" shape JS consumers see, then
+//      prepend `file://` so the result is a well-formed URL.
+//
 static void InitializeImportMetaObject(Local<Context> context, Local<Module> module,
                                        Local<Object> meta) {
   Isolate* isolate = v8::Isolate::GetCurrent();
 
-  // Look up the module path in the global module registry (with safety checks)
-  std::string modulePath;
+  std::string modulePath = tns::LookupModuleKeyForModule(isolate, module);
 
-  try {
-    for (auto& kv : tns::g_moduleRegistry) {
-      // Check if Global handle is empty before accessing
-      if (kv.second.IsEmpty()) {
-        continue;
-      }
-
-      Local<Module> registered = kv.second.Get(isolate);
-      if (!registered.IsEmpty() && registered == module) {
-        modulePath = kv.first;
-        break;
-      }
+  auto hasUrlScheme = [](const std::string& s) -> bool {
+    if (s.empty()) return false;
+    size_t colonPos = s.find(':');
+    if (colonPos == 0 || colonPos == std::string::npos) return false;
+    size_t slashPos = s.find('/');
+    if (slashPos != std::string::npos && slashPos < colonPos) return false;
+    for (size_t i = 0; i < colonPos; i++) {
+      char c = s[i];
+      const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                      c == '+' || c == '-' || c == '.';
+      if (!ok) return false;
     }
-  } catch (...) {
-    // NSLog(@"[import.meta] Exception during module registry lookup, using fallback");
-    modulePath = "";  // Will use fallback path
-  }
+    return true;
+  };
 
-  // Debug logging
-  // NSLog(@"[import.meta] Module lookup: found path = %s",
-  //       modulePath.empty() ? "(empty)" : modulePath.c_str());
-  // NSLog(@"[import.meta] Registry size: %zu", tns::g_moduleRegistry.size());
-
-  // Convert file path to file:// URL
+  // Compute import.meta.url.
   std::string moduleUrl;
-  if (!modulePath.empty()) {
-    // Remove base directory and create file:// URL
+  if (modulePath.empty()) {
+    moduleUrl = "file:///app/";
+  } else if (hasUrlScheme(modulePath)) {
+    moduleUrl = modulePath;
+  } else {
     std::string base = tns::ReplaceAll(modulePath, RuntimeConfig.BaseDir, "");
     moduleUrl = "file://" + base;
-  } else {
-    // Fallback URL if module not found in registry
-    moduleUrl = "file:///app/";
   }
-
-  // NSLog(@"[import.meta] Final URL: %s", moduleUrl.c_str());
 
   Local<String> url =
       String::NewFromUtf8(isolate, moduleUrl.c_str(), NewStringType::kNormal).ToLocalChecked();
@@ -97,17 +104,41 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
           url)
       .Check();
 
-  // Add import.meta.dirname support (extract directory from path)
+  // Compute import.meta.dirname.
+  //
+  // Spec (Node.js): `import.meta.dirname` is the OS-path of the
+  // directory containing the module — equivalent to `path.dirname(
+  // fileURLToPath(import.meta.url))`. It only makes sense for modules
+  // backed by the local filesystem.
+  //
+  // For URL-backed modules (HTTP, blob, etc.) there is no
+  // filesystem directory. We return the URL with the final segment
+  // stripped — a best-effort answer that's stable across cycles and
+  // useful for log lines / source maps. Consumers that genuinely need
+  // a filesystem path should already be guarding on `meta.url`'s
+  // scheme before using `meta.dirname`.
   std::string dirname;
-  if (!modulePath.empty()) {
+  if (modulePath.empty()) {
+    dirname = "/app";
+  } else if (hasUrlScheme(modulePath)) {
+    size_t schemeEnd = modulePath.find("://");
+    size_t pathStart =
+        (schemeEnd == std::string::npos) ? std::string::npos : modulePath.find('/', schemeEnd + 3);
+    size_t lastSlash = modulePath.find_last_of('/');
+    if (pathStart != std::string::npos && lastSlash != std::string::npos && lastSlash > pathStart) {
+      dirname = modulePath.substr(0, lastSlash);
+    } else {
+      // No path beyond the host (`http://host`) or scheme without `//`
+      // (`node:fs`, `blob:abc`). Keep the identity intact.
+      dirname = modulePath;
+    }
+  } else {
     size_t lastSlash = modulePath.find_last_of("/\\");
     if (lastSlash != std::string::npos) {
       dirname = modulePath.substr(0, lastSlash);
     } else {
       dirname = "/app";  // fallback
     }
-  } else {
-    dirname = "/app";  // fallback
   }
 
   Local<String> dirnameStr =
@@ -118,15 +149,6 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
           context, String::NewFromUtf8(isolate, "dirname", NewStringType::kNormal).ToLocalChecked(),
           dirnameStr)
       .Check();
-
-  if (RuntimeConfig.IsDebug) {
-    // Attach minimal import.meta.hot only in dev
-    try {
-      tns::InitializeImportMetaHot(isolate, context, meta, modulePath);
-    } catch (...) {
-      // If anything fails, keep meta without hot to avoid crashing
-    }
-  }
 }
 
 namespace tns {
@@ -180,7 +202,11 @@ void DisposeIsolateWhenPossible(Isolate* isolate) {
   }
 }
 
-void Runtime::Initialize() { MetaFile::setInstance(RuntimeConfig.MetadataPtr); }
+void Runtime::Initialize() {
+  // Before anything worth tracing runs, so NS_DEBUG covers boot itself.
+  tns::InitializeLogCategoriesFromEnvironment();
+  MetaFile::setInstance(RuntimeConfig.MetadataPtr);
+}
 
 Runtime::Runtime() {
   currentRuntime_ = this;
@@ -214,6 +240,8 @@ Runtime::~Runtime() {
   }
   this->isolate_->TerminateExecution();
 
+  // TODO: fix race condition on workers where a queue can leak (maybe calling Terminate before
+  // Initialize?)
   Caches::Workers->ForEach([currentIsolate](int& key, std::shared_ptr<Caches::WorkerState>& value) {
     auto childWorkerWrapper = static_cast<WorkerWrapper*>(value->UserData());
     if (childWorkerWrapper->GetMainIsolate() == currentIsolate) {
@@ -225,20 +253,23 @@ Runtime::~Runtime() {
   {
     v8::Locker lock(isolate_);
 
+    // Flag this isolate's in-flight async graph loads dead and Reset their
+    // context Globals — while the isolate is still alive, under the Locker
+    // above — so fetch completions still queued on background NSURLSession
+    // queues become no-ops. This MUST precede the event-loop Shutdown: a
+    // post the loop drops is destroyed on the POSTING (background) thread,
+    // and quiescing first guarantees such a task holds only already-Reset
+    // Globals by then. The rest of the loader state (registry / waiters)
+    // lives in a Caches state slot and is destroyed with the isolate's
+    // Caches below. Worker isolates quiesce the same way.
+    tns::QuiesceModuleLoadsForIsolate(isolate_);
+
     // Stop the event loop before any handle disposal: queued entries touch
     // caches and persistents that go away below, and posts from other threads
     // must start dropping now.
     if (eventLoop_ != nullptr) {
       eventLoop_->Shutdown();
     }
-
-    // Clear module registry before disposing other handles
-    // This prevents crashes during g_moduleRegistry cleanup
-    extern std::unordered_map<std::string, v8::Global<v8::Module>> g_moduleRegistry;
-    for (auto& kv : g_moduleRegistry) {
-      kv.second.Reset();
-    }
-    g_moduleRegistry.clear();
 
     // Before DisposeAllRegistered: the env's reference lists hold v8::Globals,
     // so its teardown needs the isolate alive and locked.
@@ -402,8 +433,13 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   Console::Init(context);
   WeakRef::Init(context);
 
-  // URL blob support (internal/blob-url.js); failures are tolerated, matching
-  // the previous compile-and-run-if-possible behavior.
+  // The dev primitives (configureLoader, invalidateModules, …) live in the
+  // `ns:module` builtin module, materialized lazily per realm on first
+  // resolution (see `BuildNsModuleBinding` in ModuleInternalCallbacks.mm for
+  // the member list) — nothing to install here.
+
+  // URL blob support (internal/blob-url.js); failures are tolerated —
+  // compile-and-run-if-possible.
   v8::Local<v8::Value> blobMethodsResult;
   bool blobMethodsOk =
       BuiltinLoader::RunBuiltin(context, BuiltinId::kBlobUrl).ToLocal(&blobMethodsResult);
@@ -435,7 +471,16 @@ void Runtime::RunMainScript() {
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
   HandleScope handle_scope(isolate);
-  this->moduleInternal_->RunModule(isolate, "./");
+  try {
+    this->moduleInternal_->RunModule(isolate, "./");
+  } catch (NativeScriptException& ex) {
+    // A failed entry module is fatal in every build — an app whose main
+    // module did not run has no defined state to continue in. Log the cause
+    // before unwinding so it survives even if the terminate handler doesn't
+    // print exception details.
+    Log(@"Fatal: the main module failed to run: %s", ex.getMessage().c_str());
+    throw;
+  }
 }
 
 void Runtime::RunModule(const std::string moduleName) {
@@ -443,6 +488,25 @@ void Runtime::RunModule(const std::string moduleName) {
   Isolate::Scope isolate_scope(isolate);
   HandleScope handle_scope(isolate);
   this->moduleInternal_->RunModule(isolate, moduleName);
+}
+
+EntryEvaluationState Runtime::PollMainEntryEvaluation(std::string* rejectionReason) {
+  Isolate* isolate = this->GetIsolate();
+  if (isolate == nullptr || this->moduleInternal_ == nullptr) {
+    return EntryEvaluationState::kNone;
+  }
+  v8::Locker locker(isolate);
+  Isolate::Scope isolate_scope(isolate);
+  HandleScope handle_scope(isolate);
+  Local<Context> context = Caches::Get(isolate)->GetContext();
+  if (context.IsEmpty()) {
+    return EntryEvaluationState::kNone;
+  }
+  Context::Scope context_scope(context);
+
+  // RunMainScript launches "./"; the promise lives under the resolved path.
+  const std::string entryPath = ResolveMainEntryFromPackageJson(RuntimeConfig.ApplicationPath);
+  return ModuleInternal::PollEntryEvaluation(isolate, entryPath, rejectionReason);
 }
 
 void Runtime::RunScript(const std::string script) {

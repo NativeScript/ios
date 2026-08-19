@@ -53,6 +53,7 @@ WorkerWrapper::WorkerWrapper(
       isTerminating_(false),
       isDisposed_(false),
       isWeak_(false),
+      messagesEnabled_(false),
       onMessage_(onMessage) {}
 
 const WrapperType WorkerWrapper::Type() { return WrapperType::Worker; }
@@ -90,12 +91,35 @@ void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker,
 }
 
 void WorkerWrapper::DrainPendingTasks() {
-  std::vector<std::shared_ptr<worker::Message>> messages = this->queue_.PopAll();
+  // The drain source is armed (and can be signaled by a main-thread
+  // PostMessage) BEFORE `workerIsolate_` is assigned in BackgroundLooper —
+  // and worker creation can spin its runloop inside that window: under an
+  // HMR dev session the worker's own script loads over HTTP, and
+  // HttpFetchModule's boot pump (MaybePumpJSThreadDuringBoot) runs the current
+  // runloop, firing this source with a null isolate (crash in
+  // v8::Locker::Initialize). Bail until the isolate exists — the messages
+  // stay queued and the explicit DrainPendingTasks() call right after
+  // isolate creation delivers them.
+  if (this->workerIsolate_ == nullptr) {
+    return;
+  }
   v8::Locker locker(this->workerIsolate_);
   Isolate::Scope isolate_scope(this->workerIsolate_);
   HandleScope handle_scope(this->workerIsolate_);
   Local<Context> context = Caches::Get(this->workerIsolate_)->GetContext();
   Local<Object> global = context->Global();
+
+  // WHATWG parity: the implicit port's message queue starts disabled and is
+  // enabled by Worker.mm once the entry script has finished evaluating
+  // (including after a pending top-level await settles). Until then messages
+  // stay buffered here; afterwards every message dispatches whether or not a
+  // handler exists — a handler installed later misses earlier messages,
+  // exactly as on the web.
+  if (!this->messagesEnabled_.load(std::memory_order_acquire)) {
+    return;
+  }
+
+  std::vector<std::shared_ptr<worker::Message>> messages = this->queue_.PopAll();
 
   for (std::shared_ptr<worker::Message> message : messages) {
     if (this->isTerminating_ || this->isClosing_) {
@@ -157,6 +181,11 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
       Caches::Workers->Remove(workerId);
     }
   }
+}
+
+void WorkerWrapper::EnableMessageQueue() {
+  this->messagesEnabled_.store(true, std::memory_order_release);
+  this->queue_.Signal();
 }
 
 void WorkerWrapper::Close() { this->isClosing_ = true; }

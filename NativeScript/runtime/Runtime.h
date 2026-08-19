@@ -37,9 +37,20 @@ class Runtime {
    */
   inline std::shared_ptr<EventLoop> GetEventLoop() const { return eventLoop_; }
 
+  // Runs `moduleName` as an entry module; throws NativeScriptException on
+  // failure (see ModuleInternal::RunModule).
   void RunModule(const std::string moduleName);
 
   void RunScript(const std::string script);
+
+  // This isolate's CommonJS loader, or null before Init() has built it.
+  ModuleInternal* GetModuleInternal() const { return moduleInternal_.get(); }
+
+  // Polls the main entry's evaluation promise, entering the isolate itself.
+  // kNone for a classic-script entry (it settled synchronously and needs no
+  // boot backstop). Used by the boot handoff to decide whether the process may
+  // fall off main() yet.
+  EntryEvaluationState PollMainEntryEvaluation(std::string* rejectionReason);
 
   static void Initialize();
 

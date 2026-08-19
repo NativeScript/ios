@@ -155,6 +155,12 @@ require("./RemoteModuleSecurityTests");
 // Node built-in and optional module resolution tests (ESM)
 require("./NodeBuiltinsAndOptionalModulesTests.mjs");
 
+// require(esm) exports interop (Node's populateCJSExportsFromESM cascade)
+require("./EsmInteropTests");
+
+// ns:module / node:module createRequire and the pumping require
+require("./CreateRequireTests");
+
 // Exception handling tests
 require("./ExceptionHandlingTests");
 

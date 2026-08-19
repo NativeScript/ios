@@ -67,6 +67,13 @@ Config keys:
 | key | values | scope | default |
 |---|---|---|---|
 | `releasedObjectPolicy` | `"report"` \| `"throw"` | process-wide (main-isolate writes only; read live by every isolate) | `"report"` |
+| `debug` | comma-separated category list, e.g. `"esm,fetch"` | process-wide (main-isolate writes only; read live by every isolate) | the `NS_DEBUG` environment variable, or `""` |
+
+Remote-module security (`security.allowRemoteModules`,
+`security.remoteModuleAllowlist`) is **not** part of this surface. Those
+values are read once from nativescript.config / package.json the first time
+the HTTP loader gates a fetch, and they cannot be inspected or changed
+through `getConfig` / `setConfig`.
 
 `releasedObjectPolicy` controls what happens when JS touches a wrapper whose
 native counterpart has already been released (a state a resurrected object can
@@ -82,6 +89,153 @@ expose — see the iOS runtime's `docs/knowledge/v8-resurrecting-finalizers.md`)
   that handles the report suppresses it with `preventDefault()`.
 - `"throw"`: the touch throws a catchable `ReferenceError` synchronously, and
   no event fires.
+
+`debug` turns on the runtime's category-scoped trace logs. Categories:
+
+| category | covers |
+|---|---|
+| `esm` | module resolution, compilation, linking, evaluation, registry keying |
+| `fetch` | the HTTP module transport (one line per fetched URL — high volume) |
+| `registry` | registry invalidation and dynamic-import cache bookkeeping |
+
+Each write replaces the whole set, so `setConfig('debug', '')` disables
+tracing and no caller needs to know what was already on. `getConfig('debug')`
+returns the canonical comma-separated list of what is enabled. Unknown names
+are ignored, with one warning line naming the valid ones.
+
+The same list can be given before boot as the `NS_DEBUG` environment variable
+(`NS_DEBUG=esm,fetch`), which is the only way to trace boot itself. Traces are
+compiled into release builds as well: a release build that cannot be traced is
+a release build that cannot be diagnosed. Lines are written to the unified log
+under subsystem `org.nativescript.runtime` with the category as the os_log
+category, so `log stream` can filter them without matching message text.
+
+### `ns:module` (v1)
+
+The module-loader control surface consumed by development tooling
+(`@nativescript/vite`). Mechanism only: every policy concern (boot
+orchestration, `import.meta.hot`, full reload, CSS apply, worker teardown,
+WebSocket protocol) lives in the tooling. See `HMR_RUNTIME_BOUNDARY.md` for
+the full contract rationale.
+
+| export | description |
+|---|---|
+| `configureLoader(config)` | Install loader policy before the session imports anything: `importMap` (`imports` + `scopes`, consulted inside the synchronous resolver — see below), `volatilePatterns` (URL substrings always re-fetched), `canonicalization` (`stripParams`/`forPathPrefixes`/`preserveQueryFor` vocabulary for registry keying). Each present section replaces its state wholesale. An invalid `importMap` throws a `TypeError` and leaves the previously installed map untouched. **Configures the calling isolate.** A worker inherits a copy of its parent's vocabulary taken at spawn, so a worker started after `configureLoader` resolves through it; a worker already running does **not** see a later reconfiguration — the dev client restarts workers when the vocabulary changes. |
+| `invalidateModules(urls)` | Evict the given URLs (canonicalized) from the module registry and mark them bust-next-fetch, so the next network fetch bypasses every HTTP cache layer. |
+| `getLoadedModuleUrls()` | URL-like keys currently in the module registry (used to compute full-reload eviction sets). |
+| `createRequire(filenameOrURL)` | A `require` resolving against `filenameOrURL`'s directory (a trailing slash names the directory itself). Accepts an absolute path string, a `file:` URL string, or a URL object; anything else throws a `TypeError`, and an `http(s)` base is refused outright because `require()` of a dev-served module is not supported — import those. ES module graphs load under Node's `require(esm)` rule: a graph containing top-level await is refused before it evaluates. |
+| `createPumpingRequire(filenameOrURL, options?)` | Same argument contract and same resolution, but an ES module graph with top-level await is evaluated by driving V8's nestable tasks and microtasks until it settles, instead of being refused. **Callable only from a task context** — see below. `options` (validated at mint time; unknown keys throw `TypeError`): `deadlineSeconds` (positive finite, default 60), `onTimeout` (`"throw"` default, or `"return-pending"`), `pumpRunLoop` (default `false`). They govern the evaluation-settle phase only — the graph walk's fetch deadline is separate. Passing `options` to `createRequire` throws. |
+
+`createPumpingRequire` pumps the loop, and the loop cannot be pumped
+re-entrantly: V8 ignores a microtask checkpoint while the isolate is already
+draining the microtask queue. A top-level await resumes through a promise
+reaction — a microtask — so such a graph can never settle from inside a
+microtask turn. Requiring one from after an `await` or inside a `.then`
+callback therefore throws immediately, before evaluation, leaving the graph
+instantiated so `import()` can still load it. Call it from a task context
+instead — a native boundary, an event handler, a timer callback, or module
+evaluation itself. A **synchronous** graph needs no pumping and stays legal
+from anywhere, microtask turns included.
+
+### Import maps and scopes
+
+`importMap` takes the WHATWG shape:
+
+```js
+configureLoader({
+  importMap: {
+    imports: { "lodash": "http://host/vendor/lodash.mjs", "@scope/pkg/": "http://host/pkg/" },
+    scopes: { "http://host/legacy/": { "lodash": "http://host/vendor/lodash-3.mjs" } },
+  },
+});
+```
+
+Within any one section, a specifier matches exactly first, then against the
+longest trailing-slash key, whose remainder is appended to the target. A key
+ending in `/` must have a target ending in `/`.
+
+A **scope key is matched as a plain prefix of the importing module's canonical
+registry key** — an absolute `http(s)` URL for a served module, or a canonical
+absolute path for a file on disk. That key is this runtime's analogue of the
+web's resolved referrer URL, which is what scope prefixes match in a browser.
+End a scope key with `/` to keep it on a directory boundary. Resolution
+consults the most specific matching scope first, then progressively less
+specific ones, then `imports` — so a scope can override a global mapping for
+one subtree and fall through to it everywhere else. The resolver, the graph
+walk, and `import()` all resolve through the same cascade.
+
+The vocabulary is per-isolate: `configureLoader` writes the isolate that
+calls it, and nothing is shared between isolates, so no lock guards it. A
+worker receives a copy captured on the parent's thread while it spawns and
+installed before the worker loads its first module. That copy is a snapshot —
+reconfiguring the parent afterwards leaves running workers on the vocabulary
+they started with, which is why the dev client restarts workers on an update.
+
+The whole map is parsed and validated before any of it is installed. A
+malformed map, a non-string target, an unknown top-level section, or a
+trailing-slash key with a non-trailing-slash target throws a `TypeError`
+naming the offending key or section, and the previously installed map keeps
+resolving — a typo in an update cannot empty a live session's vocabulary.
+
+#### Booting an ESM entry from a CJS bootstrap
+
+The supported way to give an ESM app its loader vocabulary before any ESM
+traffic — which closes the pre-configure window described in the
+canonicalization notes — is a small CommonJS bootstrap as the app entry:
+
+```js
+const { configureLoader, createPumpingRequire } = require("ns:module");
+
+configureLoader({ importMap: { imports: { /* … */ } } });
+
+createPumpingRequire(__filename, {
+  pumpRunLoop: true,
+  onTimeout: "return-pending",
+  deadlineSeconds: 1,
+})("./entry.mjs");
+```
+
+Two warnings, both load-bearing:
+
+- `pumpRunLoop: true` is sane **only while boot owns the runloop**. After boot
+  the runloop belongs to the app, and slicing it from inside a require
+  re-enters arbitrary runloop sources — including UI callbacks — underneath JS
+  frames.
+- With `onTimeout: "return-pending"` the returned namespace may still be
+  evaluating. A bootstrap must **discard it** and never read a binding off it;
+  reading one is a TDZ error at best.
+
+An entry whose top-level code reaches `UIApplicationMain` before its first
+`await` needs none of this: `Evaluate()` never returns, so no deadline ever
+arms.
+
+The bootstrap is not the only option: **an ES module main entry is supported
+directly**, top-level await included. When the app's `main` resolves to a
+`.mjs`, the entry is evaluated as a module rather than `require()`d — so
+`import`/`export` are legal there — under the boot evaluation options: a one
+second in-place yield that never throws, after which the boot backstop holds
+the process while the entry's evaluation promise is still pending, bounded at
+twice the module deadline. The trade-off is that the entry's own static imports
+resolve *before* its body runs, so anything the entry needs `configureLoader`
+to have configured must be reached through a dynamic `import()` after that
+call. The CommonJS bootstrap above avoids that constraint by being synchronous;
+pick whichever fits the app.
+
+Not implemented on either require: `require.resolve`, `require.cache`, and
+`require.main`. They are absent rather than throwing, so a feature check
+works; adding them is a spec change here first.
+
+Debug builds additionally carry `canonicalizeHttpUrlKey(url)`, a pure test
+diagnostic; release builds omit it. Missing members are simply absent —
+never present-but-throwing — so feature checks work. The module is
+registered in every build; the security boundary for remote module loading
+sits at the network layer (`security.allowRemoteModules` in
+nativescript.config, enforced inside `HttpLoader`), not the module
+registry and not `ns:runtime` getConfig/setConfig.
+
+Note: `ns:module` (loader policy, structured, boot-time) is deliberately
+separate from `ns:runtime` (live key-value runtime flags, `setConfig`/
+`getConfig`).
 
 ## `node:` compatibility shims
 
@@ -121,6 +275,8 @@ unmodified where a shim exists:
 | module | exports | notes |
 |---|---|---|
 | `node:util` | `inspect`, `format` | Re-exports `ns:util`'s members unchanged (`nodeUtil.inspect === nsUtil.inspect`) from a **distinct, separately frozen module object**. Documented as partial. |
+| `node:url` | `fileURLToPath`, `pathToFileURL` | Node-strict converters between `file:` URLs and paths. Parsing goes through the URL intrinsic, so `file://localhost/x` is accepted (the URL spec folds a `localhost` authority to none) while any other host throws, and the query and fragment are not part of the path. `fileURLToPath` rejects a non-`file:` scheme and rejects `%2F` in the path rather than decoding a separator into it. `pathToFileURL` returns a real `URL` and requires an **absolute** path: Node resolves a relative one against the process working directory, and there is no such thing here. Documented as partial — no `URL`/`URLSearchParams` re-exports (both are globals), no legacy `url.parse`/`format`/`resolve`. |
+| `node:module` | `createRequire` | Re-exports `ns:module`'s `createRequire` unchanged from a **distinct, separately frozen module object**. `createPumpingRequire` is deliberately absent: it has no Node counterpart, so code written against this shim keeps running on Node. `require.resolve`/`.cache`/`.main` are not implemented, and neither is any other `node:module` member (`Module`, `builtinModules`, `isBuiltin`, `register`, `syncBuiltinESMExports`). Documented as partial. |
 
 Candidates for future shims, in rough order of ecosystem demand:
 `node:events` (EventEmitter), `node:path` (pure JS), `node:buffer`,
@@ -172,8 +328,3 @@ module resolve/dynamic-import callbacks; ESM consumption is served by a
 synthetic module whose exports are populated from the same per-realm exports
 object. The internal require is a fixed parameter of the builtin function
 wrapper (`exports`, `require`, `module`, `binding`, `primordials`).
-
-iOS also keeps a pre-registry `node:url` polyfill (`fileURLToPath`,
-`pathToFileURL`) that predates this document. It is compiled from module
-source inside the ES module resolver and is therefore reachable through
-`import` only, not through `require()`.

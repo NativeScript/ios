@@ -21,6 +21,16 @@ declare module "ns:runtime" {
    */
   export interface RuntimeConfig {
     releasedObjectPolicy: ReleasedObjectPolicy;
+    /**
+     * The enabled debug-trace categories, as a comma-separated list — the
+     * whole set is replaced on every write, so `""` disables tracing.
+     * `getConfig` returns the canonical list of what is currently on.
+     * Unknown names are ignored with one warning line.
+     *
+     * Also settable before boot through the `NS_DEBUG` environment variable.
+     * Available in release builds too. Process-wide; main-isolate writes only.
+     */
+    debug: string;
   }
 
   /**
@@ -28,7 +38,9 @@ declare module "ns:runtime" {
    *
    * Throws `TypeError` on an unknown key, an invalid value, or — for
    * process-wide keys such as `releasedObjectPolicy` — when called from a
-   * worker isolate.
+   * worker isolate. Remote-module security (`security.allowRemoteModules`,
+   * `security.remoteModuleAllowlist`) is not a runtime config key: it is
+   * read once from nativescript.config at boot and cannot be changed here.
    */
   export function setConfig<K extends keyof RuntimeConfig | (string & {})>(
     key: K,

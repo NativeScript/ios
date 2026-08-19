@@ -281,18 +281,39 @@ describe("event loop ordered tombstones", function () {
 });
 
 // Top-level await whose continuation arrives as a v8 foreground task. The
-// waitAsync wakeup is a NON-nestable task (v8 futex-emulation), so the
-// synchronous require spin must not run it while JS frames are on the stack:
-// require returns a namespace still in its TDZ, and the module completes from
-// the loop right after the turn - on main it stayed incomplete forever.
+// waitAsync wakeup is a NON-nestable task (v8 futex-emulation), so nothing
+// synchronous can ever observe such a graph finish - require() refuses it
+// outright (Node's require(esm) semantics) and import() is the way in.
 describe("event loop top-level await", function () {
-    it("require() of a TLA module blocked on a foreground task completes after the turn", function (done) {
-        const mod = require("./esm/tla-foreground-task.mjs");
-        expect(() => mod.value).toThrowError(ReferenceError);
-        __ns__setTimeout(() => {
+    it("require() of a TLA module refuses the async graph", function () {
+        let message = "<require() returned without throwing>";
+        try {
+            require("./esm/tla-foreground-task.mjs");
+        } catch (e) {
+            message = String((e && e.message) || e);
+        }
+        expect(message.indexOf("top-level await") >= 0 ? "refused for top-level await" : message)
+            .toBe("refused for top-level await");
+    });
+
+    it("refusing require() leaves the module loadable through import()", function (done) {
+        expect(function () { require("./esm/tla-foreground-task.mjs"); }).toThrow();
+        import("~/tests/esm/tla-foreground-task.mjs").then(mod => {
             expect(mod.value).toBe("ok");
+            // Node parity: require() refuses an async graph even once it is evaluated.
+            let message = "<require() returned without throwing>";
+            try {
+                require("./esm/tla-foreground-task.mjs");
+            } catch (e) {
+                message = String((e && e.message) || e);
+            }
+            expect(message.indexOf("top-level await") >= 0 ? "still refused" : message)
+                .toBe("still refused");
             done();
-        }, 100);
+        }).catch(e => {
+            expect("rejected: " + e).toBe("resolved");
+            done();
+        });
     });
 
     it("dynamic import of a TLA module blocked on a foreground task settles", function (done) {
@@ -324,6 +345,33 @@ describe("event loop workers", function () {
         jasmine.DEFAULT_TIMEOUT_INTERVAL = this.originalTimeout;
     });
 
+    // An ES module worker entry takes the same RunModule ESM branch — and the
+    // same boot evaluation options — the app's main entry now takes, so these
+    // pin that destination even though the suite cannot re-drive main().
+    it("runs a synchronous ES module worker entry, statics and all", function (done) {
+        const worker = new Worker("~/tests/esmEntrySyncWorker.mjs");
+        worker.onmessage = function (msg) {
+            expect(msg.data).toBe("esm-entry:ping");
+            worker.terminate();
+            done();
+        };
+        worker.postMessage("ping");
+    });
+
+    it("runs an ES module worker entry whose top-level await parks past the yield window",
+       function (done) {
+        // The park is non-nestable, so the in-place window cannot settle it:
+        // the entry finishes from the real event loop afterwards, and the
+        // message queue enables on settle rather than being lost.
+        const worker = new Worker("~/tests/esmEntryTlaWorker.mjs");
+        worker.onmessage = function (msg) {
+            expect(msg.data).toBe("tla-entry:ok:ping");
+            worker.terminate();
+            done();
+        };
+        worker.postMessage("ping");
+    });
+
     it("keeps worker->parent messages ordered", function (done) {
         const worker = new Worker("./eventLoopEchoWorker.js");
         const received = [];
@@ -338,6 +386,28 @@ describe("event loop workers", function () {
         worker.postMessage(1);
         worker.postMessage(2);
         worker.postMessage(3);
+    });
+
+    // WHATWG parity: the worker's message queue is enabled when its entry
+    // script finishes evaluating, and from then on messages dispatch whether
+    // or not a handler exists. A handler registered later (from a timer)
+    // misses messages delivered in between — exactly as on the web.
+    it("drops messages dispatched before a late-registered onmessage, like the web", function (done) {
+        const worker = new Worker("./lateHandlerWorker.js");
+        const received = [];
+        worker.onmessage = function (msg) {
+            received.push(msg.data);
+            if (msg.data === "ready") {
+                worker.postMessage("second");
+            } else {
+                expect(received).toEqual(["ready", "late:second"]);
+                worker.terminate();
+                done();
+            }
+        };
+        // Posted before the entry finishes evaluating: buffered, then
+        // dispatched into a global with no handler yet — dropped.
+        worker.postMessage("early");
     });
 
     it("resolves Atomics.waitAsync inside a worker's own loop", function (done) {

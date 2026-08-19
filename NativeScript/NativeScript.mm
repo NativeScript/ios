@@ -3,6 +3,8 @@
 #include "inspector/JsV8InspectorClient.h"
 #include "runtime/Console.h"
 #include "runtime/Helpers.h"
+#include "runtime/ModuleInternal.h"
+#include "runtime/ModuleInternalCallbacks.h"
 #include "runtime/Runtime.h"
 #include "runtime/RuntimeConfig.h"
 #include "runtime/Tasks.h"
@@ -43,6 +45,57 @@ std::unique_ptr<Runtime> runtime_;
 
   CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
   tns::Tasks::Drain();
+
+  // Async boot handoff. For UI apps Tasks::Drain() invokes UIApplicationMain
+  // and never returns — the app's main runloop services whatever is still in
+  // flight. When Drain returns, the entry has not reached UIApplicationMain,
+  // so pump a manual runloop until boot actually finishes, Node-like. A
+  // completion may itself register the UIApplicationMain task, so drain after
+  // each slice; if that drain calls UIApplicationMain it takes over and never
+  // returns.
+  //
+  // Two independent things can leave boot unfinished, and BOTH must hold the
+  // pump: an in-flight module-graph load, and an entry whose own evaluation
+  // promise is still pending — a top-level await parked on anything at all
+  // (a nested import() that does its own async work, a native init that will
+  // call UIApplicationMain later). Gating on graph work alone let the second
+  // case reach counter == 0 and fall off the end of main().
+  std::string entryRejectionReason;
+  bool entryPending = runtime_->PollMainEntryEvaluation(&entryRejectionReason) ==
+                      tns::EntryEvaluationState::kPending;
+  bool entryRejected = false;
+
+  if (entryPending || tns::HasPendingAsyncModuleGraphWork()) {
+    const CFAbsoluteTime deadline =
+        CFAbsoluteTimeGetCurrent() + 2 * tns::kModuleEvaluateDeadlineSeconds;
+    while ((entryPending || tns::HasPendingAsyncModuleGraphWork()) &&
+           CFAbsoluteTimeGetCurrent() < deadline) {
+      CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, true);
+      tns::Tasks::Drain();
+
+      if (entryPending) {
+        tns::EntryEvaluationState state = runtime_->PollMainEntryEvaluation(&entryRejectionReason);
+        // Once it settles, stop probing for good.
+        entryPending = state == tns::EntryEvaluationState::kPending;
+        if (state == tns::EntryEvaluationState::kRejected) {
+          entryRejected = true;
+          break;
+        }
+      }
+    }
+    tns::Tasks::Drain();
+
+    // A settled entry that never called UIApplicationMain is a script-style
+    // app finishing normally; only the two failures below are fatal, and both
+    // are reported in every build.
+    if (entryRejected) {
+      Log(@"Fatal: the main entry module's evaluation rejected during boot: %s",
+          entryRejectionReason.c_str());
+    } else if (entryPending) {
+      Log(@"Fatal: main entry never settled and UIApplicationMain was never reached within %.0fs",
+          2 * tns::kModuleEvaluateDeadlineSeconds);
+    }
+  }
 }
 
 - (bool)liveSync {

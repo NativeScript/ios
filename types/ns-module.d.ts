@@ -1,0 +1,156 @@
+declare module "ns:module" {
+  /**
+   * An import map in the WHATWG shape the dev server emits: bare specifier →
+   * absolute URL. Consulted inside the engine's synchronous module resolver,
+   * which is why it must be handed to the runtime ahead of time rather than
+   * resolved on demand.
+   *
+   * A key ending in `/` maps a whole subtree and its target must end in `/`
+   * too; longest match wins. The map is validated in full before it is
+   * installed — an invalid map throws a `TypeError` out of
+   * {@link configureLoader} and leaves the previously installed map in place.
+   */
+  export interface ImportMap {
+    imports?: Record<string, string>;
+    /**
+     * Per-referrer overrides. Each key is matched as a plain prefix of the
+     * importing module's canonical registry key — an absolute `http(s)` URL
+     * for a served module, or a canonical absolute path for a file — which is
+     * this runtime's analogue of the web's resolved referrer URL. End a scope
+     * key with `/` to keep it on a directory boundary.
+     *
+     * Resolution consults the most specific matching scope first, then less
+     * specific ones, then {@link ImportMap.imports}.
+     */
+    scopes?: Record<string, Record<string, string>>;
+  }
+
+  /**
+   * The URL vocabulary the runtime's canonical-key function applies when
+   * keying its module registry. The mechanism (fragment strip, cache-buster
+   * param drop, param sort) is native; this vocabulary is server policy and
+   * is supplied by the development tooling.
+   */
+  export interface CanonicalizationConfig {
+    /**
+     * Query param names that are pure cache busters and are dropped for dev
+     * endpoints (e.g. `t`, `v`, `import`).
+     */
+    stripParams?: string[];
+    /**
+     * Path prefixes (starts-with) identifying dev endpoints whose query may
+     * be normalized (e.g. `/ns/`, `/@id/`).
+     */
+    forPathPrefixes?: string[];
+    /**
+     * Path substrings whose query IS the module identity and must be
+     * preserved verbatim (e.g. `/@ng/component`).
+     */
+    preserveQueryFor?: string[];
+  }
+
+  /**
+   * Loader policy, installed before the dev session imports anything. Every
+   * section is optional; each present section replaces its native state
+   * wholesale.
+   *
+   * The policy applies to the isolate that calls `configureLoader`. A worker
+   * inherits a copy of its parent's policy taken at spawn; a worker already
+   * running does not observe a later reconfiguration.
+   */
+  export interface LoaderConfig {
+    /**
+     * Replaces the whole map. Throws `TypeError` if invalid, in which case
+     * the previously installed map keeps resolving.
+     */
+    importMap?: ImportMap;
+    /** URL substrings identifying modules that are always re-fetched, never cached. */
+    volatilePatterns?: string[];
+    canonicalization?: CanonicalizationConfig;
+  }
+
+  /**
+   * Installs loader policy — the sole channel by which server/framework URL
+   * policy enters the runtime's module loader.
+   */
+  export function configureLoader(config: LoaderConfig): void;
+
+  /**
+   * Evicts the given URLs (canonicalized) from the module registry and marks
+   * them bust-next-fetch, so the next network fetch bypasses every HTTP
+   * cache layer.
+   */
+  export function invalidateModules(urls: string[]): void;
+
+  /**
+   * The URL-like keys currently in the module registry (used to compute
+   * full-reload eviction sets).
+   */
+  export function getLoadedModuleUrls(): string[];
+
+  /**
+   * A `require` that resolves against the directory of `filenameOrURL` — a
+   * trailing slash names the directory itself. Accepts an absolute path
+   * string, a `file:` URL string, or a URL object; anything else throws a
+   * `TypeError`, and an `http(s)` base is refused because `require()` of a
+   * dev-served module is not supported (import those instead).
+   *
+   * ES module graphs load under Node's `require(esm)` rule: a graph
+   * containing top-level await is refused before it evaluates.
+   *
+   * `require.resolve`, `require.cache` and `require.main` are not
+   * implemented and are absent from the returned function.
+   */
+  export function createRequire(
+    filenameOrURL: string | URL,
+  ): (specifier: string) => any;
+
+  /** Evaluation-settle options for {@link createPumpingRequire}. */
+  export interface PumpingRequireOptions {
+    /**
+     * How long the graph may take to settle, in seconds. Positive and finite.
+     * Defaults to 60. Governs the evaluation-settle phase only — the graph
+     * walk's fetch deadline is separate and unaffected.
+     */
+    deadlineSeconds?: number;
+    /**
+     * What an expired deadline means. `"throw"` (default) fails the require;
+     * `"return-pending"` returns the namespace with evaluation still in
+     * flight, which a caller must discard rather than read.
+     */
+    onTimeout?: "throw" | "return-pending";
+    /**
+     * Also give the Cocoa runloop a slice per pump iteration. Only sane while
+     * boot owns the runloop — mid-app it re-enters arbitrary runloop sources
+     * underneath JS frames. Defaults to `false`.
+     */
+    pumpRunLoop?: boolean;
+  }
+
+  /**
+   * Like {@link createRequire}, except an ES module graph containing
+   * top-level await is evaluated — by driving V8's nestable tasks and
+   * microtasks until it settles — rather than refused. The Cocoa runloop is
+   * never advanced, so a graph awaiting a native transport still cannot
+   * settle here and fails on the deadline instead of returning a
+   * half-initialized namespace.
+   *
+   * Callable only from a task context. The loop cannot be pumped
+   * re-entrantly — V8 ignores a microtask checkpoint while the isolate is
+   * already draining the microtask queue — and a top-level await resumes
+   * through a promise reaction, which is a microtask. Requiring such a graph
+   * from after an `await` or inside a `.then` callback throws immediately,
+   * before evaluation, so `import()` can still load it. A synchronous graph
+   * needs no pumping and stays legal from anywhere.
+   */
+  export function createPumpingRequire(
+    filenameOrURL: string | URL,
+    options?: PumpingRequireOptions,
+  ): (specifier: string) => any;
+
+  // Debug builds additionally carry `canonicalizeHttpUrlKey(url)`, a pure
+  // test diagnostic; release builds omit the member entirely. It is
+  // deliberately not declared here: it is not public API, and declaring it
+  // unconditionally would misrepresent release builds, where feature checks
+  // must observe it as absent.
+}

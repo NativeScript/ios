@@ -6,6 +6,7 @@
 #include "Caches.h"
 #include "Console.h"
 #include "Helpers.h"
+#include "ModuleInternalCallbacks.h"
 #include "Runtime.h"
 
 using namespace v8;
@@ -27,20 +28,35 @@ struct Registration {
 // adapts, so the two module objects stay distinct and the standard module
 // never carries compatibility code.
 constexpr Registration kRegistry[] = {
+    {"ns:module", BuiltinId::kNsModule},
     {"ns:runtime", BuiltinId::kNsRuntime},
     {"ns:util", BuiltinId::kNsUtil},
+    {"node:module", BuiltinId::kNodeModule},
+    {"node:url", BuiltinId::kNodeUrl},
     {"node:util", BuiltinId::kNodeUtil},
 };
 
 // ns:runtime config keys. Each key defines its value domain and scope here;
-// `releasedObjectPolicy` is process-wide (see ReleasedObjectPolicy in
-// Helpers.h), so setting it anywhere affects every isolate — which is why
-// writes are restricted to the main isolate.
+// process-wide keys (see Helpers.h) affect every isolate, so writes are
+// restricted to the main isolate. Remote-module security
+// (`security.allowRemoteModules`, `security.remoteModuleAllowlist`) is
+// deliberately not registered — it is boot-time nativescript.config only.
 constexpr const char* kReleasedObjectPolicyKey = "releasedObjectPolicy";
+constexpr const char* kDebugKey = "debug";
 
 void ThrowTypeError(Isolate* isolate, const std::string& message) {
   isolate->ThrowException(
       Exception::TypeError(tns::ToV8String(isolate, message)));
+}
+
+bool EnsureMainIsolateWrite(Isolate* isolate, const std::string& key) {
+  if (Runtime::IsWorker()) {
+    ThrowTypeError(isolate, "'" + key +
+                                "' is process-wide and can only be set from the main "
+                                "isolate");
+    return false;
+  }
+  return true;
 }
 
 void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
@@ -51,11 +67,7 @@ void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
   }
   std::string key = tns::ToString(isolate, info[0]);
   if (key == kReleasedObjectPolicyKey) {
-    if (Runtime::IsWorker()) {
-      ThrowTypeError(isolate,
-                     "'" + key +
-                         "' is process-wide and can only be set from the main "
-                         "isolate");
+    if (!EnsureMainIsolateWrite(isolate, key)) {
       return;
     }
     std::string value =
@@ -66,6 +78,31 @@ void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
       tns::SetReleasedObjectPolicy(tns::ReleasedObjectPolicy::kThrow);
     } else {
       ThrowTypeError(isolate, "'" + key + "' must be 'report' or 'throw'");
+    }
+    return;
+  }
+  if (key == kDebugKey) {
+    if (!EnsureMainIsolateWrite(isolate, key)) {
+      return;
+    }
+    if (!info[1]->IsString()) {
+      ThrowTypeError(
+          isolate, "'" + key + "' must be a comma-separated category string (" +
+                       tns::AllLogCategoryNames() +
+                       "), or '' to disable tracing");
+      return;
+    }
+    // The list replaces the whole mask, so a caller never has to know what was
+    // already on to turn something off.
+    std::string value = tns::ToString(isolate, info[1]);
+    bool hadUnknown = false;
+    uint32_t mask = tns::ParseLogCategories(value, &hadUnknown);
+    tns::SetEnabledLogCategories(mask);
+    if (hadUnknown) {
+      Log("ns:runtime setConfig('debug', '%s'): ignoring unknown categories; "
+          "valid "
+          "categories are %s",
+          value.c_str(), tns::AllLogCategoryNames().c_str());
     }
     return;
   }
@@ -85,6 +122,11 @@ void GetConfigCallback(const FunctionCallbackInfo<Value>& info) {
             ? "throw"
             : "report";
     info.GetReturnValue().Set(tns::ToV8String(isolate, value));
+    return;
+  }
+  if (key == kDebugKey) {
+    info.GetReturnValue().Set(
+        tns::ToV8String(isolate, tns::EnabledLogCategoryNames()));
     return;
   }
   ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
@@ -108,6 +150,15 @@ MaybeLocal<Object> BuildBinding(Local<Context> context, BuiltinId builtin) {
   Local<Object> binding = Object::New(isolate);
 
   switch (builtin) {
+    case BuiltinId::kNsModule: {
+      // The HTTP-loader control surface (HttpLoader.mm). The binding builder
+      // decides build-dependent membership; ns-module.js only shapes
+      // and freezes whatever arrives.
+      if (!BuildNsModuleBinding(context, binding)) {
+        return MaybeLocal<Object>();
+      }
+      break;
+    }
     case BuiltinId::kNsRuntime: {
       Local<v8::Function> setConfig, getConfig;
       if (!v8::Function::New(context, SetConfigCallback).ToLocal(&setConfig) ||

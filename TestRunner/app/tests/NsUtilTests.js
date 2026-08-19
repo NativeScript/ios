@@ -34,14 +34,16 @@ describe("ns:util", function () {
     });
 
     it("leaves bare specifiers to npm resolution", function () {
-        var resolved;
+        // Bare "util" must never resolve to the ns:util builtin. In this app
+        // no npm "util" package exists, so require("util") throws.
+        var error;
         try {
-            resolved = require("util");
+            require("util");
         } catch (e) {
-            resolved = undefined;
+            error = e;
         }
-        expect(resolved).not.toBe(util);
-        expect(resolved && resolved.format).not.toBe(util.format);
+        expect(error).toBeDefined();
+        expect(String(error)).toContain("Cannot find module");
     });
 
     describe("format", function () {
