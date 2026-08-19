@@ -781,18 +781,14 @@ static bool ParseImportMap(const std::string& json, ParsedImportMap* out, std::s
   return true;
 }
 
-bool SetImportMap(const std::string& json, std::string* error) {
-  // Parse-validate-swap: the live vocabulary is replaced only once a complete
-  // map has been built, so a rejected update leaves resolution exactly as it
-  // was rather than silently emptying it.
-  ParsedImportMap parsedMap;
-  std::string localError;
-  if (!ParseImportMap(json, &parsedMap, error != nullptr ? error : &localError)) {
-    return false;
-  }
+// Swaps in an already-parsed map. Split from SetImportMap so configureLoader
+// can validate every section before installing any of them.
+static bool InstallParsedImportMap(ParsedImportMap parsedMap, std::string* error) {
   LoaderVocabulary* vocabulary = VocabularyForCurrentIsolate();
   if (vocabulary == nullptr) {
-    *(error != nullptr ? error : &localError) = "the isolate is shutting down";
+    if (error != nullptr) {
+      *error = "the isolate is shutting down";
+    }
     return false;
   }
   vocabulary->importMap = std::move(parsedMap);
@@ -800,6 +796,19 @@ bool SetImportMap(const std::string& json, std::string* error) {
             (unsigned long)vocabulary->importMap.imports.size(),
             (unsigned long)vocabulary->importMap.scopes.size());
   return true;
+}
+
+bool SetImportMap(const std::string& json, std::string* error) {
+  // Parse-validate-swap: the live vocabulary is replaced only once a complete
+  // map has been built, so a rejected update leaves resolution exactly as it
+  // was rather than silently emptying it.
+  ParsedImportMap parsedMap;
+  std::string localError;
+  std::string* sink = error != nullptr ? error : &localError;
+  if (!ParseImportMap(json, &parsedMap, sink)) {
+    return false;
+  }
+  return InstallParsedImportMap(std::move(parsedMap), sink);
 }
 
 void SetVolatilePatterns(const std::vector<std::string>& patterns) {
@@ -1810,7 +1819,6 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
     uniqueUrls.push_back(registryKey);
   }
 
-  const bool traceRegistry = tns::LogCategoryEnabled(tns::LogCategory::Registry);
   size_t hits = 0, misses = 0;
   for (const auto& url : uniqueUrls) {
     bool present = registry.find(url) != registry.end();
@@ -1819,9 +1827,7 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
     } else {
       misses++;
     }
-    if (traceRegistry) {
-      TNS_DEBUG(Registry, "invalidate %s key=%s", present ? "HIT " : "MISS", url.c_str());
-    }
+    TNS_DEBUG(Registry, "invalidate %s key=%s", present ? "HIT " : "MISS", url.c_str());
 
     RejectAndClearInvalidatedModuleState(isolate, context, url);
     RemoveModuleFromRegistry(isolate, url);
@@ -1839,11 +1845,9 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
   // this isolate's thread — which is what the transport's mark set needs.
   MarkKeysForCacheBust(uniqueUrls);
 
-  if (traceRegistry) {
-    TNS_DEBUG(Registry, "invalidate summary unique=%lu hits=%lu misses=%lu (registry now=%lu)",
-              (unsigned long)uniqueUrls.size(), (unsigned long)hits, (unsigned long)misses,
-              (unsigned long)registry.size());
-  }
+  TNS_DEBUG(Registry, "invalidate summary unique=%lu hits=%lu misses=%lu (registry now=%lu)",
+            (unsigned long)uniqueUrls.size(), (unsigned long)hits, (unsigned long)misses,
+            (unsigned long)registry.size());
 }
 
 static bool IsModuleEvaluationInProgress(v8::Module::Status status) {
@@ -3322,111 +3326,196 @@ void InstallDevFunction(v8::Isolate* isolate, v8::Local<v8::Context> context,
   target->CreateDataProperty(context, tns::ToV8String(isolate, name), fn).Check();
 }
 
+// The only sections configureLoader understands. An unlisted key is a typo the
+// caller hears about rather than a setting that silently does nothing.
+constexpr const char* kLoaderConfigKeys[] = {"importMap", "volatilePatterns", "canonicalization"};
+
 void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
   v8::Isolate* isolate = info.GetIsolate();
   v8::HandleScope scope(isolate);
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
-  bool traceEsm = tns::LogCategoryEnabled(tns::LogCategory::Esm);
+
+  auto throwTypeError = [&](const std::string& message) {
+    isolate->ThrowException(v8::Exception::TypeError(tns::ToV8String(isolate, message)));
+  };
 
   if (info.Length() < 1 || !info[0]->IsObject()) {
-    if (traceEsm) {
-      TNS_DEBUG(Esm, "[ns:module configureLoader] expected config object argument");
-    }
+    throwTypeError("configureLoader expects a config object");
     return;
   }
 
   v8::Local<v8::Object> config = info[0].As<v8::Object>();
 
-  // Process importMap: can be a JSON string or an object with { imports: {...} }
-  v8::Local<v8::String> importMapKey = tns::ToV8String(isolate, "importMap");
-  v8::Local<v8::Value> importMapVal;
-  if (config->Get(ctx, importMapKey).ToLocal(&importMapVal) && !importMapVal->IsUndefined()) {
-    std::string jsonStr;
-    if (importMapVal->IsString()) {
-      v8::String::Utf8Value utf8(isolate, importMapVal);
-      if (*utf8) jsonStr = *utf8;
-    } else if (importMapVal->IsObject()) {
-      // Serialize object to JSON string
-      v8::Local<v8::Object> jsonObj = ctx->Global()
-                                          ->Get(ctx, tns::ToV8String(isolate, "JSON"))
-                                          .ToLocalChecked()
-                                          .As<v8::Object>();
-      v8::Local<v8::Function> stringify = jsonObj->Get(ctx, tns::ToV8String(isolate, "stringify"))
-                                              .ToLocalChecked()
-                                              .As<v8::Function>();
-      v8::Local<v8::Value> args[] = {importMapVal};
-      v8::Local<v8::Value> result;
-      if (stringify->Call(ctx, jsonObj, 1, args).ToLocal(&result) && result->IsString()) {
-        v8::String::Utf8Value utf8(isolate, result);
-        if (*utf8) jsonStr = *utf8;
+  // ── Validation phase ──────────────────────────────────────────────────────
+  // Nothing below mutates the vocabulary. The whole config is checked first so
+  // a rejected call leaves every section exactly as it was — the atomicity the
+  // import map alone used to have, now covering the entire call.
+
+  // Unknown top-level keys.
+  v8::Local<v8::Array> configKeys;
+  if (!config
+           ->GetOwnPropertyNames(ctx, v8::PropertyFilter::ONLY_ENUMERABLE,
+                                 v8::KeyConversionMode::kConvertToString)
+           .ToLocal(&configKeys)) {
+    return;  // pending exception
+  }
+  for (uint32_t i = 0; i < configKeys->Length(); i++) {
+    v8::Local<v8::Value> keyVal;
+    if (!configKeys->Get(ctx, i).ToLocal(&keyVal)) {
+      return;
+    }
+    std::string key = tns::ToString(isolate, keyVal);
+    bool known = false;
+    for (const char* candidate : kLoaderConfigKeys) {
+      if (key == candidate) {
+        known = true;
+        break;
       }
     }
-    std::string importMapError;
-    if (jsonStr.empty()) {
-      isolate->ThrowException(v8::Exception::TypeError(tns::ToV8String(
-          isolate, "configureLoader: importMap must be an object or a JSON string")));
+    if (!known) {
+      throwTypeError("configureLoader: unknown option '" + key + "'");
       return;
-    }
-    if (!SetImportMap(jsonStr, &importMapError)) {
-      // The previous map is still installed: a rejected update changes
-      // nothing, so a typo cannot empty a live session's vocabulary.
-      isolate->ThrowException(
-          v8::Exception::TypeError(tns::ToV8String(isolate, "configureLoader: " + importMapError)));
-      return;
-    }
-    if (traceEsm) {
-      TNS_DEBUG(Esm, "[ns:module configureLoader] import map set (%zu bytes)", jsonStr.size());
     }
   }
 
-  // Reads `obj[key]` as an array of strings into `out`; non-string elements
-  // are skipped. Returns true when the property exists and is an array.
-  auto readStringArray = [&](v8::Local<v8::Object> obj, const char* key,
-                             std::vector<std::string>& out) -> bool {
+  // Reads `obj[key]` as an array of strings into `out`. `label` names the
+  // section in any error. Returns false with an exception pending on a type
+  // failure; `present` distinguishes "absent" from "present and valid".
+  auto readStringArray = [&](v8::Local<v8::Object> obj, const char* key, const std::string& label,
+                             std::vector<std::string>& out, bool* present) -> bool {
+    *present = false;
     v8::Local<v8::Value> val;
-    if (!obj->Get(ctx, tns::ToV8String(isolate, key)).ToLocal(&val) || !val->IsArray()) {
+    if (!obj->Get(ctx, tns::ToV8String(isolate, key)).ToLocal(&val)) {
+      return false;
+    }
+    if (val->IsUndefined()) {
+      return true;
+    }
+    if (!val->IsArray()) {
+      throwTypeError("configureLoader: " + label + " must be an array of strings");
       return false;
     }
     v8::Local<v8::Array> arr = val.As<v8::Array>();
     for (uint32_t i = 0; i < arr->Length(); i++) {
       v8::Local<v8::Value> elem;
-      if (arr->Get(ctx, i).ToLocal(&elem) && elem->IsString()) {
-        v8::String::Utf8Value utf8(isolate, elem);
-        if (*utf8) out.push_back(*utf8);
+      if (!arr->Get(ctx, i).ToLocal(&elem)) {
+        return false;
       }
+      if (!elem->IsString()) {
+        throwTypeError("configureLoader: " + label + "[" + std::to_string(i) +
+                       "] must be a string");
+        return false;
+      }
+      out.push_back(tns::ToString(isolate, elem));
     }
+    *present = true;
     return true;
   };
 
-  // Process volatilePatterns: array of strings. Presence of the array decides,
-  // not its contents — an empty one is explicit policy meaning "nothing is
-  // volatile any more", the same rule canonicalization follows below, and the
-  // only reading under which a present section replaces its state wholesale.
-  {
-    std::vector<std::string> patterns;
-    if (readStringArray(config, "volatilePatterns", patterns)) {
-      SetVolatilePatterns(patterns);
-      if (traceEsm) {
-        TNS_DEBUG(Esm, "[ns:module configureLoader] %zu volatile patterns set", patterns.size());
+  // importMap: an object or a JSON string. Parsed here, installed below.
+  ParsedImportMap parsedMap;
+  bool haveImportMap = false;
+  size_t importMapBytes = 0;
+  v8::Local<v8::Value> importMapVal;
+  if (!config->Get(ctx, tns::ToV8String(isolate, "importMap")).ToLocal(&importMapVal)) {
+    return;
+  }
+  if (!importMapVal->IsUndefined()) {
+    std::string jsonStr;
+    if (importMapVal->IsString()) {
+      jsonStr = tns::ToString(isolate, importMapVal);
+    } else if (importMapVal->IsObject()) {
+      v8::Local<v8::Value> jsonVal;
+      v8::Local<v8::Value> stringifyVal;
+      if (!ctx->Global()->Get(ctx, tns::ToV8String(isolate, "JSON")).ToLocal(&jsonVal) ||
+          !jsonVal->IsObject() ||
+          !jsonVal.As<v8::Object>()
+               ->Get(ctx, tns::ToV8String(isolate, "stringify"))
+               .ToLocal(&stringifyVal) ||
+          !stringifyVal->IsFunction()) {
+        return;
+      }
+      v8::Local<v8::Value> args[] = {importMapVal};
+      v8::Local<v8::Value> result;
+      if (!stringifyVal.As<v8::Function>()->Call(ctx, jsonVal, 1, args).ToLocal(&result)) {
+        return;  // a throwing toJSON / getter propagates unchanged
+      }
+      if (result->IsString()) {
+        jsonStr = tns::ToString(isolate, result);
       }
     }
+    if (jsonStr.empty()) {
+      throwTypeError("configureLoader: importMap must be an object or a JSON string");
+      return;
+    }
+    std::string importMapError;
+    if (!ParseImportMap(jsonStr, &parsedMap, &importMapError)) {
+      // The previous map is still installed: a rejected update changes
+      // nothing, so a typo cannot empty a live session's vocabulary.
+      throwTypeError("configureLoader: " + importMapError);
+      return;
+    }
+    haveImportMap = true;
+    importMapBytes = jsonStr.size();
   }
 
-  // Process canonicalization: { stripParams, forPathPrefixes, preserveQueryFor }
-  // — the URL vocabulary CanonicalizeHttpUrlKey applies (see its doc block).
-  // Presence of the object marks the vocabulary as configured, replacing the
-  // built-in fallback entirely (empty arrays are honored as explicit policy).
-  {
-    v8::Local<v8::Value> canonVal;
-    if (config->Get(ctx, tns::ToV8String(isolate, "canonicalization")).ToLocal(&canonVal) &&
-        canonVal->IsObject()) {
-      v8::Local<v8::Object> canonObj = canonVal.As<v8::Object>();
-      CanonicalizationConfig canon;
-      readStringArray(canonObj, "stripParams", canon.stripParams);
-      readStringArray(canonObj, "forPathPrefixes", canon.devPathPrefixes);
-      readStringArray(canonObj, "preserveQueryFor", canon.preserveQueryPrefixes);
-      SetCanonicalizationConfig(std::move(canon));
+  // volatilePatterns: array of strings. Presence of the array decides, not its
+  // contents — an empty one is explicit policy meaning "nothing is volatile any
+  // more", the same rule canonicalization follows, and the only reading under
+  // which a present section replaces its state wholesale.
+  std::vector<std::string> patterns;
+  bool havePatterns = false;
+  if (!readStringArray(config, "volatilePatterns", "volatilePatterns", patterns, &havePatterns)) {
+    return;
+  }
+
+  // canonicalization: { stripParams, forPathPrefixes, preserveQueryFor } — the
+  // URL vocabulary CanonicalizeHttpUrlKey applies (see its doc block). Presence
+  // of the object marks the vocabulary as configured, replacing the built-in
+  // fallback entirely (empty arrays are honored as explicit policy).
+  CanonicalizationConfig canon;
+  bool haveCanon = false;
+  v8::Local<v8::Value> canonVal;
+  if (!config->Get(ctx, tns::ToV8String(isolate, "canonicalization")).ToLocal(&canonVal)) {
+    return;
+  }
+  if (!canonVal->IsUndefined()) {
+    if (!canonVal->IsObject()) {
+      throwTypeError("configureLoader: canonicalization must be an object");
+      return;
     }
+    v8::Local<v8::Object> canonObj = canonVal.As<v8::Object>();
+    bool ignored = false;
+    if (!readStringArray(canonObj, "stripParams", "canonicalization.stripParams", canon.stripParams,
+                         &ignored) ||
+        !readStringArray(canonObj, "forPathPrefixes", "canonicalization.forPathPrefixes",
+                         canon.devPathPrefixes, &ignored) ||
+        !readStringArray(canonObj, "preserveQueryFor", "canonicalization.preserveQueryFor",
+                         canon.preserveQueryPrefixes, &ignored)) {
+      return;
+    }
+    haveCanon = true;
+  }
+
+  // ── Apply phase ───────────────────────────────────────────────────────────
+  // Everything validated; from here nothing can fail on the caller's input.
+
+  if (haveImportMap) {
+    std::string installError;
+    if (!InstallParsedImportMap(std::move(parsedMap), &installError)) {
+      throwTypeError("configureLoader: " + installError);
+      return;
+    }
+    TNS_DEBUG(Esm, "[ns:module configureLoader] import map set (%zu bytes)", importMapBytes);
+  }
+
+  if (havePatterns) {
+    SetVolatilePatterns(patterns);
+    TNS_DEBUG(Esm, "[ns:module configureLoader] %zu volatile patterns set", patterns.size());
+  }
+
+  if (haveCanon) {
+    SetCanonicalizationConfig(std::move(canon));
   }
 }
 
@@ -3436,7 +3525,8 @@ void InvalidateModulesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) 
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 
   if (info.Length() < 1 || !info[0]->IsArray()) {
-    Log(@"[ns:module invalidateModules] expected array of URL strings");
+    isolate->ThrowException(v8::Exception::TypeError(
+        tns::ToV8String(isolate, "invalidateModules expects an array of URL strings")));
     return;
   }
 
@@ -3445,14 +3535,15 @@ void InvalidateModulesCallback(const v8::FunctionCallbackInfo<v8::Value>& info) 
   urls.reserve(urlsArray->Length());
   for (uint32_t index = 0; index < urlsArray->Length(); index++) {
     v8::Local<v8::Value> value;
-    if (!urlsArray->Get(ctx, index).ToLocal(&value) || !value->IsString()) {
-      continue;
+    if (!urlsArray->Get(ctx, index).ToLocal(&value)) {
+      return;
     }
-
-    v8::String::Utf8Value utf8(isolate, value);
-    if (*utf8) {
-      urls.emplace_back(*utf8);
+    if (!value->IsString()) {
+      isolate->ThrowException(v8::Exception::TypeError(tns::ToV8String(
+          isolate, "invalidateModules: urls[" + std::to_string(index) + "] must be a string")));
+      return;
     }
+    urls.push_back(tns::ToString(isolate, value));
   }
 
   // Permanent observability: surface every URL the runtime is asked to
@@ -3512,11 +3603,11 @@ bool BuildNsModuleBinding(v8::Local<v8::Context> context, v8::Local<v8::Object> 
     auto canonicalizeCb = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
       v8::Isolate* iso = info.GetIsolate();
       if (info.Length() < 1 || !info[0]->IsString()) {
-        info.GetReturnValue().SetEmptyString();
+        iso->ThrowException(v8::Exception::TypeError(
+            tns::ToV8String(iso, "canonicalizeHttpUrlKey expects a URL string")));
         return;
       }
-      v8::String::Utf8Value u(iso, info[0]);
-      std::string key = CanonicalizeHttpUrlKey(*u ? std::string(*u) : std::string());
+      std::string key = CanonicalizeHttpUrlKey(tns::ToString(iso, info[0]));
       info.GetReturnValue().Set(tns::ToV8String(iso, key.c_str()));
     };
     v8::Local<v8::Function> fn;

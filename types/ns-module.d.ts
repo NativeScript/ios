@@ -52,17 +52,14 @@ declare module "ns:module" {
   /**
    * Loader policy, installed before the dev session imports anything. Every
    * section is optional; each present section replaces its native state
-   * wholesale.
+   * wholesale (an empty array included — `undefined` counts as absent).
    *
    * The policy applies to the isolate that calls `configureLoader`. A worker
    * inherits a copy of its parent's policy taken at spawn; a worker already
    * running does not observe a later reconfiguration.
    */
   export interface LoaderConfig {
-    /**
-     * Replaces the whole map. Throws `TypeError` if invalid, in which case
-     * the previously installed map keeps resolving.
-     */
+    /** Replaces the whole map. */
     importMap?: ImportMap;
     /** URL substrings identifying modules that are always re-fetched, never cached. */
     volatilePatterns?: string[];
@@ -72,6 +69,12 @@ declare module "ns:module" {
   /**
    * Installs loader policy — the sole channel by which server/framework URL
    * policy enters the runtime's module loader.
+   *
+   * Throws `TypeError` on a missing or non-object config, an unknown top-level
+   * key, a section of the wrong type, or a non-string inside a section's array
+   * — the message names the offending section, key or index. The whole config
+   * is validated before any of it is installed, so a rejected call leaves every
+   * section exactly as it was.
    */
   export function configureLoader(config: LoaderConfig): void;
 
@@ -79,6 +82,9 @@ declare module "ns:module" {
    * Evicts the given URLs (canonicalized) from the module registry and marks
    * them bust-next-fetch, so the next network fetch bypasses every HTTP
    * cache layer.
+   *
+   * Throws `TypeError` if `urls` is not an array or holds a non-string, naming
+   * the offending index.
    */
   export function invalidateModules(urls: string[]): void;
 
@@ -97,6 +103,9 @@ declare module "ns:module" {
    *
    * ES module graphs load under Node's `require(esm)` rule: a graph
    * containing top-level await is refused before it evaluates.
+   *
+   * The returned `require` takes a string specifier and throws a `TypeError`
+   * with Node's `ERR_INVALID_ARG_TYPE` wording on anything else.
    *
    * `require.resolve`, `require.cache` and `require.main` are not
    * implemented and are absent from the returned function.

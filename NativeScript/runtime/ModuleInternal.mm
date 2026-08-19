@@ -4,6 +4,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <utime.h>
+#include <cmath>
 #include <cstring>
 #include <string>
 #include "BuiltinLoader.h"
@@ -12,10 +13,10 @@
 #include "HttpLoader.h"
 #include "ModuleInternalCallbacks.h"  // for ResolveModuleCallback
 #include "NativeScriptException.h"
-#include "napi/NapiModules.h"
 #include "NsBuiltinModules.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
+#include "napi/NapiModules.h"
 
 using namespace v8;
 
@@ -410,14 +411,77 @@ Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const s
   return result.As<v8::Function>();
 }
 
+// Node's `determineSpecificType` (lib/internal/errors.js), so an
+// ERR_INVALID_ARG_TYPE-shaped message reads the same here as it does there.
+// Deliberately side-effect free: no getter, no user `toString`, no `inspect`.
+static std::string DescribeValueForTypeError(Isolate* isolate, Local<Value> value) {
+  if (value.IsEmpty() || value->IsUndefined()) {
+    return "undefined";
+  }
+  if (value->IsNull()) {
+    return "null";
+  }
+
+  if (value->IsFunction()) {
+    std::string name = tns::ToString(isolate, value.As<v8::Function>()->GetName());
+    return name.empty() ? "an instance of Function" : "function " + name;
+  }
+
+  if (value->IsObject()) {
+    std::string ctorName = tns::ToString(isolate, value.As<Object>()->GetConstructorName());
+    return ctorName.empty() ? "an object" : "an instance of " + ctorName;
+  }
+
+  // A primitive: `type <typeof> (<value>)`.
+  const char* typeName = "object";
+  std::string rendered;
+  if (value->IsBoolean()) {
+    typeName = "boolean";
+    rendered = value->IsTrue() ? "true" : "false";
+  } else if (value->IsNumber()) {
+    typeName = "number";
+    double number = value.As<v8::Number>()->Value();
+    // String(-0) is "0", but Node renders the sign, and losing it here would
+    // hide exactly the distinction the message is meant to surface.
+    rendered = (number == 0 && std::signbit(number)) ? "-0" : tns::ToString(isolate, value);
+  } else if (value->IsBigInt()) {
+    typeName = "bigint";
+    rendered = tns::ToString(isolate, value) + "n";
+  } else if (value->IsSymbol()) {
+    typeName = "symbol";
+    Local<Value> description = value.As<v8::Symbol>()->Description(isolate);
+    rendered = "Symbol(" +
+               (description->IsUndefined() ? std::string() : tns::ToString(isolate, description)) +
+               ")";
+  } else {
+    rendered = tns::ToString(isolate, value);
+  }
+
+  if (rendered.size() > 28) {
+    rendered = rendered.substr(0, 25) + "...";
+  }
+  return "type " + std::string(typeName) + " (" + rendered + ")";
+}
+
 void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
+
+  // Every path below assumes a string specifier — the builtin probe, the
+  // http(s) guard and the filesystem resolution all read it — so reject a
+  // non-string before any of them rather than casting one unchecked.
+  if (info.Length() < 1 || !info[0]->IsString()) {
+    Local<Value> received = info.Length() < 1 ? Local<Value>() : info[0];
+    isolate->ThrowException(Exception::TypeError(
+        tns::ToV8String(isolate, "The \"id\" argument must be of type string. Received " +
+                                     DescribeValueForTypeError(isolate, received))));
+    return;
+  }
 
   // Builtin modules resolve before any path handling, so they can never be
   // shadowed by a file or a package, and an unknown one fails as a missing
   // builtin rather than as a missing file. Only prefixed specifiers get here:
   // a bare `util` still resolves through npm.
-  if (info.Length() > 0 && info[0]->IsString()) {
+  {
     std::string specifier = tns::ToString(isolate, info[0].As<v8::String>());
     if (NsBuiltinModules::IsBuiltinScheme(specifier)) {
       Local<Context> context = isolate->GetCurrentContext();
@@ -450,17 +514,11 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
 
   try {
     // Guard: URL-based modules must be loaded via dynamic import() in dev HTTP ESM mode.
-    if (info.Length() > 0 && info[0]->IsString()) {
-      v8::String::Utf8Value s(isolate, info[0]);
-      if (*s) {
-        moduleName.assign(*s, s.length());
-        if (moduleName.rfind("http://", 0) == 0 || moduleName.rfind("https://", 0) == 0) {
-          std::string msg =
-              std::string("NativeScript: require() of URL module is not supported: ") + moduleName +
-              ". Use dynamic import() instead.";
-          throw NativeScriptException(msg.c_str());
-        }
-      }
+    moduleName = tns::ToString(isolate, info[0]);
+    if (moduleName.rfind("http://", 0) == 0 || moduleName.rfind("https://", 0) == 0) {
+      std::string msg = std::string("NativeScript: require() of URL module is not supported: ") +
+                        moduleName + ". Use dynamic import() instead.";
+      throw NativeScriptException(msg.c_str());
     }
     ModuleInternal* moduleInternal = static_cast<ModuleInternal*>(
         info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));

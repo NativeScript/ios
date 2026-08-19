@@ -196,8 +196,8 @@ apply, worker teardown) belongs to whatever tooling drives it.
 
 | export | description |
 |---|---|
-| `configureLoader(config)` | Installs loader policy for the calling isolate. Sections: `importMap` (`imports` + `scopes`), `volatilePatterns` (URL substrings always re-fetched), `canonicalization` (registry-keying vocabulary). Each **present** section replaces its state wholesale, an empty array included. An invalid `importMap` throws `TypeError` and leaves the previously installed map untouched. |
-| `invalidateModules(urls)` | Evicts the given URLs (canonicalized) from the module registry and marks them bust-next-fetch, so the next network fetch bypasses every HTTP cache layer. Takes an array of strings; non-string elements are skipped. |
+| `configureLoader(config)` | Installs loader policy for the calling isolate. Sections: `importMap` (`imports` + `scopes`), `volatilePatterns` (URL substrings always re-fetched), `canonicalization` (registry-keying vocabulary). Each **present** section replaces its state wholesale, an empty array included. Throws `TypeError` on any malformed input, having validated the whole config first, so a rejected call installs nothing. |
+| `invalidateModules(urls)` | Evicts the given URLs (canonicalized) from the module registry and marks them bust-next-fetch, so the next network fetch bypasses every HTTP cache layer. Takes an array of strings; throws `TypeError` otherwise. |
 | `getLoadedModuleUrls()` | The URL-like keys currently in the module registry, as an array of strings (used to compute full-reload eviction sets). |
 | `createRequire(filenameOrURL)` | A `require` resolving against `filenameOrURL`'s directory (a trailing slash names the directory itself). Accepts an absolute path string, a `file:` URL string, or a URL object; anything else throws `TypeError`, and an `http(s)` base is refused outright because `require()` of a dev-served module is not supported — import those. ES module graphs load under Node's `require(esm)` rule: a graph containing top-level await is refused before it evaluates. |
 | `createPumpingRequire(filenameOrURL, options?)` | Same argument contract and same resolution, but an ES module graph with top-level await is evaluated by driving the loop until it settles, instead of being refused. **Callable only from a task context.** See [Pumping requires](#pumping-requires). |
@@ -206,13 +206,34 @@ apply, worker teardown) belongs to whatever tooling drives it.
 deliberately separate from `ns:runtime` (live key-value runtime flags via
 `setConfig`/`getConfig`).
 
-`configureLoader` reads only the three sections it knows; a section it does not
-recognize, or one present with the wrong type, is ignored rather than reported.
-"Replaces its state wholesale" is therefore keyed on a section being present
-*and well-typed* — `volatilePatterns: []` clears the list, but
-`volatilePatterns: "foo"` neither clears it nor throws. The one section that
-validates its contents and reports failures is `importMap`. `invalidateModules`
-is likewise lenient: a non-array argument is ignored, not thrown on.
+Both functions validate their arguments and throw `TypeError` on anything
+malformed — the behavior WebIDL gives a web API and `ERR_INVALID_ARG_TYPE`
+gives a Node one. Nothing is silently skipped or filtered: a mistyped section
+or a typo'd key is a caller bug, and reporting it is what keeps it from
+becoming a config that quietly does nothing.
+
+| condition | message |
+|---|---|
+| missing or non-object config | `configureLoader expects a config object` |
+| a key other than the three sections | `configureLoader: unknown option '<key>'` |
+| `volatilePatterns` not an array | `configureLoader: volatilePatterns must be an array of strings` |
+| a non-string in `volatilePatterns` | `configureLoader: volatilePatterns[<index>] must be a string` |
+| `canonicalization` not an object | `configureLoader: canonicalization must be an object` |
+| a `canonicalization` sub-key not an array | `configureLoader: canonicalization.<key> must be an array of strings` |
+| a non-string in a `canonicalization` sub-key | `configureLoader: canonicalization.<key>[<index>] must be a string` |
+| `invalidateModules` argument not an array | `invalidateModules expects an array of URL strings` |
+| a non-string in that array | `invalidateModules: urls[<index>] must be a string` |
+
+`configureLoader` validates the **entire** config — every section plus the key
+names — before installing any of it. A call that throws therefore leaves all
+three sections exactly as they were: the atomicity the import map alone used to
+have now covers the whole call, so a config that is half-right cannot land
+half-applied.
+
+"Replaces its state wholesale" is keyed on a section being **present**, not on
+its contents: `volatilePatterns: []` clears the list, and an absent section is
+left alone. `undefined` counts as absent, so spreading an optional section is
+safe.
 
 ```js
 const { configureLoader, getLoadedModuleUrls, invalidateModules } =
@@ -249,7 +270,9 @@ Neither require implements `require.resolve`, `require.cache`, or
 works; adding them is a change to this specification first.
 
 Debug builds additionally carry `canonicalizeHttpUrlKey(url)`, a pure test
-diagnostic; release builds omit it. Missing members are simply absent — never
+diagnostic that takes a string and throws
+`canonicalizeHttpUrlKey expects a URL string` otherwise; release builds omit
+it. Missing members are simply absent — never
 present-but-throwing — so feature checks work. The module is registered in
 every build: the security boundary for remote module loading sits at the
 network layer (`security.allowRemoteModules` in nativescript.config, enforced
@@ -430,6 +453,20 @@ Its `TypeError` messages are Node's:
 | `pathToFileURL` given a relative path | `The "path" argument must be an absolute path.` |
 
 ## Loading ES modules
+
+### The `require()` specifier
+
+Every `require` — the global one and any minted by `createRequire` /
+`createPumpingRequire` — takes a **string** specifier. Anything else throws a
+`TypeError` with Node's `ERR_INVALID_ARG_TYPE` wording, before any builtin,
+`http(s)` or filesystem handling runs:
+
+```
+The "id" argument must be of type string. Received <what>
+```
+
+`<what>` follows Node's `determineSpecificType`: `undefined`, `null`,
+`type number (42)`, `an instance of Object`, `function foo`, and so on.
 
 ### `require()` of an ES module
 
