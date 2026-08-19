@@ -3398,10 +3398,13 @@ void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     return true;
   };
 
-  // Process volatilePatterns: array of strings
+  // Process volatilePatterns: array of strings. Presence of the array decides,
+  // not its contents — an empty one is explicit policy meaning "nothing is
+  // volatile any more", the same rule canonicalization follows below, and the
+  // only reading under which a present section replaces its state wholesale.
   {
     std::vector<std::string> patterns;
-    if (readStringArray(config, "volatilePatterns", patterns) && !patterns.empty()) {
+    if (readStringArray(config, "volatilePatterns", patterns)) {
       SetVolatilePatterns(patterns);
       if (traceEsm) {
         TNS_DEBUG(Esm, "[ns:module configureLoader] %zu volatile patterns set", patterns.size());

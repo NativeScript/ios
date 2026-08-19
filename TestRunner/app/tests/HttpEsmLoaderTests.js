@@ -229,6 +229,51 @@ describe("HTTP ESM Loader", function() {
 
         // The import map is process-wide, so every spec here installs its own
         // and restores the empty map afterwards.
+        // Each present configureLoader section replaces its state wholesale, so
+        // an empty array is explicit policy — "nothing is volatile any more" —
+        // not a no-op.
+        describe("volatile patterns", function () {
+            var nsModule = require("ns:module");
+
+            afterEach(function () {
+                nsModule.configureLoader({ volatilePatterns: [] });
+            });
+
+            it("stops treating a URL as volatile once the list is emptied", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                // The fixture pushes one entry per evaluation, so the bucket
+                // length counts how many times the module actually ran.
+                var url = origin + "/esm/graph-leaf.mjs?k=vol";
+                function evaluations() {
+                    return (globalThis.__nsMixedOrdervol || []).length;
+                }
+
+                nsModule.configureLoader({ volatilePatterns: ["k=vol"] });
+
+                import(url).then(function () {
+                    return import(url);
+                }).then(function () {
+                    // Volatile: the cached module is dropped, so it re-evaluates.
+                    expect(evaluations()).toBe(2);
+
+                    nsModule.configureLoader({ volatilePatterns: [] });
+                    return import(url);
+                }).then(function () {
+                    // Cleared: the registry entry is reused, nothing re-runs.
+                    expect(evaluations()).toBe(2);
+                    done();
+                }).catch(function (error) {
+                    expect("rejected: " + formatError(error)).toBe("resolved");
+                    done();
+                });
+            });
+        });
+
         describe("import map", function () {
             var nsModule = require("ns:module");
 
