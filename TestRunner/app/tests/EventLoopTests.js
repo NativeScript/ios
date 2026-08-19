@@ -345,6 +345,33 @@ describe("event loop workers", function () {
         jasmine.DEFAULT_TIMEOUT_INTERVAL = this.originalTimeout;
     });
 
+    // An ES module worker entry takes the same RunModule ESM branch — and the
+    // same boot evaluation options — the app's main entry now takes, so these
+    // pin that destination even though the suite cannot re-drive main().
+    it("runs a synchronous ES module worker entry, statics and all", function (done) {
+        const worker = new Worker("~/tests/esmEntrySyncWorker.mjs");
+        worker.onmessage = function (msg) {
+            expect(msg.data).toBe("esm-entry:ping");
+            worker.terminate();
+            done();
+        };
+        worker.postMessage("ping");
+    });
+
+    it("runs an ES module worker entry whose top-level await parks past the yield window",
+       function (done) {
+        // The park is non-nestable, so the in-place window cannot settle it:
+        // the entry finishes from the real event loop afterwards, and the
+        // message queue enables on settle rather than being lost.
+        const worker = new Worker("~/tests/esmEntryTlaWorker.mjs");
+        worker.onmessage = function (msg) {
+            expect(msg.data).toBe("tla-entry:ok:ping");
+            worker.terminate();
+            done();
+        };
+        worker.postMessage("ping");
+    });
+
     it("keeps worker->parent messages ordered", function (done) {
         const worker = new Worker("./eventLoopEchoWorker.js");
         const received = [];

@@ -214,6 +214,21 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
     ~BootEvalScope() { SetBootEvaluationActive(false); }
   } bootEvalScope;
 
+  // The app entry arrives as "./"; resolve it before deciding how to run it so
+  // an ES module entry takes the module path instead of being require()d. A
+  // required entry would evaluate under the strict policy, which refuses a
+  // top-level-await graph outright — so this is what makes `import`/`export`,
+  // and a TLA entry, legal in an app's main module. Resolved with the same
+  // function the boot backstop's probe uses, so the evaluated module and the
+  // probe agree on the registry key. A CommonJS entry keeps "./" and the
+  // global-require route it has always taken.
+  if (path == "./") {
+    std::string mainEntry = ResolveMainEntryFromPackageJson(RuntimeConfig.ApplicationPath);
+    if (IsESModule(mainEntry) || IsHttpModulePath(mainEntry)) {
+      path = mainEntry;
+    }
+  }
+
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   Local<Context> context = cache->GetContext();
   Local<Object> globalObject = context->Global();

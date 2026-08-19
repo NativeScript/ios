@@ -209,6 +209,18 @@ An entry whose top-level code reaches `UIApplicationMain` before its first
 `await` needs none of this: `Evaluate()` never returns, so no deadline ever
 arms.
 
+The bootstrap is not the only option: **an ES module main entry is supported
+directly**, top-level await included. When the app's `main` resolves to a
+`.mjs`, the entry is evaluated as a module rather than `require()`d — so
+`import`/`export` are legal there — under the boot evaluation options: a one
+second in-place yield that never throws, after which the boot backstop holds
+the process while the entry's evaluation promise is still pending, bounded at
+twice the module deadline. The trade-off is that the entry's own static imports
+resolve *before* its body runs, so anything the entry needs `configureLoader`
+to have configured must be reached through a dynamic `import()` after that
+call. The CommonJS bootstrap above avoids that constraint by being synchronous;
+pick whichever fits the app.
+
 Not implemented on either require: `require.resolve`, `require.cache`, and
 `require.main`. They are absent rather than throwing, so a feature check
 works; adding them is a spec change here first.
