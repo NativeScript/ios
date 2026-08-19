@@ -231,6 +231,12 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
 
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   Local<Context> context = cache->GetContext();
+  // The ES module branch compiles and links against isolate->GetCurrentContext(),
+  // and a caller that enters the isolate through a fresh Isolate::Scope
+  // (RunMainScript) has no current context: the one Runtime::Init entered was
+  // popped with Init's own scope. The require branch never needed this because
+  // Function::Call enters the context it is handed.
+  Context::Scope context_scope(context);
   Local<Object> globalObject = context->Global();
   bool isHttpModule = IsHttpModulePath(path);
   // Ensure global.__dirname is defined so ESM/CommonJS shims relying on it work.
