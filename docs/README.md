@@ -1,5 +1,11 @@
 # Runtime documentation
 
+- [Builtin modules](ns-builtin-modules.md) — the `ns:`/`node:` builtin-module
+  reference: resolution rules, `ns:util`/`ns:runtime`/`ns:module` and the
+  `node:` compatibility shims, import maps and scopes, `createRequire` and the
+  pumping variant, the module-response (MIME) contract, and app-entry
+  bootstraps. The cross-runtime contract both iOS and Android implement.
+
 - [Performance API](performance.md) — WHATWG `performance` (hr-time, user
   timing, performance timeline with `PerformanceObserver`), per-isolate time
   origins for workers, the native clock hook that future `requestAnimationFrame`

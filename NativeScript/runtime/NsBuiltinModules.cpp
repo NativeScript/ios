@@ -23,7 +23,7 @@ struct Registration {
   BuiltinId builtin;
 };
 
-// The v1 registry (docs/ns-builtin-modules.md). One specifier, one source
+// The public registry (docs/ns-builtin-modules.md). One specifier, one source
 // file: a `node:` shim is its own builtin that requires the `ns:` module it
 // adapts, so the two module objects stay distinct and the standard module
 // never carries compatibility code.
