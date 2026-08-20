@@ -207,14 +207,6 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
 }
 
 void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
-  // Entry evaluation is this thread's boot window: while it is active, the
-  // yield inside synchronous HTTP fetches may pump the runloop (nothing else
-  // owns it yet). Balanced on every exit path.
-  struct BootEvalScope {
-    BootEvalScope() { SetBootEvaluationActive(true); }
-    ~BootEvalScope() { SetBootEvaluationActive(false); }
-  } bootEvalScope;
-
   // The app entry arrives as "./"; resolve it before deciding how to run it so
   // an ES module entry takes the module path instead of being require()d. A
   // required entry would evaluate under the strict policy, which refuses a

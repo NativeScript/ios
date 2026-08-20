@@ -121,19 +121,6 @@ bool IsRemoteUrlAllowed(const std::string& url) {
 // ─────────────────────────────────────────────────────────────
 // Boot-evaluation flag
 //
-// Nonzero while this thread is evaluating an entry module (main or worker) —
-// the only window in which HttpFetchModule's yield may pump the runloop:
-// during entry evaluation nothing else owns the runloop yet, while pumping
-// mid-app would re-enter arbitrary user code under a synchronous fetch.
-// Armed by ModuleInternal::RunModule; thread-local because the fetch and its
-// entry evaluation always share a thread, so a worker booting never arms the
-// main thread's pump. The runtime derives this itself — no client signal.
-static thread_local int t_bootEvaluationDepth = 0;
-
-void SetBootEvaluationActive(bool active) { t_bootEvaluationDepth += active ? 1 : -1; }
-
-static inline bool IsBootEvaluationActive() { return t_bootEvaluationDepth > 0; }
-
 // ─────────────────────────────────────────────────────────────
 // HTTP loader helpers
 
@@ -318,12 +305,6 @@ static void ClearCacheBustForKey(const std::string& canonicalKey) {
 static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& canonicalKey,
                                      std::string& out, std::string& contentType, int& status,
                                      bool* outBustRequested = nullptr);
-static void MaybePumpJSThreadDuringBoot();
-// Forward decl: the pluggable HTTP-fetch yield hook is defined below
-// MaybePumpJSThreadDuringBoot (which is its default callback), but HttpFetchModule
-// calls it from earlier in the file. See the definition for the rationale on
-// the atomic indirection.
-static inline void InvokeHttpFetchYield();
 
 // synchronous-fetch timing histogram.
 //
@@ -537,9 +518,6 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
               (unsigned long)result.body.size(), (unsigned long long)netMs);
   }
 
-  // Yield to the placeholder heartbeat after the sync fetch so a cold-boot
-  // progress UI still repaints between modules.
-  InvokeHttpFetchYield();
   return true;
 }
 
@@ -882,66 +860,5 @@ void FetchModuleBodyAsync(const std::string& url, const std::string& canonicalKe
 
 // Cold-boot JS-thread runloop pump.
 //
-// Synchronous `HttpFetchModule` calls during V8's static-import walk park
-// the JS thread inside `+sendSynchronousRequest:`, starving the
-// `setInterval` heartbeat that drives the placeholder progress bar.
-// Between fetches we run one short CFRunLoop slice in default mode so
-// any due `CFRunLoopTimer` (the heartbeat) fires once before we return.
-// Microtask checkpoints bracket the slice to flush V8 promise queues
-// either side of the timer callback. v8::Locker is recursive, so nested
-// acquisition by the timer callback is safe.
-//
-// Gated to JS-thread + entry-evaluation only:
-//   - `Runtime::GetCurrentRuntime()` is thread_local; null on GCD
-//     background threads, so they never pump someone else's runloop.
-//   - `IsBootEvaluationActive()` limits pumping to the window in which
-//     ModuleInternal::RunModule is evaluating this thread's entry module —
-//     HMR-time fetches must not pay the pump cost, and pumping mid-app would
-//     re-enter user code under a synchronous fetch.
-//   - The runloop identity check survives any future change that
-//     decouples the runtime's captured runloop from the current thread.
-static void MaybePumpJSThreadDuringBoot() {
-  Runtime* runtime = Runtime::GetCurrentRuntime();
-  if (runtime == nullptr) return;
-  if (!IsBootEvaluationActive()) return;
-
-  v8::Isolate* isolate = runtime->GetIsolate();
-  if (isolate == nullptr) return;
-
-  CFRunLoopRef rl = runtime->RuntimeLoop();
-  if (rl == nullptr || rl != CFRunLoopGetCurrent()) return;
-
-  isolate->PerformMicrotaskCheckpoint();
-  @autoreleasepool {
-    // 1ms slice: long enough to cover the placeholder's 250ms-cadence
-    // heartbeat when overdue, short enough that ~200 boot fetches add
-    // <200ms of pump overhead total.
-    NSRunLoop* runLoop = [NSRunLoop currentRunLoop];
-    NSDate* sliceDeadline = [NSDate dateWithTimeIntervalSinceNow:0.001];
-    [runLoop runMode:NSDefaultRunLoopMode beforeDate:sliceDeadline];
-  }
-  isolate->PerformMicrotaskCheckpoint();
-}
-
-// Pluggable "yield to caller" hook used by HttpFetchModule. The default
-// implementation pumps the JS thread runloop during dev-session cold boot
-// (see MaybePumpJSThreadDuringBoot for the gating rationale). Hosts can
-// override or null it out via RegisterHttpFetchYield to keep HTTP fetches
-// fully synchronous without any UI concerns leaking in.
-//
-// NOTE: function-pointer atomics are guaranteed lock-free on iOS for
-// pointer-sized targets, so this carries no extra lock cost on the hot
-// path. Read uses memory_order_acquire so callers see the pointer
-// installed via memory_order_release in `RegisterHttpFetchYield`.
-static std::atomic<void (*)()> g_httpFetchYield{&MaybePumpJSThreadDuringBoot};
-
-void RegisterHttpFetchYield(void (*callback)()) {
-  g_httpFetchYield.store(callback, std::memory_order_release);
-}
-
-static inline void InvokeHttpFetchYield() {
-  auto cb = g_httpFetchYield.load(std::memory_order_acquire);
-  if (cb != nullptr) cb();
-}
 
 }  // namespace tns

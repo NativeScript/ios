@@ -106,18 +106,6 @@ void FetchModuleBodyAsync(
     const std::string& url, const std::string& canonicalKey,
     std::function<void(ModuleFetchResult result)> completion);
 
-// Register a "yield" callback that `HttpFetchModule` should invoke around its
-// synchronous network turn so the caller can pump its own runloop (e.g. the
-// JS-thread runloop so a placeholder UI can repaint during cold-boot).
-//
-// Default: a built-in pump that no-ops outside the JS thread / after the
-// dev boot completes (see `MaybePumpJSThreadDuringBoot` in HttpLoader.mm).
-//
-// Pass `nullptr` to disable any yielding (used by hosts that drive their own
-// run loop or by tests that want bit-for-bit deterministic fetch timing).
-// Safe to call from any thread; reads use acquire/release ordering.
-void RegisterHttpFetchYield(void (*callback)());
-
 // Mark a URL set (canonicalized internally) so that the NEXT network
 // fetch of each URL carries a unique `__ns_dev_nonce` query parameter,
 // guaranteeing CFNetwork cannot satisfy the request from any HTTP cache
@@ -131,12 +119,6 @@ void RegisterHttpFetchYield(void (*callback)());
 // and is consulted from background fetch threads, which must never
 // canonicalize (that reads per-isolate vocabulary).
 void MarkKeysForCacheBust(const std::vector<std::string>& canonicalKeys);
-
-// Arm/disarm this thread's boot-evaluation window: while nonzero, the yield
-// inside synchronous HTTP fetches may pump the JS thread's runloop (safe
-// only while the entry module is evaluating — nothing else owns the runloop
-// yet). Balanced RAII-style by ModuleInternal::RunModule.
-void SetBootEvaluationActive(bool active);
 
 // ─────────────────────────────────────────────────────────────
 // Remote-module security gate
