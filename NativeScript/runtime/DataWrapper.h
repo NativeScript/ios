@@ -536,6 +536,12 @@ class WorkerWrapper : public BaseDataWrapper {
   void Start(std::shared_ptr<v8::Persistent<v8::Value>> poWorker,
              std::function<v8::Isolate*()> func, int qualityOfService = -1);
   void CallOnErrorHandlers(v8::TryCatch& tc);
+  // Reports a rejected entry-evaluation promise. A rejection carries a reason
+  // rather than a TryCatch, so it cannot go through CallOnErrorHandlers, but it
+  // follows the same web order: the worker scope's `onerror` first, then — only
+  // if that did not handle it — the parent's Worker error event.
+  void ReportEntryEvaluationRejection(v8::Local<v8::Context> context,
+                                      v8::Local<v8::Value> reason);
   void PassUncaughtExceptionFromWorkerToMain(v8::Local<v8::Context> context,
                                              v8::TryCatch& tc,
                                              bool async = true);

@@ -52,6 +52,11 @@ class Runtime {
   // fall off main() yet.
   EntryEvaluationState PollMainEntryEvaluation(std::string* rejectionReason);
 
+  // Whether V8 has been asked to terminate execution on this isolate, entering
+  // it the same way PollMainEntryEvaluation does. The boot pump asks so it can
+  // stop waiting on work that can no longer make progress.
+  bool IsExecutionTerminating();
+
   static void Initialize();
 
   static Runtime* GetCurrentRuntime() { return currentRuntime_; }

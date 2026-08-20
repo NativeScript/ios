@@ -294,6 +294,49 @@ void WorkerWrapper::CallOnErrorHandlers(TryCatch& tc) {
   }
 }
 
+void WorkerWrapper::ReportEntryEvaluationRejection(Local<Context> context, Local<Value> reason) {
+  if (this->isTerminating_) {
+    return;
+  }
+  Isolate* isolate = this->workerIsolate_;
+  Local<Object> global = context->Global();
+
+  Local<Value> onErrorVal;
+  if (global->Get(context, tns::ToV8String(isolate, "onerror")).ToLocal(&onErrorVal) &&
+      !onErrorVal.IsEmpty() && onErrorVal->IsFunction()) {
+    Local<Value> args[1] = {reason};
+    Local<Value> result;
+    TryCatch innerTc(isolate);
+    bool called = onErrorVal.As<v8::Function>()
+                      ->Call(context, v8::Undefined(isolate), 1, args)
+                      .ToLocal(&result);
+    if (called && !result.IsEmpty() && result->BooleanValue(isolate)) {
+      // Truthy return means handled, which is where the web stops propagation.
+      return;
+    }
+    if (!called && innerTc.HasCaught()) {
+      // The handler itself threw; that error is what the parent should see.
+      this->PassUncaughtExceptionFromWorkerToMain(context, innerTc);
+      return;
+    }
+  }
+
+  // Unhandled at the worker scope, so it becomes the parent's error event.
+  std::string message = tns::ToString(isolate, reason);
+  std::string stackTrace;
+  std::string source;
+  int lineNumber = 0;
+  if (!reason.IsEmpty() && reason->IsObject()) {
+    Local<Object> reasonObj = reason.As<Object>();
+    Local<Value> stackVal;
+    if (reasonObj->Get(context, tns::ToV8String(isolate, "stack")).ToLocal(&stackVal) &&
+        !stackVal->IsUndefined()) {
+      stackTrace = tns::ToString(isolate, stackVal);
+    }
+  }
+  this->PassUncaughtExceptionFromWorkerToMain(message, source, stackTrace, lineNumber, true);
+}
+
 void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Local<Context> context, TryCatch& tc,
                                                           bool async) {
   Isolate* workerIsolate = v8::Isolate::GetCurrent();

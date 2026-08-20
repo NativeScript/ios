@@ -388,6 +388,37 @@ describe("HTTP ESM Loader", function() {
                 worker.postMessage("ns-worker-leaf");
             });
 
+            // import() resolves through the same cascade as a static import.
+            // It used to resolve twice — once here with the referrer, once more
+            // inside the walk pre-pass with none — and the scope-less second
+            // pass is the one that decided the walk root.
+            it("resolves a dynamic import through the referrer's scope", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                var insideScope = __dirname + "/esm/scoped/inside/";
+                var scopes = {};
+                scopes[insideScope] = { "ns-scoped-leaf": origin + "/esm/graph-leaf.mjs?k=dyn" };
+                setMap({
+                    imports: { "ns-scoped-leaf": origin + "/esm/graph-leaf.mjs?k=top" },
+                    scopes: scopes,
+                });
+
+                import("~/tests/esm/scoped/inside/dynamic.mjs").then(function (mod) {
+                    return mod.loadLeaf();
+                }).then(function (name) {
+                    // The scope wins over the top-level entry for this referrer.
+                    expect(name).toBe("dyn");
+                    done();
+                }).catch(function (error) {
+                    expect("rejected: " + formatError(error)).toBe("resolved");
+                    done();
+                });
+            });
+
             it("resolves through the scope cascade for every referrer", function (done) {
                 var origin = getHostOrigin();
                 if (!origin) {

@@ -372,6 +372,69 @@ describe("event loop workers", function () {
         worker.postMessage("ping");
     });
 
+    // A rejected entry-evaluation promise is the worker's own uncaught error.
+    // Both promise outcomes used to share one handler, which marked the
+    // rejection handled and swallowed it: neither the worker's own onerror nor
+    // the parent's error event ever saw a failing top-level-await entry.
+    it("reports a rejecting ES module worker entry to both error hops", function (done) {
+        const worker = new Worker("~/tests/esmEntryRejectingWorker.mjs");
+        const seen = [];
+
+        worker.onmessage = function (msg) {
+            // The worker-scope hop, reported from inside the worker.
+            seen.push(msg.data);
+        };
+        worker.onerror = function (e) {
+            // The parent hop, reached because the worker's handler declined it.
+            const message = String((e && e.message) || e);
+            expect(seen.length).toBe(1);
+            expect(seen[0]).toBe("worker-onerror:entry-rejected");
+            expect(message.indexOf("entry-rejected") >= 0 ? "names the reason" : message)
+                .toBe("names the reason");
+            worker.terminate();
+            done();
+        };
+    });
+
+    it("stops at the worker scope when its handler claims the error", function (done) {
+        const worker = new Worker("~/tests/esmEntryRejectingHandledWorker.mjs");
+        let parentSawError = false;
+
+        worker.onerror = function () {
+            parentSawError = true;
+        };
+        worker.onmessage = function (msg) {
+            expect(msg.data).toBe("handled:entry-rejected-handled");
+            // Give the parent hop a turn it must not take: a truthy return from
+            // the worker's handler stops propagation, as it does on the web.
+            __ns__setTimeout(function () {
+                expect(parentSawError).toBe(false);
+                worker.terminate();
+                done();
+            }, 200);
+        };
+    });
+
+    // The runtime used to prepend six declaration lines to a worker .mjs entry,
+    // which collided with an entry declaring its own `const self` and shifted
+    // every stack line number by six.
+    it("runs an ES module worker entry that declares its own const self", function (done) {
+        const worker = new Worker("~/tests/esmEntrySelfDeclWorker.mjs");
+        worker.onerror = function (e) {
+            expect("worker error: " + String((e && e.message) || e)).toBe("no worker error");
+            worker.terminate();
+            done();
+        };
+        worker.onmessage = function (msg) {
+            // The throwing function sits on line 8 of the fixture; a preamble
+            // would report 14.
+            expect(msg.data).toBe("own-self:8");
+            worker.terminate();
+            done();
+        };
+        worker.postMessage("go");
+    });
+
     it("keeps worker->parent messages ordered", function (done) {
         const worker = new Worker("./eventLoopEchoWorker.js");
         const received = [];

@@ -68,8 +68,15 @@ std::unique_ptr<Runtime> runtime_;
   if (entryPending || tns::HasPendingAsyncModuleGraphWork()) {
     const CFAbsoluteTime deadline =
         CFAbsoluteTimeGetCurrent() + 2 * tns::kModuleEvaluateDeadlineSeconds;
+    bool terminated = false;
     while ((entryPending || tns::HasPendingAsyncModuleGraphWork()) &&
            CFAbsoluteTimeGetCurrent() < deadline) {
+      // Nothing pending can still complete once execution is terminating, so
+      // waiting out the remaining backstop would only delay the report.
+      if (runtime_->IsExecutionTerminating()) {
+        terminated = true;
+        break;
+      }
       CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, true);
       tns::Tasks::Drain();
 
@@ -88,7 +95,9 @@ std::unique_ptr<Runtime> runtime_;
     // A settled entry that never called UIApplicationMain is a script-style
     // app finishing normally; only the two failures below are fatal, and both
     // are reported in every build.
-    if (entryRejected) {
+    if (terminated) {
+      Log(@"Fatal: boot ended with execution terminating before the main entry settled");
+    } else if (entryRejected) {
       Log(@"Fatal: the main entry module's evaluation rejected during boot: %s",
           entryRejectionReason.c_str());
     } else if (entryPending) {

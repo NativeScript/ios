@@ -509,6 +509,16 @@ EntryEvaluationState Runtime::PollMainEntryEvaluation(std::string* rejectionReas
   return ModuleInternal::PollEntryEvaluation(isolate, entryPath, rejectionReason);
 }
 
+bool Runtime::IsExecutionTerminating() {
+  Isolate* isolate = this->GetIsolate();
+  if (isolate == nullptr) {
+    return false;
+  }
+  v8::Locker locker(isolate);
+  Isolate::Scope isolate_scope(isolate);
+  return isolate->IsExecutionTerminating();
+}
+
 void Runtime::RunScript(const std::string script) {
   Isolate* isolate = this->GetIsolate();
   v8::Locker locker(isolate);

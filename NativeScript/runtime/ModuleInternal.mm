@@ -341,10 +341,20 @@ void ModuleInternal::CreateRequireCallback(const FunctionCallbackInfo<Value>& in
   ModuleEvaluationOptions options = RequireEvaluationOptions(
       pumping ? ModuleEvaluationPolicy::kSyncPumping : ModuleEvaluationPolicy::kSyncStrict);
 
-  // ns-module.js has already validated these and passes undefined for anything
-  // the caller left out, so each present value simply overrides its default.
+  // ns-module.js validates these at mint time and passes undefined for
+  // anything the caller left out, so each present value simply overrides its
+  // default. The numeric one is re-checked here regardless: this binding is a
+  // boundary of its own, and a NaN or infinite deadline makes every deadline
+  // comparison in the pump false, which is an unbounded pump rather than a
+  // long one.
   if (info.Length() > 2 && info[2]->IsNumber()) {
-    options.deadlineSeconds = info[2].As<v8::Number>()->Value();
+    const double deadlineSeconds = info[2].As<v8::Number>()->Value();
+    if (!std::isfinite(deadlineSeconds) || deadlineSeconds <= 0) {
+      isolate->ThrowException(Exception::TypeError(tns::ToV8String(
+          isolate, "createRequire: 'deadlineSeconds' must be a positive finite number")));
+      return;
+    }
+    options.deadlineSeconds = deadlineSeconds;
   }
   if (info.Length() > 3 && info[3]->IsBoolean()) {
     options.timeoutBehavior = info[3]->BooleanValue(isolate)
@@ -502,6 +512,12 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
       Local<Object> exports;
       if (NapiModules::GetExports(context, specifier).ToLocal(&exports)) {
         info.GetReturnValue().Set(exports);
+      } else if (!isolate->HasPendingException()) {
+        // The addon is registered but failed to initialize. Returning
+        // undefined would hand the caller a module-shaped hole to trip over
+        // later; the failure belongs at the require() call.
+        isolate->ThrowException(Exception::Error(
+            tns::ToV8String(isolate, "Failed to initialize Node-API module '" + specifier + "'")));
       }
       return;
     }
@@ -620,60 +636,26 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
       }
     }
   } catch (NativeScriptException& ex) {
-    // Add context about the require call
-    std::string contextMsg = "Error in require() call:";
-    contextMsg += "\n  Requested module: '" + moduleName + "'";
-    contextMsg += "\n  Called from: " + callingModuleDirName;
-    if (fullPath != nil) {
-      contextMsg += "\n  Resolved path: " + std::string([fullPath UTF8String]);
-    }
-
-    // Add JavaScript stack trace to show who called require
-    Local<StackTrace> stackTrace =
-        StackTrace::CurrentStackTrace(isolate, 10, StackTrace::StackTraceOptions::kDetailed);
-    std::string jsStackTrace = "";
-    if (!stackTrace.IsEmpty()) {
-      for (int i = 0; i < stackTrace->GetFrameCount(); i++) {
-        Local<StackFrame> frame = stackTrace->GetFrame(isolate, i);
-        Local<v8::String> scriptName = frame->GetScriptName();
-        Local<v8::String> functionName = frame->GetFunctionName();
-        int lineNumber = frame->GetLineNumber();
-        int columnNumber = frame->GetColumn();
-
-        jsStackTrace += "\n    at ";
-        std::string funcName = tns::ToString(isolate, functionName);
-        std::string scriptNameStr = tns::ToString(isolate, scriptName);
-
-        if (!funcName.empty()) {
-          jsStackTrace += funcName + " (";
-        } else {
-          jsStackTrace += "<anonymous> (";
-        }
-        jsStackTrace += scriptNameStr + ":" + std::to_string(lineNumber) + ":" +
-                        std::to_string(columnNumber) + ")";
-      }
-    }
-
-    contextMsg += "\n\nJavaScript stack trace:" + jsStackTrace;
-    contextMsg += "\n\nOriginal error:\n" + ex.getMessage();
-
-    // Include original stack trace if available
-    if (!ex.getStackTrace().empty()) {
-      contextMsg += "\n\nOriginal stack trace:\n" + ex.getStackTrace();
-    }
-
-    NativeScriptException contextEx(isolate, contextMsg, "Error");
-    contextEx.ReThrowToV8(isolate);
+    // Rethrown as-is. Wrapping it in a fresh Error erased the original's class
+    // and identity, so `catch (e) { e instanceof TypeError }` — and any
+    // reference comparison against a module's own exported error — silently
+    // stopped working for anything thrown through a require().
+    TNS_DEBUG(Esm, "[require][fail] module=%s from=%s resolved=%s: %s", moduleName.c_str(),
+              callingModuleDirName.c_str(),
+              fullPath != nil ? [fullPath UTF8String] : "<unresolved>", ex.getMessage().c_str());
+    ex.ReThrowToV8(isolate);
   }
 }
 
 Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const std::string& moduleName,
                                        const std::string& baseDir, bool& isData,
                                        const ModuleEvaluationOptions& options) {
-  size_t lastIndex = moduleName.find_last_of(".");
-  std::string moduleNameWithoutExtension =
-      (lastIndex == std::string::npos) ? moduleName : moduleName.substr(0, lastIndex);
-  std::string cacheKey = baseDir + "*" + moduleNameWithoutExtension;
+  // The specifier goes into the key verbatim. Stripping its extension made
+  // './config.js' and './config.json' the same key, so whichever loaded first
+  // answered for both. Specifier spellings that differ but resolve to one file
+  // ('./x' and './x.js') still share a module: they meet again at the
+  // resolved-path lookup below, which is the identity that matters.
+  std::string cacheKey = baseDir + "*" + moduleName;
   auto it = this->loadedModules_.find(cacheKey);
 
   if (it != this->loadedModules_.end()) {
@@ -1277,8 +1259,13 @@ static void LogEsmPhase(const std::string& canonicalPath, const char* phase, con
   }
 
   if (!tc.HasCaught()) {
-    Local<Value> reason = promise->Result();
-    isolate->ThrowException(reason);
+    // Result() is only meaningful on a settled promise; on anything else it is
+    // an empty handle, and ThrowException does not accept one.
+    Local<Value> reason =
+        promise->State() == Promise::kRejected ? promise->Result() : Local<Value>();
+    if (!reason.IsEmpty()) {
+      isolate->ThrowException(reason);
+    }
   }
   throw NativeScriptException(isolate, tc, "Module evaluation promise rejected");
 }
@@ -1404,6 +1391,16 @@ MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context
   // evaluation promise is already settled when Evaluate() returns, so it
   // exits here without paying for a runloop slice.
   while (!promiseTc.HasCaught()) {
+    // worker.terminate() cannot settle this promise, so without this the loop
+    // spins to its full deadline and only then reports a timeout. Message-only
+    // exception: building a V8 error on a terminating isolate is not allowed.
+    if (isolate->IsExecutionTerminating()) {
+      LogEsmPhase(canonicalPath, "evaluate", "terminated");
+      RemoveModuleFromRegistry(isolate, canonicalPath);
+      throw NativeScriptException("Module evaluation interrupted by isolate termination: " +
+                                  canonicalPath);
+    }
+
     Promise::PromiseState state = promise->State();
     if (state != Promise::kPending) {
       settled = true;
@@ -1686,30 +1683,14 @@ v8::Local<v8::String> ModuleInternal::WrapModuleContent(v8::Isolate* isolate,
   // in a function expression would turn those top-level keywords into syntax
   // errors (e.g. `export *` → "Unexpected token '*'").
 
-  // Check if we're in a worker context
-  std::shared_ptr<Caches> cache = Caches::Get(isolate);
-  bool isWorkerContext = cache && cache->isWorker;
-
   // Check if this is an .mjs file but NOT a .mjs.map file
   if (IsESModule(path)) {
-    // Read raw text without wrapping.
-    std::string sourceText = tns::ReadText(path);
-
-    // For ES modules in worker context, we need to provide access to global objects
-    // since ES modules run in their own scope
-    if (isWorkerContext) {
-      // Prepend global declarations to make worker globals available in ES module scope
-      std::string globalDeclarations = "const self = globalThis.self || globalThis;\n"
-                                       "const postMessage = globalThis.postMessage;\n"
-                                       "const close = globalThis.close;\n"
-                                       "const importScripts = globalThis.importScripts;\n"
-                                       "const console = globalThis.console;\n"
-                                       "\n";
-
-      sourceText = globalDeclarations + sourceText;
-    }
-
-    return tns::ToV8String(isolate, sourceText);
+    // Read raw text without wrapping. A worker entry needs no preamble: module
+    // scope nests inside global scope, so `self`, `postMessage`, `close`,
+    // `importScripts` and `console` already resolve to the worker globals.
+    // Declaring them instead shifted every stack line number by the length of
+    // the preamble and made an entry with its own `const self` a SyntaxError.
+    return tns::ToV8String(isolate, tns::ReadText(path));
   }
 
   // Check if this is the main application bundle (webpack-style IIFE)

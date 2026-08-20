@@ -316,7 +316,8 @@ static void ClearCacheBustForKey(const std::string& canonicalKey) {
 // Forward declarations — these helpers are defined below their first use,
 // matching the existing convention in this file.
 static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& canonicalKey,
-                                     std::string& out, std::string& contentType, int& status);
+                                     std::string& out, std::string& contentType, int& status,
+                                     bool* outBustRequested = nullptr);
 static void MaybePumpJSThreadDuringBoot();
 // Forward decl: the pluggable HTTP-fetch yield hook is defined below
 // MaybePumpJSThreadDuringBoot (which is its default callback), but HttpFetchModule
@@ -494,7 +495,9 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
   std::string body;
   std::string contentType;
   int status = 0;
-  bool transportOk = PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status);
+  bool bustRequested = false;
+  bool transportOk =
+      PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status, &bustRequested);
   if (!transportOk) {
     // One retry, and only for a transport error: an HTTP status is an answer,
     // not a failure to communicate, so asking again would just repeat it.
@@ -508,6 +511,14 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
   // boot is a real failure, not a startup race — surface it immediately.
 
   ClassifyModuleResponse(url, transportOk, status, contentType, body, result);
+
+  // The mark is spent only once a response classifies as a usable module. A
+  // 2xx alone is not enough: an SPA fallback answering 200 text/html would
+  // otherwise consume the eviction nonce and leave the next fetch cacheable.
+  // Same rule as the async path.
+  if (result.ok && bustRequested) {
+    ClearCacheBustForKey(canonicalKey);
+  }
 
   if (!result.ok) {
     TNS_DEBUG(Esm, "[http-loader][fetch-sync][reject] %s", result.failureReason.c_str());
@@ -649,10 +660,12 @@ static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url,
 }
 
 static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& canonicalKey,
-                                     std::string& out, std::string& contentType, int& status) {
+                                     std::string& out, std::string& contentType, int& status,
+                                     bool* outBustRequested) {
   @autoreleasepool {
     bool bustRequested = false;
     NSMutableURLRequest* request = BuildModuleFetchRequest(url, canonicalKey, &bustRequested);
+    if (outBustRequested) *outBustRequested = bustRequested;
     if (!request) {
       status = 0;
       return false;
@@ -737,13 +750,6 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
       return false;
     }
     out.swap(bodyLocal);
-    // A fresh body arrived from origin — the bust request (if any) has
-    // been satisfied. Clear the mark so steady-state re-fetches of the
-    // same URL don't keep paying the nonce (and stay exact-match for
-    // routes that require it).
-    if (bustRequested && httpStatusLocal >= 200 && httpStatusLocal < 300) {
-      ClearCacheBustForKey(canonicalKey);
-    }
     return true;
   }
 }
