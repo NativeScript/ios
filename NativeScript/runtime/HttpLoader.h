@@ -58,6 +58,14 @@ struct CanonicalizationConfig {
 // module under exactly one URL and never varies it for freshness.
 std::string CanonicalizeHttpUrlKey(const std::string& url);
 
+// Repairs `http:/host` (one slash) back to `http://host`. Upstream path joins
+// collapse the double slash, and every key derivation has to undo it BEFORE it
+// tests the scheme — otherwise the collapsed form fails the test, is passed
+// through verbatim, and the same module ends up with two registry identities:
+// one from the resolver (which repairs) and one from whatever came in through
+// invalidateModules or a cache-bust mark (which did not).
+std::string RepairCollapsedUrlScheme(const std::string& url);
+
 // What a module response turned out to be. Decided once, by the shared
 // classifier, for whichever transport produced the response.
 enum class ModuleResponseKind {

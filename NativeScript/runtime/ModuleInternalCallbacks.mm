@@ -558,10 +558,15 @@ static bool ShouldTraceRegistryKey(const std::string& rawKey, const std::string&
   return StartsWith(registryKey, "node:") || StartsWith(registryKey, "blob:");
 }
 
-static std::string CanonicalizeRegistryKey(const std::string& key) {
-  if (key.empty()) {
-    return key;
+static std::string CanonicalizeRegistryKey(const std::string& rawKey) {
+  if (rawKey.empty()) {
+    return rawKey;
   }
+
+  // Before any scheme test: a collapsed `http:/host` would otherwise fail the
+  // http tests below, fall through as a custom scheme, and give the module a
+  // second identity that never matches the resolver's.
+  const std::string key = RepairCollapsedUrlScheme(rawKey);
 
   std::string registryKey;
   const char* classification = "path";
@@ -1151,14 +1156,10 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
     return result;
   }
 
-  std::string spec = rawSpec;
   // Repair 'http:/host' (single slash) left by upstream path joins, so the URL
-  // takes the HTTP path instead of becoming '/app/http:/host'.
-  if (spec.rfind("http:/", 0) == 0 && spec.rfind("http://", 0) != 0) {
-    spec.insert(5, "/");
-  } else if (spec.rfind("https:/", 0) == 0 && spec.rfind("https://", 0) != 0) {
-    spec.insert(6, "/");
-  }
+  // takes the HTTP path instead of becoming '/app/http:/host'. Shared with the
+  // key derivations, so the resolver and the registry agree on one identity.
+  std::string spec = RepairCollapsedUrlScheme(rawSpec);
 
   TNS_DEBUG(Esm, "[resolver][spec] %s", spec.c_str());
 
@@ -1738,7 +1739,10 @@ bool RunModuleGraphLoadPumped(v8::Isolate* isolate, v8::Local<v8::Context> conte
   while (!*done && CFAbsoluteTimeGetCurrent() < deadline) {
     // No fetch completion can be delivered once execution is terminating, so
     // the remaining budget would be spent waiting for work that cannot arrive.
-    if (isolate->IsExecutionTerminating()) {
+    // The requested-flag is consulted too: V8 surfaces a termination only once
+    // it has materialized it, which takes JS this wait may never run.
+    if (isolate->IsExecutionTerminating() ||
+        (runtime != nullptr && runtime->IsTerminationRequested())) {
       TNS_DEBUG(Esm, "[graph][pumped] execution terminating, abandoning wait for %s", root.c_str());
       return false;
     }
@@ -3270,70 +3274,6 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       }
     }
 
-    // Special handling for bundler chunks: check if this is a bundler chunk and install it
-    v8::Local<v8::Value> namespaceObj = module->GetModuleNamespace();
-    if (namespaceObj->IsObject()) {
-      v8::Local<v8::Object> nsObj = namespaceObj.As<v8::Object>();
-
-      // Check if this is a webpack chunk (has __webpack_ids__ export)
-      v8::Local<v8::String> webpackIdsKey = tns::ToV8String(isolate, "__webpack_ids__");
-      v8::Local<v8::Value> webpackIds;
-      if (nsObj->Get(context, webpackIdsKey).ToLocal(&webpackIds) && !webpackIds->IsUndefined()) {
-        TNS_DEBUG(Esm, "[dyn-import] Detected webpack chunk %s", [specStr UTF8String]);
-        // This is a webpack chunk, get the webpack runtime from the runtime module
-        try {
-          // Import the runtime module to get __webpack_require__
-          // For import assertions, we need to pass an empty FixedArray
-          // Use the empty fixed array from the isolate's roots
-          v8::Local<v8::FixedArray> empty_assertions = v8::Local<v8::FixedArray>();
-          v8::MaybeLocal<v8::Module> maybeRuntimeModule =
-              ResolveModuleCallback(context, tns::ToV8String(isolate, "file:///app/runtime.mjs"),
-                                    empty_assertions, v8::Local<v8::Module>());
-
-          v8::Local<v8::Module> runtimeModule;
-          if (maybeRuntimeModule.ToLocal(&runtimeModule)) {
-            v8::Local<v8::Value> runtimeNamespace = runtimeModule->GetModuleNamespace();
-            if (runtimeNamespace->IsObject()) {
-              v8::Local<v8::Object> runtimeObj = runtimeNamespace.As<v8::Object>();
-              v8::Local<v8::String> defaultKey = tns::ToV8String(isolate, "default");
-              v8::Local<v8::Value> webpackRequire;
-
-              if (runtimeObj->Get(context, defaultKey).ToLocal(&webpackRequire) &&
-                  webpackRequire->IsObject()) {
-                TNS_DEBUG(Esm, "[dyn-import] Found runtime module default export");
-                v8::Local<v8::String> installKey = tns::ToV8String(isolate, "C");
-                v8::Local<v8::Value> installFn;
-                if (webpackRequire.As<v8::Object>()->Get(context, installKey).ToLocal(&installFn) &&
-                    installFn->IsFunction()) {
-                  TNS_DEBUG(Esm, "[dyn-import] Calling webpack installChunk function");
-                  // Call webpack's installChunk function with the module namespace
-                  v8::Local<v8::Value> args[] = {namespaceObj};
-                  v8::Local<v8::Value> result;
-                  if (!installFn.As<v8::Function>()
-                           ->Call(context, v8::Undefined(isolate), 1, args)
-                           .ToLocal(&result)) {
-                    // If the call fails, we can ignore it since this is just a helper for webpack
-                    // chunks
-                    TNS_DEBUG(Esm, "[dyn-import] ✗ webpack installChunk call failed");
-                  } else {
-                    TNS_DEBUG(Esm, "[dyn-import] ✓ webpack installChunk call succeeded");
-                  }
-                } else {
-                  TNS_DEBUG(Esm, "[dyn-import] ✗ webpack installChunk function not found");
-                }
-              } else {
-                TNS_DEBUG(Esm, "[dyn-import] ✗ runtime module default export not found");
-              }
-            }
-          } else {
-            TNS_DEBUG(Esm, "[dyn-import] ✗ runtime module not found");
-          }
-        } catch (...) {
-          TNS_DEBUG(Esm, "[dyn-import] ✗ exception while accessing runtime module");
-        }
-      }
-    }
-
     // Final verify before resolving for non-HTTP paths too.
     v8::Local<v8::Value> nsFinal = module->GetModuleNamespace();
     if (nsFinal->IsObject()) {
@@ -3518,24 +3458,20 @@ void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     if (importMapVal->IsString()) {
       jsonStr = tns::ToString(isolate, importMapVal);
     } else if (importMapVal->IsObject()) {
-      v8::Local<v8::Value> jsonVal;
-      v8::Local<v8::Value> stringifyVal;
-      if (!ctx->Global()->Get(ctx, tns::ToV8String(isolate, "JSON")).ToLocal(&jsonVal) ||
-          !jsonVal->IsObject() ||
-          !jsonVal.As<v8::Object>()
-               ->Get(ctx, tns::ToV8String(isolate, "stringify"))
-               .ToLocal(&stringifyVal) ||
-          !stringifyVal->IsFunction()) {
+      // v8::JSON::Stringify, not the global JSON.stringify: the loader must
+      // read the map the caller passed, and an app that has replaced or
+      // patched the global would otherwise decide what the runtime resolves
+      // through. The C++ entry point cannot be reached from JS at all.
+      v8::Local<v8::String> serialized;
+      v8::TryCatch stringifyTc(isolate);
+      if (!v8::JSON::Stringify(ctx, importMapVal).ToLocal(&serialized)) {
+        // A throwing `toJSON` or accessor on the caller's object is the
+        // caller's error: it propagates as thrown rather than being reported
+        // as a malformed import map.
+        stringifyTc.ReThrow();
         return;
       }
-      v8::Local<v8::Value> args[] = {importMapVal};
-      v8::Local<v8::Value> result;
-      if (!stringifyVal.As<v8::Function>()->Call(ctx, jsonVal, 1, args).ToLocal(&result)) {
-        return;  // a throwing toJSON / getter propagates unchanged
-      }
-      if (result->IsString()) {
-        jsonStr = tns::ToString(isolate, result);
-      }
+      jsonStr = tns::ToString(isolate, serialized);
     }
     if (jsonStr.empty()) {
       throwTypeError("configureLoader: importMap must be an object or a JSON string");

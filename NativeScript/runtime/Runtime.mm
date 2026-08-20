@@ -133,9 +133,15 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
       dirname = modulePath;
     }
   } else {
-    size_t lastSlash = modulePath.find_last_of("/\\");
-    if (lastSlash != std::string::npos) {
-      dirname = modulePath.substr(0, lastSlash);
+    // Derived from the same base-stripped path `import.meta.url` reports, so
+    // the documented equivalence holds: dirname is
+    // `path.dirname(fileURLToPath(import.meta.url))`. Taking it from the raw
+    // path instead reported a container-absolute directory for a module whose
+    // url said `file:///app/…`.
+    const std::string appRelative = tns::ReplaceAll(modulePath, RuntimeConfig.BaseDir, "");
+    size_t lastSlash = appRelative.find_last_of("/\\");
+    if (lastSlash != std::string::npos && lastSlash > 0) {
+      dirname = appRelative.substr(0, lastSlash);
     } else {
       dirname = "/app";  // fallback
     }
@@ -507,6 +513,22 @@ EntryEvaluationState Runtime::PollMainEntryEvaluation(std::string* rejectionReas
   // RunMainScript launches "./"; the promise lives under the resolved path.
   const std::string entryPath = ResolveMainEntryFromPackageJson(RuntimeConfig.ApplicationPath);
   return ModuleInternal::PollEntryEvaluation(isolate, entryPath, rejectionReason);
+}
+
+void Runtime::EvictMainEntry() {
+  Isolate* isolate = this->GetIsolate();
+  if (isolate == nullptr || this->moduleInternal_ == nullptr) {
+    return;
+  }
+  v8::Locker locker(isolate);
+  Isolate::Scope isolate_scope(isolate);
+  HandleScope handle_scope(isolate);
+  Local<Context> context = Caches::Get(isolate)->GetContext();
+  if (context.IsEmpty()) {
+    return;
+  }
+  Context::Scope context_scope(context);
+  RemoveModuleFromRegistry(isolate, ResolveMainEntryFromPackageJson(RuntimeConfig.ApplicationPath));
 }
 
 bool Runtime::IsExecutionTerminating() {

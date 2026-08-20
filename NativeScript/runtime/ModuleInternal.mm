@@ -975,7 +975,7 @@ Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::str
 
   // wrap & cache lookup
   Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
-  auto* cacheData = ModuleInternal::LoadScriptCache(canonicalPath);
+  auto* cacheData = ModuleInternal::LoadScriptCache(canonicalPath, ScriptCacheKind::kClassicScript);
 
   // note: is_module=false here
   Local<v8::String> urlString;
@@ -1029,7 +1029,7 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
   std::string url = "file://" + base;
 
   Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
-  auto* cacheData = ModuleInternal::LoadScriptCache(canonicalPath);
+  auto* cacheData = ModuleInternal::LoadScriptCache(canonicalPath, ScriptCacheKind::kEsModule);
 
   Local<v8::String> urlString;
   if (!v8::String::NewFromUtf8(isolate, url.c_str(), NewStringType::kNormal).ToLocal(&urlString)) {
@@ -1053,7 +1053,7 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
   if (cacheData == nullptr) {
     Local<UnboundModuleScript> unbound = module->GetUnboundModuleScript();
     auto* generatedCache = ScriptCompiler::CreateCodeCache(unbound);
-    ModuleInternal::SaveScriptCache(generatedCache, canonicalPath);
+    ModuleInternal::SaveScriptCache(generatedCache, canonicalPath, ScriptCacheKind::kEsModule);
   }
 
   return maybeMod;
@@ -1174,92 +1174,78 @@ static void LogEsmPhase(const std::string& canonicalPath, const char* phase, con
   RemoveModuleFromRegistry(isolate, canonicalPath);
   LogEsmPhase(canonicalPath, "evaluate", "promise-rejected");
 
-  if (RuntimeConfig.IsDebug) {
-    std::string errorTitle = "Uncaught JavaScript Exception";
-    std::string errorMessage = "Module evaluation promise rejected";
-    std::string stackTrace = "";
+  // Reason extraction runs in every build. A release build that can only say
+  // "a module evaluation rejected", without naming which module or why, is a
+  // release build that cannot be diagnosed; debug adds the modal and the
+  // verbose log on top of this, never a different message.
+  std::string errorMessage;
+  std::string stackTrace;
 
-    Local<Value> reason = promise->Result();
-    if (!reason.IsEmpty()) {
-      Local<Context> context = isolate->GetCurrentContext();
-      if (reason->IsObject()) {
-        Local<Object> errorObj = reason.As<Object>();
+  Local<Value> reason = promise->State() == Promise::kRejected ? promise->Result() : Local<Value>();
+  if (!reason.IsEmpty()) {
+    Local<Context> context = isolate->GetCurrentContext();
+    if (reason->IsObject()) {
+      Local<Object> errorObj = reason.As<Object>();
 
-        auto messageKey = tns::ToV8String(isolate, "message");
-        Local<Value> messageVal;
-        if (errorObj->Get(context, messageKey).ToLocal(&messageVal) && messageVal->IsString()) {
-          v8::String::Utf8Value messageUtf8(isolate, messageVal);
-          if (*messageUtf8) errorMessage = std::string(*messageUtf8);
-        }
-
-        auto stackKey = tns::ToV8String(isolate, "stack");
-        Local<Value> stackVal;
-        if (errorObj->Get(context, stackKey).ToLocal(&stackVal) && stackVal->IsString()) {
-          v8::String::Utf8Value stackUtf8(isolate, stackVal);
-          if (*stackUtf8) {
-            stackTrace = std::string(*stackUtf8);
-            stackTrace = ReplaceAll(stackTrace, RuntimeConfig.BaseDir, "");
-          }
-        }
-      } else {
-        auto maybeReasonStr = reason->ToString(context);
-        if (!maybeReasonStr.IsEmpty()) {
-          v8::String::Utf8Value reasonUtf8(isolate, maybeReasonStr.ToLocalChecked());
-          if (*reasonUtf8) {
-            errorMessage = std::string(*reasonUtf8);
-          }
-        }
+      Local<Value> messageVal;
+      if (errorObj->Get(context, tns::ToV8String(isolate, "message")).ToLocal(&messageVal) &&
+          messageVal->IsString()) {
+        errorMessage = tns::ToString(isolate, messageVal);
       }
 
-      Log(@"NativeScript encountered a fatal error: %s", errorMessage.c_str());
-      if (!stackTrace.empty()) {
-        Log(@"JavaScript stack trace:\n%s", stackTrace.c_str());
+      Local<Value> stackVal;
+      if (errorObj->Get(context, tns::ToV8String(isolate, "stack")).ToLocal(&stackVal) &&
+          stackVal->IsString()) {
+        stackTrace = ReplaceAll(tns::ToString(isolate, stackVal), RuntimeConfig.BaseDir, "");
+      }
+    } else {
+      Local<v8::String> reasonStr;
+      if (reason->ToString(context).ToLocal(&reasonStr)) {
+        errorMessage = tns::ToString(isolate, reasonStr);
       }
     }
+  }
 
+  if (RuntimeConfig.IsDebug) {
+    const std::string displayMessage =
+        errorMessage.empty() ? "Module evaluation promise rejected" : errorMessage;
+    Log(@"NativeScript encountered a fatal error: %s", displayMessage.c_str());
+    if (!stackTrace.empty()) {
+      Log(@"JavaScript stack trace:\n%s", stackTrace.c_str());
+    }
     if (tc.HasCaught()) {
       tns::LogError(isolate, tc);
     }
-
     Log(@"***** End stack trace - Fix to continue *****");
 
-    if (stackTrace.empty()) {
-      stackTrace = tns::GetSmartStackTrace(isolate);
-    } else {
-      stackTrace = tns::RemapStackTraceIfAvailable(isolate, stackTrace);
-    }
-
+    std::string modalStack = stackTrace.empty()
+                                 ? tns::GetSmartStackTrace(isolate)
+                                 : tns::RemapStackTraceIfAvailable(isolate, stackTrace);
     if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
       std::string stackPreview =
-          stackTrace.size() > 240 ? stackTrace.substr(0, 240) + "…" : stackTrace;
+          modalStack.size() > 240 ? modalStack.substr(0, 240) + "…" : modalStack;
       TNS_DEBUG(Esm, "[evaluate][promise-rejected:detail] path=%s message=%s stack=%s",
-                canonicalPath.c_str(), errorMessage.c_str(), stackPreview.c_str());
+                canonicalPath.c_str(), displayMessage.c_str(), stackPreview.c_str());
     }
-
-    NativeScriptException::ShowErrorModal(isolate, errorTitle, errorMessage, stackTrace);
+    NativeScriptException::ShowErrorModal(isolate, "Uncaught JavaScript Exception", displayMessage,
+                                          modalStack);
     LogEsmPhase(canonicalPath, "evaluate", "promise-rejected-handled");
-
-    // The throw must carry the rejection detail so the boundary handlers
-    // (RunMainScript, worker onerror, the dev client) see the reason; debug
-    // adds the modal above, never recovery.
-    std::string detail = std::string("Module evaluation promise rejected: ") + canonicalPath;
-    if (!errorMessage.empty()) {
-      detail += " — ";
-      detail += errorMessage;
-    }
-    throw NativeScriptException(detail);
   }
 
-  if (!tc.HasCaught()) {
-    // Result() is only meaningful on a settled promise; on anything else it is
-    // an empty handle, and ThrowException does not accept one.
-    Local<Value> reason =
-        promise->State() == Promise::kRejected ? promise->Result() : Local<Value>();
-    if (!reason.IsEmpty()) {
-      isolate->ThrowException(reason);
-    }
+  // One failure, carrying both halves, in both builds. The spliced text names
+  // the module and the reason for boundaries that read a message; arming the
+  // original reason first means the exception also carries the actual JS error,
+  // so its class and its own properties survive to any boundary that re-arms it
+  // through ReThrowToV8. Choosing one or the other would lose a boundary.
+  std::string detail = "Module evaluation promise rejected: " + canonicalPath;
+  if (!errorMessage.empty()) {
+    detail += " — ";
+    detail += errorMessage;
   }
-  throw NativeScriptException(isolate, tc, "Module evaluation promise rejected");
+  if (!tc.HasCaught() && !reason.IsEmpty()) {
+    isolate->ThrowException(reason);
+  }
+  throw NativeScriptException(isolate, tc, detail);
 }
 
 MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context,
@@ -1384,9 +1370,13 @@ MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context
   // exits here without paying for a runloop slice.
   while (!promiseTc.HasCaught()) {
     // worker.terminate() cannot settle this promise, so without this the loop
-    // spins to its full deadline and only then reports a timeout. Message-only
-    // exception: building a V8 error on a terminating isolate is not allowed.
-    if (isolate->IsExecutionTerminating()) {
+    // spins to its full deadline and only then reports a timeout. Both signals
+    // are consulted: V8 only reports a termination it has already materialized,
+    // which needs JS to run, and a graph parked on a promise nothing settles
+    // never gives it any. Message-only exception: building a V8 error on a
+    // terminating isolate is not allowed.
+    if (isolate->IsExecutionTerminating() ||
+        (runtime != nullptr && runtime->IsTerminationRequested())) {
       LogEsmPhase(canonicalPath, "evaluate", "terminated");
       RemoveModuleFromRegistry(isolate, canonicalPath);
       throw NativeScriptException("Module evaluation interrupted by isolate termination: " +
@@ -1867,14 +1857,20 @@ std::string ModuleInternal::ResolvePathFromPackageJson(const std::string& packag
   return std::string([[basePath stringByAppendingPathExtension:@"js"] UTF8String]);
 }
 
-ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& path) {
+// The blob-kind suffix. `.cache` stays the classic-script name so an existing
+// installed cache keeps working; module blobs take a name of their own.
+static const char* ScriptCacheSuffix(bool isModule) { return isModule ? ".mcache" : ".cache"; }
+
+ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& path,
+                                                            ScriptCacheKind kind) {
   std::string canonicalPath = NormalizePath(path);
   if (RuntimeConfig.IsDebug) {
     return nullptr;
   }
 
   long length = 0;
-  std::string cachePath = ModuleInternal::GetCacheFileName(canonicalPath + ".cache");
+  std::string cachePath = ModuleInternal::GetCacheFileName(
+      canonicalPath + ScriptCacheSuffix(kind == ScriptCacheKind::kEsModule));
 
   struct stat result;
   if (stat(cachePath.c_str(), &result) == 0) {
@@ -1901,9 +1897,10 @@ ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& p
 }
 
 void ModuleInternal::SaveScriptCache(const ScriptCompiler::CachedData* cache,
-                                     const std::string& path) {
+                                     const std::string& path, ScriptCacheKind kind) {
   std::string canonicalPath = NormalizePath(path);
-  std::string cachePath = ModuleInternal::GetCacheFileName(canonicalPath + ".cache");
+  std::string cachePath = ModuleInternal::GetCacheFileName(
+      canonicalPath + ScriptCacheSuffix(kind == ScriptCacheKind::kEsModule));
 
   // std::ofstream ofs(cachePath, std::ios::binary);
   // if (!ofs) return;  // or throw
@@ -1940,7 +1937,9 @@ void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::stri
   ScriptCompiler::CachedData* cachedData = ScriptCompiler::CreateCodeCache(unboundScript);
 
   int length = cachedData->length;
-  std::string cachePath = ModuleInternal::GetCacheFileName(canonicalPath + ".cache");
+  // Always a classic script: this overload takes a v8::Script.
+  std::string cachePath =
+      ModuleInternal::GetCacheFileName(canonicalPath + ScriptCacheSuffix(false));
   tns::WriteBinary(cachePath, cachedData->data, length);
   delete cachedData;
 

@@ -127,14 +127,30 @@ bool IsRemoteUrlAllowed(const std::string& url) {
 // URLs touched before the client configures anything (the local trampoline's
 // clean `/ns/core/*` imports) carry no query, so they canonicalize identically
 // under any vocabulary.
+std::string RepairCollapsedUrlScheme(const std::string& url) {
+  if (StartsWith(url, "http:/") && !StartsWith(url, "http://")) {
+    std::string repaired = url;
+    repaired.insert(5, "/");
+    return repaired;
+  }
+  if (StartsWith(url, "https:/") && !StartsWith(url, "https://")) {
+    std::string repaired = url;
+    repaired.insert(6, "/");
+    return repaired;
+  }
+  return url;
+}
+
 std::string CanonicalizeHttpUrlKey(const std::string& url) {
   // Per-isolate vocabulary, so this runs on the isolate's own thread. Fetch
   // threads never reach here — they carry keys computed for them.
   const CanonicalizationConfig* canonConfig = CanonicalizationConfigForCurrentIsolate();
   // Some loaders wrap HTTP module URLs as file://http(s)://...
-  std::string normalizedUrl = url;
+  // Repaired before any scheme test, so a collapsed `http:/host` keys the same
+  // as the URL it means rather than passing through untouched.
+  std::string normalizedUrl = RepairCollapsedUrlScheme(url);
   if (StartsWith(normalizedUrl, "file://http://") || StartsWith(normalizedUrl, "file://https://")) {
-    normalizedUrl = normalizedUrl.substr(strlen("file://"));
+    normalizedUrl = RepairCollapsedUrlScheme(normalizedUrl.substr(strlen("file://")));
   }
   if (!(StartsWith(normalizedUrl, "http://") || StartsWith(normalizedUrl, "https://"))) {
     return normalizedUrl;
@@ -788,54 +804,87 @@ static void PerformModuleFetchAsyncAttempt(
     NSURLSessionDataTask* task = [ModuleFetchSession()
         dataTaskWithRequest:request
           completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
-            int status = 0;
-            std::string contentType;
-            if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
-              NSHTTPURLResponse* httpResp = (NSHTTPURLResponse*)response;
-              status = (int)[httpResp statusCode];
-              NSString* ct = [httpResp allHeaderFields][@"Content-Type"];
-              if (ct) {
-                const char* utf8 = [ct UTF8String];
-                if (utf8) contentType = std::string(utf8);
+            // NSURLSession invokes this block, so a C++ exception leaving it is
+            // an std::terminate rather than a failure anyone can report. Nothing
+            // here runs JS — the compile is posted to the isolate's own thread —
+            // so an escape could only come from an allocation failure, but the
+            // containment is structural on purpose: the graph load must hear
+            // back exactly once or it waits out its entire deadline.
+            bool retrying = false;
+            ModuleFetchResult result;
+            try {
+              int status = 0;
+              std::string contentType;
+              if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
+                NSHTTPURLResponse* httpResp = (NSHTTPURLResponse*)response;
+                status = (int)[httpResp statusCode];
+                NSString* ct = [httpResp allHeaderFields][@"Content-Type"];
+                if (ct) {
+                  const char* utf8 = [ct UTF8String];
+                  if (utf8) contentType = std::string(utf8);
+                }
               }
-            }
-            std::string body;
-            if (data && [data length] > 0) {
-              body.assign(static_cast<const char*>([data bytes]),
-                          static_cast<size_t>([data length]));
+              std::string body;
+              if (data && [data length] > 0) {
+                body.assign(static_cast<const char*>([data bytes]),
+                            static_cast<size_t>([data length]));
+              }
+
+              // Transport error → one retry, the same single-retry policy the
+              // sync path applies, without blocking any thread.
+              if (error != nil && attempt == 0) {
+                TNS_DEBUG(Esm, "[http-loader][fetch-async] retrying %s after transport error: %s",
+                          urlCopy.c_str(),
+                          (error.localizedDescription ?: @"<no description>").UTF8String);
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(120 * NSEC_PER_MSEC)),
+                               dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+                                 // Background thread: the carried key is the
+                                 // only way this attempt can consult the bust set.
+                                 PerformModuleFetchAsyncAttempt(urlCopy, keyCopy, 1,
+                                                                completionHeap);
+                               });
+                // Set only once the retry is actually queued: it now owns the
+                // completion, and this attempt must not settle it too.
+                retrying = true;
+              } else {
+                ClassifyModuleResponse(urlCopy, error == nil, status, contentType, body, result);
+
+                if (result.ok && bust) {
+                  ClearCacheBustForKey(keyCopy);
+                }
+                if (!result.ok) {
+                  TNS_DEBUG(Esm, "[http-loader][fetch-async][reject] attempt=%d %s", attempt,
+                            result.failureReason.c_str());
+                } else if (tns::LogCategoryEnabled(tns::LogCategory::Fetch)) {
+                  const uint64_t endUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+                  const uint64_t ms = endUs > startUs ? (endUs - startUs) / 1000ull : 0ull;
+                  TNS_DEBUG(Fetch, "[http-loader][fetch][async] %s bytes=%lu ms=%llu",
+                            urlCopy.c_str(), (unsigned long)result.body.size(),
+                            (unsigned long long)ms);
+                }
+              }
+            } catch (...) {
+              if (retrying) {
+                // The retry owns the completion and will settle it; nothing to
+                // report from here.
+                return;
+              }
+              result = ModuleFetchResult();
+              result.failureReason =
+                  "HTTP import failed: " + urlCopy + " (internal error handling the response)";
             }
 
-            // Transport error → one retry, the same single-retry policy the
-            // sync path applies, without blocking any thread.
-            if (error != nil && attempt == 0) {
-              TNS_DEBUG(Esm, "[http-loader][fetch-async] retrying %s after transport error: %s",
-                        urlCopy.c_str(),
-                        (error.localizedDescription ?: @"<no description>").UTF8String);
-              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(120 * NSEC_PER_MSEC)),
-                             dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-                               // Background thread: the carried key is the
-                               // only way this attempt can consult the bust set.
-                               PerformModuleFetchAsyncAttempt(urlCopy, keyCopy, 1, completionHeap);
-                             });
+            if (retrying) {
               return;
             }
-
-            ModuleFetchResult result;
-            ClassifyModuleResponse(urlCopy, error == nil, status, contentType, body, result);
-
-            if (result.ok && bust) {
-              ClearCacheBustForKey(keyCopy);
+            // Guarded for the same reason: the completion posts to the
+            // isolate's loop, and a throw on the way out would cross the
+            // ObjC boundary instead of failing the load.
+            try {
+              (*completionHeap)(std::move(result));
+            } catch (...) {
+              Log(@"NativeScript: module fetch completion threw for %s", urlCopy.c_str());
             }
-            if (!result.ok) {
-              TNS_DEBUG(Esm, "[http-loader][fetch-async][reject] attempt=%d %s", attempt,
-                        result.failureReason.c_str());
-            } else if (tns::LogCategoryEnabled(tns::LogCategory::Fetch)) {
-              const uint64_t endUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
-              const uint64_t ms = endUs > startUs ? (endUs - startUs) / 1000ull : 0ull;
-              TNS_DEBUG(Fetch, "[http-loader][fetch][async] %s bytes=%lu ms=%llu", urlCopy.c_str(),
-                        (unsigned long)result.body.size(), (unsigned long long)ms);
-            }
-            (*completionHeap)(std::move(result));
             delete completionHeap;
           }];
     [task resume];

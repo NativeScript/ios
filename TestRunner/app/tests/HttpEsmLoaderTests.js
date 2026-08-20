@@ -1132,6 +1132,17 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
                      "https://cdn.example.com/lib.js?token=abc");
         });
 
+        // Upstream path joins collapse `http://` to `http:/`. Every key
+        // derivation repairs that before it tests the scheme, so a key that
+        // arrives collapsed — through invalidateModules or a cache-bust mark —
+        // lands on the same identity the resolver produces.
+        it("repairs a collapsed scheme to one identity", function () {
+            checkKey("http:/h/ns/core", "http://h/ns/core");
+            checkKey("https:/h/ns/core", "https://h/ns/core");
+            // Already well-formed keys are untouched by the repair.
+            checkKey("http://h/ns/core", "http://h/ns/core");
+        });
+
         it("treats module identity as literally the URL — no path-tag collapses", function () {
             checkKey("http://h/ns/m/foo.js", "http://h/ns/m/foo.js");
             checkKey("http://h/ns/rt", "http://h/ns/rt");

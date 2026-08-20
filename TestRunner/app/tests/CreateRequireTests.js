@@ -256,6 +256,54 @@ describe("createRequire", function () {
                 }, 0);
             });
 
+            // Entered from a main-queue block, not from a timer callback: JS
+            // timers ride ONE shared CFRunLoopTimer, and a CFRunLoopTimer does
+            // not re-enter, so a require started from inside that timer's own
+            // callback can never let another timer fire no matter how the loop
+            // is pumped. From a runloop block the timer is free to fire, which
+            // is what makes this a test of pumpRunLoop rather than of
+            // re-entrancy.
+            function onFreshTask(fn) {
+                NSOperationQueue.mainQueue.addOperationWithBlock(fn);
+            }
+
+            // A timer token cannot be delivered by the nestable-task drain (it
+            // rides the ordered lane), so this settles only through the runloop
+            // slice that pumpRunLoop opts into.
+            it("settles a top-level await parked on a JS timer when pumpRunLoop is set",
+               function (done) {
+                onFreshTask(function () {
+                    var req = nsModule.createPumpingRequire(fixtureDir + "/anything.js", {
+                        pumpRunLoop: true,
+                        deadlineSeconds: 3,
+                    });
+                    var result = "";
+                    try {
+                        result = String(req("./timer-tla.mjs").value);
+                    } catch (e) {
+                        result = "threw: " + ((e && e.message) || e);
+                    }
+                    expect(result).toBe("timer-ok");
+                    done();
+                });
+            });
+
+            // Contract: the default pump runs engine tasks and microtasks only,
+            // so without pumpRunLoop the same timer-parked graph must reach its
+            // deadline instead of settling. Its own fixture, because a module
+            // the other spec already settled would come back from the registry
+            // without any pumping at all.
+            it("does not run JS timers under the default pump options", function (done) {
+                onFreshTask(function () {
+                    var req = nsModule.createPumpingRequire(fixtureDir + "/anything.js", {
+                        deadlineSeconds: 0.5,
+                    });
+                    expect(messageOf(function () { req("./timer-tla-gated.mjs"); }))
+                        .toContain("Top-level await timed out for ES module");
+                    done();
+                });
+            });
+
             it("keeps the microtask guard unconditional even with pumpRunLoop", function (done) {
                 var req = nsModule.createPumpingRequire(fixtureDir + "/anything.js", {
                     pumpRunLoop: true,

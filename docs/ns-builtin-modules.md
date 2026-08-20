@@ -71,7 +71,7 @@ inspect(tree, { depth: 4 }); // "{ a: { b: { c: { d: 1 } } } }"
 // Cycles are rendered, not thrown on.
 const cyclic = { name: "root" };
 cyclic.self = cyclic;
-inspect(cyclic); // "{ name: 'root', self: [Circular] }"
+inspect(cyclic); // '{ name: "root", self: [Circular] }'
 
 format("%s took %dms", "boot", 12.5); // "boot took 12.5ms"
 format("%j", { ok: true }); // '{"ok":true}'
@@ -198,7 +198,7 @@ apply, worker teardown) belongs to whatever tooling drives it.
 |---|---|
 | `configureLoader(config)` | Installs loader policy for the calling isolate. Sections: `importMap` (`imports` + `scopes`), `volatilePatterns` (URL substrings always re-fetched), `canonicalization` (registry-keying vocabulary). Each **present** section replaces its state wholesale, an empty array included. Throws `TypeError` on any malformed input, having validated the whole config first, so a rejected call installs nothing. |
 | `invalidateModules(urls)` | Evicts the given URLs (canonicalized) from the module registry and marks them bust-next-fetch, so the next network fetch bypasses every HTTP cache layer. Takes an array of strings; throws `TypeError` otherwise. |
-| `getLoadedModuleUrls()` | The URL-like keys currently in the module registry, as an array of strings (used to compute full-reload eviction sets). |
+| `getLoadedModuleUrls()` | The **URL-like** keys currently in the module registry, as an array of strings (used to compute full-reload eviction sets). A key qualifies when it starts with `blob:` or contains `://` — plain filesystem paths are deliberately excluded, because a reload computes its eviction set from what a server can re-serve. |
 | `createRequire(filenameOrURL)` | A `require` resolving against `filenameOrURL`'s directory (a trailing slash names the directory itself). Accepts an absolute path string, a `file:` URL string, or a URL object; anything else throws `TypeError`, and an `http(s)` base is refused outright because `require()` of a dev-served module is not supported — import those. ES module graphs load under Node's `require(esm)` rule: a graph containing top-level await is refused before it evaluates. |
 | `createPumpingRequire(filenameOrURL, options?)` | Same argument contract and same resolution, but an ES module graph with top-level await is evaluated by driving the loop until it settles, instead of being refused. **Callable only from a task context.** See [Pumping requires](#pumping-requires). |
 
@@ -364,6 +364,13 @@ configureLoader({
   },
 });
 ```
+
+The three are not independent: **`preserveQueryFor` is consulted first**, and a
+path matching it returns with its query intact, so `forPathPrefixes` and
+`stripParams` never see it. A path that survives that check is normalized only
+when it also matches `forPathPrefixes`; anything else keeps its query
+unchanged. Ordering it the other way would let a cache-buster name listed in
+`stripParams` erase a query that *is* the module's identity.
 
 Presence of the `canonicalization` object marks the vocabulary as configured
 and replaces the built-in fallback entirely; empty arrays are honored as
@@ -639,6 +646,12 @@ stack, so a top-level await parked on anything else could never settle in
 place; returning instead of throwing is the Node shape. Should the entry's
 evaluation promise still be pending when the yield ends, a **boot backstop**
 holds the process until it settles, **bounded at twice the module deadline**.
+
+Two outcomes are fatal, in every build: the entry's evaluation **rejects**, or
+the backstop's bound expires with it **still pending**. Both evict the entry
+from the module registry before failing — a half-evaluated entry must not be
+reachable by a later import — and then throw rather than returning into an app
+whose entry never ran.
 
 The trade-off: an ES module entry's own **static** imports resolve *before* its
 body runs, so anything that needs `configureLoader` to have run must be reached

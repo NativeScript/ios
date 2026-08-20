@@ -193,6 +193,18 @@ void WorkerWrapper::Terminate() {
   bool wasTerminating = this->isTerminating_.exchange(true);
   if (!wasTerminating) {
     if (this->workerIsolate_ != nullptr) {
+      // Flagged before the request so a pump that is between iterations sees
+      // it on its next check, rather than only once V8 has some JS to
+      // interrupt — which a parked graph never provides.
+      //
+      // NOTE: `workerIsolate_` is assigned only after the worker's ENTRY has
+      // finished evaluating, so a worker still parked in its entry is not
+      // reachable from here at all and terminate() does nothing for it. That
+      // is a pre-existing worker-lifecycle gap, not something this flag can
+      // close — see the follow-up filed for it.
+      if (Runtime* workerRuntime = Runtime::GetRuntime(this->workerIsolate_)) {
+        workerRuntime->RequestTermination();
+      }
       this->workerIsolate_->TerminateExecution();
     }
     {
