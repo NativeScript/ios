@@ -195,9 +195,12 @@ StructInfo FFICall::GetStructInfo(size_t fieldsCount, const TypeEncoding* fieldE
         structName = ss.str();
     }
 
-    auto it = structInfosCache_.find(structName);
-    if (it != structInfosCache_.end()) {
+    {
+      SpinLock lock(structInfosCacheMutex_);
+      auto it = structInfosCache_.find(structName);
+      if (it != structInfosCache_.end()) {
         return it->second;
+      }
     }
 
     std::vector<StructField> fields;
@@ -271,16 +274,22 @@ StructInfo FFICall::GetStructInfo(size_t fieldsCount, const TypeEncoding* fieldE
 
     StructInfo structInfo(structName, ffiType, fields);
 
-    structInfosCache_.emplace(structName, structInfo);
-
-    return structInfo;
+    // The lock cannot be held while building: nested struct fields recurse
+    // through GetArgumentType back into GetStructInfo. Concurrent builders are
+    // therefore possible; the first emplace wins and everyone returns the
+    // cached entry (the loser's ffi_type allocations are abandoned).
+    SpinLock lock(structInfosCacheMutex_);
+    return structInfosCache_.emplace(structName, structInfo).first->second;
 }
 
 ParametrizedCall* ParametrizedCall::Get(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount) {
+  {
+    SpinLock lock(callsCacheMutex_);
     auto it = callsCache_.find(typeEncoding);
     if (it != callsCache_.end()) {
-        return it->second;
+      return it->second;
     }
+  }
 
     const ffi_type** parameterTypesFFITypes = new const ffi_type*[argsCount]();
     ffi_type* returnType = FFICall::GetArgumentType(typeEncoding);
@@ -300,12 +309,16 @@ ParametrizedCall* ParametrizedCall::Get(const TypeEncoding* typeEncoding, const 
     tns::Assert(status == FFI_OK);
 
     ParametrizedCall* call = new ParametrizedCall(cif);
-    callsCache_.emplace(typeEncoding, call);
 
-    return call;
+    // Built without the lock held (ffi_prep_cif and the type walk are too slow
+    // for a spinlock section). On a lost race the first entry wins and the
+    // loser's call/cif are abandoned.
+    SpinLock lock(callsCacheMutex_);
+    return callsCache_.emplace(typeEncoding, call).first->second;
 }
 
 robin_hood::unordered_map<const TypeEncoding*, ParametrizedCall*> ParametrizedCall::callsCache_;
+SpinMutex ParametrizedCall::callsCacheMutex_;
 robin_hood::unordered_map<std::string, StructInfo> FFICall::structInfosCache_;
-
+SpinMutex FFICall::structInfosCacheMutex_;
 }

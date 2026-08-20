@@ -2,6 +2,8 @@
 #include <Foundation/Foundation.h>
 #include <dlfcn.h>
 #include <os/log.h>
+#include <mutex>
+#include "UnfairLock.h"
 
 namespace tns {
 
@@ -77,14 +79,21 @@ SymbolLoader& SymbolLoader::instance() {
   return loader;
 }
 
+// Guards _cache. The resolvers themselves stay usable outside the lock: they
+// are heap-allocated, owned by the map, and never erased.
+static UnfairMutex cacheMutex;
+
 SymbolResolver* SymbolLoader::resolveModule(const ModuleMeta* module) {
   if (!module) {
     return nullptr;
   }
 
-  auto it = this->_cache.find(module);
-  if (it != this->_cache.end()) {
-    return it->second.get();
+  {
+    std::lock_guard<UnfairMutex> lock(cacheMutex);
+    auto it = this->_cache.find(module);
+    if (it != this->_cache.end()) {
+      return it->second.get();
+    }
   }
 
   std::unique_ptr<SymbolResolver> resolver;
@@ -125,6 +134,10 @@ SymbolResolver* SymbolLoader::resolveModule(const ModuleMeta* module) {
     }
   }
 
+  // The lock is not held across CFBundleCreate/dlopen above — dlopen runs
+  // image initializers that could call back into the loader. On a lost race
+  // the first cached resolver wins and the duplicate is destroyed.
+  std::lock_guard<UnfairMutex> lock(cacheMutex);
   return this->_cache.emplace(module, std::move(resolver)).first->second.get();
 }
 

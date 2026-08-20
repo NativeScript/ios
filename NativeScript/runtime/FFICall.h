@@ -69,6 +69,7 @@ class ParametrizedCall {
  private:
   static robin_hood::unordered_map<const TypeEncoding*, ParametrizedCall*>
       callsCache_;
+  static SpinMutex callsCacheMutex_;
 };
 
 class FFICall : public BaseCall {
@@ -118,6 +119,7 @@ class FFICall : public BaseCall {
 
  private:
   static robin_hood::unordered_map<std::string, StructInfo> structInfosCache_;
+  static SpinMutex structInfosCacheMutex_;
   void** argsArray_;
   bool useDynamicBuffer_;
   uint8_t staticBuffer[512];

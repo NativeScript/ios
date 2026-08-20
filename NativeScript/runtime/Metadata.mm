@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include "Helpers.h"
 #include "SymbolLoader.h"
+#include "UnfairLock.h"
 
 namespace tns {
 
@@ -87,16 +88,29 @@ bool MethodMeta::isImplementedInClass(Class klass, bool isStatic) const {
     //   2. The message is forwarded to another object. E.g. `UITextField` forwards
     //      `autocapitalizationType` to an instance of `UITextInputTraits`
     static robin_hood::unordered_map<Class, id> sampleInstances;
+    // The lock is never held across [klass alloc]: alloc can trigger
+    // +initialize, which may run arbitrary code that re-enters this method.
+    static UnfairMutex sampleInstancesMutex;
 
-    auto it = sampleInstances.find(klass);
-    if (it == sampleInstances.end()) {
+    id sampleInstance = nil;
+    bool cached = false;
+    {
+      std::lock_guard<UnfairMutex> lock(sampleInstancesMutex);
+      auto it = sampleInstances.find(klass);
+      if (it != sampleInstances.end()) {
+        sampleInstance = it->second;
+        cached = true;
+      }
+    }
+    if (!cached) {
       @try {
-        it = sampleInstances.emplace(klass, [klass alloc]).first;
+        id instance = [klass alloc];
+        std::lock_guard<UnfairMutex> lock(sampleInstancesMutex);
+        sampleInstance = sampleInstances.emplace(klass, instance).first->second;
       } @catch (id err) {
         return false;
       }
     }
-    id sampleInstance = it->second;
     return [sampleInstance respondsToSelector:this->selector()];
   }
 }
