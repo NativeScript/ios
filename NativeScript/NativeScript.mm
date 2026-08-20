@@ -5,6 +5,7 @@
 #include "runtime/Helpers.h"
 #include "runtime/ModuleInternal.h"
 #include "runtime/ModuleInternalCallbacks.h"
+#include "runtime/NativeScriptException.h"
 #include "runtime/Runtime.h"
 #include "runtime/RuntimeConfig.h"
 #include "runtime/Tasks.h"
@@ -68,8 +69,24 @@ std::unique_ptr<Runtime> runtime_;
   if (entryPending || tns::HasPendingAsyncModuleGraphWork()) {
     const CFAbsoluteTime deadline =
         CFAbsoluteTimeGetCurrent() + 2 * tns::kModuleEvaluateDeadlineSeconds;
-    while ((entryPending || tns::HasPendingAsyncModuleGraphWork()) &&
-           CFAbsoluteTimeGetCurrent() < deadline) {
+    bool terminated = false;
+    for (;;) {
+      // Termination outranks everything, including an entry that settled in the
+      // same slice: boot must report the terminating fatal rather than take the
+      // normal exit and carry on into an app on a stopping isolate. Nothing
+      // pending can complete after this point either. Both signals: V8 reports
+      // only a materialized termination, which needs JS to run, and an entry
+      // parked on a promise nothing settles never runs any.
+      if (runtime_->IsExecutionTerminating() || runtime_->IsTerminationRequested()) {
+        terminated = true;
+        break;
+      }
+      if (!(entryPending || tns::HasPendingAsyncModuleGraphWork())) {
+        break;
+      }
+      if (CFAbsoluteTimeGetCurrent() >= deadline) {
+        break;
+      }
       CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, true);
       tns::Tasks::Drain();
 
@@ -85,15 +102,27 @@ std::unique_ptr<Runtime> runtime_;
     }
     tns::Tasks::Drain();
 
-    // A settled entry that never called UIApplicationMain is a script-style
-    // app finishing normally; only the two failures below are fatal, and both
-    // are reported in every build.
-    if (entryRejected) {
-      Log(@"Fatal: the main entry module's evaluation rejected during boot: %s",
-          entryRejectionReason.c_str());
+    // A settled entry that never called UIApplicationMain is a script-style app
+    // finishing normally. The failures below are fatal in every build: each one
+    // evicts the entry first, so nothing can later import the half-evaluated
+    // module the failure left behind, and then throws rather than logging and
+    // returning into an app whose entry never ran.
+    std::string fatal;
+    if (terminated) {
+      fatal = "boot ended with execution terminating before the main entry settled";
+    } else if (entryRejected) {
+      fatal = "the main entry module's evaluation rejected during boot: " + entryRejectionReason;
     } else if (entryPending) {
-      Log(@"Fatal: main entry never settled and UIApplicationMain was never reached within %.0fs",
-          2 * tns::kModuleEvaluateDeadlineSeconds);
+      char within[64];
+      snprintf(within, sizeof(within), "%.0fs", 2 * tns::kModuleEvaluateDeadlineSeconds);
+      fatal = std::string("main entry never settled and UIApplicationMain was never reached "
+                          "within ") +
+              within;
+    }
+    if (!fatal.empty()) {
+      runtime_->EvictMainEntry();
+      Log(@"Fatal: %s", fatal.c_str());
+      throw tns::NativeScriptException("Fatal: " + fatal);
     }
   }
 }

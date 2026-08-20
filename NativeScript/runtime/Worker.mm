@@ -246,9 +246,9 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
         if (!ModuleInternal::PendingEntryEvaluation(isolate, resolvedPath).ToLocal(&pendingEntry)) {
           worker->EnableMessageQueue();
         } else {
+          // Both handlers resolve the wrapper by id — never capture it across
+          // the settle; the worker may be gone by the time they run.
           auto enable = [](const FunctionCallbackInfo<Value>& info) {
-            // Resolve the wrapper by id — never capture it across the
-            // settle; the worker may be gone by the time this runs.
             bool found = false;
             int lookupId = info.Data().As<v8::Int32>()->Value();
             auto state = Caches::Workers->Get(lookupId, found);
@@ -259,10 +259,38 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
               }
             }
           };
-          Local<v8::Function> onSettled;
-          if (v8::Function::New(context, enable, v8::Integer::New(isolate, worker->WorkerId()))
-                  .ToLocal(&onSettled)) {
-            pendingEntry->Then(context, onSettled, onSettled).FromMaybe(Local<Promise>());
+          // A separate reject handler: sharing one handler across both
+          // outcomes marked the rejection handled, which swallowed a failing
+          // top-level-await entry entirely — neither the worker's own onerror
+          // nor the parent's error event ever saw it.
+          auto enableAndReport = [](const FunctionCallbackInfo<Value>& info) {
+            Isolate* iso = info.GetIsolate();
+            HandleScope hs(iso);
+            bool found = false;
+            int lookupId = info.Data().As<v8::Int32>()->Value();
+            auto state = Caches::Workers->Get(lookupId, found);
+            if (!found || state == nullptr) {
+              return;
+            }
+            WorkerWrapper* w = static_cast<WorkerWrapper*>(state->UserData());
+            if (w == nullptr) {
+              return;
+            }
+            w->EnableMessageQueue();
+            Local<Context> ctx = Caches::Get(iso)->GetContext();
+            Context::Scope ctxScope(ctx);
+            Local<Value> reason = info.Length() > 0
+                                      ? info[0]
+                                      : Local<Value>(v8::Exception::Error(tns::ToV8String(
+                                            iso, "Worker entry module evaluation rejected")));
+            w->ReportEntryEvaluationRejection(ctx, reason);
+          };
+          Local<v8::Function> onFulfilled;
+          Local<v8::Function> onRejected;
+          Local<v8::Integer> workerIdData = v8::Integer::New(isolate, worker->WorkerId());
+          if (v8::Function::New(context, enable, workerIdData).ToLocal(&onFulfilled) &&
+              v8::Function::New(context, enableAndReport, workerIdData).ToLocal(&onRejected)) {
+            pendingEntry->Then(context, onFulfilled, onRejected).FromMaybe(Local<Promise>());
           } else {
             worker->EnableMessageQueue();
           }

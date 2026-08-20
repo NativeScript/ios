@@ -134,12 +134,18 @@ class ModuleInternal {
                           const std::string& moduleName);
   std::string ResolvePathFromPackageJson(const std::string& packageJson,
                                          bool& error);
+  // A code-cache blob is either a script blob or a module blob, and V8 rejects
+  // the wrong kind outright. One file compiled both ways — require('./x.js')
+  // and import './x.js' — would otherwise share a blob and each load would
+  // reject and overwrite the other's, so the two kinds get their own suffix
+  // and the cache actually hits.
+  enum class ScriptCacheKind { kClassicScript, kEsModule };
   static v8::ScriptCompiler::CachedData* LoadScriptCache(
-      const std::string& path);
+      const std::string& path, ScriptCacheKind kind);
   static void SaveScriptCache(const v8::Local<v8::Script> script,
                               const std::string& path);
   static void SaveScriptCache(const v8::ScriptCompiler::CachedData* cache,
-                              const std::string& path);
+                              const std::string& path, ScriptCacheKind kind);
   static std::string GetCacheFileName(const std::string& path);
   v8::MaybeLocal<v8::Value> RunScriptString(v8::Isolate* isolate,
                                             v8::Local<v8::Context> context,

@@ -1,6 +1,8 @@
 #ifndef Runtime_h
 #define Runtime_h
 
+#include <atomic>
+
 #include "Caches.h"
 #include "Common.h"
 #include "EventLoop.h"
@@ -51,6 +53,34 @@ class Runtime {
   // boot backstop). Used by the boot handoff to decide whether the process may
   // fall off main() yet.
   EntryEvaluationState PollMainEntryEvaluation(std::string* rejectionReason);
+
+  // Whether V8 has been asked to terminate execution on this isolate, entering
+  // it the same way PollMainEntryEvaluation does. The boot pump asks so it can
+  // stop waiting on work that can no longer make progress.
+  bool IsExecutionTerminating();
+
+  // Whether termination has been *requested* for this runtime's isolate.
+  //
+  // v8::Isolate::IsExecutionTerminating only reports a termination that has
+  // already been materialized, which takes running JS to happen: a graph parked
+  // on a promise nothing will settle queues no microtasks and no tasks, so a
+  // pump waiting on it would never observe the terminate and would spend its
+  // entire deadline first. This flag is set on the requesting thread, before
+  // TerminateExecution, so the pumps can bail on the request itself.
+  //
+  // One-way on purpose: a worker never un-terminates, so there is no reset and
+  // no window in which a stale `true` could strand live work.
+  void RequestTermination() {
+    terminationRequested_.store(true, std::memory_order_relaxed);
+  }
+  bool IsTerminationRequested() const {
+    return terminationRequested_.load(std::memory_order_relaxed);
+  }
+
+  // Drops the main entry's module from the registry, entering the isolate the
+  // same way PollMainEntryEvaluation does. Boot calls it before reporting a
+  // fatal so a half-evaluated entry cannot be handed to a later import.
+  void EvictMainEntry();
 
   static void Initialize();
 
@@ -130,6 +160,7 @@ class Runtime {
   static void DrainRejectionsObserver(CFRunLoopObserverRef observer,
                                       CFRunLoopActivity activity, void* info);
   v8::Isolate* isolate_;
+  std::atomic<bool> terminationRequested_{false};
   napi_env napiEnv_ = nullptr;
   std::unique_ptr<ModuleInternal> moduleInternal_;
   int workerId_;

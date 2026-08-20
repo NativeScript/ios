@@ -121,33 +121,40 @@ bool IsRemoteUrlAllowed(const std::string& url) {
 // ─────────────────────────────────────────────────────────────
 // Boot-evaluation flag
 //
-// Nonzero while this thread is evaluating an entry module (main or worker) —
-// the only window in which HttpFetchModule's yield may pump the runloop:
-// during entry evaluation nothing else owns the runloop yet, while pumping
-// mid-app would re-enter arbitrary user code under a synchronous fetch.
-// Armed by ModuleInternal::RunModule; thread-local because the fetch and its
-// entry evaluation always share a thread, so a worker booting never arms the
-// main thread's pump. The runtime derives this itself — no client signal.
-static thread_local int t_bootEvaluationDepth = 0;
-
-void SetBootEvaluationActive(bool active) { t_bootEvaluationDepth += active ? 1 : -1; }
-
-static inline bool IsBootEvaluationActive() { return t_bootEvaluationDepth > 0; }
-
 // ─────────────────────────────────────────────────────────────
 // HTTP loader helpers
 
 // URLs touched before the client configures anything (the local trampoline's
 // clean `/ns/core/*` imports) carry no query, so they canonicalize identically
 // under any vocabulary.
+std::string RepairCollapsedUrlScheme(const std::string& url) {
+  if (StartsWith(url, "http:/") && !StartsWith(url, "http://")) {
+    std::string repaired = url;
+    repaired.insert(5, "/");
+    return repaired;
+  }
+  if (StartsWith(url, "https:/") && !StartsWith(url, "https://")) {
+    std::string repaired = url;
+    repaired.insert(6, "/");
+    return repaired;
+  }
+  return url;
+}
+
 std::string CanonicalizeHttpUrlKey(const std::string& url) {
   // Per-isolate vocabulary, so this runs on the isolate's own thread. Fetch
   // threads never reach here — they carry keys computed for them.
   const CanonicalizationConfig* canonConfig = CanonicalizationConfigForCurrentIsolate();
   // Some loaders wrap HTTP module URLs as file://http(s)://...
-  std::string normalizedUrl = url;
-  if (StartsWith(normalizedUrl, "file://http://") || StartsWith(normalizedUrl, "file://https://")) {
-    normalizedUrl = normalizedUrl.substr(strlen("file://"));
+  // Repaired before any scheme test, so a collapsed `http:/host` keys the same
+  // as the URL it means rather than passing through untouched.
+  std::string normalizedUrl = RepairCollapsedUrlScheme(url);
+  // The wrapper is tested on the one-slash forms as well: a path join can
+  // collapse the scheme INSIDE the wrapper (`file://http:/host/x`), which
+  // matches neither the two-slash unwrap nor the repair above (whose prefix is
+  // `file://`, not `http:/`) and would otherwise key as its own identity.
+  if (StartsWith(normalizedUrl, "file://http:/") || StartsWith(normalizedUrl, "file://https:/")) {
+    normalizedUrl = RepairCollapsedUrlScheme(normalizedUrl.substr(strlen("file://")));
   }
   if (!(StartsWith(normalizedUrl, "http://") || StartsWith(normalizedUrl, "https://"))) {
     return normalizedUrl;
@@ -263,31 +270,51 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
 // a URL it has never cached. The nonce is transport-only — it never
 // enters the module registry key (identity stays the canonical URL),
 // and the server and the registry never see a varied URL.
+//
+// Marks carry a generation rather than being plain set membership. A fetch
+// records the generation it observed and clears only that one, so an
+// invalidation raised while a fetch was already in flight survives that
+// fetch's completion instead of being erased by it — which would have left the
+// next fetch with no nonce and CFNetwork free to serve the body the
+// invalidation was raised to discard.
+//
+// Generation 0 is reserved for "not marked", so a captured 0 clears nothing.
 static std::mutex g_bustNextFetchMutex;
-static robin_hood::unordered_set<std::string> g_bustNextFetchKeys;
+static robin_hood::unordered_map<std::string, uint64_t> g_bustNextFetchKeys;
+static uint64_t g_bustNextFetchGeneration = 0;
 
 void MarkKeysForCacheBust(const std::vector<std::string>& canonicalKeys) {
   if (canonicalKeys.empty()) return;
   std::lock_guard<std::mutex> lock(g_bustNextFetchMutex);
+  const uint64_t generation = ++g_bustNextFetchGeneration;
   for (const auto& key : canonicalKeys) {
     if (key.empty()) continue;
     if (!(StartsWith(key, "http://") || StartsWith(key, "https://"))) continue;
-    g_bustNextFetchKeys.insert(key);
+    // Assigned, not inserted: re-marking an already-marked key has to move it
+    // to the new generation, or the in-flight fetch would clear it.
+    g_bustNextFetchKeys[key] = generation;
   }
 }
 
-// Peek (do not consume) — the fetch may be retried on transient failure
-// and the retry must still carry a nonce. Cleared on fetch success.
-static bool IsKeyMarkedForCacheBust(const std::string& canonicalKey) {
+// Peek (do not consume) — the fetch may be retried on transient failure and the
+// retry must still carry a nonce. Returns the generation to carry, or 0 when
+// the key is not marked. Cleared on fetch success, by generation.
+static uint64_t CacheBustGenerationForKey(const std::string& canonicalKey) {
   std::lock_guard<std::mutex> lock(g_bustNextFetchMutex);
-  if (g_bustNextFetchKeys.empty()) return false;
-  return g_bustNextFetchKeys.find(canonicalKey) != g_bustNextFetchKeys.end();
+  if (g_bustNextFetchKeys.empty()) return 0;
+  auto it = g_bustNextFetchKeys.find(canonicalKey);
+  return it == g_bustNextFetchKeys.end() ? 0 : it->second;
 }
 
-static void ClearCacheBustForKey(const std::string& canonicalKey) {
+// Clears the mark this fetch actually satisfied. A newer mark has a newer
+// generation and is left standing for the fetch that will carry it.
+static void ClearCacheBustForKey(const std::string& canonicalKey, uint64_t observedGeneration) {
+  if (observedGeneration == 0) return;
   std::lock_guard<std::mutex> lock(g_bustNextFetchMutex);
-  if (g_bustNextFetchKeys.empty()) return;
-  g_bustNextFetchKeys.erase(canonicalKey);
+  auto it = g_bustNextFetchKeys.find(canonicalKey);
+  if (it != g_bustNextFetchKeys.end() && it->second == observedGeneration) {
+    g_bustNextFetchKeys.erase(it);
+  }
 }
 
 // ============================================================================
@@ -316,13 +343,8 @@ static void ClearCacheBustForKey(const std::string& canonicalKey) {
 // Forward declarations — these helpers are defined below their first use,
 // matching the existing convention in this file.
 static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& canonicalKey,
-                                     std::string& out, std::string& contentType, int& status);
-static void MaybePumpJSThreadDuringBoot();
-// Forward decl: the pluggable HTTP-fetch yield hook is defined below
-// MaybePumpJSThreadDuringBoot (which is its default callback), but HttpFetchModule
-// calls it from earlier in the file. See the definition for the rationale on
-// the atomic indirection.
-static inline void InvokeHttpFetchYield();
+                                     std::string& out, std::string& contentType, int& status,
+                                     uint64_t* outBustGeneration = nullptr);
 
 // synchronous-fetch timing histogram.
 //
@@ -494,13 +516,18 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
   std::string body;
   std::string contentType;
   int status = 0;
-  bool transportOk = PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status);
+  uint64_t bustGeneration = 0;
+  bool transportOk =
+      PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status, &bustGeneration);
   if (!transportOk) {
     // One retry, and only for a transport error: an HTTP status is an answer,
     // not a failure to communicate, so asking again would just repeat it.
     TNS_DEBUG(Esm, "[http-loader] retrying %s after initial fetch error", url.c_str());
     usleep(120 * 1000);
-    transportOk = PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status);
+    // The retry re-peeks, so the generation it carries — the one whose nonce is
+    // on the wire for the body we end up with — replaces the first attempt's.
+    transportOk =
+        PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status, &bustGeneration);
   }
   // NOTE: no long dev-server-startup retry loop here on purpose. The CLI's
   // `compileWithWatch` gates app deploy/restart on its `vite serve`
@@ -508,6 +535,14 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
   // boot is a real failure, not a startup race — surface it immediately.
 
   ClassifyModuleResponse(url, transportOk, status, contentType, body, result);
+
+  // The mark is spent only once a response classifies as a usable module. A
+  // 2xx alone is not enough: an SPA fallback answering 200 text/html would
+  // otherwise consume the eviction nonce and leave the next fetch cacheable.
+  // Same rule as the async path.
+  if (result.ok) {
+    ClearCacheBustForKey(canonicalKey, bustGeneration);
+  }
 
   if (!result.ok) {
     TNS_DEBUG(Esm, "[http-loader][fetch-sync][reject] %s", result.failureReason.c_str());
@@ -526,9 +561,6 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
               (unsigned long)result.body.size(), (unsigned long long)netMs);
   }
 
-  // Yield to the placeholder heartbeat after the sync fetch so a cold-boot
-  // progress UI still repaints between modules.
-  InvokeHttpFetchYield();
   return true;
 }
 
@@ -568,12 +600,12 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
 // Shared request builder for the sync (NSURLConnection) and async
 // (NSURLSession) module fetch paths so both carry identical cache-defeat
 // semantics. Returns an autoreleased NSMutableURLRequest (nil for
-// unparseable URLs) and reports via `outBustRequested` whether the URL was
+// unparseable URLs) and reports via `outBustGeneration` which mark the URL was
 // marked for an eviction-driven cache-bust nonce (the caller clears the
 // mark once a fresh body actually arrives).
 static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url,
                                                     const std::string& canonicalKey,
-                                                    bool* outBustRequested) {
+                                                    uint64_t* outBustGeneration) {
   // One-time: replace the shared NSURLCache with a zero-capacity one
   // so CFNetwork has no on-disk store to satisfy fetches from. Per-
   // request cache policy + `removeCachedResponseForRequest:` were
@@ -597,9 +629,9 @@ static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url,
   // verbatim (some Vite virtual routes require exact-match URLs and
   // 404 on unknown query params).
   std::string fetchUrl = url;
-  const bool bustRequested = IsKeyMarkedForCacheBust(canonicalKey);
-  if (outBustRequested) *outBustRequested = bustRequested;
-  if (bustRequested) {
+  const uint64_t bustGeneration = CacheBustGenerationForKey(canonicalKey);
+  if (outBustGeneration) *outBustGeneration = bustGeneration;
+  if (bustGeneration != 0) {
     static std::atomic<uint64_t> s_fetchSeq{0};
     const uint64_t seq = s_fetchSeq.fetch_add(1, std::memory_order_relaxed);
     const uint64_t nowMs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0);
@@ -649,10 +681,12 @@ static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url,
 }
 
 static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& canonicalKey,
-                                     std::string& out, std::string& contentType, int& status) {
+                                     std::string& out, std::string& contentType, int& status,
+                                     uint64_t* outBustGeneration) {
   @autoreleasepool {
-    bool bustRequested = false;
-    NSMutableURLRequest* request = BuildModuleFetchRequest(url, canonicalKey, &bustRequested);
+    uint64_t bustGeneration = 0;
+    NSMutableURLRequest* request = BuildModuleFetchRequest(url, canonicalKey, &bustGeneration);
+    if (outBustGeneration) *outBustGeneration = bustGeneration;
     if (!request) {
       status = 0;
       return false;
@@ -737,13 +771,6 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
       return false;
     }
     out.swap(bodyLocal);
-    // A fresh body arrived from origin — the bust request (if any) has
-    // been satisfied. Clear the mark so steady-state re-fetches of the
-    // same URL don't keep paying the nonce (and stay exact-match for
-    // routes that require it).
-    if (bustRequested && httpStatusLocal >= 200 && httpStatusLocal < 300) {
-      ClearCacheBustForKey(canonicalKey);
-    }
     return true;
   }
 }
@@ -787,8 +814,8 @@ static void PerformModuleFetchAsyncAttempt(
     const std::string& url, const std::string& canonicalKey, int attempt,
     std::function<void(ModuleFetchResult result)>* completionHeap) {
   @autoreleasepool {
-    bool bustRequested = false;
-    NSMutableURLRequest* request = BuildModuleFetchRequest(url, canonicalKey, &bustRequested);
+    uint64_t bustGeneration = 0;
+    NSMutableURLRequest* request = BuildModuleFetchRequest(url, canonicalKey, &bustGeneration);
     if (!request) {
       ModuleFetchResult failed;
       failed.failureReason = "HTTP import failed: " + url + " (malformed request URL)";
@@ -799,59 +826,92 @@ static void PerformModuleFetchAsyncAttempt(
 
     const std::string urlCopy = url;
     const std::string keyCopy = canonicalKey;
-    const bool bust = bustRequested;
+    const uint64_t bust = bustGeneration;
     const uint64_t startUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
     NSURLSessionDataTask* task = [ModuleFetchSession()
         dataTaskWithRequest:request
           completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
-            int status = 0;
-            std::string contentType;
-            if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
-              NSHTTPURLResponse* httpResp = (NSHTTPURLResponse*)response;
-              status = (int)[httpResp statusCode];
-              NSString* ct = [httpResp allHeaderFields][@"Content-Type"];
-              if (ct) {
-                const char* utf8 = [ct UTF8String];
-                if (utf8) contentType = std::string(utf8);
+            // NSURLSession invokes this block, so a C++ exception leaving it is
+            // an std::terminate rather than a failure anyone can report. Nothing
+            // here runs JS — the compile is posted to the isolate's own thread —
+            // so an escape could only come from an allocation failure, but the
+            // containment is structural on purpose: the graph load must hear
+            // back exactly once or it waits out its entire deadline.
+            bool retrying = false;
+            ModuleFetchResult result;
+            try {
+              int status = 0;
+              std::string contentType;
+              if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
+                NSHTTPURLResponse* httpResp = (NSHTTPURLResponse*)response;
+                status = (int)[httpResp statusCode];
+                NSString* ct = [httpResp allHeaderFields][@"Content-Type"];
+                if (ct) {
+                  const char* utf8 = [ct UTF8String];
+                  if (utf8) contentType = std::string(utf8);
+                }
               }
-            }
-            std::string body;
-            if (data && [data length] > 0) {
-              body.assign(static_cast<const char*>([data bytes]),
-                          static_cast<size_t>([data length]));
+              std::string body;
+              if (data && [data length] > 0) {
+                body.assign(static_cast<const char*>([data bytes]),
+                            static_cast<size_t>([data length]));
+              }
+
+              // Transport error → one retry, the same single-retry policy the
+              // sync path applies, without blocking any thread.
+              if (error != nil && attempt == 0) {
+                TNS_DEBUG(Esm, "[http-loader][fetch-async] retrying %s after transport error: %s",
+                          urlCopy.c_str(),
+                          (error.localizedDescription ?: @"<no description>").UTF8String);
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(120 * NSEC_PER_MSEC)),
+                               dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+                                 // Background thread: the carried key is the
+                                 // only way this attempt can consult the bust set.
+                                 PerformModuleFetchAsyncAttempt(urlCopy, keyCopy, 1,
+                                                                completionHeap);
+                               });
+                // Set only once the retry is actually queued: it now owns the
+                // completion, and this attempt must not settle it too.
+                retrying = true;
+              } else {
+                ClassifyModuleResponse(urlCopy, error == nil, status, contentType, body, result);
+
+                if (result.ok) {
+                  ClearCacheBustForKey(keyCopy, bust);
+                }
+                if (!result.ok) {
+                  TNS_DEBUG(Esm, "[http-loader][fetch-async][reject] attempt=%d %s", attempt,
+                            result.failureReason.c_str());
+                } else if (tns::LogCategoryEnabled(tns::LogCategory::Fetch)) {
+                  const uint64_t endUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+                  const uint64_t ms = endUs > startUs ? (endUs - startUs) / 1000ull : 0ull;
+                  TNS_DEBUG(Fetch, "[http-loader][fetch][async] %s bytes=%lu ms=%llu",
+                            urlCopy.c_str(), (unsigned long)result.body.size(),
+                            (unsigned long long)ms);
+                }
+              }
+            } catch (...) {
+              if (retrying) {
+                // The retry owns the completion and will settle it; nothing to
+                // report from here.
+                return;
+              }
+              result = ModuleFetchResult();
+              result.failureReason =
+                  "HTTP import failed: " + urlCopy + " (internal error handling the response)";
             }
 
-            // Transport error → one retry, the same single-retry policy the
-            // sync path applies, without blocking any thread.
-            if (error != nil && attempt == 0) {
-              TNS_DEBUG(Esm, "[http-loader][fetch-async] retrying %s after transport error: %s",
-                        urlCopy.c_str(),
-                        (error.localizedDescription ?: @"<no description>").UTF8String);
-              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(120 * NSEC_PER_MSEC)),
-                             dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-                               // Background thread: the carried key is the
-                               // only way this attempt can consult the bust set.
-                               PerformModuleFetchAsyncAttempt(urlCopy, keyCopy, 1, completionHeap);
-                             });
+            if (retrying) {
               return;
             }
-
-            ModuleFetchResult result;
-            ClassifyModuleResponse(urlCopy, error == nil, status, contentType, body, result);
-
-            if (result.ok && bust) {
-              ClearCacheBustForKey(keyCopy);
+            // Guarded for the same reason: the completion posts to the
+            // isolate's loop, and a throw on the way out would cross the
+            // ObjC boundary instead of failing the load.
+            try {
+              (*completionHeap)(std::move(result));
+            } catch (...) {
+              Log(@"NativeScript: module fetch completion threw for %s", urlCopy.c_str());
             }
-            if (!result.ok) {
-              TNS_DEBUG(Esm, "[http-loader][fetch-async][reject] attempt=%d %s", attempt,
-                        result.failureReason.c_str());
-            } else if (tns::LogCategoryEnabled(tns::LogCategory::Fetch)) {
-              const uint64_t endUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
-              const uint64_t ms = endUs > startUs ? (endUs - startUs) / 1000ull : 0ull;
-              TNS_DEBUG(Fetch, "[http-loader][fetch][async] %s bytes=%lu ms=%llu", urlCopy.c_str(),
-                        (unsigned long)result.body.size(), (unsigned long long)ms);
-            }
-            (*completionHeap)(std::move(result));
             delete completionHeap;
           }];
     [task resume];
@@ -876,66 +936,5 @@ void FetchModuleBodyAsync(const std::string& url, const std::string& canonicalKe
 
 // Cold-boot JS-thread runloop pump.
 //
-// Synchronous `HttpFetchModule` calls during V8's static-import walk park
-// the JS thread inside `+sendSynchronousRequest:`, starving the
-// `setInterval` heartbeat that drives the placeholder progress bar.
-// Between fetches we run one short CFRunLoop slice in default mode so
-// any due `CFRunLoopTimer` (the heartbeat) fires once before we return.
-// Microtask checkpoints bracket the slice to flush V8 promise queues
-// either side of the timer callback. v8::Locker is recursive, so nested
-// acquisition by the timer callback is safe.
-//
-// Gated to JS-thread + entry-evaluation only:
-//   - `Runtime::GetCurrentRuntime()` is thread_local; null on GCD
-//     background threads, so they never pump someone else's runloop.
-//   - `IsBootEvaluationActive()` limits pumping to the window in which
-//     ModuleInternal::RunModule is evaluating this thread's entry module —
-//     HMR-time fetches must not pay the pump cost, and pumping mid-app would
-//     re-enter user code under a synchronous fetch.
-//   - The runloop identity check survives any future change that
-//     decouples the runtime's captured runloop from the current thread.
-static void MaybePumpJSThreadDuringBoot() {
-  Runtime* runtime = Runtime::GetCurrentRuntime();
-  if (runtime == nullptr) return;
-  if (!IsBootEvaluationActive()) return;
-
-  v8::Isolate* isolate = runtime->GetIsolate();
-  if (isolate == nullptr) return;
-
-  CFRunLoopRef rl = runtime->RuntimeLoop();
-  if (rl == nullptr || rl != CFRunLoopGetCurrent()) return;
-
-  isolate->PerformMicrotaskCheckpoint();
-  @autoreleasepool {
-    // 1ms slice: long enough to cover the placeholder's 250ms-cadence
-    // heartbeat when overdue, short enough that ~200 boot fetches add
-    // <200ms of pump overhead total.
-    NSRunLoop* runLoop = [NSRunLoop currentRunLoop];
-    NSDate* sliceDeadline = [NSDate dateWithTimeIntervalSinceNow:0.001];
-    [runLoop runMode:NSDefaultRunLoopMode beforeDate:sliceDeadline];
-  }
-  isolate->PerformMicrotaskCheckpoint();
-}
-
-// Pluggable "yield to caller" hook used by HttpFetchModule. The default
-// implementation pumps the JS thread runloop during dev-session cold boot
-// (see MaybePumpJSThreadDuringBoot for the gating rationale). Hosts can
-// override or null it out via RegisterHttpFetchYield to keep HTTP fetches
-// fully synchronous without any UI concerns leaking in.
-//
-// NOTE: function-pointer atomics are guaranteed lock-free on iOS for
-// pointer-sized targets, so this carries no extra lock cost on the hot
-// path. Read uses memory_order_acquire so callers see the pointer
-// installed via memory_order_release in `RegisterHttpFetchYield`.
-static std::atomic<void (*)()> g_httpFetchYield{&MaybePumpJSThreadDuringBoot};
-
-void RegisterHttpFetchYield(void (*callback)()) {
-  g_httpFetchYield.store(callback, std::memory_order_release);
-}
-
-static inline void InvokeHttpFetchYield() {
-  auto cb = g_httpFetchYield.load(std::memory_order_acquire);
-  if (cb != nullptr) cb();
-}
 
 }  // namespace tns

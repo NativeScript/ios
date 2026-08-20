@@ -388,6 +388,37 @@ describe("HTTP ESM Loader", function() {
                 worker.postMessage("ns-worker-leaf");
             });
 
+            // import() resolves through the same cascade as a static import.
+            // It used to resolve twice — once here with the referrer, once more
+            // inside the walk pre-pass with none — and the scope-less second
+            // pass is the one that decided the walk root.
+            it("resolves a dynamic import through the referrer's scope", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                var insideScope = __dirname + "/esm/scoped/inside/";
+                var scopes = {};
+                scopes[insideScope] = { "ns-scoped-leaf": origin + "/esm/graph-leaf.mjs?k=dyn" };
+                setMap({
+                    imports: { "ns-scoped-leaf": origin + "/esm/graph-leaf.mjs?k=top" },
+                    scopes: scopes,
+                });
+
+                import("~/tests/esm/scoped/inside/dynamic.mjs").then(function (mod) {
+                    return mod.loadLeaf();
+                }).then(function (name) {
+                    // The scope wins over the top-level entry for this referrer.
+                    expect(name).toBe("dyn");
+                    done();
+                }).catch(function (error) {
+                    expect("rejected: " + formatError(error)).toBe("resolved");
+                    done();
+                });
+            });
+
             it("resolves through the scope cascade for every referrer", function (done) {
                 var origin = getHostOrigin();
                 if (!origin) {
@@ -1099,6 +1130,28 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
         it("leaves public URLs untouched", function () {
             checkKey("https://cdn.example.com/lib.js?token=abc",
                      "https://cdn.example.com/lib.js?token=abc");
+        });
+
+        // Upstream path joins collapse `http://` to `http:/`. Every key
+        // derivation repairs that before it tests the scheme, so a key that
+        // arrives collapsed — through invalidateModules or a cache-bust mark —
+        // lands on the same identity the resolver produces.
+        it("repairs a collapsed scheme to one identity", function () {
+            checkKey("http:/h/ns/core", "http://h/ns/core");
+            checkKey("https:/h/ns/core", "https://h/ns/core");
+            // Already well-formed keys are untouched by the repair.
+            checkKey("http://h/ns/core", "http://h/ns/core");
+        });
+
+        // Some loaders hand the URL over wrapped as file://http(s)://…, and a
+        // path join can collapse the scheme inside that wrapper too. Unwrapping
+        // and repairing have to compose, or the wrapped-collapsed form becomes
+        // a third identity for the same module.
+        it("repairs a collapsed scheme inside a file:// wrapper", function () {
+            checkKey("file://http:/h/ns/core", "http://h/ns/core");
+            checkKey("file://https:/h/ns/core", "https://h/ns/core");
+            // The well-formed wrapper still unwraps to the same key.
+            checkKey("file://http://h/ns/core", "http://h/ns/core");
         });
 
         it("treats module identity as literally the URL — no path-tag collapses", function () {

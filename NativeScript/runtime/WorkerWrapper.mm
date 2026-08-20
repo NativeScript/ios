@@ -92,14 +92,12 @@ void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker,
 
 void WorkerWrapper::DrainPendingTasks() {
   // The drain source is armed (and can be signaled by a main-thread
-  // PostMessage) BEFORE `workerIsolate_` is assigned in BackgroundLooper —
-  // and worker creation can spin its runloop inside that window: under an
-  // HMR dev session the worker's own script loads over HTTP, and
-  // HttpFetchModule's boot pump (MaybePumpJSThreadDuringBoot) runs the current
-  // runloop, firing this source with a null isolate (crash in
-  // v8::Locker::Initialize). Bail until the isolate exists — the messages
-  // stay queued and the explicit DrainPendingTasks() call right after
-  // isolate creation delivers them.
+  // PostMessage) BEFORE `workerIsolate_` is assigned in BackgroundLooper, and
+  // worker creation spins this runloop inside that window: the entry's module
+  // graph load pumps it while waiting on fetches, which fires this source with
+  // a null isolate (crash in v8::Locker::Initialize). Bail until the isolate
+  // exists — the messages stay queued and the explicit DrainPendingTasks()
+  // call right after isolate creation delivers them.
   if (this->workerIsolate_ == nullptr) {
     return;
   }
@@ -195,6 +193,18 @@ void WorkerWrapper::Terminate() {
   bool wasTerminating = this->isTerminating_.exchange(true);
   if (!wasTerminating) {
     if (this->workerIsolate_ != nullptr) {
+      // Flagged before the request so a pump that is between iterations sees
+      // it on its next check, rather than only once V8 has some JS to
+      // interrupt — which a parked graph never provides.
+      //
+      // NOTE: `workerIsolate_` is assigned only after the worker's ENTRY has
+      // finished evaluating, so a worker still parked in its entry is not
+      // reachable from here at all and terminate() does nothing for it. That
+      // is a pre-existing worker-lifecycle gap, not something this flag can
+      // close — see the follow-up filed for it.
+      if (Runtime* workerRuntime = Runtime::GetRuntime(this->workerIsolate_)) {
+        workerRuntime->RequestTermination();
+      }
       this->workerIsolate_->TerminateExecution();
     }
     {
@@ -292,6 +302,55 @@ void WorkerWrapper::CallOnErrorHandlers(TryCatch& tc) {
 
     this->PassUncaughtExceptionFromWorkerToMain(context, tc);
   }
+}
+
+void WorkerWrapper::ReportEntryEvaluationRejection(Local<Context> context, Local<Value> reason) {
+  if (this->isTerminating_) {
+    return;
+  }
+  Isolate* isolate = this->workerIsolate_;
+  Local<Object> global = context->Global();
+
+  Local<Value> onErrorVal;
+  if (global->Get(context, tns::ToV8String(isolate, "onerror")).ToLocal(&onErrorVal) &&
+      !onErrorVal.IsEmpty() && onErrorVal->IsFunction()) {
+    Local<Value> args[1] = {reason};
+    Local<Value> result;
+    TryCatch innerTc(isolate);
+    bool called = onErrorVal.As<v8::Function>()
+                      ->Call(context, v8::Undefined(isolate), 1, args)
+                      .ToLocal(&result);
+    if (called && !result.IsEmpty() && result->BooleanValue(isolate)) {
+      // Truthy return means handled, which is where the web stops propagation.
+      return;
+    }
+    if (!called && innerTc.HasCaught()) {
+      // The handler itself threw; that error is what the parent should see.
+      this->PassUncaughtExceptionFromWorkerToMain(context, innerTc);
+      return;
+    }
+  }
+
+  // Unhandled at the worker scope, so it becomes the parent's error event.
+  // One emptiness test up front: every read below — the string conversion as
+  // much as the stack lookup — needs a real handle, and only the stack read
+  // used to be guarded.
+  std::string message = "<no reason>";
+  std::string stackTrace;
+  std::string source;
+  int lineNumber = 0;
+  if (!reason.IsEmpty()) {
+    message = tns::ToString(isolate, reason);
+    if (reason->IsObject()) {
+      Local<Object> reasonObj = reason.As<Object>();
+      Local<Value> stackVal;
+      if (reasonObj->Get(context, tns::ToV8String(isolate, "stack")).ToLocal(&stackVal) &&
+          !stackVal->IsUndefined()) {
+        stackTrace = tns::ToString(isolate, stackVal);
+      }
+    }
+  }
+  this->PassUncaughtExceptionFromWorkerToMain(message, source, stackTrace, lineNumber, true);
 }
 
 void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Local<Context> context, TryCatch& tc,

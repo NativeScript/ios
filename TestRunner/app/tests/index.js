@@ -161,6 +161,9 @@ require("./EsmInteropTests");
 // ns:module / node:module createRequire and the pumping require
 require("./CreateRequireTests");
 
+// Loader defects found by the Android parity port (NativeScript/ios#443)
+require("./LoaderHardeningTests");
+
 // Exception handling tests
 require("./ExceptionHandlingTests");
 

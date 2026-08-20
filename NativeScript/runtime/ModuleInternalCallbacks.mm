@@ -262,6 +262,42 @@ void DropRequireFacadesForTarget(ModuleLoaderState& state, v8::Isolate* isolate,
     state.requireFacadesByTargetHash.erase(bucketIt);
   }
 }
+
+// Drops everything hanging off whatever module is currently registered under
+// `key`: its require(esm) facades and its entry in the identity index. Eviction
+// always did this; replacement did not, so overwriting a key leaked one facade
+// and two Globals per reload. Both routes go through here now, which is what
+// makes replacing a key mean the same thing as evicting it and inserting again.
+void UnindexRegisteredModule(ModuleLoaderState& state, v8::Isolate* isolate,
+                             const std::string& key) {
+  auto it = state.registry.find(key);
+  if (it == state.registry.end()) {
+    return;
+  }
+  v8::Local<v8::Module> previous = it->second.Get(isolate);
+  if (previous.IsEmpty()) {
+    return;
+  }
+  DropRequireFacadesForTarget(state, isolate, previous);
+  auto bucketIt = state.keysByModuleHash.find(previous->GetIdentityHash());
+  if (bucketIt == state.keysByModuleHash.end()) {
+    return;
+  }
+  auto& keys = bucketIt->second;
+  keys.erase(std::remove(keys.begin(), keys.end(), key), keys.end());
+  if (keys.empty()) {
+    state.keysByModuleHash.erase(bucketIt);
+  }
+}
+
+// Replaces the registry entry for `key`, unhooking the previous occupant first
+// and indexing the new one. The only supported way to overwrite a live key.
+void SetRegisteredModule(ModuleLoaderState& state, v8::Isolate* isolate, const std::string& key,
+                         v8::Local<v8::Module> mod) {
+  UnindexRegisteredModule(state, isolate, key);
+  state.registry[key].Reset(isolate, mod);
+  IndexRegisteredModule(state, key, mod);
+}
 }  // namespace
 
 v8::MaybeLocal<v8::Module> GetOrCreateRequireFacade(v8::Isolate* isolate,
@@ -460,8 +496,7 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
       return v8::MaybeLocal<v8::Module>();
     }
   }
-  registry[registryKey].Reset(isolate, mod);
-  IndexRegisteredModule(*moduleState, registryKey, mod);
+  SetRegisteredModule(*moduleState, isolate, registryKey, mod);
   return hs.Escape(mod);
 }
 
@@ -523,10 +558,15 @@ static bool ShouldTraceRegistryKey(const std::string& rawKey, const std::string&
   return StartsWith(registryKey, "node:") || StartsWith(registryKey, "blob:");
 }
 
-static std::string CanonicalizeRegistryKey(const std::string& key) {
-  if (key.empty()) {
-    return key;
+static std::string CanonicalizeRegistryKey(const std::string& rawKey) {
+  if (rawKey.empty()) {
+    return rawKey;
   }
+
+  // Before any scheme test: a collapsed `http:/host` would otherwise fail the
+  // http tests below, fall through as a custom scheme, and give the module a
+  // second identity that never matches the resolver's.
+  const std::string key = RepairCollapsedUrlScheme(rawKey);
 
   std::string registryKey;
   const char* classification = "path";
@@ -1116,14 +1156,10 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
     return result;
   }
 
-  std::string spec = rawSpec;
   // Repair 'http:/host' (single slash) left by upstream path joins, so the URL
-  // takes the HTTP path instead of becoming '/app/http:/host'.
-  if (spec.rfind("http:/", 0) == 0 && spec.rfind("http://", 0) != 0) {
-    spec.insert(5, "/");
-  } else if (spec.rfind("https:/", 0) == 0 && spec.rfind("https://", 0) != 0) {
-    spec.insert(6, "/");
-  }
+  // takes the HTTP path instead of becoming '/app/http:/host'. Shared with the
+  // key derivations, so the resolver and the registry agree on one identity.
+  std::string spec = RepairCollapsedUrlScheme(rawSpec);
 
   TNS_DEBUG(Esm, "[resolver][spec] %s", spec.c_str());
 
@@ -1211,6 +1247,20 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
       result.kind = ModuleResolution::Kind::kHttp;
       result.url = resolvedHttp;
       return result;
+    }
+  }
+
+  // A query or fragment is URL syntax, never part of a file name, so
+  // `import './x.js?v=1'` names x.js. Stripped here rather than at the
+  // import() entry point, so a static import from a local referrer resolves
+  // the same way instead of probing for a file literally called 'x.js?v=1'.
+  // HTTP specifiers returned above keep their query: there it is identity.
+  {
+    size_t queryOrHash = spec.find_first_of("?#");
+    if (queryOrHash != std::string::npos) {
+      std::string stripped = spec.substr(0, queryOrHash);
+      TNS_DEBUG(Esm, "[resolver][strip-query] %s -> %s", spec.c_str(), stripped.c_str());
+      spec = stripped;
     }
   }
 
@@ -1537,8 +1587,7 @@ static void AsyncGraphCompileLocalModule(const std::shared_ptr<AsyncGraphLoad>& 
     }
   }
 
-  moduleState->registry[key].Reset(isolate, mod);
-  IndexRegisteredModule(*moduleState, key, mod);
+  SetRegisteredModule(*moduleState, isolate, key, mod);
   load->compiledCount++;
   AsyncGraphWalkModuleRequests(load, context, mod, key);
 }
@@ -1687,12 +1736,34 @@ bool RunModuleGraphLoadPumped(v8::Isolate* isolate, v8::Local<v8::Context> conte
   Runtime* runtime = Runtime::GetRuntime(isolate);
   std::shared_ptr<EventLoop> eventLoop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
   const CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + timeoutSeconds;
-  while (!*done && CFAbsoluteTimeGetCurrent() < deadline) {
+  for (;;) {
+    // Termination outranks completion, which is why this precedes the `*done`
+    // test rather than sharing a loop condition with it. A walk that finished
+    // in the same slice termination began must still report failure: returning
+    // success sends the caller on to instantiate and evaluate the graph, which
+    // is more JS on an isolate V8 has been told to stop. No fetch completion
+    // can arrive after this point either, so the remaining budget would only be
+    // spent waiting for work that cannot come. The requested-flag is consulted
+    // too: V8 surfaces a termination only once it has materialized it, which
+    // takes JS this wait may never run.
+    if (isolate->IsExecutionTerminating() ||
+        (runtime != nullptr && runtime->IsTerminationRequested())) {
+      TNS_DEBUG(Esm, "[graph][pumped] execution terminating, abandoning wait for %s", root.c_str());
+      return false;
+    }
+    if (*done) {
+      break;
+    }
+    if (CFAbsoluteTimeGetCurrent() >= deadline) {
+      break;
+    }
     if (eventLoop != nullptr) {
       eventLoop->RunNestableV8Tasks();
     }
     if (*done) {
-      break;
+      // Back to the loop head rather than breaking here: the termination check
+      // gets the last word on a completion the drain just produced.
+      continue;
     }
     CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, true);
   }
@@ -1747,18 +1818,7 @@ void RemoveModuleFromRegistry(v8::Isolate* isolate, const std::string& canonical
     if (tns::LogCategoryEnabled(tns::LogCategory::Esm) && !isHttpKey) {
       TNS_DEBUG(Esm, "[resolver] removing stale module %s", registryKey.c_str());
     }
-    v8::Local<v8::Module> doomed = it->second.Get(isolate);
-    if (!doomed.IsEmpty()) {
-      DropRequireFacadesForTarget(*moduleState, isolate, doomed);
-      auto bucketIt = moduleState->keysByModuleHash.find(doomed->GetIdentityHash());
-      if (bucketIt != moduleState->keysByModuleHash.end()) {
-        auto& keys = bucketIt->second;
-        keys.erase(std::remove(keys.begin(), keys.end(), registryKey), keys.end());
-        if (keys.empty()) {
-          moduleState->keysByModuleHash.erase(bucketIt);
-        }
-      }
-    }
+    UnindexRegisteredModule(*moduleState, isolate, registryKey);
     it->second.Reset();
     registry.erase(it);
   } else if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
@@ -2103,7 +2163,11 @@ static v8::MaybeLocal<v8::Module> CompileJsonTextAsEsModule(v8::Isolate* isolate
     if (!existing.IsEmpty() && existing->GetStatus() == v8::Module::kEvaluated) {
       return v8::MaybeLocal<v8::Module>(existing);
     }
-    registry.erase(existingIt);
+    // Through the shared unhook, not a bare erase: dropping the entry has to
+    // release the previous module's facades and identity-index entry too, which
+    // is the whole reason replacement and eviction share one path.
+    UnindexRegisteredModule(*moduleState, isolate, registryAbsPath);
+    registry.erase(registryAbsPath);
   }
 
   TNS_DEBUG(Esm, "[json] wrapping %s", displayUrl.c_str());
@@ -2144,14 +2208,9 @@ static v8::MaybeLocal<v8::Module> CompileJsonTextAsEsModule(v8::Isolate* isolate
     return v8::MaybeLocal<v8::Module>();
   }
 
-  // Store in registry and return - with safe Global handle management
-  auto it = registry.find(registryAbsPath);
-  if (it != registry.end()) {
-    // Clear the existing Global handle before replacing it
-    it->second.Reset();
-  }
-  registry[registryAbsPath].Reset(isolate, jsonModule);
-  IndexRegisteredModule(*moduleState, registryAbsPath, jsonModule);
+  // Store in registry and return. Replacing a live key drops the previous
+  // module's facades and index entry, exactly as evicting it would.
+  SetRegisteredModule(*moduleState, isolate, registryAbsPath, jsonModule);
   return v8::MaybeLocal<v8::Module>(jsonModule);
 }
 
@@ -2249,8 +2308,7 @@ v8::MaybeLocal<v8::Module> ResolveModuleCallback(v8::Local<v8::Context> context,
       // importer's instantiation with it.
       return v8::MaybeLocal<v8::Module>();
     }
-    registry[registryAbsPath].Reset(isolate, mod);
-    IndexRegisteredModule(*moduleState, registryAbsPath, mod);
+    SetRegisteredModule(*moduleState, isolate, registryAbsPath, mod);
     return v8::MaybeLocal<v8::Module>(mod);
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
@@ -2278,7 +2336,21 @@ static void FinishHttpDynamicImport(v8::Isolate* isolate, v8::Local<v8::Context>
       TNS_DEBUG(Esm, "[async-graph][fallback-sync-load] root missed walk: %s", key.c_str());
     }
   }
-  v8::MaybeLocal<v8::Module> modMaybe = LoadHttpModuleForUrl(isolate, context, requestUrl);
+  // LoadHttpModuleForUrl throws the classifier's reason — which names the URL
+  // and the cause (status, MIME or transport) — and returns empty. Catching it
+  // here is what lets the rejection say any of that; leaving it pending on the
+  // isolate would instead surface it at some unrelated later checkpoint.
+  v8::MaybeLocal<v8::Module> modMaybe;
+  v8::Local<v8::Value> loadFailureReason;
+  {
+    v8::TryCatch loadTc(isolate);
+    modMaybe = LoadHttpModuleForUrl(isolate, context, requestUrl);
+    if (modMaybe.IsEmpty()) {
+      loadFailureReason =
+          BuildModuleFailureReason(isolate, loadTc, "HTTP fetch/compile failed", requestUrl);
+      loadTc.Reset();
+    }
+  }
   if (!modMaybe.IsEmpty()) {
     v8::Local<v8::Module> mod;
     if (modMaybe.ToLocal(&mod)) {
@@ -2377,10 +2449,12 @@ static void FinishHttpDynamicImport(v8::Isolate* isolate, v8::Local<v8::Context>
       return;
     }
   }
-  // On fetch/compile miss: clean inflight and reject queued
-  RejectHttpDynamicWaiters(
-      isolate, context, key,
-      v8::Exception::Error(tns::ToV8String(isolate, "HTTP fetch/compile failed")));
+  // On fetch/compile miss: clean inflight and reject queued.
+  if (loadFailureReason.IsEmpty()) {
+    loadFailureReason =
+        v8::Exception::Error(tns::ToV8String(isolate, "HTTP fetch/compile failed: " + requestUrl));
+  }
+  RejectHttpDynamicWaiters(isolate, context, key, loadFailureReason);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -2465,25 +2539,39 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     return v8::MaybeLocal<v8::Promise>();
   }
 
-  // ── Import map resolution for dynamic import() ────────────────
-  // Same scoped lookup the resolver and the walk use. The referrer key comes
-  // from the host-supplied resource name, canonicalized the way the registry
-  // keys it, so a scope matches an import() exactly as it matches a static
-  // import from the same module.
-  const LoaderVocabulary* dynamicVocabulary = VocabularyForCurrentIsolate();
-  if (dynamicVocabulary != nullptr && !dynamicVocabulary->importMap.empty() &&
-      !normalizedSpec.empty()) {
-    std::string dynamicReferrerKey;
-    if (!resource_name.IsEmpty() && resource_name->IsString()) {
-      v8::String::Utf8Value resourceUtf8(isolate, resource_name);
-      if (*resourceUtf8) {
-        dynamicReferrerKey = CanonicalizeRegistryKey(*resourceUtf8);
+  // ── Resolution for dynamic import() ───────────────────────────
+  // Resolved once, here, through the same seam the static resolver and the
+  // graph walk use, and reused for the discovery pre-pass further down. The
+  // referrer key comes from the host-supplied resource name, canonicalized the
+  // way the registry keys it, so a scope matches an import() exactly as it
+  // matches a static import from the same module. Resolving a second time for
+  // the pre-pass applied the import map twice and, having no referrer to hand,
+  // resolved that second pass with every scope dropped.
+  std::string dynamicReferrerKey;
+  if (!resource_name.IsEmpty() && resource_name->IsString()) {
+    v8::String::Utf8Value resourceUtf8(isolate, resource_name);
+    if (*resourceUtf8) {
+      // The host names the referrer by its script origin — `file:///app/…` for
+      // a local module — while scopes are matched against the registry key, an
+      // absolute app path. Canonicalizing the origin alone stops at `/app/…`
+      // and matches no scope, so the origin goes through the same resolution
+      // the registry keys by first.
+      const std::string resourceName(*resourceUtf8);
+      const ModuleResolution referrer = ResolveSpecifierToPath(resourceName, std::string());
+      if (referrer.kind == ModuleResolution::Kind::kFile) {
+        dynamicReferrerKey = CanonicalizeRegistryKey(referrer.path);
+      } else if (referrer.kind == ModuleResolution::Kind::kHttp) {
+        dynamicReferrerKey = CanonicalizeRegistryKey(referrer.url);
+      } else {
+        dynamicReferrerKey = CanonicalizeRegistryKey(resourceName);
       }
     }
-    std::string mapped = LookupImportMap(normalizedSpec, dynamicReferrerKey);
-    if (!mapped.empty()) {
-      // Mapped to an HTTP URL or other specifier
-      normalizedSpec = mapped;
+  }
+  ModuleResolution dynamicResolution;
+  if (!normalizedSpec.empty()) {
+    dynamicResolution = ResolveSpecifierToPath(normalizedSpec, dynamicReferrerKey);
+    if (!dynamicResolution.specifier.empty() && dynamicResolution.specifier != normalizedSpec) {
+      normalizedSpec = dynamicResolution.specifier;
       specifier = tns::ToV8String(isolate, normalizedSpec.c_str());
       specStr = [NSString stringWithUTF8String:normalizedSpec.c_str()];
       TNS_DEBUG(Esm, "[dyn-import][import-map] rewrite: %s -> %s", rawSpec.c_str(),
@@ -3073,14 +3161,9 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     // fetch serially, one blocking round trip each. A graph with no HTTP edges
     // settles inside the call, so a local-only dynamic import is unchanged —
     // it neither waits nor touches the runloop.
-    {
-      v8::String::Utf8Value adjustedUtf8(isolate, adjustedSpecifier);
-      const ModuleResolution rootResolution =
-          ResolveSpecifierToPath(*adjustedUtf8 ? *adjustedUtf8 : "", std::string());
-      if (rootResolution.kind == ModuleResolution::Kind::kFile) {
-        RunModuleGraphLoadPumped(isolate, context, rootResolution.path,
-                                 tns::kModuleEvaluateDeadlineSeconds);
-      }
+    if (dynamicResolution.kind == ModuleResolution::Kind::kFile) {
+      RunModuleGraphLoadPumped(isolate, context, dynamicResolution.path,
+                               tns::kModuleEvaluateDeadlineSeconds);
     }
 
     v8::TryCatch resolveTc(isolate);
@@ -3131,7 +3214,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
           }
         }
         resolver->Reject(context, v8::Exception::Error(tns::ToV8String(isolate, msg.c_str())))
-            .Check();
+            .FromMaybe(false);
         return scope.Escape(resolver->GetPromise());
       }
     }
@@ -3148,7 +3231,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
         std::string msg =
             std::string("Evaluation failed for module: ") + std::string([specStr UTF8String]);
         v8::Local<v8::Value> ex = v8::Exception::Error(tns::ToV8String(isolate, msg.c_str()));
-        resolver->Reject(context, ex).Check();
+        resolver->Reject(context, ex).FromMaybe(false);
         return scope.Escape(resolver->GetPromise());
       }
       // If top-level await returns a Promise, resolve only after it settles
@@ -3208,71 +3291,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       }
     }
 
-    // Special handling for bundler chunks: check if this is a bundler chunk and install it
-    v8::Local<v8::Value> namespaceObj = module->GetModuleNamespace();
-    if (namespaceObj->IsObject()) {
-      v8::Local<v8::Object> nsObj = namespaceObj.As<v8::Object>();
-
-      // Check if this is a webpack chunk (has __webpack_ids__ export)
-      v8::Local<v8::String> webpackIdsKey = tns::ToV8String(isolate, "__webpack_ids__");
-      v8::Local<v8::Value> webpackIds;
-      if (nsObj->Get(context, webpackIdsKey).ToLocal(&webpackIds) && !webpackIds->IsUndefined()) {
-        TNS_DEBUG(Esm, "[dyn-import] Detected webpack chunk %s", [specStr UTF8String]);
-        // This is a webpack chunk, get the webpack runtime from the runtime module
-        try {
-          // Import the runtime module to get __webpack_require__
-          // For import assertions, we need to pass an empty FixedArray
-          // Use the empty fixed array from the isolate's roots
-          v8::Local<v8::FixedArray> empty_assertions = v8::Local<v8::FixedArray>();
-          v8::MaybeLocal<v8::Module> maybeRuntimeModule =
-              ResolveModuleCallback(context, tns::ToV8String(isolate, "file:///app/runtime.mjs"),
-                                    empty_assertions, v8::Local<v8::Module>());
-
-          v8::Local<v8::Module> runtimeModule;
-          if (maybeRuntimeModule.ToLocal(&runtimeModule)) {
-            v8::Local<v8::Value> runtimeNamespace = runtimeModule->GetModuleNamespace();
-            if (runtimeNamespace->IsObject()) {
-              v8::Local<v8::Object> runtimeObj = runtimeNamespace.As<v8::Object>();
-              v8::Local<v8::String> defaultKey = tns::ToV8String(isolate, "default");
-              v8::Local<v8::Value> webpackRequire;
-
-              if (runtimeObj->Get(context, defaultKey).ToLocal(&webpackRequire) &&
-                  webpackRequire->IsObject()) {
-                TNS_DEBUG(Esm, "[dyn-import] Found runtime module default export");
-                v8::Local<v8::String> installKey = tns::ToV8String(isolate, "C");
-                v8::Local<v8::Value> installFn;
-                if (webpackRequire.As<v8::Object>()->Get(context, installKey).ToLocal(&installFn) &&
-                    installFn->IsFunction()) {
-                  TNS_DEBUG(Esm, "[dyn-import] Calling webpack installChunk function");
-                  // Call webpack's installChunk function with the module namespace
-                  v8::Local<v8::Value> args[] = {namespaceObj};
-                  v8::Local<v8::Value> result;
-                  if (!installFn.As<v8::Function>()
-                           ->Call(context, v8::Undefined(isolate), 1, args)
-                           .ToLocal(&result)) {
-                    // If the call fails, we can ignore it since this is just a helper for webpack
-                    // chunks
-                    TNS_DEBUG(Esm, "[dyn-import] ✗ webpack installChunk call failed");
-                  } else {
-                    TNS_DEBUG(Esm, "[dyn-import] ✓ webpack installChunk call succeeded");
-                  }
-                } else {
-                  TNS_DEBUG(Esm, "[dyn-import] ✗ webpack installChunk function not found");
-                }
-              } else {
-                TNS_DEBUG(Esm, "[dyn-import] ✗ runtime module default export not found");
-              }
-            }
-          } else {
-            TNS_DEBUG(Esm, "[dyn-import] ✗ runtime module not found");
-          }
-        } catch (...) {
-          TNS_DEBUG(Esm, "[dyn-import] ✗ exception while accessing runtime module");
-        }
-      }
-    }
-
-    // Final verify before resolving for non-HTTP paths too
+    // Final verify before resolving for non-HTTP paths too.
     v8::Local<v8::Value> nsFinal = module->GetModuleNamespace();
     if (nsFinal->IsObject()) {
       v8::Local<v8::Object> o = nsFinal.As<v8::Object>();
@@ -3281,22 +3300,53 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       if (!o->Get(context, tns::ToV8String(isolate, "default")).ToLocal(&defVal)) {
         TNS_DEBUG(Esm, "[dyn-import][verify] ns.default threw after eval (generic) %s",
                   [specStr UTF8String]);
-        resolver
-            ->Reject(context, v8::Exception::Error(
-                                  tns::ToV8String(isolate, "TDZ on default after eval (generic)")))
-            .Check();
+        v8::Local<v8::Value> reason = tc3.HasCaught()
+                                          ? tc3.Exception()
+                                          : v8::Exception::Error(tns::ToV8String(
+                                                isolate, "TDZ on default after eval (generic)"));
+        tc3.Reset();
+        resolver->Reject(context, reason).FromMaybe(false);
         return scope.Escape(resolver->GetPromise());
       }
     }
-    resolver->Resolve(context, module->GetModuleNamespace()).Check();
+
+    // Resolving with the namespace reads `then` off it, because that is how a
+    // promise adopts a thenable. In an import cycle that export can still be in
+    // its temporal dead zone, so the read throws and Resolve reports failure —
+    // which .Check() turned into a process abort triggered by ordinary user
+    // code. Reject with whatever was thrown instead.
+    {
+      v8::TryCatch resolveTc(isolate);
+      if (!resolver->Resolve(context, module->GetModuleNamespace()).FromMaybe(false)) {
+        v8::Local<v8::Value> reason =
+            resolveTc.HasCaught()
+                ? resolveTc.Exception()
+                : v8::Exception::Error(tns::ToV8String(
+                      isolate, std::string("Could not resolve the namespace of module: ") +
+                                   std::string([specStr UTF8String])));
+        resolveTc.Reset();
+        resolver->Reject(context, reason).FromMaybe(false);
+        return scope.Escape(resolver->GetPromise());
+      }
+    }
     TNS_DEBUG(Esm, "[dyn-import] ✓ resolved %s", [specStr UTF8String]);
   } catch (NativeScriptException& ex) {
-    ex.ReThrowToV8(isolate);
     TNS_DEBUG(Esm, "[dyn-import] ✗ native failed %s", [specStr UTF8String]);
-    resolver
-        ->Reject(context, v8::Exception::Error(
-                              tns::ToV8String(isolate, "Native error during dynamic import")))
-        .Check();
+    // The failure is delivered through the returned promise, so it must not
+    // also be left pending on the isolate: a pending exception makes the Reject
+    // below fail, which is what the old .Check() aborted on. The TryCatch keeps
+    // ReThrowToV8's exception in hand just long enough to reject with it.
+    v8::Local<v8::Value> reason;
+    {
+      v8::TryCatch nativeTc(isolate);
+      ex.ReThrowToV8(isolate);
+      reason = nativeTc.HasCaught()
+                   ? nativeTc.Exception()
+                   : v8::Exception::Error(tns::ToV8String(
+                         isolate, "Native error during dynamic import: " + ex.getMessage()));
+      nativeTc.Reset();
+    }
+    resolver->Reject(context, reason).FromMaybe(false);
   }
 
   return scope.Escape(resolver->GetPromise());
@@ -3425,24 +3475,20 @@ void ConfigureLoaderCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     if (importMapVal->IsString()) {
       jsonStr = tns::ToString(isolate, importMapVal);
     } else if (importMapVal->IsObject()) {
-      v8::Local<v8::Value> jsonVal;
-      v8::Local<v8::Value> stringifyVal;
-      if (!ctx->Global()->Get(ctx, tns::ToV8String(isolate, "JSON")).ToLocal(&jsonVal) ||
-          !jsonVal->IsObject() ||
-          !jsonVal.As<v8::Object>()
-               ->Get(ctx, tns::ToV8String(isolate, "stringify"))
-               .ToLocal(&stringifyVal) ||
-          !stringifyVal->IsFunction()) {
+      // v8::JSON::Stringify, not the global JSON.stringify: the loader must
+      // read the map the caller passed, and an app that has replaced or
+      // patched the global would otherwise decide what the runtime resolves
+      // through. The C++ entry point cannot be reached from JS at all.
+      v8::Local<v8::String> serialized;
+      v8::TryCatch stringifyTc(isolate);
+      if (!v8::JSON::Stringify(ctx, importMapVal).ToLocal(&serialized)) {
+        // A throwing `toJSON` or accessor on the caller's object is the
+        // caller's error: it propagates as thrown rather than being reported
+        // as a malformed import map.
+        stringifyTc.ReThrow();
         return;
       }
-      v8::Local<v8::Value> args[] = {importMapVal};
-      v8::Local<v8::Value> result;
-      if (!stringifyVal.As<v8::Function>()->Call(ctx, jsonVal, 1, args).ToLocal(&result)) {
-        return;  // a throwing toJSON / getter propagates unchanged
-      }
-      if (result->IsString()) {
-        jsonStr = tns::ToString(isolate, result);
-      }
+      jsonStr = tns::ToString(isolate, serialized);
     }
     if (jsonStr.empty()) {
       throwTypeError("configureLoader: importMap must be an object or a JSON string");
