@@ -332,16 +332,22 @@ void WorkerWrapper::ReportEntryEvaluationRejection(Local<Context> context, Local
   }
 
   // Unhandled at the worker scope, so it becomes the parent's error event.
-  std::string message = tns::ToString(isolate, reason);
+  // One emptiness test up front: every read below — the string conversion as
+  // much as the stack lookup — needs a real handle, and only the stack read
+  // used to be guarded.
+  std::string message = "<no reason>";
   std::string stackTrace;
   std::string source;
   int lineNumber = 0;
-  if (!reason.IsEmpty() && reason->IsObject()) {
-    Local<Object> reasonObj = reason.As<Object>();
-    Local<Value> stackVal;
-    if (reasonObj->Get(context, tns::ToV8String(isolate, "stack")).ToLocal(&stackVal) &&
-        !stackVal->IsUndefined()) {
-      stackTrace = tns::ToString(isolate, stackVal);
+  if (!reason.IsEmpty()) {
+    message = tns::ToString(isolate, reason);
+    if (reason->IsObject()) {
+      Local<Object> reasonObj = reason.As<Object>();
+      Local<Value> stackVal;
+      if (reasonObj->Get(context, tns::ToV8String(isolate, "stack")).ToLocal(&stackVal) &&
+          !stackVal->IsUndefined()) {
+        stackTrace = tns::ToString(isolate, stackVal);
+      }
     }
   }
   this->PassUncaughtExceptionFromWorkerToMain(message, source, stackTrace, lineNumber, true);

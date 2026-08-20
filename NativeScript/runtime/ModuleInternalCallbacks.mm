@@ -1736,21 +1736,34 @@ bool RunModuleGraphLoadPumped(v8::Isolate* isolate, v8::Local<v8::Context> conte
   Runtime* runtime = Runtime::GetRuntime(isolate);
   std::shared_ptr<EventLoop> eventLoop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
   const CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + timeoutSeconds;
-  while (!*done && CFAbsoluteTimeGetCurrent() < deadline) {
-    // No fetch completion can be delivered once execution is terminating, so
-    // the remaining budget would be spent waiting for work that cannot arrive.
-    // The requested-flag is consulted too: V8 surfaces a termination only once
-    // it has materialized it, which takes JS this wait may never run.
+  for (;;) {
+    // Termination outranks completion, which is why this precedes the `*done`
+    // test rather than sharing a loop condition with it. A walk that finished
+    // in the same slice termination began must still report failure: returning
+    // success sends the caller on to instantiate and evaluate the graph, which
+    // is more JS on an isolate V8 has been told to stop. No fetch completion
+    // can arrive after this point either, so the remaining budget would only be
+    // spent waiting for work that cannot come. The requested-flag is consulted
+    // too: V8 surfaces a termination only once it has materialized it, which
+    // takes JS this wait may never run.
     if (isolate->IsExecutionTerminating() ||
         (runtime != nullptr && runtime->IsTerminationRequested())) {
       TNS_DEBUG(Esm, "[graph][pumped] execution terminating, abandoning wait for %s", root.c_str());
       return false;
     }
+    if (*done) {
+      break;
+    }
+    if (CFAbsoluteTimeGetCurrent() >= deadline) {
+      break;
+    }
     if (eventLoop != nullptr) {
       eventLoop->RunNestableV8Tasks();
     }
     if (*done) {
-      break;
+      // Back to the loop head rather than breaking here: the termination check
+      // gets the last word on a completion the drain just produced.
+      continue;
     }
     CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, true);
   }
@@ -2150,7 +2163,11 @@ static v8::MaybeLocal<v8::Module> CompileJsonTextAsEsModule(v8::Isolate* isolate
     if (!existing.IsEmpty() && existing->GetStatus() == v8::Module::kEvaluated) {
       return v8::MaybeLocal<v8::Module>(existing);
     }
-    registry.erase(existingIt);
+    // Through the shared unhook, not a bare erase: dropping the entry has to
+    // release the previous module's facades and identity-index entry too, which
+    // is the whole reason replacement and eviction share one path.
+    UnindexRegisteredModule(*moduleState, isolate, registryAbsPath);
+    registry.erase(registryAbsPath);
   }
 
   TNS_DEBUG(Esm, "[json] wrapping %s", displayUrl.c_str());

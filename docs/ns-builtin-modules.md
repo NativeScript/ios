@@ -647,11 +647,14 @@ place; returning instead of throwing is the Node shape. Should the entry's
 evaluation promise still be pending when the yield ends, a **boot backstop**
 holds the process until it settles, **bounded at twice the module deadline**.
 
-Two outcomes are fatal, in every build: the entry's evaluation **rejects**, or
-the backstop's bound expires with it **still pending**. Both evict the entry
-from the module registry before failing — a half-evaluated entry must not be
-reachable by a later import — and then throw rather than returning into an app
-whose entry never ran.
+Three outcomes are fatal, in every build: the entry's evaluation **rejects**,
+the backstop's bound expires with it **still pending**, or execution starts
+**terminating**. Termination outranks the other two — an entry that settles in
+the same slice a terminate lands still reports the terminating fatal, because
+carrying on would run app code on an isolate the engine has been told to stop.
+Each evicts the entry from the module registry before failing — a
+half-evaluated entry must not be reachable by a later import — and then throws
+rather than returning into an app whose entry never ran.
 
 The trade-off: an ES module entry's own **static** imports resolve *before* its
 body runs, so anything that needs `configureLoader` to have run must be reached

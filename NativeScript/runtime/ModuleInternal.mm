@@ -1369,16 +1369,25 @@ MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context
   // evaluation promise is already settled when Evaluate() returns, so it
   // exits here without paying for a runloop slice.
   while (!promiseTc.HasCaught()) {
-    // worker.terminate() cannot settle this promise, so without this the loop
-    // spins to its full deadline and only then reports a timeout. Both signals
-    // are consulted: V8 only reports a termination it has already materialized,
-    // which needs JS to run, and a graph parked on a promise nothing settles
-    // never gives it any. Message-only exception: building a V8 error on a
-    // terminating isolate is not allowed.
+    // Termination outranks a settled result. Handing back a namespace here
+    // would send the caller on to run more JS — enabling a queue, draining
+    // messages — on an isolate V8 has already been told to stop, so a
+    // termination seen at the loop head always throws, settled or not.
+    //
+    // Both signals are consulted: V8 only reports a termination it has already
+    // materialized, which needs JS to run, and a graph parked on a promise
+    // nothing settles never gives it any. Message-only exception: building a
+    // V8 error on a terminating isolate is not allowed.
     if (isolate->IsExecutionTerminating() ||
         (runtime != nullptr && runtime->IsTerminationRequested())) {
       LogEsmPhase(canonicalPath, "evaluate", "terminated");
-      RemoveModuleFromRegistry(isolate, canonicalPath);
+      // Probed, not consumed: only a still-pending promise leaves a
+      // half-evaluated module in the registry. One that already settled is
+      // complete, and evicting it would throw away a good entry for no reason
+      // — the result simply goes unused.
+      if (promise->State() == Promise::kPending) {
+        RemoveModuleFromRegistry(isolate, canonicalPath);
+      }
       throw NativeScriptException("Module evaluation interrupted by isolate termination: " +
                                   canonicalPath);
     }

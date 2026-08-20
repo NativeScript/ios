@@ -149,7 +149,11 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   // Repaired before any scheme test, so a collapsed `http:/host` keys the same
   // as the URL it means rather than passing through untouched.
   std::string normalizedUrl = RepairCollapsedUrlScheme(url);
-  if (StartsWith(normalizedUrl, "file://http://") || StartsWith(normalizedUrl, "file://https://")) {
+  // The wrapper is tested on the one-slash forms as well: a path join can
+  // collapse the scheme INSIDE the wrapper (`file://http:/host/x`), which
+  // matches neither the two-slash unwrap nor the repair above (whose prefix is
+  // `file://`, not `http:/`) and would otherwise key as its own identity.
+  if (StartsWith(normalizedUrl, "file://http:/") || StartsWith(normalizedUrl, "file://https:/")) {
     normalizedUrl = RepairCollapsedUrlScheme(normalizedUrl.substr(strlen("file://")));
   }
   if (!(StartsWith(normalizedUrl, "http://") || StartsWith(normalizedUrl, "https://"))) {
@@ -266,31 +270,51 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
 // a URL it has never cached. The nonce is transport-only — it never
 // enters the module registry key (identity stays the canonical URL),
 // and the server and the registry never see a varied URL.
+//
+// Marks carry a generation rather than being plain set membership. A fetch
+// records the generation it observed and clears only that one, so an
+// invalidation raised while a fetch was already in flight survives that
+// fetch's completion instead of being erased by it — which would have left the
+// next fetch with no nonce and CFNetwork free to serve the body the
+// invalidation was raised to discard.
+//
+// Generation 0 is reserved for "not marked", so a captured 0 clears nothing.
 static std::mutex g_bustNextFetchMutex;
-static robin_hood::unordered_set<std::string> g_bustNextFetchKeys;
+static robin_hood::unordered_map<std::string, uint64_t> g_bustNextFetchKeys;
+static uint64_t g_bustNextFetchGeneration = 0;
 
 void MarkKeysForCacheBust(const std::vector<std::string>& canonicalKeys) {
   if (canonicalKeys.empty()) return;
   std::lock_guard<std::mutex> lock(g_bustNextFetchMutex);
+  const uint64_t generation = ++g_bustNextFetchGeneration;
   for (const auto& key : canonicalKeys) {
     if (key.empty()) continue;
     if (!(StartsWith(key, "http://") || StartsWith(key, "https://"))) continue;
-    g_bustNextFetchKeys.insert(key);
+    // Assigned, not inserted: re-marking an already-marked key has to move it
+    // to the new generation, or the in-flight fetch would clear it.
+    g_bustNextFetchKeys[key] = generation;
   }
 }
 
-// Peek (do not consume) — the fetch may be retried on transient failure
-// and the retry must still carry a nonce. Cleared on fetch success.
-static bool IsKeyMarkedForCacheBust(const std::string& canonicalKey) {
+// Peek (do not consume) — the fetch may be retried on transient failure and the
+// retry must still carry a nonce. Returns the generation to carry, or 0 when
+// the key is not marked. Cleared on fetch success, by generation.
+static uint64_t CacheBustGenerationForKey(const std::string& canonicalKey) {
   std::lock_guard<std::mutex> lock(g_bustNextFetchMutex);
-  if (g_bustNextFetchKeys.empty()) return false;
-  return g_bustNextFetchKeys.find(canonicalKey) != g_bustNextFetchKeys.end();
+  if (g_bustNextFetchKeys.empty()) return 0;
+  auto it = g_bustNextFetchKeys.find(canonicalKey);
+  return it == g_bustNextFetchKeys.end() ? 0 : it->second;
 }
 
-static void ClearCacheBustForKey(const std::string& canonicalKey) {
+// Clears the mark this fetch actually satisfied. A newer mark has a newer
+// generation and is left standing for the fetch that will carry it.
+static void ClearCacheBustForKey(const std::string& canonicalKey, uint64_t observedGeneration) {
+  if (observedGeneration == 0) return;
   std::lock_guard<std::mutex> lock(g_bustNextFetchMutex);
-  if (g_bustNextFetchKeys.empty()) return;
-  g_bustNextFetchKeys.erase(canonicalKey);
+  auto it = g_bustNextFetchKeys.find(canonicalKey);
+  if (it != g_bustNextFetchKeys.end() && it->second == observedGeneration) {
+    g_bustNextFetchKeys.erase(it);
+  }
 }
 
 // ============================================================================
@@ -320,7 +344,7 @@ static void ClearCacheBustForKey(const std::string& canonicalKey) {
 // matching the existing convention in this file.
 static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& canonicalKey,
                                      std::string& out, std::string& contentType, int& status,
-                                     bool* outBustRequested = nullptr);
+                                     uint64_t* outBustGeneration = nullptr);
 
 // synchronous-fetch timing histogram.
 //
@@ -492,15 +516,18 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
   std::string body;
   std::string contentType;
   int status = 0;
-  bool bustRequested = false;
+  uint64_t bustGeneration = 0;
   bool transportOk =
-      PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status, &bustRequested);
+      PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status, &bustGeneration);
   if (!transportOk) {
     // One retry, and only for a transport error: an HTTP status is an answer,
     // not a failure to communicate, so asking again would just repeat it.
     TNS_DEBUG(Esm, "[http-loader] retrying %s after initial fetch error", url.c_str());
     usleep(120 * 1000);
-    transportOk = PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status);
+    // The retry re-peeks, so the generation it carries — the one whose nonce is
+    // on the wire for the body we end up with — replaces the first attempt's.
+    transportOk =
+        PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status, &bustGeneration);
   }
   // NOTE: no long dev-server-startup retry loop here on purpose. The CLI's
   // `compileWithWatch` gates app deploy/restart on its `vite serve`
@@ -513,8 +540,8 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
   // 2xx alone is not enough: an SPA fallback answering 200 text/html would
   // otherwise consume the eviction nonce and leave the next fetch cacheable.
   // Same rule as the async path.
-  if (result.ok && bustRequested) {
-    ClearCacheBustForKey(canonicalKey);
+  if (result.ok) {
+    ClearCacheBustForKey(canonicalKey, bustGeneration);
   }
 
   if (!result.ok) {
@@ -573,12 +600,12 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
 // Shared request builder for the sync (NSURLConnection) and async
 // (NSURLSession) module fetch paths so both carry identical cache-defeat
 // semantics. Returns an autoreleased NSMutableURLRequest (nil for
-// unparseable URLs) and reports via `outBustRequested` whether the URL was
+// unparseable URLs) and reports via `outBustGeneration` which mark the URL was
 // marked for an eviction-driven cache-bust nonce (the caller clears the
 // mark once a fresh body actually arrives).
 static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url,
                                                     const std::string& canonicalKey,
-                                                    bool* outBustRequested) {
+                                                    uint64_t* outBustGeneration) {
   // One-time: replace the shared NSURLCache with a zero-capacity one
   // so CFNetwork has no on-disk store to satisfy fetches from. Per-
   // request cache policy + `removeCachedResponseForRequest:` were
@@ -602,9 +629,9 @@ static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url,
   // verbatim (some Vite virtual routes require exact-match URLs and
   // 404 on unknown query params).
   std::string fetchUrl = url;
-  const bool bustRequested = IsKeyMarkedForCacheBust(canonicalKey);
-  if (outBustRequested) *outBustRequested = bustRequested;
-  if (bustRequested) {
+  const uint64_t bustGeneration = CacheBustGenerationForKey(canonicalKey);
+  if (outBustGeneration) *outBustGeneration = bustGeneration;
+  if (bustGeneration != 0) {
     static std::atomic<uint64_t> s_fetchSeq{0};
     const uint64_t seq = s_fetchSeq.fetch_add(1, std::memory_order_relaxed);
     const uint64_t nowMs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0);
@@ -655,11 +682,11 @@ static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url,
 
 static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& canonicalKey,
                                      std::string& out, std::string& contentType, int& status,
-                                     bool* outBustRequested) {
+                                     uint64_t* outBustGeneration) {
   @autoreleasepool {
-    bool bustRequested = false;
-    NSMutableURLRequest* request = BuildModuleFetchRequest(url, canonicalKey, &bustRequested);
-    if (outBustRequested) *outBustRequested = bustRequested;
+    uint64_t bustGeneration = 0;
+    NSMutableURLRequest* request = BuildModuleFetchRequest(url, canonicalKey, &bustGeneration);
+    if (outBustGeneration) *outBustGeneration = bustGeneration;
     if (!request) {
       status = 0;
       return false;
@@ -787,8 +814,8 @@ static void PerformModuleFetchAsyncAttempt(
     const std::string& url, const std::string& canonicalKey, int attempt,
     std::function<void(ModuleFetchResult result)>* completionHeap) {
   @autoreleasepool {
-    bool bustRequested = false;
-    NSMutableURLRequest* request = BuildModuleFetchRequest(url, canonicalKey, &bustRequested);
+    uint64_t bustGeneration = 0;
+    NSMutableURLRequest* request = BuildModuleFetchRequest(url, canonicalKey, &bustGeneration);
     if (!request) {
       ModuleFetchResult failed;
       failed.failureReason = "HTTP import failed: " + url + " (malformed request URL)";
@@ -799,7 +826,7 @@ static void PerformModuleFetchAsyncAttempt(
 
     const std::string urlCopy = url;
     const std::string keyCopy = canonicalKey;
-    const bool bust = bustRequested;
+    const uint64_t bust = bustGeneration;
     const uint64_t startUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
     NSURLSessionDataTask* task = [ModuleFetchSession()
         dataTaskWithRequest:request
@@ -849,8 +876,8 @@ static void PerformModuleFetchAsyncAttempt(
               } else {
                 ClassifyModuleResponse(urlCopy, error == nil, status, contentType, body, result);
 
-                if (result.ok && bust) {
-                  ClearCacheBustForKey(keyCopy);
+                if (result.ok) {
+                  ClearCacheBustForKey(keyCopy, bust);
                 }
                 if (!result.ok) {
                   TNS_DEBUG(Esm, "[http-loader][fetch-async][reject] attempt=%d %s", attempt,

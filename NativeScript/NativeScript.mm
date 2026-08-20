@@ -70,14 +70,21 @@ std::unique_ptr<Runtime> runtime_;
     const CFAbsoluteTime deadline =
         CFAbsoluteTimeGetCurrent() + 2 * tns::kModuleEvaluateDeadlineSeconds;
     bool terminated = false;
-    while ((entryPending || tns::HasPendingAsyncModuleGraphWork()) &&
-           CFAbsoluteTimeGetCurrent() < deadline) {
-      // Nothing pending can still complete once execution is terminating, so
-      // waiting out the remaining backstop would only delay the report. Both
-      // signals: V8 reports only a materialized termination, which needs JS to
-      // run, and an entry parked on a promise nothing settles never runs any.
+    for (;;) {
+      // Termination outranks everything, including an entry that settled in the
+      // same slice: boot must report the terminating fatal rather than take the
+      // normal exit and carry on into an app on a stopping isolate. Nothing
+      // pending can complete after this point either. Both signals: V8 reports
+      // only a materialized termination, which needs JS to run, and an entry
+      // parked on a promise nothing settles never runs any.
       if (runtime_->IsExecutionTerminating() || runtime_->IsTerminationRequested()) {
         terminated = true;
+        break;
+      }
+      if (!(entryPending || tns::HasPendingAsyncModuleGraphWork())) {
+        break;
+      }
+      if (CFAbsoluteTimeGetCurrent() >= deadline) {
         break;
       }
       CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, true);

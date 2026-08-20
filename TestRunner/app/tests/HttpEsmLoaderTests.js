@@ -1143,6 +1143,17 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
             checkKey("http://h/ns/core", "http://h/ns/core");
         });
 
+        // Some loaders hand the URL over wrapped as file://http(s)://…, and a
+        // path join can collapse the scheme inside that wrapper too. Unwrapping
+        // and repairing have to compose, or the wrapped-collapsed form becomes
+        // a third identity for the same module.
+        it("repairs a collapsed scheme inside a file:// wrapper", function () {
+            checkKey("file://http:/h/ns/core", "http://h/ns/core");
+            checkKey("file://https:/h/ns/core", "https://h/ns/core");
+            // The well-formed wrapper still unwraps to the same key.
+            checkKey("file://http://h/ns/core", "http://h/ns/core");
+        });
+
         it("treats module identity as literally the URL — no path-tag collapses", function () {
             checkKey("http://h/ns/m/foo.js", "http://h/ns/m/foo.js");
             checkKey("http://h/ns/rt", "http://h/ns/rt");
