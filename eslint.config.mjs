@@ -16,6 +16,7 @@ const capturedStatics = [
   ['ArrayBuffer', 'isView', 'ArrayBufferIsView'],
   ['JSON', 'stringify', 'JSONStringify'],
   ['Number', 'isFinite', 'NumberIsFinite'],
+  ['Number', 'isInteger', 'NumberIsInteger'],
   ['Number', 'isNaN', 'NumberIsNaN'],
   ['Number', 'parseFloat', 'NumberParseFloat'],
   ['Number', 'parseInt', 'NumberParseInt'],
@@ -42,7 +43,7 @@ const capturedStatics = [
 // fills in after init). Array.from has no primordial: copying `arguments` goes
 // through an index loop instead, because Array.from depends on the tamperable
 // array iterator protocol.
-const restrictedGlobals = ['Error', 'Map', 'Number', 'Proxy', 'Set', 'String', 'TypeError'].map((name) => ({
+const restrictedGlobals = ['Error', 'Map', 'Number', 'Proxy', 'RangeError', 'Set', 'String', 'TypeError'].map((name) => ({
   name,
   message: `Destructure ${name} from primordials — builtins must not read intrinsics off globals user code can replace.`,
 }));

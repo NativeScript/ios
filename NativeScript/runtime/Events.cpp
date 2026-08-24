@@ -25,6 +25,13 @@ void Events::Init(Local<Context> context) {
   auto cache = Caches::Get(isolate);
   cache->GlobalEventTarget =
       std::make_unique<Persistent<v8::Object>>(isolate, result.As<Object>());
+
+  // AbortController/AbortSignal (internal/abort-signal.js) build directly on
+  // the event primitives installed above; no native binding, no export.
+  Local<Value> abortResult;
+  success = BuiltinLoader::RunBuiltin(context, BuiltinId::kAbortSignal)
+                .ToLocal(&abortResult);
+  tns::Assert(success, isolate);
 }
 
 }  // namespace tns

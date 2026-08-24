@@ -169,6 +169,9 @@ require("./ExceptionHandlingTests");
 // WHATWG error events (error/unhandledrejection/rejectionhandled, reportError)
 require("./ErrorEventsTests");
 
+// AbortController/AbortSignal (abort/timeout/any) on top of EventTarget
+require("./AbortSignalTests");
+
 // interop.escapeException + JS<->native boundary hardening (Phase 3)
 require("./EscapeExceptionTests");
 
