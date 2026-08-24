@@ -1,4 +1,5 @@
 $(SRCROOT)/tools/js2c.mjs
+$(SRCROOT)/NativeScript/runtime/js/abort-signal.js
 $(SRCROOT)/NativeScript/runtime/js/blob-url.js
 $(SRCROOT)/NativeScript/runtime/js/class-extends.js
 $(SRCROOT)/NativeScript/runtime/js/error-events.js

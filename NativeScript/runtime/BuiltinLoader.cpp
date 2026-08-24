@@ -28,7 +28,30 @@ constexpr const char* kRequireParamName = "require";
 constexpr const char* kModuleParamName = "module";
 constexpr const char* kBindingParamName = "binding";
 constexpr const char* kPrimordialsParamName = "primordials";
-constexpr int kParamCount = 5;
+constexpr const char* kInternalsParamName = "internals";
+constexpr int kParamCount = 6;
+
+// Per-isolate `internals` object handed to every builtin: the private
+// channel for cross-builtin capabilities (hook keys, setters) that must
+// never reach app code. Producers publish during their init, consumers read
+// during theirs, so Runtime::Init's ordering is the dependency graph.
+struct BuiltinInternalsState {
+  Persistent<Object> internals;
+};
+
+MaybeLocal<Object> GetInternals(Local<Context> context) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  auto* state = Caches::StateFor<BuiltinInternalsState>(isolate);
+  if (state == nullptr) {
+    return MaybeLocal<Object>();
+  }
+  if (!state->internals.IsEmpty()) {
+    return state->internals.Get(isolate);
+  }
+  Local<Object> internals = Object::New(isolate);
+  state->internals.Reset(isolate, internals);
+  return internals;
+}
 
 // The `require` every builtin receives: builtin specifiers only, so a builtin
 // can never reach application code or the filesystem.
@@ -94,12 +117,12 @@ MaybeLocal<v8::Function> CompileBuiltin(Local<Context> context, BuiltinId id) {
   );
   Local<v8::String> sourceText = tns::ToV8String(
       isolate, builtin.source, static_cast<int>(builtin.length));
-  Local<v8::String> params[] = {
-      tns::ToV8String(isolate, kExportsParamName),
-      tns::ToV8String(isolate, kRequireParamName),
-      tns::ToV8String(isolate, kModuleParamName),
-      tns::ToV8String(isolate, kBindingParamName),
-      tns::ToV8String(isolate, kPrimordialsParamName)};
+  Local<v8::String> params[] = {tns::ToV8String(isolate, kExportsParamName),
+                                tns::ToV8String(isolate, kRequireParamName),
+                                tns::ToV8String(isolate, kModuleParamName),
+                                tns::ToV8String(isolate, kBindingParamName),
+                                tns::ToV8String(isolate, kPrimordialsParamName),
+                                tns::ToV8String(isolate, kInternalsParamName)};
 
   Local<v8::Function> fn;
   if (!blob.empty()) {
@@ -140,7 +163,8 @@ MaybeLocal<v8::Function> CompileBuiltin(Local<Context> context, BuiltinId id) {
 }
 
 MaybeLocal<Value> CallBuiltin(Local<Context> context, BuiltinId id,
-                              Local<Value> binding, Local<Value> primordials) {
+                              Local<Value> binding, Local<Value> primordials,
+                              Local<Object> internals) {
   Isolate* isolate = v8::Isolate::GetCurrent();
 
   Local<v8::Function> fn;
@@ -161,9 +185,12 @@ MaybeLocal<Value> CallBuiltin(Local<Context> context, BuiltinId id,
   }
 
   Local<Value> args[] = {
-      exportsObj, require, moduleObj,
+      exportsObj,
+      require,
+      moduleObj,
       binding.IsEmpty() ? v8::Undefined(isolate).As<Value>() : binding,
-      primordials};
+      primordials,
+      internals};
   if (fn->Call(context, v8::Undefined(isolate), kParamCount, args).IsEmpty()) {
     return MaybeLocal<Value>();
   }
@@ -175,7 +202,8 @@ MaybeLocal<Value> CallBuiltin(Local<Context> context, BuiltinId id,
 // isolate — during runtime init, before user code can replace a global.
 // Builtins compiled later in the isolate's life get the same pristine
 // snapshot.
-MaybeLocal<Object> GetPrimordials(Local<Context> context) {
+MaybeLocal<Object> GetPrimordials(Local<Context> context,
+                                  Local<Object> internals) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   if (cache->Primordials != nullptr) {
@@ -184,7 +212,7 @@ MaybeLocal<Object> GetPrimordials(Local<Context> context) {
 
   Local<Value> result;
   if (!CallBuiltin(context, BuiltinId::kPrimordials, Local<Value>(),
-                   v8::Undefined(isolate))
+                   v8::Undefined(isolate), internals)
            .ToLocal(&result) ||
       !result->IsObject()) {
     return MaybeLocal<Object>();
@@ -201,12 +229,17 @@ MaybeLocal<Object> GetPrimordials(Local<Context> context) {
 MaybeLocal<Value> BuiltinLoader::RunBuiltin(Local<Context> context,
                                             BuiltinId id,
                                             Local<Value> binding) {
-  Local<Object> primordials;
-  if (!GetPrimordials(context).ToLocal(&primordials)) {
+  Local<Object> internals;
+  if (!GetInternals(context).ToLocal(&internals)) {
     return MaybeLocal<Value>();
   }
 
-  return CallBuiltin(context, id, binding, primordials);
+  Local<Object> primordials;
+  if (!GetPrimordials(context, internals).ToLocal(&primordials)) {
+    return MaybeLocal<Value>();
+  }
+
+  return CallBuiltin(context, id, binding, primordials, internals);
 }
 
 }  // namespace tns
