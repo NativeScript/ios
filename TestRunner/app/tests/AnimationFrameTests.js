@@ -1,0 +1,272 @@
+// Contract port of the Android runtime's testPostFrameCallback.js: the two
+// frame-callback surfaces must be indistinguishable across platforms from JS.
+describe("test PostFrameCallback", function () {
+  const defaultWaitTime = 300;
+  it("__postFrameCallback exists", () => {
+    expect(global.__postFrameCallback).toBeDefined();
+  });
+
+  it("__removeFrameCallback exists", () => {
+    expect(global.__removeFrameCallback).toBeDefined();
+  });
+
+  it("should throw when providing wrong arguments", () => {
+    expect(() => global.__postFrameCallback(null)).toThrow();
+    expect(() => global.__removeFrameCallback(null)).toThrow();
+    expect(() => global.__postFrameCallback("")).toThrow();
+    expect(() => global.__removeFrameCallback("")).toThrow();
+    expect(() => global.__postFrameCallback()).toThrow();
+    expect(() => global.__removeFrameCallback()).toThrow();
+  });
+
+  it("should call the callback once", (done) => {
+    let callCount = 0;
+    const callback = () => {
+      callCount++;
+    };
+    global.__postFrameCallback(callback);
+    setTimeout(() => {
+      expect(callCount).toBe(1);
+      done();
+    }, defaultWaitTime);
+  });
+
+  it("should pass the frame time and a performance-timeline timestamp", (done) => {
+    global.__postFrameCallback(function (frameTimeNanos, performanceMillis) {
+      expect(arguments.length).toBe(2);
+      expect(typeof frameTimeNanos).toBe("number");
+      expect(typeof performanceMillis).toBe("number");
+      expect(frameTimeNanos).toBeGreaterThan(0);
+      const now = performance.now();
+      expect(performanceMillis).toBeGreaterThan(0);
+      expect(performanceMillis).not.toBeGreaterThan(now);
+      expect(now - performanceMillis).toBeLessThan(250);
+      done();
+    });
+  });
+
+  it("should call the callback once even if scheduled multiple times", (done) => {
+    let callCount = 0;
+    const callback = () => {
+      callCount++;
+    };
+    global.__postFrameCallback(callback);
+    global.__postFrameCallback(callback);
+    setTimeout(() => {
+      expect(callCount).toBe(1);
+      done();
+    }, defaultWaitTime);
+  });
+
+  it("should not trigger the callback if it was canceled", (done) => {
+    let callCount = 0;
+    const callback = () => {
+      callCount++;
+    };
+    global.__postFrameCallback(callback);
+    global.__removeFrameCallback(callback);
+    setTimeout(() => {
+      expect(callCount).toBe(0);
+      done();
+    }, defaultWaitTime);
+  });
+
+  it("should trigger the callback if it was canceled then re-scheduled", (done) => {
+    let callCount = 0;
+    const callback = () => {
+      callCount++;
+    };
+    global.__postFrameCallback(callback);
+    global.__removeFrameCallback(callback);
+    global.__postFrameCallback(callback);
+    setTimeout(() => {
+      expect(callCount).toBe(1);
+      done();
+    }, defaultWaitTime);
+  });
+
+  it("should trigger the callback if it was re-scheduled by itself", (done) => {
+    let callCount = 0;
+    const callback = () => {
+      callCount++;
+      if (callCount === 1) {
+        global.__postFrameCallback(callback);
+      }
+    };
+    global.__postFrameCallback(callback);
+    setTimeout(() => {
+      expect(callCount).toBe(2);
+      done();
+    }, defaultWaitTime);
+  });
+
+  it("honors the optional delay", (done) => {
+    const start = Date.now();
+    global.__postFrameCallback(() => {
+      expect(Date.now() - start).not.toBeLessThan(180);
+      done();
+    }, 200);
+  });
+
+  it("should release the callback after being done", (done) => {
+    let callCount = 0;
+    let callback = () => {
+      callCount++;
+    };
+    global.__postFrameCallback(callback);
+    const weakCallback = new WeakRef(callback);
+    callback = null;
+    gc();
+    setTimeout(() => {
+      gc();
+      expect(callCount).toBe(1);
+      expect(!!weakCallback.deref()).toBe(false);
+      done();
+    }, defaultWaitTime);
+  });
+
+  it("should release the callback removal", (done) => {
+    let callCount = 0;
+    let callback = () => {
+      callCount++;
+    };
+    global.__postFrameCallback(callback);
+    global.__removeFrameCallback(callback);
+    const weakCallback = new WeakRef(callback);
+    callback = null;
+    gc();
+    setTimeout(() => {
+      gc();
+      expect(callCount).toBe(0);
+      expect(!!weakCallback.deref()).toBe(false);
+      done();
+    }, defaultWaitTime);
+  });
+
+  it("should retain callback until called", (done) => {
+    let callCount = 0;
+    let callback = () => {
+      callCount++;
+      gc();
+      expect(!!weakCallback.deref()).toBe(true);
+    };
+    global.__postFrameCallback(callback);
+    global.__removeFrameCallback(callback);
+    global.__postFrameCallback(callback);
+    const weakCallback = new WeakRef(callback);
+    callback = null;
+    gc();
+    setTimeout(() => {
+      gc();
+      expect(callCount).toBe(1);
+      expect(!!weakCallback.deref()).toBe(false);
+      done();
+    }, defaultWaitTime);
+  });
+});
+
+describe("requestAnimationFrame", function () {
+  const defaultWaitTime = 300;
+
+  it("is exposed under the standard global names", () => {
+    expect(typeof global.requestAnimationFrame).toBe("function");
+    expect(typeof global.cancelAnimationFrame).toBe("function");
+  });
+
+  it("throws on non-function callbacks and ignores bogus cancel handles", () => {
+    expect(() => global.requestAnimationFrame()).toThrowError(TypeError);
+    expect(() => global.requestAnimationFrame(null)).toThrowError(TypeError);
+    expect(() => global.requestAnimationFrame("")).toThrowError(TypeError);
+    expect(() => global.cancelAnimationFrame()).not.toThrow();
+    expect(() => global.cancelAnimationFrame(null)).not.toThrow();
+    expect(() => global.cancelAnimationFrame(-1)).not.toThrow();
+    expect(() => global.cancelAnimationFrame(Number.MAX_SAFE_INTEGER)).not.toThrow();
+  });
+
+  it("returns a handle and passes a single performance-timeline timestamp", (done) => {
+    const handle = global.requestAnimationFrame(function (timestamp) {
+      expect(arguments.length).toBe(1);
+      expect(typeof timestamp).toBe("number");
+      const now = performance.now();
+      expect(timestamp).toBeGreaterThan(0);
+      expect(timestamp).not.toBeGreaterThan(now);
+      expect(now - timestamp).toBeLessThan(250);
+      done();
+    });
+    expect(typeof handle).toBe("number");
+    expect(handle).toBeGreaterThan(0);
+  });
+
+  it("runs the same function once per request", (done) => {
+    let callCount = 0;
+    const callback = () => {
+      callCount++;
+    };
+    const first = global.requestAnimationFrame(callback);
+    const second = global.requestAnimationFrame(callback);
+    expect(second).not.toBe(first);
+    setTimeout(() => {
+      expect(callCount).toBe(2);
+      done();
+    }, defaultWaitTime);
+  });
+
+  it("cancels only the cancelled request", (done) => {
+    let cancelledRan = false;
+    let keptRan = false;
+    const cancelled = global.requestAnimationFrame(() => {
+      cancelledRan = true;
+    });
+    global.requestAnimationFrame(() => {
+      keptRan = true;
+    });
+    global.cancelAnimationFrame(cancelled);
+    setTimeout(() => {
+      expect(cancelledRan).toBe(false);
+      expect(keptRan).toBe(true);
+      done();
+    }, defaultWaitTime);
+  });
+
+  it("gives every callback in a batch the same timestamp", (done) => {
+    let firstTimestamp = null;
+    global.requestAnimationFrame((timestamp) => {
+      firstTimestamp = timestamp;
+    });
+    global.requestAnimationFrame((timestamp) => {
+      expect(firstTimestamp).not.toBeNull();
+      expect(timestamp).toBe(firstTimestamp);
+      done();
+    });
+  });
+
+  it("chains frames when the callback re-requests itself", (done) => {
+    const timestamps = [];
+    const callback = (timestamp) => {
+      timestamps.push(timestamp);
+      if (timestamps.length === 1) {
+        global.requestAnimationFrame(callback);
+      }
+    };
+    global.requestAnimationFrame(callback);
+    setTimeout(() => {
+      expect(timestamps.length).toBe(2);
+      expect(timestamps[1]).not.toBeLessThan(timestamps[0]);
+      done();
+    }, defaultWaitTime);
+  });
+
+  it("does not disturb __postFrameCallback dedupe for the same function", (done) => {
+    let callCount = 0;
+    const callback = () => {
+      callCount++;
+    };
+    global.__postFrameCallback(callback);
+    global.requestAnimationFrame(callback);
+    global.__postFrameCallback(callback);
+    setTimeout(() => {
+      expect(callCount).toBe(2);
+      done();
+    }, defaultWaitTime);
+  });
+});
