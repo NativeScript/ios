@@ -1,3 +1,13 @@
+// A timer source foreign to the runtime's event loop: a CFRunLoopTimer on the
+// same runloop, outside the ordered timer lane. The global setTimeout is the
+// runtime's own timers, so tests probing interleaving with non-runtime work
+// must schedule NSTimers directly.
+function foreignSetTimeout(callback, milliseconds) {
+    const timer = NSTimer.scheduledTimerWithTimeIntervalRepeatsBlock(
+        milliseconds / 1000, false, () => callback());
+    NSRunLoop.currentRunLoop.addTimerForMode(timer, NSRunLoopCommonModes);
+}
+
 // V8 delivers these resolutions as platform foreground tasks, so they only
 // settle if the runtime pumps its foreground task runner (the EventLoop's
 // internal lane).
@@ -121,8 +131,6 @@ describe("event loop ordered macrotasks", function () {
         });
     });
 
-    // native timers (__ns__*): the app-level `setTimeout` global in this test
-    // app is an NSTimer-based polyfill, not the runtime timers
     it("stays FIFO-ordered with native setTimeout(0)", function (done) {
         const order = [];
         __ns__queueMacrotask(() => order.push("macro1"));
@@ -139,19 +147,18 @@ describe("event loop ordered macrotasks", function () {
         expect(() => __ns__queueMacrotask()).toThrowError(TypeError);
     });
 
-    // the global setTimeout is the harness's NSTimer polyfill - a foreign
-    // CFRunLoopTimer on the same runloop. A foreign timer due between two of
-    // our matured tokens must fire between them (one token drains per fire;
-    // the runloop orders due timers by fire date), not after the batch.
+    // A foreign timer due between two of our matured tokens must fire between
+    // them (one token drains per fire; the runloop orders due timers by fire
+    // date), not after the batch.
     it("interleaves with foreign NSTimer timeouts by due time", function (done) {
         const order = [];
         __ns__setTimeout(() => order.push("ns20"), 20);
-        setTimeout(() => order.push("nstimer25"), 25);
+        foreignSetTimeout(() => order.push("nstimer25"), 25);
         __ns__setTimeout(() => order.push("ns30"), 30);
         // make all three overdue so they drain from the same runloop burst
         const start = Date.now();
         while (Date.now() - start < 45) { }
-        setTimeout(() => {
+        foreignSetTimeout(() => {
             expect(order).toEqual(["ns20", "nstimer25", "ns30"]);
             done();
         }, 30);
@@ -175,7 +182,7 @@ describe("event loop immediate timer yielding", function () {
             drainStep = step;
         };
         global.addEventListener("unhandledrejection", onRejection);
-        setTimeout(() => { nstimerStep = step; }, 0); // foreign NSTimer
+        foreignSetTimeout(() => { nstimerStep = step; }, 0);
         NSOperationQueue.mainQueue.addOperationWithBlock(() => { mainQueueStep = step; });
 
         (function chain() {
@@ -190,7 +197,7 @@ describe("event loop immediate timer yielding", function () {
             // NSTimer wait: guarantees the loop reaches before-waiting at
             // least once after the chain, so a starved drain still fires
             // before the assertions instead of leaking into later specs
-            setTimeout(() => {
+            foreignSetTimeout(() => {
                 global.removeEventListener("unhandledrejection", onRejection);
                 expect(nstimerStep).toBeGreaterThan(0);
                 expect(nstimerStep).toBeLessThan(25);

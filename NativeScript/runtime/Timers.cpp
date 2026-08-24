@@ -245,22 +245,26 @@ void Timers::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
     timerState->eventLoop_->SetTimerSource(timerState);
   }
   Caches::Get(isolate)->registerCacheBoundObject(timerState);
+  Local<v8::External> data = v8::External::New(
+      isolate, timerState, v8::kExternalPointerTypeTagDefault);
+  // the __ns__-prefixed variants are kept for backwards compatibility with
+  // callers that predate the timers being exposed under their standard names
+  tns::SetMethod(isolate, globalTemplate, "setTimeout",
+                 Timers::SetTimeoutCallback, data);
+  tns::SetMethod(isolate, globalTemplate, "setInterval",
+                 Timers::SetIntervalCallback, data);
+  tns::SetMethod(isolate, globalTemplate, "clearTimeout",
+                 Timers::ClearTimeoutCallback, data);
+  tns::SetMethod(isolate, globalTemplate, "clearInterval",
+                 Timers::ClearTimeoutCallback, data);
   tns::SetMethod(isolate, globalTemplate, "__ns__setTimeout",
-                 Timers::SetTimeoutCallback,
-                 v8::External::New(isolate, timerState,
-                                   v8::kExternalPointerTypeTagDefault));
+                 Timers::SetTimeoutCallback, data);
   tns::SetMethod(isolate, globalTemplate, "__ns__setInterval",
-                 Timers::SetIntervalCallback,
-                 v8::External::New(isolate, timerState,
-                                   v8::kExternalPointerTypeTagDefault));
+                 Timers::SetIntervalCallback, data);
   tns::SetMethod(isolate, globalTemplate, "__ns__clearTimeout",
-                 Timers::ClearTimeoutCallback,
-                 v8::External::New(isolate, timerState,
-                                   v8::kExternalPointerTypeTagDefault));
+                 Timers::ClearTimeoutCallback, data);
   tns::SetMethod(isolate, globalTemplate, "__ns__clearInterval",
-                 Timers::ClearTimeoutCallback,
-                 v8::External::New(isolate, timerState,
-                                   v8::kExternalPointerTypeTagDefault));
+                 Timers::ClearTimeoutCallback, data);
 }
 
 void Timers::SetTimer(const v8::FunctionCallbackInfo<v8::Value>& args,

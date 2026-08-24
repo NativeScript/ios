@@ -4,7 +4,6 @@ console.log('Application Start!');
 // The report delivery deadline (REPORT_DEADLINE_SECONDS) counts from launch.
 var appStartMs = Date.now();
 
-require("../Infrastructure/timers");
 require("../Infrastructure/simulator");
 global.utf8 = require("../Infrastructure/utf8")
 
