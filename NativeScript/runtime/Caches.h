@@ -218,12 +218,10 @@ class Caches {
   std::unique_ptr<v8::Persistent<v8::Function>> UnmanagedTypeCtorFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
 
-  // `ns:`/`node:` builtin modules (NsBuiltinModules), keyed by specifier. Both
-  // are per isolate: a builtin module is a singleton per realm, so workers get
-  // their own exports objects and their own synthetic modules.
-  robin_hood::unordered_map<std::string,
-                            std::unique_ptr<v8::Persistent<v8::Object>>>
-      BuiltinModuleExports;
+  // Synthetic ES modules wrapping the `ns:`/`node:` builtin modules
+  // (NsBuiltinModules), keyed by specifier. Per isolate: a builtin module is a
+  // singleton per realm, so workers get their own. The exports they wrap live
+  // in the per-isolate builtin exports cache (BuiltinLoader::GetExports).
   robin_hood::unordered_map<std::string,
                             std::unique_ptr<v8::Persistent<v8::Module>>>
       BuiltinModules;

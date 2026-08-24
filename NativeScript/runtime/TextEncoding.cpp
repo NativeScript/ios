@@ -8,6 +8,7 @@
 #include "v8-fast-api-calls.h"
 #pragma clang diagnostic pop
 
+#include "BuiltinLoader.h"
 #include "Helpers.h"
 
 using namespace v8;
@@ -639,9 +640,7 @@ bool FastEncodeInto(Local<Value> receiver, Local<Value> source,
 const CFunction kFastEncodeInto = CFunction::Make(FastEncodeInto);
 #endif
 
-}  // namespace
-
-Local<Object> TextEncoding::CreateBinding(Local<Context> context) {
+MaybeLocal<Object> CreateBinding(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   Local<Object> binding = Object::New(isolate);
 
@@ -658,6 +657,13 @@ Local<Object> TextEncoding::CreateBinding(Local<Context> context) {
 #endif
 
   return binding;
+}
+
+}  // namespace
+
+MaybeLocal<Object> TextEncoding::GetExports(Local<Context> context) {
+  return BuiltinLoader::GetExports(context, BuiltinId::kTextEncoding,
+                                   CreateBinding);
 }
 
 }  // namespace tns

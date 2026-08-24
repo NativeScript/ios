@@ -10,7 +10,9 @@ namespace tns {
 // null instead of throwing, so the builtin owns the error shape.
 class Base64 {
  public:
-  static v8::Local<v8::Object> CreateBinding(v8::Local<v8::Context> context);
+  // The builtin's exports, `{ atob, btoa }`, from the one run it gets per
+  // isolate.
+  static v8::MaybeLocal<v8::Object> GetExports(v8::Local<v8::Context> context);
 };
 
 }  // namespace tns

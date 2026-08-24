@@ -8,6 +8,7 @@
 #include "Helpers.h"
 #include "ModuleInternalCallbacks.h"
 #include "Runtime.h"
+#include "TextEncoding.h"
 
 using namespace v8;
 
@@ -18,9 +19,17 @@ namespace {
 constexpr const char* kNsPrefix = "ns:";
 constexpr const char* kNodePrefix = "node:";
 
+// Defined below, each next to the natives it gathers.
+MaybeLocal<Object> NsModuleBinding(Local<Context> context);
+MaybeLocal<Object> NsRuntimeBinding(Local<Context> context);
+MaybeLocal<Object> NsUtilBinding(Local<Context> context);
+
 struct Registration {
   const char* specifier;
   BuiltinId builtin;
+  // Natives the file receives as `binding`, null when it needs none (every
+  // `node:` shim, which reaches its `ns:` module through require instead).
+  BuiltinLoader::BindingFactory binding;
 };
 
 // The public registry (docs/ns-builtin-modules.md). One specifier, one source
@@ -28,12 +37,12 @@ struct Registration {
 // adapts, so the two module objects stay distinct and the standard module
 // never carries compatibility code.
 constexpr Registration kRegistry[] = {
-    {"ns:module", BuiltinId::kNsModule},
-    {"ns:runtime", BuiltinId::kNsRuntime},
-    {"ns:util", BuiltinId::kNsUtil},
-    {"node:module", BuiltinId::kNodeModule},
-    {"node:url", BuiltinId::kNodeUrl},
-    {"node:util", BuiltinId::kNodeUtil},
+    {"ns:module", BuiltinId::kNsModule, NsModuleBinding},
+    {"ns:runtime", BuiltinId::kNsRuntime, NsRuntimeBinding},
+    {"ns:util", BuiltinId::kNsUtil, NsUtilBinding},
+    {"node:module", BuiltinId::kNodeModule, nullptr},
+    {"node:url", BuiltinId::kNodeUrl, nullptr},
+    {"node:util", BuiltinId::kNodeUtil, nullptr},
 };
 
 // ns:runtime config keys. Each key defines its value domain and scope here;
@@ -145,97 +154,77 @@ bool HasPrefix(const std::string& specifier, const char* prefix) {
   return specifier.rfind(prefix, 0) == 0;
 }
 
-MaybeLocal<Object> BuildBinding(Local<Context> context, BuiltinId builtin) {
+MaybeLocal<Object> NsModuleBinding(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   Local<Object> binding = Object::New(isolate);
-
-  switch (builtin) {
-    case BuiltinId::kNsModule: {
-      // The HTTP-loader control surface (HttpLoader.mm). The binding builder
-      // decides build-dependent membership; ns-module.js only shapes
-      // and freezes whatever arrives.
-      if (!BuildNsModuleBinding(context, binding)) {
-        return MaybeLocal<Object>();
-      }
-      break;
-    }
-    case BuiltinId::kNsRuntime: {
-      Local<v8::Function> setConfig, getConfig;
-      if (!v8::Function::New(context, SetConfigCallback).ToLocal(&setConfig) ||
-          !v8::Function::New(context, GetConfigCallback).ToLocal(&getConfig) ||
-          !binding
-               ->Set(context, tns::ToV8String(isolate, "setConfig"), setConfig)
-               .FromMaybe(false) ||
-          !binding
-               ->Set(context, tns::ToV8String(isolate, "getConfig"), getConfig)
-               .FromMaybe(false)) {
-        return MaybeLocal<Object>();
-      }
-      break;
-    }
-    case BuiltinId::kNsUtil: {
-      // The console formatter is built once per realm; ns:util re-exports that
-      // instance instead of creating a second one.
-      Console::InitInspect(context);
-      std::shared_ptr<Caches> cache = Caches::Get(isolate);
-      if (cache->InspectFunc == nullptr) {
-        return MaybeLocal<Object>();
-      }
-      if (!binding
-               ->Set(context, tns::ToV8String(isolate, "inspect"),
-                     cache->InspectFunc->Get(isolate))
-               .FromMaybe(false)) {
-        return MaybeLocal<Object>();
-      }
-      break;
-    }
-    default:
-      break;
+  // The HTTP-loader control surface (HttpLoader.mm). The binding builder
+  // decides build-dependent membership; ns-module.js only shapes and freezes
+  // whatever arrives.
+  if (!BuildNsModuleBinding(context, binding)) {
+    return MaybeLocal<Object>();
   }
-
   return binding;
 }
 
-// Runs a module's builtin and caches its exports. Always leaves an exception
-// pending when it returns false.
-bool Instantiate(Local<Context> context, const Registration& requested) {
+MaybeLocal<Object> NsRuntimeBinding(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Object> binding = Object::New(isolate);
+  Local<v8::Function> setConfig, getConfig;
+  if (!v8::Function::New(context, SetConfigCallback).ToLocal(&setConfig) ||
+      !v8::Function::New(context, GetConfigCallback).ToLocal(&getConfig) ||
+      !binding->Set(context, tns::ToV8String(isolate, "setConfig"), setConfig)
+           .FromMaybe(false) ||
+      !binding->Set(context, tns::ToV8String(isolate, "getConfig"), getConfig)
+           .FromMaybe(false)) {
+    return MaybeLocal<Object>();
+  }
+  return binding;
+}
+
+// TextEncoder / TextDecoder for ns:util, read straight out of the
+// text-encoding builtin's per-isolate run, so the module's classes are the
+// objects the globals of the same name expose.
+void TextEncodingClassGetter(Local<v8::Name> property,
+                             const PropertyCallbackInfo<Value>& info) {
+  Local<Context> context = info.GetIsolate()->GetCurrentContext();
+  Local<Object> exports;
+  Local<Value> value;
+  if (TextEncoding::GetExports(context).ToLocal(&exports) &&
+      exports->Get(context, property).ToLocal(&value)) {
+    info.GetReturnValue().Set(value);
+  }
+}
+
+MaybeLocal<Object> NsUtilBinding(Local<Context> context) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Object> binding = Object::New(isolate);
+
+  // The console formatter is built once per realm; ns:util re-exports that
+  // instance instead of creating a second one.
+  Console::InitInspect(context);
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
-
-  // A shim reaches its ns: module through the builtin require, so the graph is
-  // walked while a module is still being built; a cycle would otherwise
-  // recurse until the stack runs out.
-  if (cache->BuiltinModulesInProgress.count(requested.specifier) > 0) {
-    isolate->ThrowException(Exception::Error(
-        tns::ToV8String(isolate, "Circular require of built-in module: " +
-                                     std::string(requested.specifier))));
-    return false;
+  if (cache->InspectFunc == nullptr) {
+    return MaybeLocal<Object>();
   }
-  cache->BuiltinModulesInProgress.emplace(requested.specifier);
-
-  TryCatch tc(isolate);
-  Local<Object> binding;
-  Local<Value> result;
-  bool built = BuildBinding(context, requested.builtin).ToLocal(&binding) &&
-               BuiltinLoader::RunBuiltin(context, requested.builtin, binding)
-                   .ToLocal(&result) &&
-               result->IsObject();
-  cache->BuiltinModulesInProgress.erase(requested.specifier);
-
-  if (built) {
-    cache->BuiltinModuleExports[requested.specifier] =
-        std::make_unique<Persistent<Object>>(isolate, result.As<Object>());
-    return true;
+  if (!binding
+           ->Set(context, tns::ToV8String(isolate, "inspect"),
+                 cache->InspectFunc->Get(isolate))
+           .FromMaybe(false)) {
+    return MaybeLocal<Object>();
   }
 
-  if (tc.HasCaught()) {
-    tc.ReThrow();
-    return false;
+  // Lazy so that requiring ns:util does not run the text-encoding builtin;
+  // ns-util.js keeps the read inside its own getters to preserve that.
+  for (const char* name : {"TextEncoder", "TextDecoder"}) {
+    if (binding
+            ->SetLazyDataProperty(context, tns::ToV8String(isolate, name),
+                                  TextEncodingClassGetter)
+            .IsNothing()) {
+      return MaybeLocal<Object>();
+    }
   }
-  isolate->ThrowException(Exception::Error(
-      tns::ToV8String(isolate, "Failed to initialize built-in module '" +
-                                   std::string(requested.specifier) + "'")));
-  return false;
+
+  return binding;
 }
 
 // The exports a synthetic module re-exports by name, in the order used both
@@ -327,17 +316,34 @@ MaybeLocal<Object> NsBuiltinModules::GetExports(Local<Context> context,
 
   Isolate* isolate = v8::Isolate::GetCurrent();
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
-  auto it = cache->BuiltinModuleExports.find(specifier);
-  if (it == cache->BuiltinModuleExports.end()) {
-    if (!Instantiate(context, *registration)) {
-      return MaybeLocal<Object>();
-    }
-    it = cache->BuiltinModuleExports.find(specifier);
-    if (it == cache->BuiltinModuleExports.end()) {
-      return MaybeLocal<Object>();
-    }
+
+  // A shim reaches its ns: module through the builtin require, so the graph is
+  // walked while a module is still being built; a cycle would otherwise
+  // recurse until the stack runs out.
+  if (cache->BuiltinModulesInProgress.count(specifier) > 0) {
+    isolate->ThrowException(Exception::Error(tns::ToV8String(
+        isolate, "Circular require of built-in module: " + specifier)));
+    return MaybeLocal<Object>();
   }
-  return it->second->Get(isolate);
+  cache->BuiltinModulesInProgress.emplace(specifier);
+
+  TryCatch tc(isolate);
+  Local<Object> exports;
+  bool built = BuiltinLoader::GetExports(context, registration->builtin,
+                                         registration->binding)
+                   .ToLocal(&exports);
+  cache->BuiltinModulesInProgress.erase(specifier);
+
+  if (built) {
+    return exports;
+  }
+  if (tc.HasCaught()) {
+    tc.ReThrow();
+    return MaybeLocal<Object>();
+  }
+  isolate->ThrowException(Exception::Error(tns::ToV8String(
+      isolate, "Failed to initialize built-in module '" + specifier + "'")));
+  return MaybeLocal<Object>();
 }
 
 MaybeLocal<Module> NsBuiltinModules::GetModule(Local<Context> context,
