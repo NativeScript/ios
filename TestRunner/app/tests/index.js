@@ -138,6 +138,7 @@ require("./Modules");
 require("./RuntimeImplementedAPIs");
 
 require("./Timers");
+require("./AnimationFrameTests");
 require("./EventLoopTests");
 
 require("./URL");
