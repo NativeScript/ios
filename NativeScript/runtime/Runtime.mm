@@ -12,6 +12,7 @@
 #include "InlineFunctions.h"
 #include "Interop.h"
 #include "IsolateTracked.h"
+#include "LazyGlobals.h"
 #include "NativeScriptException.h"
 #include "NativeScriptPlatform.h"
 #include "ObjectManager.h"
@@ -401,6 +402,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
     globalTemplate->Set(tns::ToV8String(isolate, "queueMicrotask"), qmtTemplate);
   }
   ObjectManager::Init(isolate, globalTemplate);
+  LazyGlobals::Init(isolate, globalTemplate);
   MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, isWorker);
 
   isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
