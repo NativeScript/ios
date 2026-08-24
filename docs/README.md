@@ -12,8 +12,9 @@
   work must share, and the documented spec deviations.
 - [AbortController / AbortSignal](abort-signal.md) — the DOM abort primitives
   (`AbortController`, `AbortSignal` with the `abort`/`timeout`/`any` statics)
-  layered on the runtime's `EventTarget`, and the documented deviations: no
-  `DOMException` (name-patched `Error` reasons) and no `WeakRef` bookkeeping.
+  layered on the runtime's `EventTarget`, the GC contract (weak timers and
+  `any()` links, listener-driven persistence), and the `DOMException`
+  stand-in (name-patched `Error` reasons).
 
 - [Error handling](error-handling.md) — global `error`/`unhandledrejection` events, `reportError`, catching native exceptions in JS (`error.nativeException`), forwarding JS throws to native (`interop.escapeException`), JS stacks on `NSException`, configuration flags, and crash-reporter integration.
 

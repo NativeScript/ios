@@ -22,6 +22,7 @@ const uncurryThis = FunctionPrototypeBind.bind(FunctionPrototypeCall);
 const intrinsics = {
   // Constructors and well-known symbols.
   Error,
+  FinalizationRegistry,
   Map,
   Number,
   Proxy,
@@ -30,6 +31,7 @@ const intrinsics = {
   String,
   TypeError,
   URL,
+  WeakRef,
   SymbolHasInstance: Symbol.hasInstance,
   SymbolIterator: Symbol.iterator,
   SymbolToStringTag: Symbol.toStringTag,
@@ -66,6 +68,8 @@ const intrinsics = {
   ArrayPrototypeSlice: uncurryThis(Array.prototype.slice),
   ArrayPrototypeSort: uncurryThis(Array.prototype.sort),
   ArrayPrototypeSplice: uncurryThis(Array.prototype.splice),
+  FinalizationRegistryPrototypeRegister: uncurryThis(FinalizationRegistry.prototype.register),
+  FinalizationRegistryPrototypeUnregister: uncurryThis(FinalizationRegistry.prototype.unregister),
   FunctionPrototypeApply: uncurryThis(FunctionPrototypeApply),
   FunctionPrototypeBind: uncurryThis(FunctionPrototypeBind),
   FunctionPrototypeCall: uncurryThis(FunctionPrototypeCall),
@@ -93,6 +97,7 @@ const intrinsics = {
   StringPrototypeStartsWith: uncurryThis(String.prototype.startsWith),
   StringPrototypeToLowerCase: uncurryThis(String.prototype.toLowerCase),
   SymbolPrototypeToString: uncurryThis(Symbol.prototype.toString),
+  WeakRefPrototypeDeref: uncurryThis(WeakRef.prototype.deref),
 
   // Iterator-protocol escape hatches: the captured `next` of the live map/set
   // iterator prototypes, so entries can be walked with early exit even after
