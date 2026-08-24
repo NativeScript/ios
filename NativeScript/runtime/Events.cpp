@@ -27,11 +27,11 @@ void Events::Init(Local<Context> context) {
       std::make_unique<Persistent<v8::Object>>(isolate, result.As<Object>());
 
   // AbortController/AbortSignal (internal/abort-signal.js) build directly on
-  // the event primitives installed above. The events export is its binding:
-  // the abort builtin takes the one-shot listener-mutation hook key from it
-  // (_takeListenerChangedKey) for its GC-liveness accounting.
+  // the event primitives installed above; the listener-mutation hook key for
+  // its GC-liveness accounting arrives through the shared `internals`
+  // parameter, published by the events builtin.
   Local<Value> abortResult;
-  success = BuiltinLoader::RunBuiltin(context, BuiltinId::kAbortSignal, result)
+  success = BuiltinLoader::RunBuiltin(context, BuiltinId::kAbortSignal)
                 .ToLocal(&abortResult);
   tns::Assert(success, isolate);
 }
