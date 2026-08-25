@@ -23,6 +23,8 @@
   "scripts": {
     "prepare": "husky",
     "apply-patches": "./apply_patches.sh",
+    "setup-xcode-env": "./tools/update-xcode-env.sh",
+    "open-xcode": "./tools/update-xcode-env.sh && open v8ios.xcodeproj",
     "build-ios": "node prepare-target ios && ./build_all_ios.sh",
     "build-vision": "node prepare-target visionos && ./build_all_vision.sh",
     "setup-ci": "./build_metadata_generator.sh",

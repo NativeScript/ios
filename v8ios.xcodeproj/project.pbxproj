@@ -1973,7 +1973,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\nexport PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\"\nif ! command -v node >/dev/null 2>&1; then\n  echo \"error: node is required to generate the runtime builtins (tools/js2c.mjs); install Node.js or add it to PATH\" >&2\n  exit 1\nfi\ncd \"${SRCROOT}\"\nnode tools/js2c.mjs --out-dir NativeScript/runtime/generated --filelist tools/js2c-inputs.xcfilelist NativeScript/runtime/js/*.js\n";
+			shellScript = "set -e\ncd \"${SRCROOT}\"\n[ -f .xcode.env ] && . ./.xcode.env\n[ -f .xcode.env.local ] && . ./.xcode.env.local\nif [ -z \"${NODE_BINARY:-}\" ] || [ ! -x \"${NODE_BINARY:-}\" ]; then\n  echo \"error: no usable node for tools/js2c.mjs (NODE_BINARY='${NODE_BINARY:-}'). Run 'npm run setup-xcode-env' in the runtime repo to record your node in .xcode.env.local\" >&2\n  exit 1\nfi\n\"$NODE_BINARY\" tools/js2c.mjs --out-dir NativeScript/runtime/generated --filelist tools/js2c-inputs.xcfilelist NativeScript/runtime/js/*.js\n";
 		};
 		2BFE21F02AC1B28000307752 /* Add default metadata */ = {
 			isa = PBXShellScriptBuildPhase;

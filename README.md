@@ -29,8 +29,9 @@ git submodule update --init
 sudo gem install xcodeproj
 sudo gem install cocoapods
 
-# Open the runtime in Xcode
-open v8ios.xcodeproj
+# Record this shell's node in .xcode.env.local and open the runtime in Xcode
+# (Xcode build phases don't see your shell's PATH — see "Node.js in Xcode builds")
+npm run open-xcode
 ```
 
 Select the `TestRunner` target and an emulator and hit Run (the play button).
@@ -46,6 +47,15 @@ Runtime initialization took 55ms
 ```
 
 If all tests pass, everything is good! At this point you can make changes to the runtime, add breakpoints and step through with the debugger. In the next section we'll see how to attach the runtime to an existing NativeScript application allowing us to debug runtime issues in actual apps.
+
+## Node.js in Xcode builds
+
+Building the `NativeScript` target generates the runtime JS builtins with `tools/js2c.mjs`, which needs Node.js. Xcode runs build phases with a minimal `PATH` and never reads your shell profile, so a node managed by nvm/fnm/volta/asdf is invisible to it. The build phase instead sources two files from the repo root:
+
+- `.xcode.env` — committed defaults (`NODE_BINARY=$(command -v node)`, enough for Homebrew installs and `xcodebuild` runs from a terminal)
+- `.xcode.env.local` — gitignored per-machine overrides, sourced last so it wins
+
+`npm run setup-xcode-env` writes the node from your current shell into `.xcode.env.local` (other variables in the file are preserved); `npm run open-xcode` does that and then opens `v8ios.xcodeproj`. If a build fails with `no usable node for tools/js2c.mjs`, run either command — or point `NODE_BINARY` at a node binary yourself, in `.xcode.env.local` or the build environment.
 
 # Documentation
 
@@ -67,6 +77,8 @@ Now `ns clean` and prepare again with `ns prepare ios`.
 This will make sure when the iOS project is generated that you end up with a .xcworkspace file so attaching the v8 runtime source works properly.
 
 You can now open the `platforms/ios/{project-name}.xcworkspace` file in Xcode and then drag the `v8ios.xcodeproj` from the root of this repo under the `<appname>` in the Xcode sidebar.
+
+The runtime's builtins build phase needs node even when the project builds inside your app's workspace, so run `npm run setup-xcode-env` in the runtime repo at least once per machine (see [Node.js in Xcode builds](#nodejs-in-xcode-builds)).
 
 <img width="941" alt="Screenshot 2020-09-09 at 18 46 18" src="https://user-images.githubusercontent.com/879060/92628228-c294c000-f2cc-11ea-8822-58df689d3cd3.png">
 
