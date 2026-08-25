@@ -35,6 +35,11 @@ describe("ns:util", function () {
         var replies = 0;
         orders.forEach(function (order) {
             var worker = new Worker("./nsUtilEncodingOrderWorker.js");
+            worker.onerror = function (err) {
+                worker.terminate();
+                fail("worker (" + order + ") failed: " + (err && err.message));
+                done();
+            };
             worker.onmessage = function (msg) {
                 expect(msg.data).toEqual({
                     order: order,
