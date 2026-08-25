@@ -270,18 +270,32 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       if (strArg->IsExternalOneByte()) {
         const v8::String::ExternalOneByteStringResource* resource =
             strArg->GetExternalOneByteStringResource();
-        value = resource->data();
-      } else {
+        if (OneByteStringResource::Owns(resource)) {
+          value = resource->data();
+        }
+      }
+
+      if (value == nullptr) {
         v8::String::Utf8Value utf8Value(isolate, arg);
-        value = strdup(*utf8Value);
-        // The external string only ties the strdup'd buffer's lifetime to the
-        // GC; it is never read as a string, and its one-byte (Latin-1) content
-        // matches the UTF-8 buffer only for ASCII. Length is the buffer's byte
-        // count, excluding the NUL.
-        OneByteStringResource* resource =
-            new OneByteStringResource(value, (size_t)utf8Value.length());
-        bool success = v8::String::NewExternalOneByte(isolate, resource).ToLocal(&arg);
-        tns::Assert(success, isolate);
+        char* buffer = strdup(*utf8Value);
+        size_t byteLength = (size_t)utf8Value.length();
+        value = buffer;
+        OneByteStringResource* resource = new OneByteStringResource(buffer, byteLength);
+
+        // A one-byte external string's content is Latin-1, which coincides
+        // with the UTF-8 buffer exactly when every character is ASCII - i.e.
+        // when the byte count equals the UTF-16 length. Externalizing the
+        // argument itself lets later marshals of the same string take the
+        // reuse path above.
+        bool externalized = byteLength == (size_t)strArg->Length() &&
+                            strArg->CanMakeExternal(v8::String::ONE_BYTE_ENCODING) &&
+                            strArg->MakeExternal(isolate, resource);
+        if (!externalized) {
+          // The external string only ties the buffer's lifetime to the GC; it
+          // is never read as a string.
+          bool success = v8::String::NewExternalOneByte(isolate, resource).ToLocal(&arg);
+          tns::Assert(success, isolate);
+        }
       }
       Interop::SetValue(dest, value);
     } else {
