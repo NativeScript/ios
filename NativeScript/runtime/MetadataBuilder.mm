@@ -6,6 +6,7 @@
 #include "Helpers.h"
 #include "InlineFunctions.h"
 #include "Interop.h"
+#include "LazyGlobals.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
@@ -52,7 +53,10 @@ v8::Intercepted MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property,
     return v8::Intercepted::kNo;
   }
 
-  if (InlineFunctions::IsGlobalFunction(propName)) {
+  // Globals the runtime owns: the eager ones inline-functions.js installs and
+  // the lazy tier's, which are only accessors until first read and so would
+  // otherwise lose the name to a metadata symbol that shares it.
+  if (InlineFunctions::IsGlobalFunction(propName) || LazyGlobals::IsLazyGlobal(propName)) {
     return v8::Intercepted::kNo;
   }
 

@@ -22,6 +22,12 @@
 		2BFE22062AC1C93100307752 /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BFE22052AC1C93100307752 /* metadata-arm64.bin */; };
 		3C1850542A6DCB2D002ACC81 /* Timers.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C1850522A6DCB2D002ACC81 /* Timers.cpp */; };
 		3C1850552A6DCB2D002ACC81 /* Timers.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3C1850532A6DCB2D002ACC81 /* Timers.hpp */; };
+		3CAE10112F900001002ACC81 /* TextEncoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3CAE10012F900001002ACC81 /* TextEncoding.cpp */; };
+		3CAE10122F900001002ACC81 /* TextEncoding.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CAE10022F900001002ACC81 /* TextEncoding.h */; };
+		3CAE10132F900001002ACC81 /* Base64.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3CAE10032F900001002ACC81 /* Base64.cpp */; };
+		3CAE10142F900001002ACC81 /* Base64.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CAE10042F900001002ACC81 /* Base64.h */; };
+		3CAE10152F900001002ACC81 /* LazyGlobals.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3CAE10052F900001002ACC81 /* LazyGlobals.cpp */; };
+		3CAE10162F900001002ACC81 /* LazyGlobals.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CAE10062F900001002ACC81 /* LazyGlobals.h */; };
 		3CFCA0032E5A0001002ACC81 /* AnimationFrame.mm in Sources */ = {isa = PBXBuildFile; fileRef = 3CFCA0012E5A0001002ACC81 /* AnimationFrame.mm */; };
 		3CFCA0042E5A0001002ACC81 /* AnimationFrame.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3CFCA0022E5A0001002ACC81 /* AnimationFrame.hpp */; };
 		3C48F68D2F57905500C14231 /* json.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3C48F68B2F57905500C14231 /* json.hpp */; };
@@ -469,6 +475,12 @@
 		2BFE22052AC1C93100307752 /* metadata-arm64.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = "metadata-arm64.bin"; sourceTree = "<group>"; };
 		3C1850522A6DCB2D002ACC81 /* Timers.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Timers.cpp; sourceTree = "<group>"; };
 		3C1850532A6DCB2D002ACC81 /* Timers.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Timers.hpp; sourceTree = "<group>"; };
+		3CAE10012F900001002ACC81 /* TextEncoding.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TextEncoding.cpp; sourceTree = "<group>"; };
+		3CAE10022F900001002ACC81 /* TextEncoding.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = TextEncoding.h; sourceTree = "<group>"; };
+		3CAE10032F900001002ACC81 /* Base64.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Base64.cpp; sourceTree = "<group>"; };
+		3CAE10042F900001002ACC81 /* Base64.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Base64.h; sourceTree = "<group>"; };
+		3CAE10052F900001002ACC81 /* LazyGlobals.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = LazyGlobals.cpp; sourceTree = "<group>"; };
+		3CAE10062F900001002ACC81 /* LazyGlobals.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = LazyGlobals.h; sourceTree = "<group>"; };
 		3CFCA0012E5A0001002ACC81 /* AnimationFrame.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = AnimationFrame.mm; sourceTree = "<group>"; };
 		3CFCA0022E5A0001002ACC81 /* AnimationFrame.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = AnimationFrame.hpp; sourceTree = "<group>"; };
 		3C48F68B2F57905500C14231 /* json.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = json.hpp; sourceTree = "<group>"; };
@@ -1547,6 +1559,12 @@
 				3C78BA5B2A0D600100C20A88 /* ModuleBinding.hpp */,
 				3C1850522A6DCB2D002ACC81 /* Timers.cpp */,
 				3C1850532A6DCB2D002ACC81 /* Timers.hpp */,
+				3CAE10012F900001002ACC81 /* TextEncoding.cpp */,
+				3CAE10022F900001002ACC81 /* TextEncoding.h */,
+				3CAE10032F900001002ACC81 /* Base64.cpp */,
+				3CAE10042F900001002ACC81 /* Base64.h */,
+				3CAE10052F900001002ACC81 /* LazyGlobals.cpp */,
+				3CAE10062F900001002ACC81 /* LazyGlobals.h */,
 				3CFCA0012E5A0001002ACC81 /* AnimationFrame.mm */,
 				3CFCA0022E5A0001002ACC81 /* AnimationFrame.hpp */,
 				3C5333332B0E683100BE0C47 /* Message.hpp */,
@@ -1644,6 +1662,9 @@
 				C22536B8241A318900192740 /* ffi.h in Headers */,
 				C247C16F22F82842001D2CA2 /* v8-util.h in Headers */,
 				3C1850552A6DCB2D002ACC81 /* Timers.hpp in Headers */,
+				3CAE10122F900001002ACC81 /* TextEncoding.h in Headers */,
+				3CAE10142F900001002ACC81 /* Base64.h in Headers */,
+				3CAE10162F900001002ACC81 /* LazyGlobals.h in Headers */,
 				3CFCA0042E5A0001002ACC81 /* AnimationFrame.hpp in Headers */,
 				C2C8EE7222CE323C001F8CEC /* ConcurrentMap.h in Headers */,
 				C2A6EF3123745A0B00E8FBE7 /* MetadataInlines.h in Headers */,
@@ -2289,6 +2310,9 @@
 				6573B9D4291FE29F00B0ED7C /* V8RuntimeFactory.cpp in Sources */,
 				C2DDEBB4229EAC8300345BFE /* DictionaryAdapter.mm in Sources */,
 				3C1850542A6DCB2D002ACC81 /* Timers.cpp in Sources */,
+				3CAE10112F900001002ACC81 /* TextEncoding.cpp in Sources */,
+				3CAE10132F900001002ACC81 /* Base64.cpp in Sources */,
+				3CAE10152F900001002ACC81 /* LazyGlobals.cpp in Sources */,
 				3CFCA0032E5A0001002ACC81 /* AnimationFrame.mm in Sources */,
 				C298C027233C9AEA000DDF54 /* TSHelpers.cpp in Sources */,
 				C2FEA16F22A3C75C00A5C0FC /* InlineFunctions.cpp in Sources */,

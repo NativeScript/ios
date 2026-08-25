@@ -526,6 +526,13 @@ void SetMethod(v8::Local<v8::Context> context, v8::Local<v8::Object> that, const
 // Similar to SetProtoMethod but without receiver signature checks.
 void SetMethod(v8::Isolate* isolate, v8::Local<v8::Template> that, const char* name,
                v8::FunctionCallback callback, v8::Local<v8::Value> data = v8::Local<v8::Value>());
+// Whether the runtime registers v8::CFunction fast-call overloads next to the
+// slow callbacks. A registered overload is inert wherever the optimizing tiers
+// are absent — iOS ships V8 in lite mode, which implies jitless, so every call
+// there goes through the slow callback — and only fires on JIT-enabled embeds.
+#ifndef NATIVESCRIPT_ENABLE_FAST_API
+#define NATIVESCRIPT_ENABLE_FAST_API 1
+#endif
 void SetFastMethod(v8::Isolate* isolate, v8::Local<v8::Template> that, const char* name,
                    v8::FunctionCallback slow_callback, const v8::CFunction* c_function,
                    v8::Local<v8::Value> data = v8::Local<v8::Value>());
