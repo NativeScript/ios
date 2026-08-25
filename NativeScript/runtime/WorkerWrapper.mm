@@ -147,13 +147,22 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
         runLoop,
         [](void* info) {
           WorkerWrapper* w = static_cast<WorkerWrapper*>(info);
-          w->DrainPendingTasks();
+          // Autoreleased objects die with the callout; a worker has no UIKit
+          // observer draining a pool per run-loop pass.
+          @autoreleasepool {
+            w->DrainPendingTasks();
+          }
         },
         this);
 
-    this->workerIsolate_ = func();
+    // Autoreleased objects created during the boot phase (isolate creation and
+    // entry-script evaluation run before the loop starts) otherwise accumulate
+    // until the worker dies - the backing NSOperation's pool is the only drain.
+    @autoreleasepool {
+      this->workerIsolate_ = func();
 
-    this->DrainPendingTasks();
+      this->DrainPendingTasks();
+    }
 
     // check again as it could terminate before this
     if (!this->isTerminating_) {
@@ -161,22 +170,24 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
     }
   }
 
-  // The inspector must be gone before the Runtime (and with it the isolate)
-  // is deleted below.
-  this->DestroyInspector();
+  @autoreleasepool {  // teardown garbage drains before the thread is gone
+    // The inspector must be gone before the Runtime (and with it the isolate)
+    // is deleted below.
+    this->DestroyInspector();
 
-  this->isDisposed_ = true;
-  Runtime* runtime = Runtime::GetCurrentRuntime();
-  if (runtime != nullptr) {
-    delete runtime;
-  } else {
-    // Runtime was never created (worker terminated before initialization).
-    // The runtime destructor normally handles this cleanup, so do it here.
-    int workerId = this->workerId_;
-    bool found;
-    auto state = Caches::Workers->Get(workerId, found);
-    if (found) {
-      Caches::Workers->Remove(workerId);
+    this->isDisposed_ = true;
+    Runtime* runtime = Runtime::GetCurrentRuntime();
+    if (runtime != nullptr) {
+      delete runtime;
+    } else {
+      // Runtime was never created (worker terminated before initialization).
+      // The runtime destructor normally handles this cleanup, so do it here.
+      int workerId = this->workerId_;
+      bool found;
+      auto state = Caches::Workers->Get(workerId, found);
+      if (found) {
+        Caches::Workers->Remove(workerId);
+      }
     }
   }
 }

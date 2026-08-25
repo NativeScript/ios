@@ -20,10 +20,16 @@ const CFTimeInterval kNeverFireInterval = 1.0e10;
 // a CFRunLoop callback frame. Deliberately no catch(...): on Darwin it would
 // also swallow NSExceptions, and bare entries (which may @throw on purpose)
 // never come through here anyway.
+// The pool scopes autoreleased objects to the callout: worker threads have no
+// UIKit observer draining once per run-loop pass, so without it they would
+// accumulate until the worker dies. Bare entries stay unwrapped - an
+// @throw must not unwind through a pool this code owns.
 template <typename F>
 void RunGuarded(F&& body) {
   try {
-    body();
+    @autoreleasepool {
+      body();
+    }
   } catch (tns::NativeScriptException& ex) {
     Log(@"NativeScript: uncaught NativeScriptException in event loop task: %s",
         ex.getMessage().c_str());

@@ -192,6 +192,8 @@ require("./NapiCoverageTests");
 // Worker-isolate scoping of extended objc class names
 require("./ExtendedClassNamingTests");
 
+require("./WorkerAutoreleasePoolTests");
+
 // Tests common for all runtimes (git submodule of NativeScript/common-runtime-tests-app).
 require("../shared/index").runAllTests();
 

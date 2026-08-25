@@ -20,4 +20,10 @@
     TNSLog(@"TNSAllocLog dealloc");
 }
 
++ (void)autoreleaseInstance {
+  // CFBridgingRetain moves the instance's ownership out of ARC so the
+  // CFAutorelease'd reference in the current pool is the only one left.
+  CFAutorelease(CFBridgingRetain([[TNSAllocLog alloc] init]));
+}
+
 @end
