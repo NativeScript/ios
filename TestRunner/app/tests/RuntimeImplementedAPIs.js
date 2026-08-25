@@ -81,6 +81,12 @@ describe("DOMException canary", () => {
   it("is not reachable as a module from app code", () => {
     expect(() => require("internal/dom-exception")).toThrow();
   });
+
+  it("serializes through structuredClone on this runtime", () => {
+    const clone = structuredClone(new DOMException("x", "AbortError"));
+    expect(clone instanceof DOMException).toBe(true);
+    expect(clone.name).toBe("AbortError");
+  });
 });
 
 describe("CustomEvent canary", () => {
