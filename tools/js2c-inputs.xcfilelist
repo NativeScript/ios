@@ -3,6 +3,7 @@ $(SRCROOT)/NativeScript/runtime/js/abort-signal.js
 $(SRCROOT)/NativeScript/runtime/js/base64.js
 $(SRCROOT)/NativeScript/runtime/js/blob-url.js
 $(SRCROOT)/NativeScript/runtime/js/class-extends.js
+$(SRCROOT)/NativeScript/runtime/js/dom-exception.js
 $(SRCROOT)/NativeScript/runtime/js/error-events.js
 $(SRCROOT)/NativeScript/runtime/js/events.js
 $(SRCROOT)/NativeScript/runtime/js/inline-functions.js

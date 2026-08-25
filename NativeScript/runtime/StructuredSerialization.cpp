@@ -1,5 +1,6 @@
 #include "StructuredSerialization.h"
 
+#include "BuiltinLoader.h"
 #include "Helpers.h"
 #include "NativeScriptException.h"
 
@@ -9,6 +10,36 @@ namespace tns {
 namespace serialization {
 
 void ThrowDataCloneError(Isolate* isolate, const std::string& message) {
+  // The spec's DataCloneError is a DOMException; build it through the
+  // builtin's exports cache so native and JS throw sites produce the same
+  // class. Delegates may call into JS here — V8 allows it, and Node's
+  // serializer delegates do the same. The fallback covers a builtin that can
+  // no longer run (isolate teardown, broken realm).
+  Local<Object> domException;
+  {
+    TryCatch tc(isolate);
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> exports;
+    Local<Value> ctor;
+    if (BuiltinLoader::GetExports(context, BuiltinId::kDomException, nullptr)
+            .ToLocal(&exports) &&
+        exports->Get(context, tns::ToV8String(isolate, "DOMException"))
+            .ToLocal(&ctor) &&
+        ctor->IsFunction()) {
+      Local<Value> args[] = {tns::ToV8String(isolate, message),
+                             tns::ToV8String(isolate, "DataCloneError")};
+      Local<Object> instance;
+      if (ctor.As<v8::Function>()
+              ->NewInstance(context, 2, args)
+              .ToLocal(&instance)) {
+        domException = instance;
+      }
+    }
+  }
+  if (!domException.IsEmpty()) {
+    isolate->ThrowException(domException);
+    return;
+  }
   NativeScriptException exception(isolate, message, "DataCloneError");
   exception.ReThrowToV8(isolate);
 }

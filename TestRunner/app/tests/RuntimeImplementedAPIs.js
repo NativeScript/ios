@@ -69,3 +69,23 @@ describe("structuredClone canary", () => {
     expect(typeof structuredClone).toBe("function");
   });
 });
+
+// Same contract as above for the shared DOMException / CustomEvent suites:
+// they self-gate, these unguarded specs turn absence into a failure.
+describe("DOMException canary", () => {
+  it("is implemented by this runtime", () => {
+    expect(typeof DOMException).toBe("function");
+    expect(new DOMException("x", "AbortError") instanceof Error).toBe(true);
+  });
+
+  it("is not reachable as a module from app code", () => {
+    expect(() => require("internal/dom-exception")).toThrow();
+  });
+});
+
+describe("CustomEvent canary", () => {
+  it("is implemented by this runtime", () => {
+    expect(typeof CustomEvent).toBe("function");
+    expect(new CustomEvent("x") instanceof Event).toBe(true);
+  });
+});

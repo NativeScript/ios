@@ -69,7 +69,6 @@ export default [
         module: 'readonly',
         binding: 'readonly',
         primordials: 'readonly',
-        internals: 'readonly',
         global: 'readonly',
         console: 'readonly',
         URL: 'readonly',

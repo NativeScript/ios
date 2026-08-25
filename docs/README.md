@@ -14,11 +14,11 @@
   (`AbortController`, `AbortSignal` with the `abort`/`timeout`/`any` statics)
   layered on the runtime's `EventTarget`, the GC contract (weak timers and
   `any()` links, listener-driven persistence), and the `DOMException`
-  stand-in (name-patched `Error` reasons).
+  reasons.
 
 - [Error handling](error-handling.md) — global `error`/`unhandledrejection` events, `reportError`, catching native exceptions in JS (`error.nativeException`), forwarding JS throws to native (`interop.escapeException`), JS stacks on `NSException`, configuration flags, and crash-reporter integration.
 
-- [structuredClone](structured-clone.md) — the WHATWG `structuredClone(value, { transfer })` global: what clones, how graph identity and cycles are preserved, `ArrayBuffer` transfer, and the `DataCloneError`-named `Error` that stands in for `DOMException`.
+- [structuredClone](structured-clone.md) — the WHATWG `structuredClone(value, { transfer })` global: what clones, how graph identity and cycles are preserved, `ArrayBuffer` transfer, and the `DataCloneError` `DOMException` on failure.
 
 - [Node-API](node-api.md) — writing a Node-API addon for this runtime: registering a module and loading it with `require()`, getting the `napi_env` from native code, the threading contract, finalizer timing, which Node-API version applies, and the divergences from Node's `node_api.h`.
 
