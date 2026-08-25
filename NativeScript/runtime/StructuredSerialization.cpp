@@ -15,9 +15,17 @@ namespace {
 // The private symbol markCloneable stamps on every DOMException instance.
 // Private, so app code can neither forge the brand onto an impostor nor strip
 // it; per isolate because a worker's instances are branded and checked on its
-// own isolate, and only bytes cross between them.
+// own isolate, and only bytes cross between them. `anyInstances` flips when
+// the first instance is branded and gates HasCustomHostObject: claiming host
+// objects makes V8 consult IsHostObject for every plain JS object in a
+// serialized graph (~25ns each, ~+12% on an object-heavy clone), and an
+// isolate that never constructed a DOMException cannot be holding one, so it
+// keeps serializing on the exact pre-claim path. Every instance passes
+// through markCloneable — deserialization rebuilds via the constructor — so
+// the flag cannot miss one.
 struct DomExceptionBrandState {
   Persistent<Private> brand;
+  bool anyInstances = false;
 };
 
 // Empty once teardown has begun — callers bail to their fallback.
@@ -34,6 +42,11 @@ Local<Private> DomExceptionBrand(Isolate* isolate) {
   return state->brand.Get(isolate);
 }
 
+bool AnyDomExceptionInstances(Isolate* isolate) {
+  auto* state = Caches::StateFor<DomExceptionBrandState>(isolate);
+  return state != nullptr && state->anyInstances;
+}
+
 void MarkCloneableCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   if (info.Length() < 1 || !info[0]->IsObject()) {
@@ -43,10 +56,12 @@ void MarkCloneableCallback(const FunctionCallbackInfo<Value>& info) {
   if (brand.IsEmpty()) {
     return;
   }
-  info[0]
-      .As<Object>()
-      ->SetPrivate(isolate->GetCurrentContext(), brand, v8::True(isolate))
-      .FromMaybe(false);
+  if (info[0]
+          .As<Object>()
+          ->SetPrivate(isolate->GetCurrentContext(), brand, v8::True(isolate))
+          .FromMaybe(false)) {
+    Caches::StateFor<DomExceptionBrandState>(isolate)->anyInstances = true;
+  }
 }
 
 }  // namespace
@@ -137,8 +152,16 @@ class SerializerDelegate : public ValueSerializer::Delegate {
   // With this returning true, V8 asks IsHostObject about every plain JS
   // object in the graph — the cost of claiming a plain-JS class as a host
   // object is one private-symbol lookup per object (Node pays the same for
-  // its JSTransferable protocol).
-  bool HasCustomHostObject(Isolate* isolate) override { return true; }
+  // its JSTransferable protocol). Claimed only once this isolate has actually
+  // constructed a DOMException; until then serialization runs the pre-claim
+  // path untouched. V8 samples this once per ValueSerializer. Accepted edge:
+  // a getter invoked during this very clone could construct the isolate's
+  // FIRST DOMException and return it into the graph after a false sample —
+  // that one instance degrades to a plain object (the pre-feature behavior)
+  // instead of cloning; every later serialization sees the flag.
+  bool HasCustomHostObject(Isolate* isolate) override {
+    return AnyDomExceptionInstances(isolate);
+  }
 
   Maybe<bool> IsHostObject(Isolate* isolate, Local<Object> object) override {
     // Only branded DOMException instances are claimed; native-backed wrappers
