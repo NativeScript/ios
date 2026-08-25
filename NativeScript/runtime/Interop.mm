@@ -274,8 +274,12 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       } else {
         v8::String::Utf8Value utf8Value(isolate, arg);
         value = strdup(*utf8Value);
-        auto length = strArg->Length() + 1;
-        OneByteStringResource* resource = new OneByteStringResource(value, length);
+        // The external string only ties the strdup'd buffer's lifetime to the
+        // GC; it is never read as a string, and its one-byte (Latin-1) content
+        // matches the UTF-8 buffer only for ASCII. Length is the buffer's byte
+        // count, excluding the NUL.
+        OneByteStringResource* resource =
+            new OneByteStringResource(value, (size_t)utf8Value.length());
         bool success = v8::String::NewExternalOneByte(isolate, resource).ToLocal(&arg);
         tns::Assert(success, isolate);
       }

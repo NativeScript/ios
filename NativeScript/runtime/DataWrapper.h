@@ -226,7 +226,7 @@ class ReferenceWrapper : public BaseDataWrapper {
       delete value_;
     }
 
-    if (this->data_ != nullptr) {
+    if (this->data_ != nullptr && this->disposeData_) {
       std::free(this->data_);
     }
   }

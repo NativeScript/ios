@@ -1,5 +1,7 @@
 #include "OneByteStringResource.h"
 
+#include <cstdlib>
+
 using namespace v8;
 
 namespace tns {
@@ -9,7 +11,8 @@ OneByteStringResource::OneByteStringResource(const char* data, size_t length):
 }
 
 OneByteStringResource::~OneByteStringResource() {
-    delete this->data_;
+  // data_ comes from strdup (see Interop::WriteValue's CStringEncoding path).
+  std::free(const_cast<char*>(this->data_));
 }
 
 const char* OneByteStringResource::data() const {
