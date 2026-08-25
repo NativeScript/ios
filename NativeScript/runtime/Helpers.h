@@ -331,17 +331,18 @@ static inline void TNS_FormatAndLog(NSString* fmt, ...) {
     return;
   }
 
-  // Convert to C string for logging
+  // Convert to C string for logging. The buffer belongs to the string, so it
+  // must outlive the call below.
   const char* cStr = [formattedString UTF8String];
-  if (!cStr) {
-    return;
+  if (cStr) {
+#if TNS_HAVE_OS_LOG
+    os_log(OS_LOG_DEFAULT, "%{public}s", cStr);
+#else
+    NSLog(@"%s", cStr);
+#endif
   }
 
-#if TNS_HAVE_OS_LOG
-  os_log(OS_LOG_DEFAULT, "%{public}s", cStr);
-#else
-  NSLog(@"%s", cStr);
-#endif
+  [formattedString S_RELEASE];
 }
 #endif
 

@@ -30,6 +30,7 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
                                   V8Args& args, const MethodMeta* meta, bool isMethodCallback) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   id target = nil;
+  Class allocKlass = nil;
   bool instanceMethod = !receiver.IsEmpty();
   bool callSuper = false;
   if (instanceMethod) {
@@ -55,8 +56,7 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
 
     if (wrapper->Type() == WrapperType::ObjCAllocObject) {
       ObjCAllocDataWrapper* allocWrapper = static_cast<ObjCAllocDataWrapper*>(wrapper);
-      Class klass = allocWrapper->Klass();
-      target = [klass alloc];
+      allocKlass = allocWrapper->Klass();
     } else if (wrapper->Type() == WrapperType::ObjCObject) {
       ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
       target = objcWrapper->Data();
@@ -108,6 +108,12 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
                 << "\".";
     std::string errorMessage = errorStream.str();
     throw NativeScriptException(errorMessage);
+  }
+
+  if (allocKlass != nil) {
+    // The +1 belongs to the initializer invoked below, which consumes it. Nothing
+    // between here and that call may throw, or the reference is lost.
+    target = [allocKlass alloc];
   }
 
   ObjCMethodCall methodCall(context, meta, target, klass, args, callSuper);

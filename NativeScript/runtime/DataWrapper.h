@@ -477,7 +477,7 @@ class FunctionReferenceTypeWrapper : public BaseDataWrapper {
 class FunctionReferenceWrapper : public BaseDataWrapper {
  public:
   FunctionReferenceWrapper(std::shared_ptr<v8::Persistent<v8::Value>> function)
-      : function_(function), data_(nullptr) {}
+      : function_(function), data_(nullptr), encoding_(nullptr) {}
 
   const WrapperType Type() { return WrapperType::FunctionReference; }
 
@@ -487,11 +487,17 @@ class FunctionReferenceWrapper : public BaseDataWrapper {
 
   void* Data() const { return this->data_; }
 
-  void SetData(void* data) { this->data_ = data; }
+  const TypeEncoding* Encoding() const { return this->encoding_; }
+
+  void SetData(void* data, const TypeEncoding* encoding = nullptr) {
+    this->data_ = data;
+    this->encoding_ = encoding;
+  }
 
  private:
   std::shared_ptr<v8::Persistent<v8::Value>> function_;
   void* data_;
+  const TypeEncoding* encoding_;
 };
 
 class ExtVectorWrapper : public BaseDataWrapper {

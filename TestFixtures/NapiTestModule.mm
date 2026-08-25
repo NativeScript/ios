@@ -555,13 +555,23 @@ static napi_value ExerciseCleanupHooks(napi_env env, napi_callback_info info) {
   // Removing twice must be rejected, not silently accepted.
   napi_status removedTwice = napi_remove_env_cleanup_hook(env, FreeCleanupToken, token);
 
+  // A removed async hook never runs, so its data is the caller's to free.
+  void* removedToken = malloc(1);
   napi_async_cleanup_hook_handle handle = NULL;
-  NAPI_CALL(env, napi_add_async_cleanup_hook(env, RemoveAsyncCleanupHook, malloc(1), &handle));
-  if (handle == NULL) {
-    napi_throw_error(env, NULL, "expected an async cleanup hook handle");
+  napi_status added =
+      napi_add_async_cleanup_hook(env, RemoveAsyncCleanupHook, removedToken, &handle);
+  if (added != napi_ok || handle == NULL) {
+    free(removedToken);
+    if (added != napi_ok) {
+      NapiThrowLastError(env);
+    } else {
+      napi_throw_error(env, NULL, "expected an async cleanup hook handle");
+    }
     return NULL;
   }
-  NAPI_CALL(env, napi_remove_async_cleanup_hook(handle));
+  napi_status removed = napi_remove_async_cleanup_hook(handle);
+  free(removedToken);
+  NAPI_CALL(env, removed);
 
   // Both kinds are left registered so env teardown has something to run; the
   // tokens they free are what would leak if it never did.

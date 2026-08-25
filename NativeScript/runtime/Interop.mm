@@ -480,18 +480,26 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
           typeEncoding->details.functionPointer.signature.first();
       int argsCount = typeEncoding->details.functionPointer.signature.count - 1;
 
-      Local<Value> callbackValue = funcWrapper->Function()->Get(isolate);
-      tns::Assert(callbackValue->IsFunction(), isolate);
-      Local<v8::Function> callback = callbackValue.As<v8::Function>();
-      std::shared_ptr<Persistent<Value>> poCallback =
-          std::make_shared<Persistent<Value>>(isolate, callback);
-      MethodCallbackWrapper* userData =
-          new MethodCallbackWrapper(isolate, poCallback, 0, argsCount, functionTypeEncoding);
+      // A trampoline handed to native code (directly or through
+      // interop.handleof) has no ownership protocol and can never be freed, so
+      // build at most one per reference and signature instead of one per write.
+      void* functionPointer =
+          funcWrapper->Encoding() == functionTypeEncoding ? funcWrapper->Data() : nullptr;
 
-      void* functionPointer = (void*)Interop::CreateMethod(0, argsCount, functionTypeEncoding,
-                                                           ArgConverter::MethodCallback, userData);
+      if (functionPointer == nullptr) {
+        Local<Value> callbackValue = funcWrapper->Function()->Get(isolate);
+        tns::Assert(callbackValue->IsFunction(), isolate);
+        Local<v8::Function> callback = callbackValue.As<v8::Function>();
+        std::shared_ptr<Persistent<Value>> poCallback =
+            std::make_shared<Persistent<Value>>(isolate, callback);
+        MethodCallbackWrapper* userData =
+            new MethodCallbackWrapper(isolate, poCallback, 0, argsCount, functionTypeEncoding);
 
-      funcWrapper->SetData(functionPointer);
+        functionPointer = (void*)Interop::CreateMethod(0, argsCount, functionTypeEncoding,
+                                                       ArgConverter::MethodCallback, userData);
+
+        funcWrapper->SetData(functionPointer, functionTypeEncoding);
+      }
 
       Interop::SetValue(dest, functionPointer);
     } else {
@@ -505,7 +513,11 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     BaseDataWrapper* baseWrapper = tns::GetValue(isolate, arg);
     if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Block) {
       BlockWrapper* wrapper = static_cast<BlockWrapper*>(baseWrapper);
-      blockPtr = Block_copy(wrapper->Block());
+      // The callee takes the block at +0 and copies it if it needs to keep it,
+      // so the copy that keeps it alive across the call must be balanced: the
+      // JSBlock dispose helper owns the ffi closure and the callback wrapper
+      // and only runs once the last reference goes away.
+      blockPtr = CFAutorelease(Block_copy(wrapper->Block()));
     } else {
       std::shared_ptr<Persistent<Value>> poCallback =
           std::make_shared<Persistent<Value>>(isolate, arg);
@@ -1663,6 +1675,8 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     // reason, and attach the wrapped native object as `nativeException` (mirrors
     // the NSError-out path below). Throw it via NativeScriptException so the JS
     // catch handler receives exactly this object.
+    std::free(errorRef);
+
     Isolate* isolate = v8::Isolate::GetCurrent();
     Local<Context> context = isolate->GetCurrentContext();
 

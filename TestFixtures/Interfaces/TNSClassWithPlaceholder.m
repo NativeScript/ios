@@ -22,7 +22,9 @@
 #pragma clang diagnostic ignored "-Wobjc-designated-initializers"
 
 - (TNSClassWithPlaceholder*)init {
-    return (id)[[TNSClassWithPlaceholderReal alloc] init];
+  [self release];
+
+  return (id)[[TNSClassWithPlaceholderReal alloc] init];
 }
 
 #pragma clang diagnostic pop
