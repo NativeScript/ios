@@ -38,7 +38,7 @@ declare module "ns:util" {
     readonly fatal: boolean;
     readonly ignoreBOM: boolean;
     decode(
-      input?: ArrayBuffer | ArrayBufferView | null,
+      input?: ArrayBufferLike | ArrayBufferView,
       options?: { stream?: boolean }
     ): string;
   }
