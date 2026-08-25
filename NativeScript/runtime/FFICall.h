@@ -3,7 +3,9 @@
 
 #include <malloc/malloc.h>
 
+#include <cstdlib>
 #include <map>
+#include <vector>
 
 #include "DataWrapper.h"
 #include "Metadata.h"
@@ -92,10 +94,18 @@ class FFICall : public BaseCall {
   }
 
   ~FFICall() {
+    for (void* buffer : this->ownedBuffers_) {
+      std::free(buffer);
+    }
+
     if (this->useDynamicBuffer_) {
       free(this->buffer_);
     }
   }
+
+  // Ties a malloc'd argument buffer to this call: it stays valid until after
+  // ffi_call returns and the result has been read.
+  inline void OwnBuffer(void* buffer) { this->ownedBuffers_.push_back(buffer); }
 
   /**
    When calling this, always make another call to DisposeFFIType with the same
@@ -122,6 +132,7 @@ class FFICall : public BaseCall {
   static SpinMutex structInfosCacheMutex_;
   void** argsArray_;
   bool useDynamicBuffer_;
+  std::vector<void*> ownedBuffers_;
   uint8_t staticBuffer[512];
 };
 

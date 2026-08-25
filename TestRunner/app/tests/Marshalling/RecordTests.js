@@ -358,4 +358,51 @@ describe(module.id, function () {
         TNSTestNativeCallbacks.recordsPointer(obj);
         expect(TNSGetOutput()).toBe("1 2");
     });
+
+    it("Marshalling struct pointers from object literals repeatedly", () => {
+        for (let i = 0; i < 1000; i++) {
+            const echoed = TNSTestNativeCallbacks.recordsPointerEcho({ x: i, y: i + 1 });
+            expect(echoed instanceof TNSSimpleStruct).toBe(true);
+            expect(echoed.x).toBe(i);
+            expect(echoed.y).toBe(i + 1);
+        }
+    });
+
+    it("Marshalling struct pointers from a wrapped struct leaves the wrapper's buffer intact", () => {
+        const record = new TNSSimpleStruct();
+        record.x = 3;
+        record.y = 4;
+
+        for (let i = 0; i < 100; i++) {
+            const echoed = TNSTestNativeCallbacks.recordsPointerEcho(record);
+            expect(echoed.x).toBe(3);
+            expect(echoed.y).toBe(4);
+        }
+
+        expect(record.x).toBe(3);
+        expect(record.y).toBe(4);
+    });
+
+    it("Marshalling struct pointers from an interop.Reference leaves the reference readable", () => {
+        const record = new TNSSimpleStruct();
+        record.x = 5;
+        record.y = 6;
+
+        const reference = new interop.Reference(record);
+
+        const echoed = TNSTestNativeCallbacks.recordsPointerEcho(reference);
+        expect(echoed.x).toBe(5);
+        expect(echoed.y).toBe(6);
+
+        expect(reference.value.x).toBe(5);
+        expect(reference.value.y).toBe(6);
+    });
+
+    it("Marshalling structs by value from object literals repeatedly", () => {
+        for (let i = 0; i < 1000; i++) {
+            const echoed = TNSTestNativeCallbacks.recordsSimpleStruct({ x: i, y: i + 1 });
+            expect(echoed.x).toBe(i);
+            expect(echoed.y).toBe(i + 1);
+        }
+    });
 });
