@@ -711,17 +711,20 @@ describe(module.id, function () {
         expect(TNSReturnsRetained.newNSObjectMethod().retainCount()).toBe(1);
     });
 
-    it("takes ownership of +0 stack blocks returned from native", function () {
-        // Regression for the native-block ownership bug. blockCapturing: returns a
-        // +0 __NSStackBlock__ capturing its argument. A correct runtime Block_copy's
-        // each one into its own distinct heap block. The buggy CFRetain path does
-        // NOT promote a stack block to the heap, so all three wrappers are left
-        // pointing at the same (reused) stack slot and alias each other - reading
-        // whichever value was written last (and a later CFRelease would fault on
-        // the dead frame). See Interop::GetResult and ObjectManager::DisposeValue.
-        var b1 = TNSReturnsRetained.blockCapturing(11);
-        var b2 = TNSReturnsRetained.blockCapturing(22);
-        var b3 = TNSReturnsRetained.blockCapturing(33);
+    it("takes ownership of +0 stack blocks passed from native", function () {
+        // Regression for the native-block ownership bug. passStackBlockCapturing:to:
+        // synchronously hands the JS callback a +0 __NSStackBlock__ capturing its
+        // argument, so the frame that owns the block is still alive while the
+        // runtime marshals it. A correct runtime Block_copy's each one into its own
+        // distinct heap block. The buggy CFRetain path does NOT promote a stack
+        // block to the heap, so all three wrappers are left pointing at dead stack
+        // slots that alias each other - reading whichever value was written last
+        // (and a later CFRelease would fault on the dead frame). See
+        // Interop::GetResult and ObjectManager::DisposeValue.
+        var b1, b2, b3;
+        TNSReturnsRetained.passStackBlockCapturingTo(11, function (blk) { b1 = blk; });
+        TNSReturnsRetained.passStackBlockCapturingTo(22, function (blk) { b2 = blk; });
+        TNSReturnsRetained.passStackBlockCapturingTo(33, function (blk) { b3 = blk; });
 
         // On the fixed runtime each block is an independent heap copy.
         expect(b1()).toBe(11);

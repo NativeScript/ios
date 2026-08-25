@@ -13,8 +13,9 @@ typedef int (^TNSIntBlock)(void);
 + (id)methodReturnsNSRetained NS_RETURNS_RETAINED;
 + (id)methodReturnsCFRetained CF_RETURNS_RETAINED;
 + (id)newNSObjectMethod;
-// Returns a +0 __NSStackBlock__ capturing `value` (see implementation). Used to
-// regression-test native block ownership: the runtime must take it with
-// Block_copy and release it with Block_release, not CFRetain/CFRelease.
-+ (TNSIntBlock)blockCapturing:(int)value;
+// Synchronously invokes `callback` with a +0 __NSStackBlock__ capturing `value`
+// (see implementation). Used to regression-test native block ownership: the
+// runtime must take the argument with Block_copy (which heap-promotes a stack
+// block) and release it with Block_release, not CFRetain/CFRelease.
++ (void)passStackBlockCapturing:(int)value to:(void (^)(TNSIntBlock))callback;
 @end
