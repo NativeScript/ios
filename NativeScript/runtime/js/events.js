@@ -154,7 +154,14 @@ g.EventTarget = EventTarget;
 function CustomEvent(type, opts) {
   FunctionPrototypeCall(Event, this, type, opts);
   opts = opts || {};
-  this.detail = opts.detail !== undefined ? opts.detail : null;
+  // `detail` is readonly in the IDL, unlike the base Event's mutable-by-need
+  // fields (target/defaultPrevented change during dispatch).
+  ObjectDefineProperty(this, "detail", {
+    value: opts.detail !== undefined ? opts.detail : null,
+    writable: false,
+    enumerable: true,
+    configurable: true,
+  });
 }
 CustomEvent.prototype = ObjectCreate(Event.prototype);
 ObjectDefineProperty(CustomEvent.prototype, "constructor", {

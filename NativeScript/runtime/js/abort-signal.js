@@ -52,9 +52,8 @@ const dispatchEvent = EventTarget.prototype.dispatchEvent;
 const addEventListener = EventTarget.prototype.addEventListener;
 const removeEventListener = EventTarget.prototype.removeEventListener;
 // Published by events.js: the symbol under which EventTargetImpl looks up
-// the listener-mutation hook. events.js already ran, so this require is a
-// cache hit; running before it would be an init-order bug this line turns
-// into a loud failure.
+// the listener-mutation hook. events.js already ran (Events::Init), so this
+// require is a cache hit; a miss would run it on demand rather than fail.
 const { kListenerChanged } = require("internal/events");
 
 // Construction token: AbortSignal instances come only from the factories in

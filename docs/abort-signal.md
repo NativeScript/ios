@@ -57,13 +57,12 @@ be dropped.
 Entries leave the persistent set on abort, on the last abort-listener
 removal, or when a composite loses its last source.
 
+Default reasons are real `DOMException`s — `"AbortError"` for a plain abort,
+`"TimeoutError"` for `timeout()` — so both `reason.name` and
+`instanceof DOMException` checks work.
+
 ## Deviations from Node / the web
 
-- **No `DOMException`.** As with [structuredClone](structured-clone.md) and
-  the [Performance API](performance.md), default reasons are `Error`
-  instances with `name` patched: `"AbortError"` (default abort) and
-  `"TimeoutError"` (timeout). `instanceof DOMException` checks cannot work;
-  match on `reason.name`.
 - Abort events carry no `isTrusted` flag (the runtime's `Event` doesn't
   model it).
 

@@ -37,8 +37,9 @@ module.exports = somethingTheCallSiteNeeds;
   the capability in its `module.exports`, the consumer requires it.
   `require("internal/…")` at first use runs the file through the shared
   exports cache — for a consumer of an eager producer that is a cache hit,
-  and requiring before the producer ran is an init-order bug that fails
-  loudly at the require.
+  and a miss runs the producer on demand. A consumer can therefore never
+  observe a missing capability: it gets the exports, or the require throws
+  (circular require, or the producer failing to run).
 - `primordials` is the frozen intrinsics snapshot built by `primordials.js`
   (see below), the same object for every builtin in an isolate.
 - **`module.exports` is the export channel** — whatever it holds when the file
