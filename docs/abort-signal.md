@@ -50,9 +50,9 @@ be dropped.
   accounting comes from an internal symbol-keyed hook the events builtin
   calls from every listener-list mutation path (add, remove, and `once`
   removal during dispatch); the key travels only through the builtin-only
-  `internals` object (see `NativeScript/runtime/js/README.md`) and never
-  reaches app code, so the accounting cannot be bypassed via a captured
-  `EventTarget.prototype.addEventListener`.
+  `require("internal/events")` tier (see `NativeScript/runtime/js/README.md`)
+  and never reaches app code, so the accounting cannot be bypassed via a
+  captured `EventTarget.prototype.addEventListener`.
 
 Entries leave the persistent set on abort, on the last abort-listener
 removal, or when a composite loses its last source.

@@ -23,7 +23,11 @@ class NsBuiltinModules {
   static bool IsNsScheme(const std::string& specifier);
 
   // Whether a module of that name exists.
-  static bool IsRegistered(const std::string& specifier);
+  // Whether the specifier names a registered builtin module. Internal-tier
+  // rows (see kRegistry) only count when includeInternal is set, which is the
+  // builtin require's privilege; every app-facing caller keeps the default.
+  static bool IsRegistered(const std::string& specifier,
+                           bool includeInternal = false);
 
   // Frozen exports object of a registered specifier. Empty when the specifier
   // is not registered (nothing thrown) or when the module failed to build (an

@@ -39,10 +39,12 @@ const intrinsics = {
   SymbolToStringTag: Symbol.toStringTag,
 
   // Namespaces / prototypes.
+  ErrorPrototype: Error.prototype,
   ObjectPrototype: Object.prototype,
 
   // Statics.
   ArrayBufferIsView: ArrayBuffer.isView,
+  ErrorCaptureStackTrace: Error.captureStackTrace,
   ArrayIsArray: Array.isArray,
   decodeURIComponent,
   JSONStringify: JSON.stringify,

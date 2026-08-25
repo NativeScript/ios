@@ -26,9 +26,9 @@ enum class HostObjectPolicy {
   kDegrade,
 };
 
-// Throws the runtime's DataCloneError. There is no DOMException here, so it is
-// an Error carrying that name — routed through NativeScriptException so the
-// object is shaped like every other error the runtime raises.
+// Throws a "DataCloneError" DOMException, the same class the JS half of
+// structuredClone raises. Falls back to a NativeScriptException-shaped Error
+// carrying that name when the dom-exception builtin cannot run.
 void ThrowDataCloneError(v8::Isolate* isolate, const std::string& message);
 
 // A value serialized out of one isolate, plus the memory that travels with it.
