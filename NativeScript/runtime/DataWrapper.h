@@ -20,6 +20,7 @@ class WorkerInspectorClient;
 namespace tns {
 
 class PrimitiveDataWrapper;
+struct ObjectWeakCallbackState;
 
 enum class WrapperType {
   Base = 1 << 0,
@@ -598,6 +599,19 @@ class WorkerWrapper : public BaseDataWrapper {
   inline bool HeapLimitExceeded() const {
     return heapLimitExceeded_.load(std::memory_order_acquire);
   }
+  // The JS Worker object is a GC root from a successful start until the worker
+  // ends, so a running worker is reachable the way a browser's is rather than
+  // depending on its finalizer to keep it. Both of these run on the main
+  // isolate's thread only -- they re-arm that isolate's global handle -- and
+  // the unroot is idempotent, since terminate() and the thread-exit
+  // notification can both reach it.
+  void RootWorkerObject();
+  void UnrootWorkerObject();
+  // Dispatches the end-of-worker event and unroots. Main isolate's thread,
+  // with the isolate entered and locked by the caller.
+  void EndWrapperLifetime();
+
+  ~WorkerWrapper();
 
   const WrapperType Type();
   const int Id();
@@ -645,6 +659,15 @@ class WorkerWrapper : public BaseDataWrapper {
   // handle may be created.
   static size_t OnNearHeapLimit(void* data, size_t current_heap_limit,
                                 size_t initial_heap_limit);
+  // Parked while the Worker object is rooted, so the unroot can re-arm the very
+  // finalizer ObjectManager::Register installed. Main isolate's thread only.
+  ObjectWeakCallbackState* weakCallbackState_ = nullptr;
+  bool workerObjectRooted_ = false;
+  // Cleared by the destructor, so a task posted from the worker thread can tell
+  // whether this wrapper still exists once it reaches the main isolate. The
+  // wrapper is only ever destroyed with that isolate locked, which is what the
+  // task takes before reading this.
+  std::shared_ptr<std::atomic<WorkerWrapper*>> selfRef_;
 
   void BackgroundLooper(std::function<v8::Isolate*()> func);
   void DrainPendingTasks();
