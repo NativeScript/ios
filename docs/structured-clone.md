@@ -28,7 +28,7 @@ Not cloneable — each throws (see the deviations below): functions, symbols, `W
 
 ## Transfer semantics
 
-The list is validated before anything is serialized: each entry must be an `ArrayBuffer` or a `MessagePort`, must not already be detached (an `ArrayBuffer` must additionally be detachable), and must appear at most once. A violation throws before the sources are touched, and nothing is detached or handed over until the whole graph has serialized successfully — so a rejected call never leaves a half-transferred graph behind, and every listed buffer and port is still usable afterwards.
+The list is validated before anything is serialized: each entry must be an `ArrayBuffer` or a `MessagePort`, must not already be detached (an `ArrayBuffer` must additionally be detachable), and must appear at most once. A violation throws before the sources are touched, and nothing is detached or handed over until the whole graph has serialized successfully — a rejected call never leaves a half-transferred graph behind. The guarantee covers transfer state only: serializing the graph runs user getters, and a getter's own side effects (closing a listed port, say) are not rolled back — a port closed that way makes the call fail, already closed.
 
 On success the memory changes hands rather than being copied: the source buffer is detached (`byteLength` becomes 0, and every typed array over it becomes zero-length) and the clone receives the original backing store. A transferred buffer need not appear inside `value` at all; a buffer reached through a typed array in `value` is transferred as a unit, so the cloned view sees the original bytes.
 

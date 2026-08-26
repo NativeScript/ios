@@ -218,17 +218,23 @@ g.EventTarget = EventTarget;
 // listener-changed hook applies.
 var addListener = EventTargetImpl.prototype.addEventListener;
 
-function makeEventHandler(handler) {
+function makeEventHandler(handler, cancelOnTruthy) {
   function eventHandler(event) {
     if (typeof eventHandler.handler !== "function") { return; }
-    return FunctionPrototypeCall(eventHandler.handler, this, event);
+    var result = FunctionPrototypeCall(eventHandler.handler, this, event);
+    // Special error event handling (HTML §8.1.7.3): only for `onerror`, a
+    // truthy return cancels the event. It is the one way a handler
+    // attribute's return value is observable, so it is also how "the worker
+    // error was handled" leaves dispatch.
+    if (cancelOnTruthy && result) { event.preventDefault(); }
+    return result;
   }
   eventHandler.handler = handler;
   eventHandler.delta = 0;
   return eventHandler;
 }
 
-function defineEventHandler(target, name, event) {
+function defineEventHandler(target, name, event, cancelOnTruthy) {
   if (event === undefined) { event = name; }
   var propName = "on" + name;
 
@@ -254,7 +260,7 @@ function defineEventHandler(target, name, event) {
     if (wrapper === undefined) {
       // First assignment ever, `null` included: the slot is claimed now, and
       // the listener count rises with it (HTML port enabling depends on it).
-      wrapper = wrappers[event] = makeEventHandler(value);
+      wrapper = wrappers[event] = makeEventHandler(value, cancelOnTruthy);
       FunctionPrototypeCall(addListener, this, event, wrapper);
       return;
     }
@@ -262,7 +268,12 @@ function defineEventHandler(target, name, event) {
     var isActive = typeof value === "function";
     wrapper.handler = value;
     if (wasActive === isActive) { return; }
-    wrapper.delta += isActive ? 1 : -1;
+    // Absolute, never cumulative: the wrapper holds its one slot for good, so
+    // the correction is all-or-nothing — a cleared handler cancels its slot
+    // out, an active one needs no correction. Accumulating instead drifts a
+    // count that never returns to zero, and the port/signal accounting built
+    // on it then never sees "no listeners left".
+    wrapper.delta = isActive ? 0 : -1;
     var list = bag[event];
     notifyListenerChanged(this, event, list ? list.length : 0);
   }

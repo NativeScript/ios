@@ -17,10 +17,12 @@ namespace tns {
 
 namespace {
 
-// The worker-events builtin's delivery callout for this isolate. Both
-// directions share it; only the receiver differs.
+// The worker-events builtin's delivery callouts for this isolate. Both message
+// directions share emitMessage; only the receiver differs. emitError is
+// parent-side only.
 struct WorkerEventsState {
   Global<v8::Function> emitMessage;
+  Global<v8::Function> emitError;
 };
 
 }  // namespace
@@ -73,9 +75,15 @@ void Worker::InitEvents(Local<Context> context) {
             emitMessage->IsFunction();
   tns::Assert(success, isolate);
 
+  Local<Value> emitError;
+  success = exports->Get(context, tns::ToV8String(isolate, "emitError")).ToLocal(&emitError) &&
+            emitError->IsFunction();
+  tns::Assert(success, isolate);
+
   WorkerEventsState* state = Caches::StateFor<WorkerEventsState>(isolate);
   tns::Assert(state != nullptr, isolate);
   state->emitMessage.Reset(isolate, emitMessage.As<v8::Function>());
+  state->emitError.Reset(isolate, emitError.As<v8::Function>());
 }
 
 void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
@@ -485,6 +493,23 @@ void Worker::OnMessageCallback(Isolate* isolate, Local<Object> receiver,
   // TryCatch turns it into the scope's error event, and on the parent side
   // V8's uncaught-message listener reports it.
   (void)state->emitMessage.Get(isolate)->Call(context, receiver, 3, args).ToLocal(&result);
+}
+
+bool Worker::EmitError(Isolate* isolate, Local<Object> receiver, const std::string& message,
+                       const std::string& source, const std::string& stackTrace, int lineNumber) {
+  WorkerEventsState* state = Caches::StateFor<WorkerEventsState>(isolate);
+  if (state == nullptr || state->emitError.IsEmpty()) {
+    return false;
+  }
+  Local<Context> context = Caches::Get(isolate)->GetContext();
+
+  Local<Value> args[4]{tns::ToV8String(isolate, message), tns::ToV8String(isolate, source),
+                       Number::New(isolate, lineNumber), tns::ToV8String(isolate, stackTrace)};
+  Local<Value> result;
+  if (!state->emitError.Get(isolate)->Call(context, receiver, 4, args).ToLocal(&result)) {
+    return false;
+  }
+  return result->BooleanValue(isolate);
 }
 
 void Worker::CloseWorkerCallback(const FunctionCallbackInfo<Value>& info) {

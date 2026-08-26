@@ -659,8 +659,10 @@ void NativeMessagePort::Drain() {
   // or close this very port, so it is re-checked every iteration.
   while (this->data_ != nullptr) {
     if (budget-- == 0) {
-      // Hand the runloop back rather than starve it; the repost carries
-      // whatever is left.
+      // Only messages that arrived after this drain began are deferred: the
+      // budget is a floor, not a cap, so the backlog present at the trigger
+      // always drains in one turn (Node's processing_limit semantics). The
+      // repost carries the late arrivals.
       reschedule = true;
       break;
     }

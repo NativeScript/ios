@@ -1,7 +1,10 @@
 "use strict";
 // Worker (HTML Standard §10.2.6) and the worker global scope (§10.2.1) as
 // EventTargets: both deliver MessageEvents instead of the runtime's historical
-// direct call of an `onmessage` property.
+// direct call of an `onmessage` property, and the Worker object receives the
+// worker's unhandled errors as ErrorEvents. The worker global scope's own
+// `onerror` stays a direct call with the error — a documented NativeScript
+// contract, not the web's event.
 //
 // Eager, because the handler attributes have to exist before app code assigns
 // one. MessageEvent itself is pulled in on the first delivery, so a worker
@@ -25,6 +28,17 @@ function getMessageEvent() {
   return MessageEvent;
 }
 
+// ErrorEvent is installed by the error-events builtin, which Runtime::Init
+// runs AFTER this one — so the constructor can only be taken on the first
+// error delivery, not at init.
+let ErrorEvent;
+function getErrorEvent() {
+  if (ErrorEvent === undefined) {
+    ErrorEvent = g.ErrorEvent;
+  }
+  return ErrorEvent;
+}
+
 // The delivery callout, invoked by native with the receiving target as `this`:
 // the Worker object on the parent isolate, the global scope's EventTarget
 // inside a worker. `ports` is the array of MessagePorts the message
@@ -38,14 +52,31 @@ function emitMessage(data, ports, type) {
   dispatchEventRethrowing(this, new MessageEventCtor(type, { data, ports }));
 }
 
+// The parent-side error delivery callout, invoked by native with the Worker
+// object as `this` once the worker scope has left the error unhandled. Only
+// primitives cross the isolate boundary, so the event carries no `error`
+// object; `stackTrace` is this runtime's addition to the ErrorEvent fields.
+//
+// Returns whether the error was handled: a truthy return from the `onerror`
+// attribute cancels the event (HTML §8.1.7.3), as does preventDefault() from
+// any listener.
+function emitError(message, filename, lineno, stackTrace) {
+  const ErrorEventCtor = getErrorEvent();
+  const event = new ErrorEventCtor("error", {
+    message,
+    filename,
+    lineno,
+    cancelable: true,
+  });
+  event.stackTrace = stackTrace;
+  dispatchEventRethrowing(this, event);
+  return event.defaultPrevented;
+}
+
 ObjectSetPrototypeOf(g.Worker.prototype, EventTarget.prototype);
 defineEventHandler(g.Worker.prototype, "message");
 defineEventHandler(g.Worker.prototype, "messageerror");
-// `error` is a handler attribute and nothing more: the worker error path still
-// reads `onerror` off the worker object and calls it with a plain error
-// record, so no event is ever dispatched for it and addEventListener("error")
-// on a Worker stays inert.
-defineEventHandler(g.Worker.prototype, "error");
+defineEventHandler(g.Worker.prototype, "error", "error", true);
 
 // The global scope's handler attributes are defined against the EventTarget
 // backing the global listener methods, which is what native dispatches on and
@@ -68,4 +99,4 @@ for (const name of ["onmessage", "onmessageerror"]) {
   });
 }
 
-module.exports = { emitMessage };
+module.exports = { emitMessage, emitError };
