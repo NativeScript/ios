@@ -126,6 +126,8 @@ class MessageEvent extends Event {
     this.cancelable = !!cancelable;
     this.defaultPrevented = false;
     this.target = null;
+    this._stopPropagation = false;
+    this._stopImmediate = false;
     this.#data = data;
     this.#origin = `${origin}`;
     this.#lastEventId = `${lastEventId}`;

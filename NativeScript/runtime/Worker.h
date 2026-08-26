@@ -19,6 +19,17 @@ class Worker {
   // after Events::Init has installed the event primitives it builds on.
   static void InitEvents(v8::Local<v8::Context> context);
 
+  // Dispatches an `error` ErrorEvent on `receiver` (the Worker object, on the
+  // parent isolate) and returns whether a handler took ownership of it —
+  // either by returning truthy from the `onerror` attribute or by calling
+  // preventDefault(). Only primitives cross the isolate boundary, so the event
+  // carries no error object. A listener that throws leaves the exception
+  // pending for the caller's TryCatch and reports as unhandled. False before
+  // InitEvents has run.
+  static bool EmitError(v8::Isolate* isolate, v8::Local<v8::Object> receiver,
+                        const std::string& message, const std::string& source,
+                        const std::string& stackTrace, int lineNumber);
+
   static std::vector<std::string> GlobalFunctions;
 
  private:

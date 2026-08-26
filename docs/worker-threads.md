@@ -79,15 +79,22 @@ finished. `terminate()` therefore resolves with `0` and emits `exit` with code
 `0` on the way, and that is the only path that emits it. A worker that ends by
 its own `close()` produces no `exit`.
 
-### `worker.addEventListener("error", …)` is inert
+### A worker error carries no `error` object, and the worker scope's `onerror` is not an event
 
-`Worker` is an `EventTarget` and `message`/`messageerror` are dispatched as
-real `MessageEvent`s, so a handler attribute and an `addEventListener`
-registration interleave in the order they were installed. `error` is the
-exception: the worker error path reads the `onerror` property straight off the
-worker object and calls it with a plain error record (`message`, `stackTrace`,
-`filename`, `lineno`), never dispatching an event. **`worker.onerror` works;
-`addEventListener("error", …)` on a `Worker` never fires.**
+An error the worker scope leaves unhandled reaches the parent as a real
+`ErrorEvent` dispatched on the `Worker`, so `worker.onerror` and
+`addEventListener("error", …)` both fire, interleaved in the order they were
+installed. Two things differ from a browser:
+
+- Only primitives cross the isolate boundary, so `event.error` is always
+  `null`; the worker's stack comes through as `event.stackTrace`, a string
+  alongside the standard `message`, `filename` and `lineno`.
+- Inside the worker, `onerror` is still a direct call taking the thrown value —
+  not an `ErrorEvent`, and not reachable through `addEventListener`. Returning
+  truthy from it handles the error and stops it from reaching the parent, which
+  is the same "handled" contract `worker.onerror` has on the parent side (a
+  truthy return there cancels the event, as does `preventDefault()` from any
+  listener).
 
 ### Inside a worker, `event.target` is not `globalThis`
 
@@ -229,8 +236,9 @@ it found them** — still open, still holding their memory — so a failed
 
 The listed ports are re-checked after the write as well, because writing the
 graph runs user getters and one of them may have closed a listed port; that
-late failure is the same `MessagePort in transfer list is already detached`,
-and it too leaves everything intact.
+late failure is the same `MessagePort in transfer list is already detached`.
+What it undoes is the transfer — nothing is detached, nothing changes hands —
+not what the getters did on the way there: a port a getter closed stays closed.
 
 ## Worker messages
 
