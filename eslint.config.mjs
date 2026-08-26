@@ -43,7 +43,7 @@ const capturedStatics = [
 // fills in after init). Array.from has no primordial: copying `arguments` goes
 // through an index loop instead, because Array.from depends on the tamperable
 // array iterator protocol.
-const restrictedGlobals = ['Error', 'FinalizationRegistry', 'Map', 'Number', 'Proxy', 'RangeError', 'Set', 'String', 'TypeError', 'WeakRef'].map((name) => ({
+const restrictedGlobals = ['Error', 'FinalizationRegistry', 'Map', 'Number', 'Promise', 'Proxy', 'RangeError', 'Set', 'String', 'TypeError', 'WeakMap', 'WeakRef', 'WeakSet'].map((name) => ({
   name,
   message: `Destructure ${name} from primordials — builtins must not read intrinsics off globals user code can replace.`,
 }));
