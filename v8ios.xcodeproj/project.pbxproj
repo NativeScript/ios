@@ -25,6 +25,8 @@
 		3CAE10112F900001002ACC81 /* TextEncoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3CAE10012F900001002ACC81 /* TextEncoding.cpp */; };
 		3CAE10122F900001002ACC81 /* TextEncoding.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CAE10022F900001002ACC81 /* TextEncoding.h */; };
 		3CAE10132F900001002ACC81 /* Base64.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3CAE10032F900001002ACC81 /* Base64.cpp */; };
+		3CAE20112F900002002ACC81 /* Messaging.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3CAE20012F900002002ACC81 /* Messaging.cpp */; };
+		3CAE20122F900002002ACC81 /* Messaging.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CAE20022F900002002ACC81 /* Messaging.h */; };
 		3CAE10142F900001002ACC81 /* Base64.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CAE10042F900001002ACC81 /* Base64.h */; };
 		3CAE10152F900001002ACC81 /* LazyGlobals.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3CAE10052F900001002ACC81 /* LazyGlobals.cpp */; };
 		3CAE10162F900001002ACC81 /* LazyGlobals.h in Headers */ = {isa = PBXBuildFile; fileRef = 3CAE10062F900001002ACC81 /* LazyGlobals.h */; };
@@ -478,6 +480,8 @@
 		3CAE10012F900001002ACC81 /* TextEncoding.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TextEncoding.cpp; sourceTree = "<group>"; };
 		3CAE10022F900001002ACC81 /* TextEncoding.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = TextEncoding.h; sourceTree = "<group>"; };
 		3CAE10032F900001002ACC81 /* Base64.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Base64.cpp; sourceTree = "<group>"; };
+		3CAE20012F900002002ACC81 /* Messaging.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Messaging.cpp; sourceTree = "<group>"; };
+		3CAE20022F900002002ACC81 /* Messaging.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Messaging.h; sourceTree = "<group>"; };
 		3CAE10042F900001002ACC81 /* Base64.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Base64.h; sourceTree = "<group>"; };
 		3CAE10052F900001002ACC81 /* LazyGlobals.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = LazyGlobals.cpp; sourceTree = "<group>"; };
 		3CAE10062F900001002ACC81 /* LazyGlobals.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = LazyGlobals.h; sourceTree = "<group>"; };
@@ -1562,6 +1566,8 @@
 				3CAE10012F900001002ACC81 /* TextEncoding.cpp */,
 				3CAE10022F900001002ACC81 /* TextEncoding.h */,
 				3CAE10032F900001002ACC81 /* Base64.cpp */,
+				3CAE20012F900002002ACC81 /* Messaging.cpp */,
+				3CAE20022F900002002ACC81 /* Messaging.h */,
 				3CAE10042F900001002ACC81 /* Base64.h */,
 				3CAE10052F900001002ACC81 /* LazyGlobals.cpp */,
 				3CAE10062F900001002ACC81 /* LazyGlobals.h */,
@@ -1664,6 +1670,7 @@
 				3C1850552A6DCB2D002ACC81 /* Timers.hpp in Headers */,
 				3CAE10122F900001002ACC81 /* TextEncoding.h in Headers */,
 				3CAE10142F900001002ACC81 /* Base64.h in Headers */,
+				3CAE20122F900002002ACC81 /* Messaging.h in Headers */,
 				3CAE10162F900001002ACC81 /* LazyGlobals.h in Headers */,
 				3CFCA0042E5A0001002ACC81 /* AnimationFrame.hpp in Headers */,
 				C2C8EE7222CE323C001F8CEC /* ConcurrentMap.h in Headers */,
@@ -2312,6 +2319,7 @@
 				3C1850542A6DCB2D002ACC81 /* Timers.cpp in Sources */,
 				3CAE10112F900001002ACC81 /* TextEncoding.cpp in Sources */,
 				3CAE10132F900001002ACC81 /* Base64.cpp in Sources */,
+				3CAE20112F900002002ACC81 /* Messaging.cpp in Sources */,
 				3CAE10152F900001002ACC81 /* LazyGlobals.cpp in Sources */,
 				3CFCA0032E5A0001002ACC81 /* AnimationFrame.mm in Sources */,
 				C298C027233C9AEA000DDF54 /* TSHelpers.cpp in Sources */,

@@ -6,6 +6,7 @@
 #include "Caches.h"
 #include "Console.h"
 #include "Helpers.h"
+#include "Messaging.h"
 #include "ModuleInternalCallbacks.h"
 #include "Runtime.h"
 #include "StructuredSerialization.h"
@@ -48,9 +49,16 @@ constexpr Registration kRegistry[] = {
     {"node:module", BuiltinId::kNodeModule, nullptr},
     {"node:url", BuiltinId::kNodeUrl, nullptr},
     {"node:util", BuiltinId::kNodeUtil, nullptr},
+    {"node:worker_threads", BuiltinId::kNodeWorkerThreads,
+     messaging::CreateBinding},
+    {"internal/broadcast-channel", BuiltinId::kBroadcastChannel,
+     messaging::CreateBinding, true},
     {"internal/dom-exception", BuiltinId::kDomException,
      serialization::DomExceptionBinding, true},
     {"internal/events", BuiltinId::kEvents, nullptr, true},
+    {"internal/message-channel", BuiltinId::kMessageChannel,
+     messaging::CreateBinding, true},
+    {"internal/message-event", BuiltinId::kMessageEvent, nullptr, true},
 };
 
 // ns:runtime config keys. Each key defines its value domain and scope here;

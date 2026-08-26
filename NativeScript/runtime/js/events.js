@@ -42,19 +42,59 @@ function setListenerErrorReporter(fn) {
   reportListenerError = fn;
 }
 
-// Internal listener-mutation hook. A target (in practice: AbortSignal, on
-// its prototype) may carry a function under this symbol; it is called with
-// (target, type, newCount) from every path that changes a listener list —
-// add, remove, and the once-splice inside dispatch. The key travels only
-// through require("internal/events"), so the accounting cannot be bypassed
-// the way an overridable addEventListener could.
+// Event name -> handler-attribute wrapper (see defineEventHandler), stored on
+// the target's own listener bag under a symbol so it cannot collide with an
+// event type. Deliberately NOT a WeakMap keyed by the target: a Worker is an
+// ObjectManager-registered object whose finalizer resurrects it while its
+// thread is alive, and a resurrected object's weak-collection entries are
+// already gone. Each wrapper carries a `delta` that the listener count is
+// corrected by: the wrapper occupies one slot in the listener list from its
+// first assignment onwards, but a cleared handler is not a listener.
+var kHandlers = Symbol("handlers");
+
+function handlersOf(target) {
+  var bag = target._listeners;
+  return bag === undefined ? undefined : bag[kHandlers];
+}
+
+// Internal listener-mutation hook. A target (in practice: AbortSignal and
+// MessagePort, on their prototypes) may carry a function under this symbol;
+// it is called with (target, type, newCount) from every path that changes a
+// listener list — add, remove, the once-splice inside dispatch, and a handler
+// attribute going active or inert. The key travels only through
+// require("internal/events"), so the accounting cannot be bypassed the way an
+// overridable addEventListener could.
 var kListenerChanged = Symbol("listenerChanged");
 function notifyListenerChanged(target, type, count) {
   var hook = target[kListenerChanged];
-  if (hook !== undefined) { hook(target, type, count); }
+  if (hook === undefined) { return; }
+  var wrappers = handlersOf(target);
+  if (wrappers !== undefined) {
+    var wrapper = wrappers[type];
+    if (wrapper !== undefined) { count += wrapper.delta; }
+  }
+  hook(target, type, count);
 }
 
 function EventTargetImpl() { this._listeners = ObjectCreate(null); }
+
+// A target whose prototype was grafted onto EventTarget.prototype rather than
+// built by the constructor — Worker, MessagePort — has no bag until it needs
+// one. Non-enumerable, because those are platform objects.
+function listenersOf(target) {
+  var bag = target._listeners;
+  if (bag === undefined) {
+    bag = ObjectCreate(null);
+    ObjectDefineProperty(target, "_listeners", {
+      value: bag,
+      writable: true,
+      enumerable: false,
+      configurable: true,
+    });
+  }
+  return bag;
+}
+
 EventTargetImpl.prototype.addEventListener = function (type, callback, options) {
   if (callback === null || callback === undefined) { return; }
   type = String(type);
@@ -65,8 +105,9 @@ EventTargetImpl.prototype.addEventListener = function (type, callback, options) 
     capture = !!options.capture;
     once = !!options.once;
   }
-  var list = this._listeners[type];
-  if (!list) { list = this._listeners[type] = []; }
+  var bag = listenersOf(this);
+  var list = bag[type];
+  if (!list) { list = bag[type] = []; }
   for (var i = 0; i < list.length; i++) {
     if (list[i].callback === callback && list[i].capture === capture) { return; }
   }
@@ -81,7 +122,8 @@ EventTargetImpl.prototype.removeEventListener = function (type, callback, option
   } else if (options && typeof options === "object") {
     capture = !!options.capture;
   }
-  var list = this._listeners[type];
+  var bag = this._listeners;
+  var list = bag === undefined ? undefined : bag[type];
   if (!list) { return; }
   for (var i = 0; i < list.length; i++) {
     if (list[i].callback === callback && list[i].capture === capture) {
@@ -91,10 +133,13 @@ EventTargetImpl.prototype.removeEventListener = function (type, callback, option
     }
   }
 };
-EventTargetImpl.prototype.dispatchEvent = function (event) {
-  event.target = this;
-  event.currentTarget = this;
-  var list = this._listeners[event.type];
+function dispatch(target, event, rethrow) {
+  event.target = target;
+  event.currentTarget = target;
+  var thrown;
+  var hasThrown = false;
+  var bag = target._listeners;
+  var list = bag === undefined ? undefined : bag[event.type];
   if (list) {
     // Snapshot so listeners added during dispatch are not invoked and
     // registration order is preserved.
@@ -105,24 +150,42 @@ EventTargetImpl.prototype.dispatchEvent = function (event) {
       if (idx === -1) { continue; }  // removed since snapshot
       if (entry.once) {
         ArrayPrototypeSplice(list, idx, 1);
-        notifyListenerChanged(this, event.type, list.length);
+        notifyListenerChanged(target, event.type, list.length);
       }
       var cb = entry.callback;
       try {
         if (typeof cb === "function") {
-          FunctionPrototypeCall(cb, this, event);
+          FunctionPrototypeCall(cb, target, event);
         } else if (cb && typeof cb.handleEvent === "function") {
           cb.handleEvent(event);
         }
       } catch (e) {
-        reportListenerError(e);
+        if (rethrow && !hasThrown) {
+          thrown = e;
+          hasThrown = true;
+        } else {
+          reportListenerError(e);
+        }
       }
       if (event._stopImmediate) { break; }
     }
   }
   event.currentTarget = null;
+  if (hasThrown) { throw thrown; }
   return !event.defaultPrevented;
+}
+
+EventTargetImpl.prototype.dispatchEvent = function (event) {
+  return dispatch(this, event, false);
 };
+
+// Dispatch whose first listener exception reaches the caller instead of the
+// uncaught-error reporter. Worker message delivery needs it: the native frame
+// that called in owns the worker's error chain (the scope's `onerror`, then
+// the parent's), and throwing back into it is the only way there.
+function dispatchEventRethrowing(target, event) {
+  return dispatch(target, event, true);
+}
 
 // Internal EventTarget instance backing the global. globalThis's prototype
 // is intentionally NOT made an EventTarget; only the three methods are
@@ -145,6 +208,74 @@ EventTarget.prototype.dispatchEvent = EventTargetImpl.prototype.dispatchEvent;
 
 g.Event = Event;
 g.EventTarget = EventTarget;
+
+// Event handler IDL attributes (HTML §8.1.7.2), Node's defineEventHandler.
+// The handler is never registered directly: a wrapper listener takes its slot
+// on the first assignment and stays there, so `onfoo` fires at the position it
+// was FIRST set at even after being replaced or cleared, interleaved correctly
+// with addEventListener registrations. A cleared handler leaves the wrapper in
+// place but inert, which is why the wrapper carries the count correction the
+// listener-changed hook applies.
+var addListener = EventTargetImpl.prototype.addEventListener;
+
+function makeEventHandler(handler) {
+  function eventHandler(event) {
+    if (typeof eventHandler.handler !== "function") { return; }
+    return FunctionPrototypeCall(eventHandler.handler, this, event);
+  }
+  eventHandler.handler = handler;
+  eventHandler.delta = 0;
+  return eventHandler;
+}
+
+function defineEventHandler(target, name, event) {
+  if (event === undefined) { event = name; }
+  var propName = "on" + name;
+
+  function get() {
+    var wrappers = handlersOf(this);
+    if (wrappers === undefined) { return null; }
+    var wrapper = wrappers[event];
+    return wrapper === undefined ? null : wrapper.handler;
+  }
+
+  function set(value) {
+    // [LegacyTreatNonObjectAsNull]: anything neither callable nor an object
+    // clears the handler.
+    if (typeof value !== "function" && (typeof value !== "object" || value === null)) {
+      value = null;
+    }
+    var bag = listenersOf(this);
+    var wrappers = bag[kHandlers];
+    if (wrappers === undefined) {
+      wrappers = bag[kHandlers] = ObjectCreate(null);
+    }
+    var wrapper = wrappers[event];
+    if (wrapper === undefined) {
+      // First assignment ever, `null` included: the slot is claimed now, and
+      // the listener count rises with it (HTML port enabling depends on it).
+      wrapper = wrappers[event] = makeEventHandler(value);
+      FunctionPrototypeCall(addListener, this, event, wrapper);
+      return;
+    }
+    var wasActive = typeof wrapper.handler === "function";
+    var isActive = typeof value === "function";
+    wrapper.handler = value;
+    if (wasActive === isActive) { return; }
+    wrapper.delta += isActive ? 1 : -1;
+    var list = bag[event];
+    notifyListenerChanged(this, event, list ? list.length : 0);
+  }
+
+  ObjectDefineProperty(get, "name", { value: "get " + propName, configurable: true });
+  ObjectDefineProperty(set, "name", { value: "set " + propName, configurable: true });
+  ObjectDefineProperty(target, propName, {
+    get: get,
+    set: set,
+    enumerable: true,
+    configurable: true,
+  });
+}
 
 // CustomEvent (DOM Standard §2.4): Event carrying an app-supplied `detail`.
 // Defined here so it extends the same Event the globals hold, but NOT
@@ -181,4 +312,10 @@ module.exports = {
   CustomEvent: CustomEvent,
   kListenerChanged: kListenerChanged,
   setListenerErrorReporter: setListenerErrorReporter,
+  // The base classes and the handler-attribute helper, for the lazy builtins
+  // that may not read them off the globals user code can replace.
+  Event: Event,
+  EventTarget: EventTarget,
+  defineEventHandler: defineEventHandler,
+  dispatchEventRethrowing: dispatchEventRethrowing,
 };

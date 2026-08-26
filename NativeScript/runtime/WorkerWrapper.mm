@@ -104,8 +104,6 @@ void WorkerWrapper::DrainPendingTasks() {
   v8::Locker locker(this->workerIsolate_);
   Isolate::Scope isolate_scope(this->workerIsolate_);
   HandleScope handle_scope(this->workerIsolate_);
-  Local<Context> context = Caches::Get(this->workerIsolate_)->GetContext();
-  Local<Object> global = context->Global();
 
   // WHATWG parity: the implicit port's message queue starts disabled and is
   // enabled by Worker.mm once the entry script has finished evaluating
@@ -117,6 +115,18 @@ void WorkerWrapper::DrainPendingTasks() {
     return;
   }
 
+  // Messages dispatch on the EventTarget backing the global scope's listener
+  // methods rather than on globalThis, so app code replacing
+  // globalThis.dispatchEvent cannot intercept delivery.
+  auto cache = Caches::Get(this->workerIsolate_);
+  if (cache->GlobalEventTarget == nullptr) {
+    return;
+  }
+  Local<Object> globalTarget = cache->GlobalEventTarget->Get(this->workerIsolate_);
+  if (globalTarget.IsEmpty()) {
+    return;
+  }
+
   std::vector<std::shared_ptr<worker::Message>> messages = this->queue_.PopAll();
 
   for (std::shared_ptr<worker::Message> message : messages) {
@@ -124,7 +134,7 @@ void WorkerWrapper::DrainPendingTasks() {
       break;
     }
     TryCatch tc(this->workerIsolate_);
-    this->onMessage_(this->workerIsolate_, global, message);
+    this->onMessage_(this->workerIsolate_, globalTarget, message);
 
     if (tc.HasCaught()) {
       this->CallOnErrorHandlers(tc);

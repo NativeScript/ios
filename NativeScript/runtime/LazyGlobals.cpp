@@ -3,6 +3,7 @@
 #include "Base64.h"
 #include "BuiltinLoader.h"
 #include "Helpers.h"
+#include "Messaging.h"
 #include "StructuredSerialization.h"
 #include "TextEncoding.h"
 
@@ -39,6 +40,11 @@ constexpr LazyGlobalEntry kLazyGlobals[] = {
     // events.js is an eager builtin (Events::Init), so this row never runs a
     // file: the read hits the exports cache and only the placement is lazy.
     {"CustomEvent", "CustomEvent", BuiltinExports<BuiltinId::kEvents>},
+    {"MessageEvent", "MessageEvent", BuiltinExports<BuiltinId::kMessageEvent>},
+    {"MessagePort", "MessagePort", messaging::GetMessageChannelExports},
+    {"MessageChannel", "MessageChannel", messaging::GetMessageChannelExports},
+    {"BroadcastChannel", "BroadcastChannel",
+     messaging::GetBroadcastChannelExports},
 };
 
 void LazyGlobalGetter(Local<v8::Name> property,
