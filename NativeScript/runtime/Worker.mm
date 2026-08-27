@@ -18,11 +18,12 @@ namespace tns {
 namespace {
 
 // The worker-events builtin's delivery callouts for this isolate. Both message
-// directions share emitMessage; only the receiver differs. emitError is
-// parent-side only.
+// directions share emitMessage; only the receiver differs. emitError and
+// emitEnded are parent-side only.
 struct WorkerEventsState {
   Global<v8::Function> emitMessage;
   Global<v8::Function> emitError;
+  Global<v8::Function> emitEnded;
 };
 
 }  // namespace
@@ -80,10 +81,16 @@ void Worker::InitEvents(Local<Context> context) {
             emitError->IsFunction();
   tns::Assert(success, isolate);
 
+  Local<Value> emitEnded;
+  success = exports->Get(context, tns::ToV8String(isolate, "emitEnded")).ToLocal(&emitEnded) &&
+            emitEnded->IsFunction();
+  tns::Assert(success, isolate);
+
   WorkerEventsState* state = Caches::StateFor<WorkerEventsState>(isolate);
   tns::Assert(state != nullptr, isolate);
   state->emitMessage.Reset(isolate, emitMessage.As<v8::Function>());
   state->emitError.Reset(isolate, emitError.As<v8::Function>());
+  state->emitEnded.Reset(isolate, emitEnded.As<v8::Function>());
 }
 
 void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
@@ -351,6 +358,10 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     });
 
     worker->Start(poWorker, func, qos);
+    // The thread is away, so from here the Worker object is a GC root. The
+    // parent's loop cannot run before this returns, so the thread-exit
+    // notification can never overtake this root.
+    worker->RootWorkerObject();
 
     std::shared_ptr<Caches::WorkerState> state =
         std::make_shared<Caches::WorkerState>(isolate, poWorker, worker);
@@ -512,6 +523,16 @@ bool Worker::EmitError(Isolate* isolate, Local<Object> receiver, const std::stri
   return result->BooleanValue(isolate);
 }
 
+void Worker::EmitEnded(Isolate* isolate, Local<Object> receiver) {
+  WorkerEventsState* state = Caches::StateFor<WorkerEventsState>(isolate);
+  if (state == nullptr || state->emitEnded.IsEmpty()) {
+    return;
+  }
+  Local<Context> context = Caches::Get(isolate)->GetContext();
+  Local<Value> result;
+  (void)state->emitEnded.Get(isolate)->Call(context, receiver, 0, nullptr).ToLocal(&result);
+}
+
 void Worker::CloseWorkerCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   int workerId = Worker::GetWorkerId(isolate, info.This());
@@ -549,6 +570,10 @@ void Worker::TerminateCallback(const FunctionCallbackInfo<Value>& info) {
 
   WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
   worker->Terminate();
+  // The root is NOT released here: the wrapper stays strong until the thread
+  // has actually wound down and the thread-exit notification releases it, so
+  // no GC can condemn a wrapper whose thread is still draining — the
+  // ObjectManager resurrection fallback stays unreachable for workers.
 }
 
 void Worker::SetWorkerId(Isolate* isolate, int workerId) {

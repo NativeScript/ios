@@ -278,7 +278,16 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
     case WrapperType::Worker: {
       WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
       if (!worker->isDisposed()) {
-        // during final disposal, inform the worker it should delete itself
+        // A running worker's Worker object is rooted (WorkerWrapper::
+        // RootWorkerObject), so a weak callback should not reach a live worker
+        // at all. This refusal stays as the floor under that: re-arming keeps
+        // the wrapper alive for another cycle, which is safe, whereas freeing
+        // it while the thread still posts through it is not. Reaching it is not
+        // free either -- a re-armed handle that is also a weak-collection key
+        // can corrupt the collector's ephemeron bookkeeping -- so it is a
+        // fallback, not a mechanism to rely on.
+        //
+        // During final disposal, inform the worker it should delete itself.
         if (isFinalDisposal) {
           worker->MakeWeak();
         }

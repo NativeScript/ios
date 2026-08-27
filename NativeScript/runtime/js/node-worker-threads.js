@@ -175,9 +175,29 @@ class Worker extends WorkerEmitter {
     worker.onerror = function (error) {
       self.emit("error", error);
     };
+    // The runtime's end-of-worker event, which a worker's own close() reaches
+    // as much as a terminate() does — so 'exit' is not the terminate()-only
+    // signal it used to be.
+    FunctionPrototypeCall(
+      addEventListener,
+      worker,
+      "nsworkerended",
+      function () {
+        self.#reportExit();
+      }
+    );
     soon(function () {
       self.emit("online", undefined);
     });
+  }
+
+  // Both ends of a worker report through here, and Node emits 'exit' once.
+  #reportExit() {
+    if (this.#exited) {
+      return;
+    }
+    this.#exited = true;
+    this.emit("exit", 0);
   }
 
   postMessage(value, transfer) {
@@ -188,10 +208,7 @@ class Worker extends WorkerEmitter {
     this.#worker.terminate();
     const self = this;
     return PromisePrototypeThen(PromiseResolve(), function () {
-      if (!self.#exited) {
-        self.#exited = true;
-        self.emit("exit", 0);
-      }
+      self.#reportExit();
       return 0;
     });
   }
