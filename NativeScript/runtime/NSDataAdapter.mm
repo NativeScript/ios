@@ -25,8 +25,9 @@ using namespace v8;
   // must not change for the object's lifetime — and the live ByteLength()
   // reads zero after a transfer detach while the pinned bytes stay valid.
   size_t length_;
-  // Lazily-built stable copy for a view whose buffer was never materialized;
-  // owned here, freed in dealloc.
+  // Stable copy for a view whose buffer was never materialized, built during
+  // init while the isolate is owned and the view alive — -bytes may run on
+  // threads that cannot touch V8. Owned here, freed in dealloc.
   void* heapCopy_;
 }
 
@@ -54,6 +55,13 @@ using namespace v8;
       if (view->HasBuffer()) {
         self->store_ = view->Buffer()->GetBackingStore();
         self->storeOffset_ = view->ByteOffset();
+      } else {
+        self->heapCopy_ = malloc(self->length_);
+        if (self->heapCopy_ != nullptr) {
+          view->CopyContents(self->heapCopy_, self->length_);
+        } else {
+          self->length_ = 0;
+        }
       }
     }
     // A JS object's internal field holds at most one wrapper, owned by whoever
@@ -73,8 +81,8 @@ using namespace v8;
 }
 
 - (void*)mutableBytes {
-  // The pinned store answers without touching V8, so native callers on
-  // foreign threads need no isolate access (the old per-call
+  // Every branch answers from native storage captured at init, so callers on
+  // foreign threads never need isolate access (the old per-call
   // GetBackingStore() lookup ran unlocked from any thread).
   if (store_ != nullptr) {
     void* data = store_->Data();
@@ -82,23 +90,6 @@ using namespace v8;
       return nullptr;
     }
     return static_cast<uint8_t*>(data) + storeOffset_;
-  }
-
-  if (!wrapper_->IsValid()) {
-    return nil;
-  }
-  // Only reachable for a view whose buffer was never materialized. Serve one
-  // stable copy for the adapter's lifetime: NSData callers assume -bytes is
-  // stable, and a fresh allocation per call also never got freed.
-  if (heapCopy_ != nullptr) {
-    return heapCopy_;
-  }
-  Isolate* isolate = wrapper_->Isolate();
-  Local<Object> obj = self->object_->Get(isolate).As<Object>();
-  Local<ArrayBufferView> bufferView = obj.As<ArrayBufferView>();
-  heapCopy_ = malloc(length_);
-  if (heapCopy_ != nullptr) {
-    bufferView->CopyContents(heapCopy_, length_);
   }
   return heapCopy_;
 }
