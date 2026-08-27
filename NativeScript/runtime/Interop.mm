@@ -1675,7 +1675,11 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
   void* errorRef = nullptr;
   if (methodCall.provideErrorOutParameter_) {
     void* dest = call.ArgumentBuffer(argsCount);
-    errorRef = malloc(ffi_type_pointer.size);
+    // Zero-initialized: a callee writes *error only on failure, so the
+    // success-path read below must find nil. Garbage here is read through a
+    // __strong pointer -- ARC retains and releases it -- so a stale non-null
+    // value over-releases whatever lives at that address now.
+    errorRef = calloc(1, ffi_type_pointer.size);
     Interop::SetValue(dest, errorRef);
   }
 
