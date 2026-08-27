@@ -1,3 +1,112 @@
+# [9.1.0](https://github.com/NativeScript/ios/compare/v9.0.3...v9.1.0) (2026-08-27)
+
+
+### Bug Fixes
+
+* add buffer-length check in unzip.cpp ([#429](https://github.com/NativeScript/ios/issues/429)) ([131611a](https://github.com/NativeScript/ios/commit/131611a6a878669bdc3869145f3a5a08b7565912))
+* add SharedArrayBuffer support and fix byteOffset handling across all buffer paths ([#370](https://github.com/NativeScript/ios/issues/370)) ([5555935](https://github.com/NativeScript/ios/commit/55559351f0387f3d3359cead8fc22a7cdc070fbf))
+* clear pending exception before rejecting a builtin dynamic import ([3232fb5](https://github.com/NativeScript/ios/commit/3232fb58986f0e526e48fbb12c12cff2b71c55c5))
+* close the inspector client socket on disconnect ([#390](https://github.com/NativeScript/ios/issues/390)) ([e271a77](https://github.com/NativeScript/ios/commit/e271a7741eaa0dc5bc9b86c259ac50b3a8edeaed))
+* delete self-owned URL wrappers at isolate teardown ([#438](https://github.com/NativeScript/ios/issues/438)) ([73e22b5](https://github.com/NativeScript/ios/commit/73e22b5e9b523e01cbb2af63a59707b1f58b3ef9))
+* enable interruption of V8 execution on Debugger.pause command ([#378](https://github.com/NativeScript/ios/issues/378)) ([714be8c](https://github.com/NativeScript/ios/commit/714be8cfac40b35232ea9392f716774709cac077))
+* enhance nullable type handling in method parameter validation ([#367](https://github.com/NativeScript/ios/issues/367)) ([e0d30a8](https://github.com/NativeScript/ios/commit/e0d30a8a1514a9ed1606673f18b66ea299bd4fb5))
+* error handling with ES module compilation, instantiation, and evaluation ([#375](https://github.com/NativeScript/ios/issues/375)) ([4dadac8](https://github.com/NativeScript/ios/commit/4dadac87bf0f0f9d9e0c5788bdc6ca453c1866f1))
+* loader additional hardening ([#443](https://github.com/NativeScript/ios/issues/443)) ([#444](https://github.com/NativeScript/ios/issues/444)) ([f1b0e4d](https://github.com/NativeScript/ios/commit/f1b0e4d630ded30c2f988ff42f5e1053fb057867))
+* make V8 string to NSString conversions UTF-16 faithful ([#392](https://github.com/NativeScript/ios/issues/392)) ([6778dfd](https://github.com/NativeScript/ios/commit/6778dfdd5b436be0dad51f1f64df1e1408d8e76c))
+* native methods expecting a NSError arg will now throw a JS exception if the error arg is not passed ([#311](https://github.com/NativeScript/ios/issues/311)) ([217873b](https://github.com/NativeScript/ios/commit/217873b444af506aed70abde8dd699fe76b94038))
+* only marshal promise resolution when created on the runtime loop ([#396](https://github.com/NativeScript/ios/issues/396)) ([721633a](https://github.com/NativeScript/ios/commit/721633a50ad32c69b20b5016e5ae49f4c6cb03c8)), closes [#330](https://github.com/NativeScript/ios/issues/330)
+* own native blocks with Block_copy/Block_release ([#394](https://github.com/NativeScript/ios/issues/394)) ([e40de8a](https://github.com/NativeScript/ios/commit/e40de8ae0488af514f190f84eaa4bbd6bab0e007))
+* re-throw exceptions in both debug and release modes for better error handling ([#368](https://github.com/NativeScript/ios/issues/368)) ([1eaf03d](https://github.com/NativeScript/ios/commit/1eaf03dd6f34db28e11ae608afef901b54176ead))
+* release our own blocks and release instead of dealloc data ([a65b729](https://github.com/NativeScript/ios/commit/a65b729f712d6dfee8a23532f909b9b49203472d))
+* report the rejection reason when ES module evaluation fails ([#410](https://github.com/NativeScript/ios/issues/410)) ([164e752](https://github.com/NativeScript/ios/commit/164e7524cb9fdf91bf8862c7d2d96b596575cfb9))
+* resolve race condition in nsld.sh with parallel linker invocations ([#356](https://github.com/NativeScript/ios/issues/356)) ([a61d35c](https://github.com/NativeScript/ios/commit/a61d35ce1eb6c807d3ac9a3bfe6e4223dfbdbe7f))
+* serialize extended-class allocate/register to prevent duplicate class names ([#421](https://github.com/NativeScript/ios/issues/421)) ([f5f9200](https://github.com/NativeScript/ios/commit/f5f9200de6d5005c7517f67ab943b2e27a6c51db))
+* stop over-releasing objects wrapped from a raw pointer ([#432](https://github.com/NativeScript/ios/issues/432)) ([bddaacb](https://github.com/NativeScript/ios/commit/bddaacb984ac2dac426f58577a538fee4ce25bc0))
+* throw JS exception instead of silent warning for disposed native object calls in debug mode ([#354](https://github.com/NativeScript/ios/issues/354)) ([becb19b](https://github.com/NativeScript/ios/commit/becb19bf52eafa8c3627b5b9809688461a8859a9))
+* typed array offset ([6cb26c0](https://github.com/NativeScript/ios/commit/6cb26c06617853091c6ea89d56b8a145d35c44e9))
+* URLSearchParams construction and iteration spec compliance ([#388](https://github.com/NativeScript/ios/issues/388)) ([ad920c6](https://github.com/NativeScript/ios/commit/ad920c6b4a7e4bc4d2dd23394235846b4b1edb48))
+* use -fmodule-map-file for Swift metadata discovery in nsld.sh ([#374](https://github.com/NativeScript/ios/issues/374)) ([ecd3598](https://github.com/NativeScript/ios/commit/ecd3598527bc7a9740d93869685aff6422af1825))
+* use-after-free in interop.bufferFromData under memory pressure ([#372](https://github.com/NativeScript/ios/issues/372)) ([90ac16c](https://github.com/NativeScript/ios/commit/90ac16ca5a1426fa9e0cf2656427c4c4340f1e66))
+* workers should gracefully shutdown on close() ([#369](https://github.com/NativeScript/ios/issues/369)) ([4644fce](https://github.com/NativeScript/ios/commit/4644fced293eb084ac12972fe3dae6953d3bd850))
+* Xcode 26.4 build for runtime, inspector, and metadata-generator ([#376](https://github.com/NativeScript/ios/issues/376)) ([5e34fec](https://github.com/NativeScript/ios/commit/5e34fec429a2bf10bb358cc6492e0b5a948f29d2))
+* **console:** find custom toString on deep prototype chains ([3d178e7](https://github.com/NativeScript/ios/commit/3d178e772ff174430cf4875d38130175f1dc6c0b))
+* **hooks:** stop the pre-commit hook from swallowing failures ([f860466](https://github.com/NativeScript/ios/commit/f860466af318cbde01282d0e1e72fc9908dc1cc7))
+* **inspect:** bound Map/Set iteration and harden proxy handling ([9bebe69](https://github.com/NativeScript/ios/commit/9bebe6979dedc30019c9c75fdfc0778453a63ce7))
+* **inspector:** answer the Tracing domain off the JS thread, stop swapping the trace buffer ([b68a963](https://github.com/NativeScript/ios/commit/b68a963975448b9ff592250cc234f7086cba56d0))
+* **inspector:** make the Tracing domain protocol-correct and faster ([87ab586](https://github.com/NativeScript/ios/commit/87ab58624b4b67dda7bdc02856ce334c4823bfbb))
+* **metadata-generator:** emit UIKit metadata for Mac Catalyst ([#433](https://github.com/NativeScript/ios/issues/433)) ([7291cf3](https://github.com/NativeScript/ios/commit/7291cf3b705f3c7425b282ba09857a8de34d179e))
+* **metadata-generator:** handle spaces in xcode path by appending the paths directly post split ([#344](https://github.com/NativeScript/ios/issues/344)) ([327f9ba](https://github.com/NativeScript/ios/commit/327f9bad76eb42359321f6355365572aa0200b32))
+* **metadata-generator:** strip nullability wrappers before structural type checks ([#389](https://github.com/NativeScript/ios/issues/389)) ([05224d3](https://github.com/NativeScript/ios/commit/05224d35a81af2cc3d5091ab951835d4fe5774c5))
+* **napi:** enter the env's context around async-work completion ([3645898](https://github.com/NativeScript/ios/commit/3645898b9a5e8b8cd7b34fa45c49a83555ddaaaf)), closes [#441](https://github.com/NativeScript/ios/issues/441)
+* **performance:** treat a null measure() options argument as absent ([4af8d21](https://github.com/NativeScript/ios/commit/4af8d21f42fc04a3c900b7e1dcb6113378baca59))
+* **release:** default to embedded SwiftPM packaging and restore portable local/PR packages ([#406](https://github.com/NativeScript/ios/issues/406)) ([2098243](https://github.com/NativeScript/ios/commit/209824303beef844e8c36b2c3fbdd4e417f20b7e))
+* **release:** shape the ios-spm manifest per channel and verify the real manifest ([#405](https://github.com/NativeScript/ios/issues/405)) ([746d4da](https://github.com/NativeScript/ios/commit/746d4da0c111fbad3e5a18392e9ef7811740cf41))
+* **runtime:** configureLoader volatilePatterns replaces wholesale, empty included ([828d913](https://github.com/NativeScript/ios/commit/828d91367b7612a2c5c3a80a82fc127949633d26))
+* **runtime:** correct allocator use and ownership metadata in wrapper teardown ([addf287](https://github.com/NativeScript/ios/commit/addf287e322c5bafbec71b18d90232f68fe04140))
+* **runtime:** finalizer-safe handle ownership and deferred JSBlock teardown ([#457](https://github.com/NativeScript/ios/issues/457)) ([70ad372](https://github.com/NativeScript/ios/commit/70ad3729de03409e66a7c2296a64f0700ed02ea3))
+* **runtime:** interop memory-safety fixes from the worker memory-corruption hunt ([#458](https://github.com/NativeScript/ios/issues/458)) ([5d4569c](https://github.com/NativeScript/ios/commit/5d4569c197810cdd4c1e02e7c16d42a01a77d5c0)), closes [#459](https://github.com/NativeScript/ios/issues/459)
+* **runtime:** loader callbacks throw TypeErrors on invalid input ([ee51d74](https://github.com/NativeScript/ios/commit/ee51d7414eccb6caa1182f9706c819cb4cebca16))
+* **runtime:** lock process-global caches shared across isolates ([3a6332a](https://github.com/NativeScript/ios/commit/3a6332a7ae4aac936d0d75b831c5c739699e6322))
+* **runtime:** plug native memory leaks found by Instruments ([8080bc0](https://github.com/NativeScript/ios/commit/8080bc0688e1a9533f7473301b9425627f3e0477))
+* **test-runner:** make junit report delivery resilient on starved CI VMs ([#419](https://github.com/NativeScript/ios/issues/419)) ([e5e84e0](https://github.com/NativeScript/ios/commit/e5e84e0b7f8b5e0f7386d02ac39b023dc1d10754))
+* **url:** resync cached searchParams when search/href changes ([#422](https://github.com/NativeScript/ios/issues/422)) ([10547cc](https://github.com/NativeScript/ios/commit/10547cc4475ec3ce67e982795c60555320c2bac2))
+* **urlpattern:** match capture groups in test()/exec() ([#402](https://github.com/NativeScript/ios/issues/402)) ([9f21329](https://github.com/NativeScript/ios/commit/9f21329a8f4d83830c6ccc0ad6054975d8036c33))
+* **v8:** pin the prebuilt release that exports the public V8 API ([9fb910c](https://github.com/NativeScript/ios/commit/9fb910c44d509d25d83e5d3bb829d31f3012ddfc))
+* **v8:** pin the release without the cppgc caged heap ([2f47ad9](https://github.com/NativeScript/ios/commit/2f47ad988e990b71e8cde26d9c49a7fcb94f4726))
+* **worker:** worker path resolution parity with android and error handling for missing scripts ([20ce8d4](https://github.com/NativeScript/ios/commit/20ce8d45167ec917c4b3c5ffc2c552b829652107))
+
+
+### Features
+
+* Ada v4 ([#413](https://github.com/NativeScript/ios/issues/413)) ([9b6df7d](https://github.com/NativeScript/ios/commit/9b6df7d68bf72b3cef780fa0f477cedfaa9071d9))
+* add more null types for types the runtime accept or returns as null ([#363](https://github.com/NativeScript/ios/issues/363)) ([fb0a5f4](https://github.com/NativeScript/ios/commit/fb0a5f4fcd408369a318ae3d17b60b196e6cbc34))
+* add Node-style primordials to runtime builtins ([#415](https://github.com/NativeScript/ios/issues/415)) ([d5c187c](https://github.com/NativeScript/ios/commit/d5c187c462cde4e7a26be5378593b083cf1ba153))
+* add support for nullable types and ArrayBuffers for pointers ([#357](https://github.com/NativeScript/ios/issues/357)) ([961dc76](https://github.com/NativeScript/ios/commit/961dc769386992dd53d722b31073fa500a5c7323))
+* allow custom priority for workers ([#377](https://github.com/NativeScript/ios/issues/377)) ([8d238ed](https://github.com/NativeScript/ios/commit/8d238eddbf20e69e27ba0044522fcd53a6d357d8))
+* budgeted console formatter (inspect builtin) ([#416](https://github.com/NativeScript/ios/issues/416)) ([5e40702](https://github.com/NativeScript/ios/commit/5e40702bc788589f5f2868dcb69149da0428e594))
+* enable TestRunner suite and metadata availability checks on visionOS ([#407](https://github.com/NativeScript/ios/issues/407)) ([d907487](https://github.com/NativeScript/ios/commit/d9074873eb5eeb389168e0aa1e7074430ecfa6ae))
+* ESM resolver hardening, HTTP module loader, ns:module dev surface ([#383](https://github.com/NativeScript/ios/issues/383)) ([c5e9886](https://github.com/NativeScript/ios/commit/c5e9886e96516884d337a1920d581011fdcfdcac))
+* guard released-native-object access behind a policy (ns:runtime) ([4193a8e](https://github.com/NativeScript/ios/commit/4193a8e9e84cfbbec53df07857954e1616e67a8b))
+* improve profiler performance ([#332](https://github.com/NativeScript/ios/issues/332)) ([c371b6c](https://github.com/NativeScript/ios/commit/c371b6cbc084e90a9db84b1ccdde0f2db5bf1154))
+* Node-API (napi) surface for plugin developers ([#437](https://github.com/NativeScript/ios/issues/437)) ([3900e1c](https://github.com/NativeScript/ios/commit/3900e1ca9f6749e55a93375759e2aa242964eb9a))
+* ns:util builtin module (inspect, format) ([#418](https://github.com/NativeScript/ios/issues/418)) ([22226ba](https://github.com/NativeScript/ios/commit/22226ba1d8636ebd8a09c6416820d57c9813d74d))
+* per-runtime EventLoop - v8 platform tasks + two-lane scheduler (CFRunLoop timer/source) ([#439](https://github.com/NativeScript/ios/issues/439)) ([4a90925](https://github.com/NativeScript/ios/commit/4a909252a3df273a803b6a68de68587ab088b900))
+* scope worker-created extended class names to their isolate ([#428](https://github.com/NativeScript/ios/issues/428)) ([77b1ea3](https://github.com/NativeScript/ios/commit/77b1ea3ca2c3cfb1f5e88d759f5ded1479bb7da8))
+* ship TypeScript declarations for the ns:* builtin modules ([5e470f4](https://github.com/NativeScript/ios/commit/5e470f4565be19016dade382a8f7b8a0be552219))
+* structuredClone global (HTML structured clone, ArrayBuffer transfer) ([#431](https://github.com/NativeScript/ios/issues/431)) ([5ad8bb1](https://github.com/NativeScript/ios/commit/5ad8bb149b0192a0c0a1b7838ed3384f0e34d9d5))
+* swift package release workflow ([#395](https://github.com/NativeScript/ios/issues/395)) ([732c439](https://github.com/NativeScript/ios/commit/732c4396ea12c01569312a0b0caaed0a5badfdc8))
+* update libffi to upstream with FFI_TYPE_VECTOR support ([#408](https://github.com/NativeScript/ios/issues/408)) ([485cdbb](https://github.com/NativeScript/ios/commit/485cdbbbcbc0b6563fc1ebd630eadea5882e45dd))
+* upgrade V8 to 14.9.207.39 ([#412](https://github.com/NativeScript/ios/issues/412)) ([0e89474](https://github.com/NativeScript/ios/commit/0e89474b1a203ff084b4c88df8a2aa777e5c50a0))
+* web-compliant error handling (unhandled rejections, error events, interop.escapeException) ([#409](https://github.com/NativeScript/ios/issues/409)) ([55ffdef](https://github.com/NativeScript/ios/commit/55ffdef9adbc8548473987709b74d6e27d40dc11))
+* WHATWG performance API (hr-time, user timing, performance timeline) ([#430](https://github.com/NativeScript/ios/issues/430)) ([e338870](https://github.com/NativeScript/ios/commit/e338870d8c9d24d66fde5c22349b0a9dcb4af85c))
+* **inspector:** attach Chrome DevTools to Web Worker isolates ([#386](https://github.com/NativeScript/ios/issues/386)) ([cd28c41](https://github.com/NativeScript/ios/commit/cd28c415e6352376daad593ef3e136cb51444fc2))
+* **inspector:** serve source maps to DevTools via Network.loadNetworkResource ([#385](https://github.com/NativeScript/ios/issues/385)) ([91ce499](https://github.com/NativeScript/ios/commit/91ce499f8888eed309c26398803609f7e9ac2a8c))
+* **performance:** structured-clone mark/measure detail per spec ([6dd5523](https://github.com/NativeScript/ios/commit/6dd55238d5b20ab75d2b9b08ce07a50c6bf10356))
+* **runtime:** add AbortController and AbortSignal ([#447](https://github.com/NativeScript/ios/issues/447)) ([292a9e3](https://github.com/NativeScript/ios/commit/292a9e38162d5ce8ad852ddb1d644b1316e7155d))
+* **runtime:** DOMException and CustomEvent as lazy globals ([#452](https://github.com/NativeScript/ios/issues/452)) ([d7bf2c7](https://github.com/NativeScript/ios/commit/d7bf2c7308f1605cac339ddfe48e8840add90e87))
+* **runtime:** expose timers under the standard global names ([9399899](https://github.com/NativeScript/ios/commit/9399899958a3cfdf5fd31a63cbdce47824489594))
+* **runtime:** lazy-global tier with native TextEncoder/TextDecoder and atob/btoa ([#448](https://github.com/NativeScript/ios/issues/448)) ([ac195f0](https://github.com/NativeScript/ios/commit/ac195f0c3edc339ed7e960f31560d1d15c858e9d))
+* **runtime:** requestAnimationFrame and Android-parity frame callbacks ([#446](https://github.com/NativeScript/ios/issues/446)) ([e9ce46e](https://github.com/NativeScript/ios/commit/e9ce46e29e56d40bb683de0033e1891447286dcd))
+* **runtime:** typed per-isolate state slots on Caches ([abe7ffe](https://github.com/NativeScript/ios/commit/abe7ffe57e67e350009d7ba38c0f81d0177fe14b))
+
+
+### Performance Improvements
+
+* convert strings across the V8/Obj-C bridge without the UTF-8 round trip ([#442](https://github.com/NativeScript/ios/issues/442)) ([bfc6c5e](https://github.com/NativeScript/ios/commit/bfc6c5ef2487c48994392b1f1e364afc2717f456))
+* **metadata:** small size reductions in metadata.bin ([#434](https://github.com/NativeScript/ios/issues/434)) ([ba922a7](https://github.com/NativeScript/ios/commit/ba922a7c70c73b4b1e92df96ae92f1bff27de68a))
+
+
+### Reverts
+
+* swift package release workflow and follow-ups ([#404](https://github.com/NativeScript/ios/issues/404)) ([2c2b63f](https://github.com/NativeScript/ios/commit/2c2b63f75b7dfbda4b942e22a4817bf0cd9dc166))
+
+
+### BREAKING CHANGES
+
+* V8 is upgraded from 10.3.22 to 14.9.207.39 ([#412](https://github.com/NativeScript/ios/issues/412)). The prebuilt V8 libraries and vendored headers are no longer committed to the repo — `download_v8.sh` (run automatically by `build_nativescript.sh`) installs them from the release pinned in `V8_RELEASE`. `require()` of an unresolvable module now throws at require time instead of returning a placeholder that fails on property access. The embedder API migration notes live in `docs/knowledge/v8-14-migration.md`.
+
+
+
 ## [9.0.3](https://github.com/NativeScript/ios/compare/v9.0.2...v9.0.3) (2026-01-04)
 
 
