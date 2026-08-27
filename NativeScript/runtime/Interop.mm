@@ -38,6 +38,11 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
         [](JSBlock* block) {
           if (block->descriptor == &JSBlock::kJSBlockDescriptor) {
             MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
+            // Runs on whatever thread drops the last native reference. That is
+            // safe inline: callback_ is a strong, unregistered persistent, so
+            // resetting it never touches the finalizer drain's bookkeeping,
+            // and a foreign-thread Locker into the block's own isolate is
+            // legitimate now that extended class names are worker-scoped.
             if (wrapper->isolateWrapper_.IsValid()) {
               Isolate* isolate = wrapper->isolateWrapper_.Isolate();
               v8::Locker locker(isolate);
@@ -48,9 +53,12 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
                 BlockWrapper* blockWrapper =
                     static_cast<BlockWrapper*>(tns::GetValue(isolate, callback));
                 tns::DeleteValue(isolate, callback);
-                wrapper->callback_->Reset();
                 delete blockWrapper;
               }
+              // Unconditional: an already-detached callback still owns its
+              // node, and dropping the persistent without a reset would leave
+              // that node rooted forever.
+              wrapper->callback_->Reset();
             }
             delete wrapper;
             ffi_closure_free(block->ffiClosure);

@@ -246,10 +246,10 @@ where `Holder() == This()` and nothing inherits it.
 
 ## Outstanding
 
-Nothing blocking. One follow-up:
+Nothing blocking.
 
-- `DisposerPHV.{h,mm}` is now dead code -- `Isolate::VisitHandlesWithClassIds` no longer exists,
-  so the visitor can never be driven. Its logic moved to `ObjectManager::DisposeAllRegistered()`.
+- `DisposerPHV.{h,mm}` were deleted: `Isolate::VisitHandlesWithClassIds` no longer exists, so the
+  visitor could never be driven. Its logic lives in `ObjectManager::DisposeAllRegistered()`.
 
 ### Behavioural parity traps in the accessor rewrite
 
