@@ -256,17 +256,27 @@ describe("GC finalizer callbacks", function () {
         TNSClearOutput();
 
         scrubStack();
-        __collect();
-        setTimeout(function () {
+        // The deferred teardown runs on a later event-loop pass, so the
+        // collectability check polls rather than assuming one tick suffices.
+        var attempts = 20;
+        (function pollCollected() {
             __collect();
-            expect(ref.deref()).toBeUndefined();
-            done();
-        }, 0);
+            if (ref.deref() === undefined) {
+                done();
+                return;
+            }
+            if (--attempts === 0) {
+                expect(ref.deref()).toBeUndefined();
+                done();
+                return;
+            }
+            setTimeout(pollCollected);
+        })();
     });
 
-    // The wrapper attached to the JS function outlives its block until the
-    // deferred teardown runs, so a re-marshal in that window must build a new
-    // block instead of copying freed memory.
+    // Releasing the block detaches the function's wrapper, so a later
+    // marshal of the same function must build a fresh block rather than
+    // reaching for the dead one.
     it("re-marshals a function whose block was already released", function (done) {
         var callback = function () {
             TNSLog("re-marshalled block called");

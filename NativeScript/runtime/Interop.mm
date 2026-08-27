@@ -30,45 +30,6 @@ static constexpr int64_t kMinSafeInteger =
     static_cast<int64_t>(kUint64AllBitsSet << 53) + 1;        // -9007199254740991 (-(2^53-1))
 static constexpr int64_t kMaxSafeInteger = -kMinSafeInteger;  // 9007199254740991 (2^53-1)
 
-namespace {
-
-// Tears down the JS side of a JSBlock whose last native reference just went
-// away. The release lands on whatever thread the owning native code runs on,
-// and can land inside ObjectManager's finalizer drain (a -dealloc cascade
-// started by DisposeValue), where mutating global handles corrupts the drain's
-// bookkeeping. So the handles are only ever touched from the owning runtime's
-// home thread, through its event loop. A refused post means the loop is gone
-// with its isolate, which took the handles with it -- only native memory is
-// left to free.
-void DisposeBlockCallback(MethodCallbackWrapper* wrapper) {
-  BlockWrapper* blockWrapper = wrapper->blockWrapper_;
-  Runtime* runtime = wrapper->isolateWrapper_.IsValid()
-                         ? Runtime::GetRuntime(wrapper->isolateWrapper_.Isolate())
-                         : nullptr;
-  std::shared_ptr<EventLoop> eventLoop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
-
-  bool posted = eventLoop != nullptr && eventLoop->PostInternal([wrapper, blockWrapper]() {
-    Isolate* isolate = wrapper->isolateWrapper_.Isolate();
-    Local<Value> callback = wrapper->callback_->Get(isolate);
-    // The function may have been handed to native again in the meantime, which
-    // attaches a fresh wrapper; only detach the one this block owns.
-    if (!callback.IsEmpty() && callback->IsObject() &&
-        tns::GetValue(isolate, callback) == blockWrapper) {
-      tns::DeleteValue(isolate, callback);
-    }
-    wrapper->callback_->Reset();
-    delete blockWrapper;
-    delete wrapper;
-  });
-
-  if (!posted) {
-    delete blockWrapper;
-    delete wrapper;
-  }
-}
-
-}  // namespace
-
 Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
     .reserved = 0,
     .size = sizeof(JSBlock),
@@ -77,12 +38,29 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
         [](JSBlock* block) {
           if (block->descriptor == &JSBlock::kJSBlockDescriptor) {
             MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
-            // The block memory dies with this call, so the wrapper that still
-            // names it must stop naming it now, before the deferred teardown.
-            if (wrapper->blockWrapper_ != nullptr) {
-              wrapper->blockWrapper_->ClearBlock();
+            // Runs on whatever thread drops the last native reference. That is
+            // safe inline: callback_ is a strong, unregistered persistent, so
+            // resetting it never touches the finalizer drain's bookkeeping,
+            // and a foreign-thread Locker into the block's own isolate is
+            // legitimate now that extended class names are worker-scoped.
+            if (wrapper->isolateWrapper_.IsValid()) {
+              Isolate* isolate = wrapper->isolateWrapper_.Isolate();
+              v8::Locker locker(isolate);
+              Isolate::Scope isolate_scope(isolate);
+              HandleScope handle_scope(isolate);
+              Local<Value> callback = wrapper->callback_->Get(isolate);
+              if (!callback.IsEmpty() && callback->IsObject()) {
+                BlockWrapper* blockWrapper =
+                    static_cast<BlockWrapper*>(tns::GetValue(isolate, callback));
+                tns::DeleteValue(isolate, callback);
+                delete blockWrapper;
+              }
+              // Unconditional: an already-detached callback still owns its
+              // node, and dropping the persistent without a reset would leave
+              // that node rooted forever.
+              wrapper->callback_->Reset();
             }
-            DisposeBlockCallback(wrapper);
+            delete wrapper;
             ffi_closure_free(block->ffiClosure);
             block->~JSBlock();
           }
@@ -545,17 +523,13 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
 
     CFTypeRef blockPtr = nullptr;
     BaseDataWrapper* baseWrapper = tns::GetValue(isolate, arg);
-    BlockWrapper* liveWrapper = baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Block
-                                    ? static_cast<BlockWrapper*>(baseWrapper)
-                                    : nullptr;
-    // A cleared block means the wrapper outlived its JSBlock and is waiting for
-    // the deferred teardown; this call needs a fresh one.
-    if (liveWrapper != nullptr && liveWrapper->Block() != nullptr) {
+    if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Block) {
+      BlockWrapper* wrapper = static_cast<BlockWrapper*>(baseWrapper);
       // The callee takes the block at +0 and copies it if it needs to keep it,
       // so the copy that keeps it alive across the call must be balanced: the
       // JSBlock dispose helper owns the ffi closure and the callback wrapper
       // and only runs once the last reference goes away.
-      blockPtr = CFAutorelease(Block_copy(liveWrapper->Block()));
+      blockPtr = CFAutorelease(Block_copy(wrapper->Block()));
     } else {
       std::shared_ptr<Persistent<Value>> poCallback =
           std::make_shared<Persistent<Value>>(isolate, arg);
@@ -565,7 +539,6 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
                                       userData);
 
       BlockWrapper* wrapper = new BlockWrapper((void*)blockPtr, blockTypeEncoding, false);
-      userData->blockWrapper_ = wrapper;
       tns::SetValue(isolate, arg.As<v8::Function>(), wrapper);
     }
 

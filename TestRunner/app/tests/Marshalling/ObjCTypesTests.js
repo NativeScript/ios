@@ -101,12 +101,22 @@ describe(module.id, function () {
             expect(!!functionRef.deref()).toBe(true);
             verifyBlockCall();
             instance.methodReleaseRetainingBlock();
-            gc();
-            setTimeout(() => {
+            // The JS side of the block is torn down on the event loop after the
+            // native release, so collectability lands a few ticks later.
+            var attempts = 20;
+            (function pollCollected() {
                 gc();
-                expect(!!functionRef.deref()).toBe(false);
-                done();    
-            })
+                if (functionRef.deref() === undefined) {
+                    done();
+                    return;
+                }
+                if (--attempts === 0) {
+                    expect(!!functionRef.deref()).toBe(false);
+                    done();
+                    return;
+                }
+                setTimeout(pollCollected);
+            })();
         });
     });
 

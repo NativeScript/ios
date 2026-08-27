@@ -143,6 +143,16 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
   ObjectWeakCallbackState* state = data.GetParameter();
   Isolate* isolate = data.GetIsolate();
 
+  if (state->disposing_) {
+    // Another frame owns this state's teardown — the DisposeAllRegistered
+    // walk, whose pre-claimed entries a nested collection can still condemn.
+    // Re-arm to satisfy the finalizer contract on this node and leave the
+    // clear/reset/delete to the owner.
+    state->target_->ClearWeak<void>();
+    state->target_->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
+    return;
+  }
+
   state->disposing_ = true;
   Local<Value> value = state->target_->Get(isolate);
   bool disposed = ObjectManager::DisposeValue(isolate, value);
