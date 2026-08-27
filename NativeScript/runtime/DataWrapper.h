@@ -459,6 +459,11 @@ class BlockWrapper : public BaseDataWrapper {
 
   void* Block() { return this->block_; }
 
+  // A JSBlock's dispose helper frees the block while this wrapper is still
+  // attached to its JS function; clearing the pointer there keeps a later
+  // marshalling of that function from copying dead block memory.
+  void ClearBlock() { this->block_ = nullptr; }
+
   const TypeEncoding* Encodings() { return this->typeEncoding_; }
 
   bool OwnsBlock() { return this->ownsBlock_; }

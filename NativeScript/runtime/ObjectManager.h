@@ -7,6 +7,16 @@ namespace tns {
 
 class ObjectManager;
 
+// Parameter of the kFinalizer weak callback armed on target_.
+//
+// Ownership: created by ObjectManager::Register and deleted by exactly two
+// sites -- ObjectManager::FinalizerCallback's disposed branch and
+// DisposeAllRegistered. Retiring a registration from anywhere else (the
+// __releaseNativeCounterpart builtin is the only one) must Reset target_
+// first: resetting frees the V8 node, which clears its pending-finalizer bit
+// and guarantees no further callback, so the state is unreachable afterwards
+// and safe to unlink and delete. Dropping the weakness without resetting
+// leaves the node rooted forever with parameter() pointing at the freed state.
 struct ObjectWeakCallbackState {
   ObjectWeakCallbackState(std::shared_ptr<v8::Persistent<v8::Value>> target)
       : target_(target) {}
@@ -21,6 +31,13 @@ struct ObjectWeakCallbackState {
   ObjectWeakCallbackState** head_ = nullptr;
   ObjectWeakCallbackState* prev_ = nullptr;
   ObjectWeakCallbackState* next_ = nullptr;
+
+  // Set while one of the two owning sites is disposing this handle's value.
+  // Disposal releases the native counterpart, whose -dealloc can re-enter JS
+  // and reach __releaseNativeCounterpart for this very handle; retiring it
+  // there would free the state under the frame that owns it. Retirement
+  // observes the flag and leaves the handle to that frame.
+  bool disposing_ = false;
 };
 
 class ObjectManager {

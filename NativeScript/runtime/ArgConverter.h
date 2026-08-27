@@ -30,6 +30,10 @@ struct MethodCallbackWrapper {
   const uint8_t initialParamIndex_;
   const uint8_t paramsCount_;
   const TypeEncoding* typeEncoding_;
+  // Set only for JSBlocks: the wrapper attached to callback_, owned by the
+  // block's dispose helper. Reaching it without V8 lets the helper neuter the
+  // block pointer on whatever thread the last release lands on.
+  BlockWrapper* blockWrapper_ = nullptr;
 };
 
 class ArgConverter {

@@ -104,9 +104,15 @@ void ObjectManager::DisposeAllRegistered(Isolate* isolate) {
   Isolate::Scope isolateScope(isolate);
   HandleScope scope(isolate);
 
-  // Detach the whole list first so disposal can't walk into freed entries.
+  // Detach the whole list first so disposal can't walk into freed entries, and
+  // claim every state up front: disposing one entry can re-enter JS from
+  // -dealloc and reach __releaseNativeCounterpart for any other entry this
+  // walk still owns.
   ObjectWeakCallbackState* state = cache->ObjectManagedValues;
   cache->ObjectManagedValues = nullptr;
+  for (ObjectWeakCallbackState* claimed = state; claimed != nullptr; claimed = claimed->next_) {
+    claimed->disposing_ = true;
+  }
 
   while (state != nullptr) {
     ObjectWeakCallbackState* next = state->next_;
@@ -136,17 +142,27 @@ void ObjectManager::DisposeAllRegistered(Isolate* isolate) {
 void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackState>& data) {
   ObjectWeakCallbackState* state = data.GetParameter();
   Isolate* isolate = data.GetIsolate();
+
+  state->disposing_ = true;
   Local<Value> value = state->target_->Get(isolate);
   bool disposed = ObjectManager::DisposeValue(isolate, value);
+  state->disposing_ = false;
 
-  if (disposed) {
-    UnlinkRegistered(state);
+  // Disposal releases the native counterpart, and a -dealloc reached that way
+  // can reset this very handle (the collection adapters reset the persistent
+  // they were built from). An empty handle means the node is already freed, so
+  // there is nothing left to reset or re-arm -- ClearWeak/SetWeak would write
+  // through a dead slot -- and the registration must be retired even when
+  // disposal was refused.
+  if (disposed || state->target_->IsEmpty()) {
     state->target_->Reset();
+    UnlinkRegistered(state);
     delete state;
-  } else {
-    state->target_->ClearWeak<void>();
-    state->target_->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
+    return;
   }
+
+  state->target_->ClearWeak<void>();
+  state->target_->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
 }
 
 bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFinalDisposal) {
@@ -332,12 +348,25 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     auto it = cache->Instances.find(data);
     if (it != cache->Instances.end()) {
-      ObjectWeakCallbackState* state = it->second->ClearWeak<ObjectWeakCallbackState>();
+      std::shared_ptr<Persistent<Value>> handle = it->second;
+      ObjectWeakCallbackState* state =
+          handle->IsWeak() ? handle->ClearWeak<ObjectWeakCallbackState>() : nullptr;
+      if (state != nullptr && state->disposing_) {
+        // Reached from a -dealloc running inside this handle's own finalizer:
+        // that frame already released the native counterpart and owns the
+        // state, so restore the weakness and let it finish.
+        handle->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
+        return;
+      }
+      cache->Instances.erase(it);
       if (state != nullptr) {
+        // Reset before deleting the state: it frees the node, which clears the
+        // pending-finalizer bit and guarantees no callback can reach the freed
+        // parameter.
+        handle->Reset();
         UnlinkRegistered(state);
         delete state;
       }
-      cache->Instances.erase(it);
     }
 
     // Release the runtime's strong reference (taken when the object was first

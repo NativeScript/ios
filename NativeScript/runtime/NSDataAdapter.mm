@@ -104,7 +104,6 @@ using namespace v8;
     delete dataWrapper_;
   }
 
-  self->object_->Reset();
   delete self->wrapper_;
   self->object_ = nullptr;
   [super dealloc];
