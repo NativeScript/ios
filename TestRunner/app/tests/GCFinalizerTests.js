@@ -236,6 +236,162 @@ describe("GC finalizer callbacks", function () {
         expect(survivor.objectAtIndex(1)).toBe(2);
     });
 
+    // Allocation pressure shaped like the field workload: native lazy-global
+    // paths (TextDecoder, atob/btoa) interleaved with adapter marshalling, so
+    // a wrapper freed twice lands on somebody else's live allocation.
+    function churn(rounds) {
+        var decoder = new TextDecoder();
+        var sink = 0;
+        for (var i = 0; i < rounds; i++) {
+            sink += decoder.decode(new Uint8Array([65, 66, 67, i % 128])).length;
+            sink += atob(btoa("churn-" + i)).length;
+            var probe = NSMutableArray.alloc().init();
+            probe.addObject([i, i + 1]);
+            probe.addObject(new Uint8Array(8));
+            probe.addObject({ k: i });
+            sink += probe.count;
+        }
+        return sink;
+    }
+
+    // The JS object's internal field owns the wrapper an adapter attaches to
+    // it. When a finalizer drops the last native reference to the adapter, the
+    // adapter's -dealloc detaches that wrapper from inside the disposal that
+    // released it, so the disposal must not free what it read beforehand.
+    it("releases adapters from inside a finalizer across repeated cycles", function () {
+        var cycles = 12;
+
+        for (var c = 0; c < cycles; c++) {
+            (function () {
+                var holders = [];
+                for (var i = 0; i < 8; i++) {
+                    // Each holder takes the only native reference to the
+                    // adapters built for these collections.
+                    var holder = NSMutableArray.alloc().init();
+                    holder.addObject([c, i, i + 1]);
+                    holder.addObject(new Uint8Array(16));
+                    holder.addObject({ c: c, i: i });
+                    holders.push(holder);
+                }
+            })();
+
+            scrubStack();
+            __collect();
+            expect(churn(16)).toBeGreaterThan(0);
+            __collect();
+        }
+
+        var survivor = NSMutableArray.arrayWithArray([1, 2, 3]);
+        expect(survivor.count).toBe(3);
+        expect(survivor.objectAtIndex(2)).toBe(3);
+    });
+
+    // Marshalling the same collection twice builds a second adapter for a JS
+    // object whose field is already claimed. The second adapter must leave the
+    // field alone, so that neither adapter's -dealloc frees the other's
+    // wrapper, and both must still marshal back to the original JS object.
+    it("survives a JS collection marshalled to native twice", function () {
+        var rounds = 8;
+
+        for (var r = 0; r < rounds; r++) {
+            var arr = [r, r + 1, r + 2];
+            var obj = { id: r, param: "abc" };
+            var types = TNSObjCTypes.alloc().init();
+
+            // objectAtIndex: on the outer adapter builds a fresh adapter for
+            // the nested collection on every call.
+            expect(types.methodWithNSArrayWrappingDictionary([obj])).toBe(obj);
+            expect(types.methodWithNSArrayWrappingDictionary([obj])).toBe(obj);
+            expect(types.methodWithNSArrayWrappingDictionary([arr])).toBe(arr);
+            expect(types.methodWithNSArrayWrappingDictionary([arr])).toBe(arr);
+
+            var first = NSMutableArray.alloc().init();
+            first.addObject(arr);
+            var second = NSMutableArray.alloc().init();
+            second.addObject(arr);
+            expect(first.count).toBe(1);
+            expect(second.count).toBe(1);
+
+            expect(churn(8)).toBeGreaterThan(0);
+        }
+
+        scrubStack();
+        __collect();
+        expect(churn(16)).toBeGreaterThan(0);
+        __collect();
+
+        var survivor = NSMutableArray.arrayWithArray([4, 5]);
+        expect(survivor.count).toBe(2);
+    });
+
+    // A key enumerator reads the persistent its adapter owns, and the adapter
+    // resets that persistent in -dealloc, so an enumeration keeps its adapter
+    // alive for as long as the enumerator itself lives.
+    it("keeps a dictionary adapter alive for its keys enumerator", function () {
+        var rounds = 8;
+
+        for (var r = 0; r < rounds; r++) {
+            var types = TNSObjCTypes.alloc().init();
+            // Fast enumeration over a foreign NSDictionary goes through
+            // -keyEnumerator; the enumerator outlives the call that made it,
+            // draining with the pool rather than with the adapter.
+            var dictionary = { a: 3, b: { "-1": [4, 5] }, d: 6 };
+            expect(types.methodWithNSDictionary(dictionary)).toBe(dictionary);
+            TNSClearOutput();
+
+            var map = new Map();
+            map.set("a", 3);
+            map.set("d", 6);
+            expect(types.methodWithNSDictionary(map)).toBe(map);
+            TNSClearOutput();
+
+            expect(churn(8)).toBeGreaterThan(0);
+        }
+
+        scrubStack();
+        __collect();
+        expect(churn(16)).toBeGreaterThan(0);
+        __collect();
+
+        // A dictionary enumerated after the sweep still reports its keys.
+        var late = { x: 1, y: 2 };
+        expect(TNSObjCTypes.alloc().init().methodWithNSDictionary(late)).toBe(late);
+        expect(TNSGetOutput()).toBe("x 1y 2");
+        TNSClearOutput();
+    });
+
+    // The field crashes surfaced on worker isolates, where the same churn runs
+    // and the isolate is torn down while adapters may still be alive.
+    it("survives the same churn on a worker isolate", function (done) {
+        var originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 15000;
+
+        var worker = new Worker("./adapterChurnWorker.js");
+        var rounds = 0;
+
+        var finish = function () {
+            jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+            worker.terminate();
+            done();
+        };
+
+        worker.onmessage = function (msg) {
+            expect(msg.data.ok).toBe(true);
+            rounds++;
+            if (rounds === 6) {
+                finish();
+                return;
+            }
+            worker.postMessage(rounds);
+        };
+        worker.onerror = function (e) {
+            expect(String(e && e.message ? e.message : e)).toBe("<no worker error>");
+            finish();
+        };
+
+        worker.postMessage(0);
+    });
+
     // A natively held block's last release can land inside the finalizer
     // drain, where the JSBlock dispose helper must not touch handles itself.
     it("tears down a natively held block released by a finalizer", function (done) {

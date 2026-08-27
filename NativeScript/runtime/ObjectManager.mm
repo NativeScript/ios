@@ -317,9 +317,14 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
       break;
   }
 
-  delete wrapper;
-  wrapper = nullptr;
-  tns::DeleteValue(isolate, obj);
+  // A branch above can run arbitrary code -- [target release] reaching an ObjC
+  // -dealloc is the reachable one -- and that code may detach this wrapper or
+  // attach a different one. The object's internal field is the wrapper's owner,
+  // so only a wrapper still sitting in it is ours to free.
+  if (tns::GetValue(isolate, obj) == wrapper) {
+    delete wrapper;
+    tns::DeleteValue(isolate, obj);
+  }
   return true;
 }
 
@@ -387,8 +392,12 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
     // were still referenced elsewhere and caused use-after-free crashes.
     [data release];
 
-    delete wrapper;
-    tns::SetValue(isolate, value.As<Object>(), nullptr);
+    // The release above can run a -dealloc that detaches this wrapper; the
+    // internal field owns it, so free only what is still attached.
+    if (tns::GetValue(isolate, value) == wrapper) {
+      delete wrapper;
+      tns::SetValue(isolate, value.As<Object>(), nullptr);
+    }
   }
 }
 

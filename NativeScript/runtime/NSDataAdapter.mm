@@ -8,6 +8,9 @@ using namespace v8;
 
 @implementation NSDataAdapter {
   IsolateWrapper* wrapper_;
+  // The wrapper this adapter attached to the JS object, or nullptr when the
+  // field was already taken. Ownership lives with the field, not with this
+  // pointer: it is only the claim used to recognise our own wrapper there.
   ObjCDataWrapper* dataWrapper_;
   std::shared_ptr<Persistent<Value>> object_;
 }
@@ -19,8 +22,14 @@ using namespace v8;
                 isolate);
     self->wrapper_ = new IsolateWrapper(isolate);
     self->object_ = std::make_shared<Persistent<Value>>(isolate, jsObject);
-    self->wrapper_->GetCache()->Instances.emplace(self, self->object_);
-    tns::SetValue(isolate, jsObject, (dataWrapper_ = new ObjCDataWrapper(self)));
+    self->wrapper_->GetCache()->Instances[self] = self->object_;
+    // A JS object's internal field holds at most one wrapper, owned by whoever
+    // attached it first. An adapter that finds the field taken stays detached
+    // and never writes or clears it; it still reads the object through object_.
+    if (tns::GetValue(isolate, jsObject) == nullptr) {
+      self->dataWrapper_ = new ObjCDataWrapper(self);
+      tns::SetValue(isolate, jsObject, self->dataWrapper_);
+    }
   }
 
   return self;
@@ -87,21 +96,20 @@ using namespace v8;
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
     wrapper_->GetCache()->Instances.erase(self);
-    Local<Value> value = self->object_->Get(isolate);
-    BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
-    if (wrapper != nullptr) {
-      tns::DeleteValue(isolate, value);
-      // ensure we don't delete the same wrapper twice
-      // this is just needed as a failsafe in case some other wrapper is assigned to this object
-      if (wrapper == dataWrapper_) {
-        dataWrapper_ = nullptr;
+    // Detach and free only a wrapper that is still the one we attached: a
+    // finalizer or __releaseNativeCounterpart can have retired it already, and
+    // whatever else sits in the field belongs to another owner. Once the
+    // isolate is gone the field can no longer be read, so the claim is dropped
+    // rather than freed blind.
+    if (dataWrapper_ != nullptr) {
+      Local<Value> value = self->object_->Get(isolate);
+      if (tns::GetValue(isolate, value) == dataWrapper_) {
+        tns::DeleteValue(isolate, value);
+        delete dataWrapper_;
       }
-      delete wrapper;
+      dataWrapper_ = nullptr;
     }
     self->object_->Reset();
-  }
-  if (dataWrapper_ != nullptr) {
-    delete dataWrapper_;
   }
 
   delete self->wrapper_;
