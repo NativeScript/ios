@@ -21,6 +21,10 @@ using namespace v8;
   std::shared_ptr<v8::BackingStore> store_;
   // View byte offset into store_, captured with it (immutable for a view).
   size_t storeOffset_;
+  // Byte length snapshotted with the store. NSData is immutable — its length
+  // must not change for the object's lifetime — and the live ByteLength()
+  // reads zero after a transfer detach while the pinned bytes stay valid.
+  size_t length_;
   // Lazily-built stable copy for a view whose buffer was never materialized;
   // owned here, freed in dealloc.
   void* heapCopy_;
@@ -37,11 +41,16 @@ using namespace v8;
     self->storeOffset_ = 0;
     self->heapCopy_ = nullptr;
     if (jsObject->IsArrayBuffer()) {
-      self->store_ = jsObject.As<ArrayBuffer>()->GetBackingStore();
+      Local<ArrayBuffer> buffer = jsObject.As<ArrayBuffer>();
+      self->store_ = buffer->GetBackingStore();
+      self->length_ = buffer->ByteLength();
     } else if (jsObject->IsSharedArrayBuffer()) {
-      self->store_ = jsObject.As<SharedArrayBuffer>()->GetBackingStore();
+      Local<SharedArrayBuffer> buffer = jsObject.As<SharedArrayBuffer>();
+      self->store_ = buffer->GetBackingStore();
+      self->length_ = buffer->ByteLength();
     } else {
       Local<ArrayBufferView> view = jsObject.As<ArrayBufferView>();
+      self->length_ = view->ByteLength();
       if (view->HasBuffer()) {
         self->store_ = view->Buffer()->GetBackingStore();
         self->storeOffset_ = view->ByteOffset();
@@ -87,29 +96,15 @@ using namespace v8;
   Isolate* isolate = wrapper_->Isolate();
   Local<Object> obj = self->object_->Get(isolate).As<Object>();
   Local<ArrayBufferView> bufferView = obj.As<ArrayBufferView>();
-  size_t length = bufferView->ByteLength();
-  heapCopy_ = malloc(length);
+  heapCopy_ = malloc(length_);
   if (heapCopy_ != nullptr) {
-    bufferView->CopyContents(heapCopy_, length);
+    bufferView->CopyContents(heapCopy_, length_);
   }
   return heapCopy_;
 }
 
 - (NSUInteger)length {
-  if (!wrapper_->IsValid()) {
-    return 0;
-  }
-  Isolate* isolate = wrapper_->Isolate();
-  Local<Object> obj = self->object_->Get(isolate).As<Object>();
-  if (obj->IsArrayBuffer()) {
-    return obj.As<ArrayBuffer>()->ByteLength();
-  }
-
-  if (obj->IsSharedArrayBuffer()) {
-    return obj.As<SharedArrayBuffer>()->ByteLength();
-  }
-
-  return obj.As<ArrayBufferView>()->ByteLength();
+  return length_;
 }
 
 - (void)dealloc {
