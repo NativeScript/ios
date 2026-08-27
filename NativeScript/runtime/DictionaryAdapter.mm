@@ -221,8 +221,10 @@ using namespace tns;
   IsolateWrapper* wrapper_;
   std::shared_ptr<Persistent<Value>> object_;
   // The wrapper this adapter attached to the JS object, or nullptr when the
-  // field was already taken. Ownership lives with the field, not with this
-  // pointer: it is only the claim used to recognise our own wrapper there.
+  // field was already taken. The adapter owns the claim exclusively --
+  // retirement paths leave adapter claims attached -- so -dealloc frees it in
+  // both isolate states; the field compare below guards the isolate-alive
+  // path against a slot someone else overwrote.
   ObjCDataWrapper* dataWrapper_;
 }
 
@@ -236,6 +238,7 @@ using namespace tns;
     // and never writes or clears it; it still reads the object through object_.
     if (tns::GetValue(isolate, jsObject) == nullptr) {
       self->dataWrapper_ = new ObjCDataWrapper(self);
+      self->dataWrapper_->MarkAdapterClaim();
       tns::SetValue(isolate, jsObject, self->dataWrapper_);
     }
   }
@@ -377,11 +380,11 @@ using namespace tns;
     // reading the handle by the time this runs.
     self->object_->Reset();
   } else if (dataWrapper_ != nullptr) {
-    // The isolate is gone, and with it the JS object and every other reader
-    // or deleter of the claim (all IsValid-gated): an attached claim only
-    // ever exists on a plain, never-registered object no finalizer visits,
-    // so the owner frees it here — adapters released after a worker isolate's
-    // teardown otherwise leak one wrapper each.
+    // The isolate is gone, and with it the JS object and every reader of the
+    // claim; no other path deletes one (__releaseNativeCounterpart leaves
+    // adapter claims attached), so the owner frees it here — adapters
+    // released after a worker isolate's teardown otherwise leak one wrapper
+    // each.
     delete dataWrapper_;
     dataWrapper_ = nullptr;
   }

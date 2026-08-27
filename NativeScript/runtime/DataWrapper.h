@@ -375,6 +375,13 @@ class ObjCDataWrapper : public BaseDataWrapper {
 
   id Data() { return this->data_; }
 
+  // True for the claim a collection adapter attaches to the plain JS object it
+  // was built from. The adapter owns that claim exclusively -- it must stay
+  // deletable from the adapter's -dealloc even after isolate teardown -- so no
+  // other retirement path may free it.
+  bool IsAdapterClaim() { return this->adapterClaim_; }
+  void MarkAdapterClaim() { this->adapterClaim_ = true; }
+
   const TypeEncoding* TypeEncoding() { return this->typeEncoding_; }
 
   // The class Data() had when this wrapper was built. Data() alone cannot tell
@@ -383,6 +390,7 @@ class ObjCDataWrapper : public BaseDataWrapper {
   Class Klass() { return this->klass_; }
 
  private:
+  bool adapterClaim_ = false;
   id data_;
   const tns::TypeEncoding* typeEncoding_;
   Class klass_;

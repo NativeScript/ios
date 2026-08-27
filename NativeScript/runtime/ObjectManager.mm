@@ -390,11 +390,19 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
     // NSNotificationCenter observer token) the remaining owners keep it alive.
     // Calling [data dealloc] here, as this used to do, destroyed objects that
     // were still referenced elsewhere and caused use-after-free crashes.
+    // Read before the release below: an adapter claim's -dealloc frees the
+    // wrapper, so it must not be touched afterwards.
+    bool adapterClaim = objcWrapper->IsAdapterClaim();
+
     [data release];
 
     // The release above can run a -dealloc that detaches this wrapper; the
-    // internal field owns it, so free only what is still attached.
-    if (tns::GetValue(isolate, value) == wrapper) {
+    // internal field owns it, so free only what is still attached. An
+    // adapter's claim is exempt: the adapter owns it exclusively and deletes
+    // it from its own -dealloc even after isolate teardown, so retiring it
+    // here would leave the adapter holding a stale pointer it later frees
+    // again.
+    if (!adapterClaim && tns::GetValue(isolate, value) == wrapper) {
       delete wrapper;
       tns::SetValue(isolate, value.As<Object>(), nullptr);
     }
