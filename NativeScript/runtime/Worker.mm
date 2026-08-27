@@ -1,4 +1,5 @@
 #include "Worker.h"
+#include <pthread.h>
 #include <functional>
 #include "Caches.h"
 #include "Constants.h"
@@ -181,6 +182,22 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     tns::LoaderVocabulary inheritedVocabulary = tns::CaptureLoaderVocabulary(isolate);
 
     std::function<Isolate*()> func([worker, workerPath, inheritedVocabulary]() {
+      // Name the looper thread after its entry script so a crash report
+      // identifies which worker died instead of an anonymous NSOperationQueue
+      // thread. Darwin caps thread names at 63 bytes; keep the basename only.
+      {
+        std::string threadName = workerPath;
+        size_t slash = threadName.find_last_of('/');
+        if (slash != std::string::npos) {
+          threadName = threadName.substr(slash + 1);
+        }
+        threadName = "worker" + std::to_string(worker->WorkerId()) + ":" + threadName;
+        if (threadName.size() > 63) {
+          threadName.resize(63);
+        }
+        pthread_setname_np(threadName.c_str());
+      }
+
       // Resolve tilde paths before creating the runtime
       std::string resolvedPath = workerPath;
       if (!workerPath.empty() && workerPath[0] == '~') {
