@@ -129,6 +129,14 @@ using namespace v8;
       dataWrapper_ = nullptr;
     }
     self->object_->Reset();
+  } else if (dataWrapper_ != nullptr) {
+    // The isolate is gone, and with it the JS object and every other reader
+    // or deleter of the claim (all IsValid-gated): an attached claim only
+    // ever exists on a plain, never-registered object no finalizer visits,
+    // so the owner frees it here — adapters released after a worker isolate's
+    // teardown otherwise leak one wrapper each.
+    delete dataWrapper_;
+    dataWrapper_ = nullptr;
   }
   delete wrapper_;
   self->object_ = nullptr;
