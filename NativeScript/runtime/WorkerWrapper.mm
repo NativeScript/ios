@@ -426,26 +426,37 @@ void WorkerWrapper::ForwardErrorPayloadToMain(const std::string& message, const 
   if (runtime == nullptr) {
     return;
   }
+  // Captured by value, never `this`: the wrapper dies with the worker thread's
+  // teardown while this entry may still be queued on the parent's loop. The
+  // shared_ptr keeps the Persistent object alive; a teardown-reset handle
+  // surfaces as the empty-worker bail below. The isolate pointer stays valid
+  // for as long as the loop runs entries — the loop shuts down before the
+  // isolate is disposed, and posts after that are dropped.
+  Isolate* mainIsolate = this->mainIsolate_;
+  std::shared_ptr<Persistent<Value>> poWorker = this->poWorker_;
+  if (poWorker == nullptr) {
+    return;
+  }
   PostToRuntimeLoop(
       runtime,
-      [this, message, source, stackTrace, lineNumber]() {
-        v8::Locker locker(this->mainIsolate_);
-        Isolate::Scope isolate_scope(this->mainIsolate_);
-        HandleScope handle_scope(this->mainIsolate_);
-        Local<Value> worker = this->poWorker_->Get(this->mainIsolate_);
+      [mainIsolate, poWorker, message, source, stackTrace, lineNumber]() {
+        v8::Locker locker(mainIsolate);
+        Isolate::Scope isolate_scope(mainIsolate);
+        HandleScope handle_scope(mainIsolate);
+        Local<Value> worker = poWorker->Get(mainIsolate);
         if (worker.IsEmpty() || !worker->IsObject()) {
           // The parent dropped its reference to the worker object; there is
           // nothing left to dispatch on.
           return;
         }
 
-        TryCatch tc(this->mainIsolate_);
-        Worker::EmitError(this->mainIsolate_, worker.As<Object>(), message, source, stackTrace,
+        TryCatch tc(mainIsolate);
+        Worker::EmitError(mainIsolate, worker.As<Object>(), message, source, stackTrace,
                           lineNumber);
         if (tc.HasCaught()) {
           Local<Value> error = tc.Exception();
-          Log(@"%s", tns::ToString(this->mainIsolate_, error).c_str());
-          this->mainIsolate_->ThrowException(error);
+          Log(@"%s", tns::ToString(mainIsolate, error).c_str());
+          mainIsolate->ThrowException(error);
         }
       },
       async);
