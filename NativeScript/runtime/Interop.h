@@ -213,6 +213,11 @@ class Interop {
     JSBlockDescriptor* descriptor;
     void* userData;
     ffi_closure* ffiClosure;
+    // The wrapper caching this block on the JS function it was built from. It
+    // is owned here rather than through that function: the cache slot lives in
+    // a V8 heap that can be torn down (a worker isolate) while the block is
+    // still referenced by native code.
+    BlockWrapper* blockWrapper;
 
     static JSBlockDescriptor kJSBlockDescriptor;
   } JSBlock;
