@@ -38,6 +38,7 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
         [](JSBlock* block) {
           if (block->descriptor == &JSBlock::kJSBlockDescriptor) {
             MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
+            BlockWrapper* blockWrapper = block->blockWrapper;
             // Runs on whatever thread drops the last native reference. That is
             // safe inline: callback_ is a strong, unregistered persistent, so
             // resetting it never touches the finalizer drain's bookkeeping,
@@ -50,16 +51,22 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
               HandleScope handle_scope(isolate);
               Local<Value> callback = wrapper->callback_->Get(isolate);
               if (!callback.IsEmpty() && callback->IsObject()) {
-                BlockWrapper* blockWrapper =
-                    static_cast<BlockWrapper*>(tns::GetValue(isolate, callback));
-                tns::DeleteValue(isolate, callback);
-                delete blockWrapper;
+                // The callback's slot is the cache's owner, so only a wrapper
+                // still sitting in it is ours to free.
+                if (tns::GetValue(isolate, callback) == blockWrapper) {
+                  tns::DeleteValue(isolate, callback);
+                } else {
+                  blockWrapper = nullptr;
+                }
               }
               // Unconditional: an already-detached callback still owns its
               // node, and dropping the persistent without a reset would leave
               // that node rooted forever.
               wrapper->callback_->Reset();
             }
+            // Outside the isolate guard: once the isolate is gone the cache
+            // slot is unreachable and nothing else can free the wrapper.
+            delete blockWrapper;
             delete wrapper;
             ffi_closure_free(block->ffiClosure);
             block->~JSBlock();
@@ -109,6 +116,7 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
       .descriptor = &JSBlock::kJSBlockDescriptor,
       .userData = userData,
       .ffiClosure = result.second,
+      .blockWrapper = nullptr,
   };
 
   object_setClass((__bridge id)blockPointer, objc_getClass("__NSMallocBlock__"));
@@ -539,6 +547,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
                                       userData);
 
       BlockWrapper* wrapper = new BlockWrapper((void*)blockPtr, blockTypeEncoding, false);
+      reinterpret_cast<JSBlock*>((void*)blockPtr)->blockWrapper = wrapper;
       tns::SetValue(isolate, arg.As<v8::Function>(), wrapper);
     }
 
@@ -1675,7 +1684,11 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
   void* errorRef = nullptr;
   if (methodCall.provideErrorOutParameter_) {
     void* dest = call.ArgumentBuffer(argsCount);
-    errorRef = malloc(ffi_type_pointer.size);
+    // Zero-initialized: a callee writes *error only on failure, so the
+    // success-path read below must find nil. Garbage here is read through a
+    // __strong pointer -- ARC retains and releases it -- so a stale non-null
+    // value over-releases whatever lives at that address now.
+    errorRef = calloc(1, ffi_type_pointer.size);
     Interop::SetValue(dest, errorRef);
   }
 

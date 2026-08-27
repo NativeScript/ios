@@ -106,6 +106,11 @@ bool MethodMeta::isImplementedInClass(Class klass, bool isStatic) const {
       @try {
         id instance = [klass alloc];
         std::lock_guard<UnfairMutex> lock(sampleInstancesMutex);
+        // A losing emplace (a +initialize re-entry or another thread populated
+        // the entry first) LEAKS `instance`, knowingly: it was never init'd, so
+        // releasing it would run -dealloc against zero-filled ivars of an
+        // arbitrary class on an arbitrary thread.
+        // https://github.com/NativeScript/ios/issues/459
         sampleInstance = sampleInstances.emplace(klass, instance).first->second;
       } @catch (id err) {
         return false;
