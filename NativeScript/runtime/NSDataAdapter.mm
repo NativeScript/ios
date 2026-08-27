@@ -13,6 +13,17 @@ using namespace v8;
   // pointer: it is only the claim used to recognise our own wrapper there.
   ObjCDataWrapper* dataWrapper_;
   std::shared_ptr<Persistent<Value>> object_;
+  // Pins the bytes for the adapter's lifetime, which is the NSData contract
+  // native callers rely on. The persistent above pins only the JS OBJECT: a
+  // postMessage transfer detaches it and hands the store to another isolate,
+  // whose GC can free the memory while native code still holds this NSData —
+  // an async reader/writer then touches a freed, recycled chunk.
+  std::shared_ptr<v8::BackingStore> store_;
+  // View byte offset into store_, captured with it (immutable for a view).
+  size_t storeOffset_;
+  // Lazily-built stable copy for a view whose buffer was never materialized;
+  // owned here, freed in dealloc.
+  void* heapCopy_;
 }
 
 - (instancetype)initWithJSObject:(Local<Object>)jsObject isolate:(Isolate*)isolate {
@@ -23,6 +34,19 @@ using namespace v8;
     self->wrapper_ = new IsolateWrapper(isolate);
     self->object_ = std::make_shared<Persistent<Value>>(isolate, jsObject);
     self->wrapper_->GetCache()->Instances[self] = self->object_;
+    self->storeOffset_ = 0;
+    self->heapCopy_ = nullptr;
+    if (jsObject->IsArrayBuffer()) {
+      self->store_ = jsObject.As<ArrayBuffer>()->GetBackingStore();
+    } else if (jsObject->IsSharedArrayBuffer()) {
+      self->store_ = jsObject.As<SharedArrayBuffer>()->GetBackingStore();
+    } else {
+      Local<ArrayBufferView> view = jsObject.As<ArrayBufferView>();
+      if (view->HasBuffer()) {
+        self->store_ = view->Buffer()->GetBackingStore();
+        self->storeOffset_ = view->ByteOffset();
+      }
+    }
     // A JS object's internal field holds at most one wrapper, owned by whoever
     // attached it first. An adapter that finds the field taken stays detached
     // and never writes or clears it; it still reads the object through object_.
@@ -40,36 +64,35 @@ using namespace v8;
 }
 
 - (void*)mutableBytes {
-  if (!wrapper_->IsValid()) {
-    return nil;
-  }
-  Isolate* isolate = wrapper_->Isolate();
-  Local<Object> obj = self->object_->Get(isolate).As<Object>();
-  if (obj->IsArrayBuffer()) {
-    void* data = obj.As<ArrayBuffer>()->GetBackingStore()->Data();
-    return data;
-  }
-
-  if (obj->IsSharedArrayBuffer()) {
-    void* data = obj.As<SharedArrayBuffer>()->GetBackingStore()->Data();
-    return data;
-  }
-
-  Local<ArrayBufferView> bufferView = obj.As<ArrayBufferView>();
-  if (bufferView->HasBuffer()) {
-    uint8_t* data = static_cast<uint8_t*>(bufferView->Buffer()->GetBackingStore()->Data());
+  // The pinned store answers without touching V8, so native callers on
+  // foreign threads need no isolate access (the old per-call
+  // GetBackingStore() lookup ran unlocked from any thread).
+  if (store_ != nullptr) {
+    void* data = store_->Data();
     if (data == nullptr) {
       return nullptr;
     }
-
-    return data + bufferView->ByteOffset();
+    return static_cast<uint8_t*>(data) + storeOffset_;
   }
 
+  if (!wrapper_->IsValid()) {
+    return nil;
+  }
+  // Only reachable for a view whose buffer was never materialized. Serve one
+  // stable copy for the adapter's lifetime: NSData callers assume -bytes is
+  // stable, and a fresh allocation per call also never got freed.
+  if (heapCopy_ != nullptr) {
+    return heapCopy_;
+  }
+  Isolate* isolate = wrapper_->Isolate();
+  Local<Object> obj = self->object_->Get(isolate).As<Object>();
+  Local<ArrayBufferView> bufferView = obj.As<ArrayBufferView>();
   size_t length = bufferView->ByteLength();
-  void* data = malloc(length);
-  bufferView->CopyContents(data, length);
-
-  return data;
+  heapCopy_ = malloc(length);
+  if (heapCopy_ != nullptr) {
+    bufferView->CopyContents(heapCopy_, length);
+  }
+  return heapCopy_;
 }
 
 - (NSUInteger)length {
@@ -114,6 +137,8 @@ using namespace v8;
 
   delete self->wrapper_;
   self->object_ = nullptr;
+  free(self->heapCopy_);
+  self->heapCopy_ = nullptr;
   [super dealloc];
 }
 
