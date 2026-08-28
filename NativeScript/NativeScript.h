@@ -1,14 +1,16 @@
 #import <Foundation/Foundation.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface Config : NSObject
 
 @property (nonatomic, retain) NSString* BaseDir;
-@property (nonatomic, retain) NSString* ApplicationPath;
-@property (nonatomic) void* MetadataPtr;
+@property (nonatomic, retain, nullable) NSString* ApplicationPath;
+@property (nonatomic, nullable) void* MetadataPtr;
 @property BOOL IsDebug;
 @property BOOL LogToSystemConsole;
 @property int ArgumentsCount;
-@property (nonatomic) char** Arguments;
+@property (nonatomic) char* _Nullable* _Nullable Arguments;
 
 @end
 
@@ -26,3 +28,5 @@
 - (bool)liveSync;
 
 @end
+
+NS_ASSUME_NONNULL_END
