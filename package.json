@@ -36,7 +36,7 @@
   "devDependencies": {
     "conventional-changelog-cli": "^2.1.1",
     "dayjs": "^1.11.7",
-    "esbuild": "0.28.1",
+    "esbuild": "0.28.2",
     "eslint": "10.8.0",
     "globals": "17.8.0",
     "husky": "^9.0.11",
