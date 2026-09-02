@@ -1137,16 +1137,18 @@ Intercepted ArgConverter::IndexedPropertyGetterCallback(uint32_t index,
 
   ObjCDataWrapper* objcDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
   id target = objcDataWrapper->Data();
-  if (![target isKindOfClass:[NSArray class]]) {
+  // Treat anything that can report a count and return elements by index as
+  // indexable, not just NSArray (e.g. PHFetchResult, NSOrderedSet).
+  if (![target respondsToSelector:@selector(count)] ||
+      ![target respondsToSelector:@selector(objectAtIndex:)]) {
     return v8::Intercepted::kNo;
   }
 
-  NSArray* array = (NSArray*)target;
-  if (index >= [array count]) {
+  if (index >= [target count]) {
     return v8::Intercepted::kNo;
   }
 
-  id obj = [array objectAtIndex:index];
+  id obj = [target objectAtIndex:index];
 
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   auto it = cache->Instances.find(obj);
@@ -1214,6 +1216,17 @@ Intercepted ArgConverter::IndexedPropertySetterCallback(
   ObjCDataWrapper* objcDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
   id target = objcDataWrapper->Data();
   if (![target isKindOfClass:[NSMutableArray class]]) {
+    // Indexed assignment is only supported for NSMutableArray. Other indexable
+    // collections (e.g. NSOrderedSet, PHFetchResult) reject the write so it can't be
+    // silently dropped into an unreachable JS property on the wrapper. NSArray is
+    // excluded from the throw and falls through to a silent no-op.
+    if ([target respondsToSelector:@selector(count)] &&
+        [target respondsToSelector:@selector(objectAtIndex:)] &&
+        ![target isKindOfClass:[NSArray class]]) {
+      isolate->ThrowException(Exception::TypeError(
+          tns::ToV8String(isolate, "Indexed assignment is only supported for NSMutableArray")));
+      return v8::Intercepted::kYes;
+    }
     return v8::Intercepted::kNo;
   }
 
