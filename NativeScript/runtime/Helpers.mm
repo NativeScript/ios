@@ -8,10 +8,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <atomic>
-#include <fstream>
+#include <cerrno>
 #include <mutex>
 #include <sstream>
+#include <vector>
 #include "Caches.h"
 #include "ErrorEvents.h"
 #include "NativeScriptException.h"
@@ -19,12 +21,6 @@
 #include "RuntimeConfig.h"
 
 using namespace v8;
-
-namespace {
-const int BUFFER_SIZE = 1024 * 1024;
-char* Buffer = new char[BUFFER_SIZE];
-uint8_t* BinBuffer = new uint8_t[BUFFER_SIZE];
-}  // namespace
 
 std::u16string tns::ToUtf16String(Isolate* isolate, const Local<Value>& value) {
   // Read the V8 string's native UTF-16 buffer directly instead of round-tripping
@@ -99,88 +95,107 @@ Local<v8::String> tns::ReadModule(Isolate* isolate, const std::string& filePath)
   return str;
 }
 
-const char* tns::ReadText(const std::string& filePath, long& length, bool& isNew) {
+// The file readers below run on the main thread and on every worker's thread
+// at once (workers load shared modules and their code caches while starting),
+// so each call reads into storage of its own; no scratch buffer is shared.
+
+std::string tns::ReadText(const std::string& filePath) {
   FILE* file = fopen(filePath.c_str(), "rb");
   if (file == nullptr) {
     tns::Assert(false);
   }
 
   fseek(file, 0, SEEK_END);
-
-  length = ftell(file);
-  isNew = length > BUFFER_SIZE;
-
+  long length = ftell(file);
   rewind(file);
 
-  if (isNew) {
-    char* newBuffer = new char[length];
-    fread(newBuffer, 1, length, file);
-    fclose(file);
-
-    return newBuffer;
+  std::string result;
+  if (length > 0) {
+    result.resize(length);
+    size_t readBytes = fread(result.data(), 1, length, file);
+    result.resize(readBytes);
   }
-
-  fread(Buffer, 1, length, file);
   fclose(file);
-
-  return Buffer;
-}
-
-std::string tns::ReadText(const std::string& file) {
-  long length;
-  bool isNew;
-  const char* content = tns::ReadText(file, length, isNew);
-
-  std::string result(content, length);
-
-  if (isNew) {
-    delete[] content;
-  }
 
   return result;
 }
 
-uint8_t* tns::ReadBinary(const std::string path, long& length, bool& isNew) {
+uint8_t* tns::ReadBinary(const std::string& path, long& length) {
   length = 0;
-  std::ifstream ifs(path);
-  if (ifs.fail()) {
-    return nullptr;
-  }
-
   FILE* file = fopen(path.c_str(), "rb");
   if (!file) {
     return nullptr;
   }
 
   fseek(file, 0, SEEK_END);
-  length = ftell(file);
+  long fileLength = ftell(file);
   rewind(file);
-
-  isNew = length > BUFFER_SIZE;
-
-  if (isNew) {
-    uint8_t* data = new uint8_t[length];
-    fread(data, sizeof(uint8_t), length, file);
+  if (fileLength <= 0) {
     fclose(file);
-    return data;
+    return nullptr;
   }
 
-  fread(BinBuffer, 1, length, file);
+  uint8_t* data = new uint8_t[fileLength];
+  size_t readBytes = fread(data, sizeof(uint8_t), fileLength, file);
   fclose(file);
+  if (readBytes != static_cast<size_t>(fileLength)) {
+    delete[] data;
+    return nullptr;
+  }
 
-  return BinBuffer;
+  length = fileLength;
+  return data;
 }
 
-bool tns::WriteBinary(const std::string& path, const void* data, long length) {
-  FILE* file = fopen(path.c_str(), "wb");
-  if (!file) {
+bool tns::WriteBinary(const std::string& path, const void* data, long length,
+                      time_t modificationTime) {
+  // Written to a private temp file in the same directory, then renamed over the
+  // target: rename is atomic on the local file system, so a concurrent reader
+  // of `path` never observes a truncated or half-written file, and two writers
+  // racing on the same path leave whichever complete file landed last.
+  std::string tmpTemplate = path + ".XXXXXX";
+  std::vector<char> tmpPath(tmpTemplate.begin(), tmpTemplate.end());
+  tmpPath.push_back('\0');
+  int fd = mkstemp(tmpPath.data());
+  if (fd < 0) {
     return false;
   }
 
-  size_t writtenBytes = fwrite(data, sizeof(uint8_t), length, file);
-  fclose(file);
+  bool ok = true;
+  const uint8_t* cursor = static_cast<const uint8_t*>(data);
+  long remaining = length;
+  while (remaining > 0) {
+    ssize_t written = write(fd, cursor, remaining);
+    if (written < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      ok = false;
+      break;
+    }
+    cursor += written;
+    remaining -= written;
+  }
 
-  return writtenBytes == length;
+  if (ok && modificationTime >= 0) {
+    struct timespec times[2];
+    times[0].tv_sec = time(nullptr);
+    times[0].tv_nsec = 0;
+    times[1].tv_sec = modificationTime;
+    times[1].tv_nsec = 0;
+    ok = futimens(fd, times) == 0;
+  }
+
+  close(fd);
+
+  if (ok && rename(tmpPath.data(), path.c_str()) != 0) {
+    ok = false;
+  }
+  if (!ok) {
+    unlink(tmpPath.data());
+  }
+
+  return ok;
 }
 
 void tns::SetPrivateValue(const Local<Object>& obj, const Local<v8::String>& propName,

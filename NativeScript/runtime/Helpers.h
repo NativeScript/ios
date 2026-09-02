@@ -243,10 +243,15 @@ inline bool ToBool(const v8::Local<v8::Value>& value) {
 }
 bool Exists(const char* fullPath);
 v8::Local<v8::String> ReadModule(v8::Isolate* isolate, const std::string& filePath);
-const char* ReadText(const std::string& filePath, long& length, bool& isNew);
 std::string ReadText(const std::string& file);
-uint8_t* ReadBinary(const std::string path, long& length, bool& isNew);
-bool WriteBinary(const std::string& path, const void* data, long length);
+// The whole file in a heap buffer the caller owns (delete[]); nullptr and a
+// zero length when it cannot be read.
+uint8_t* ReadBinary(const std::string& path, long& length);
+// Replaces the file at `path` atomically: readers see the old contents or the
+// new ones, never a partial write. A non-negative `modificationTime` stamps the
+// file's mtime before it is published.
+bool WriteBinary(const std::string& path, const void* data, long length,
+                 time_t modificationTime = -1);
 
 void SetPrivateValue(const v8::Local<v8::Object>& obj, const v8::Local<v8::String>& propName,
                      const v8::Local<v8::Value>& value);

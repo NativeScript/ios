@@ -130,6 +130,7 @@ require("./MetadataTests");
 require("./ApiTests");
 require("./NsRuntimeTests");
 require("./GCFinalizerTests");
+require("./WorkerConcurrentStartupTests");
 require("./DeclarationConflicts");
 //
 require("./Promises");

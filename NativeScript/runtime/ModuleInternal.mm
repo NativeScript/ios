@@ -3,7 +3,6 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-#include <utime.h>
 #include <cmath>
 #include <cstring>
 #include <string>
@@ -1894,44 +1893,39 @@ ScriptCompiler::CachedData* ModuleInternal::LoadScriptCache(const std::string& p
     }
   }
 
-  bool isNew = false;
-  uint8_t* data = tns::ReadBinary(cachePath, length, isNew);
+  uint8_t* data = tns::ReadBinary(cachePath, length);
   if (!data) {
     return nullptr;
   }
 
-  return new ScriptCompiler::CachedData(
-      data, (int)length,
-      isNew ? ScriptCompiler::CachedData::BufferOwned : ScriptCompiler::CachedData::BufferNotOwned);
+  return new ScriptCompiler::CachedData(data, (int)length, ScriptCompiler::CachedData::BufferOwned);
+}
+
+// A blob is published carrying its source file's modification time; that is
+// the freshness check LoadScriptCache applies, so the two must land together.
+static void WriteScriptCache(const std::string& cachePath, const std::string& sourcePath,
+                             const uint8_t* data, long length) {
+  time_t sourceModifiedTime = -1;
+  struct stat result;
+  if (stat(sourcePath.c_str(), &result) == 0) {
+    sourceModifiedTime = result.st_mtime;
+  }
+  tns::WriteBinary(cachePath, data, length, sourceModifiedTime);
 }
 
 void ModuleInternal::SaveScriptCache(const ScriptCompiler::CachedData* cache,
                                      const std::string& path, ScriptCacheKind kind) {
+  // CreateCodeCache yields nullptr for a script V8 declines to serialize.
+  if (cache == nullptr) {
+    return;
+  }
+
   std::string canonicalPath = NormalizePath(path);
   std::string cachePath = ModuleInternal::GetCacheFileName(
       canonicalPath + ScriptCacheSuffix(kind == ScriptCacheKind::kEsModule));
 
-  // std::ofstream ofs(cachePath, std::ios::binary);
-  // if (!ofs) return;  // or throw
-
-  // ofs.write(reinterpret_cast<const char*>(cache->data),
-  //           cache->length);
-  // ofs.close();
-
-  int length = cache->length;
-  tns::WriteBinary(cachePath, cache->data, length);
+  WriteScriptCache(cachePath, canonicalPath, cache->data, cache->length);
   delete cache;
-
-  // make sure cache and js file have the same modification date
-  struct stat result;
-  struct utimbuf new_times;
-  new_times.actime = time(nullptr);
-  new_times.modtime = time(nullptr);
-  if (stat(canonicalPath.c_str(), &result) == 0) {
-    auto jsLastModifiedTime = result.st_mtime;
-    new_times.modtime = jsLastModifiedTime;
-  }
-  utime(cachePath.c_str(), &new_times);
 }
 
 void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::string& path) {
@@ -1944,24 +1938,15 @@ void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::stri
   Local<UnboundScript> unboundScript = script->GetUnboundScript();
   // CachedData returned by this function should be owned by the caller (v8 docs)
   ScriptCompiler::CachedData* cachedData = ScriptCompiler::CreateCodeCache(unboundScript);
+  if (cachedData == nullptr) {
+    return;
+  }
 
-  int length = cachedData->length;
   // Always a classic script: this overload takes a v8::Script.
   std::string cachePath =
       ModuleInternal::GetCacheFileName(canonicalPath + ScriptCacheSuffix(false));
-  tns::WriteBinary(cachePath, cachedData->data, length);
+  WriteScriptCache(cachePath, canonicalPath, cachedData->data, cachedData->length);
   delete cachedData;
-
-  // make sure cache and js file have the same modification date
-  struct stat result;
-  struct utimbuf new_times;
-  new_times.actime = time(nullptr);
-  new_times.modtime = time(nullptr);
-  if (stat(canonicalPath.c_str(), &result) == 0) {
-    auto jsLastModifiedTime = result.st_mtime;
-    new_times.modtime = jsLastModifiedTime;
-  }
-  utime(cachePath.c_str(), &new_times);
 }
 
 std::string ModuleInternal::GetCacheFileName(const std::string& path) {
