@@ -107,7 +107,8 @@ class Interop {
                              v8::Local<v8::Value> arg);
   static void WriteValue(v8::Local<v8::Context> context,
                          const TypeEncoding* typeEncoding, void* dest,
-                         v8::Local<v8::Value> arg);
+                         v8::Local<v8::Value> arg,
+                         FFICall* callOwner = nullptr);
   static id ToObject(v8::Local<v8::Context> context, v8::Local<v8::Value> arg);
   static v8::Local<v8::Value> GetPrimitiveReturnType(
       v8::Local<v8::Context> context, BinaryTypeEncodingType type,
