@@ -13,6 +13,7 @@
 #include "Interop.h"
 #include "IsolateTracked.h"
 #include "LazyGlobals.h"
+#include "Messaging.h"
 #include "NativeScriptException.h"
 #include "NativeScriptPlatform.h"
 #include "ObjectManager.h"
@@ -286,6 +287,12 @@ Runtime::~Runtime() {
     ObjectManager::DisposeAllRegistered(isolate_);
     IsolateTracked::SweepAll(isolate_);
 
+    // After the loop stopped: a port force-closed here can no longer be woken,
+    // and the disentangle both delivers the close sentinels this isolate's
+    // siblings are owed and puts each port's queue beyond the reach of the
+    // threads that were filling it.
+    messaging::CloseAllPorts(isolate_);
+
     if (IsRuntimeWorker()) {
       auto currentWorker =
           static_cast<WorkerWrapper*>(Caches::Workers->Get(this->workerId_)->UserData());
@@ -435,6 +442,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   DefineCollectFunction(context);
   PromiseProxy::Init(context);
   Events::Init(context);
+  Worker::InitEvents(context);
   ErrorEvents::Init(context);
   StructuredClone::Init(context);
   Performance::Init(context);

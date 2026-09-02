@@ -624,11 +624,6 @@ class WorkerWrapper : public BaseDataWrapper {
                                  const std::string& source,
                                  const std::string& stackTrace, int lineNumber,
                                  bool async);
-  v8::Local<v8::Object> ConstructErrorObject(v8::Local<v8::Context> context,
-                                             std::string message,
-                                             std::string source,
-                                             std::string stackTrace,
-                                             int lineNumber);
 };
 
 }  // namespace tns

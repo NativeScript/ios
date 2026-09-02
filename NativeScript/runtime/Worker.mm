@@ -1,6 +1,7 @@
 #include "Worker.h"
 #include <pthread.h>
 #include <functional>
+#include "BuiltinLoader.h"
 #include "Caches.h"
 #include "Constants.h"
 #include "Helpers.h"
@@ -14,6 +15,18 @@
 using namespace v8;
 
 namespace tns {
+
+namespace {
+
+// The worker-events builtin's delivery callouts for this isolate. Both message
+// directions share emitMessage; only the receiver differs. emitError is
+// parent-side only.
+struct WorkerEventsState {
+  Global<v8::Function> emitMessage;
+  Global<v8::Function> emitError;
+};
+
+}  // namespace
 
 std::vector<std::string> Worker::GlobalFunctions = {"postMessage", "close"};
 
@@ -48,6 +61,30 @@ void Worker::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate, bool i
   prototype->Set(ToV8String(isolate, "terminate"), terminateWorkerFuncTemplate);
 
   globalTemplate->Set(workerFuncName, workerFuncTemplate);
+}
+
+void Worker::InitEvents(Local<Context> context) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+
+  Local<Object> exports;
+  bool success =
+      BuiltinLoader::GetExports(context, BuiltinId::kWorkerEvents, nullptr).ToLocal(&exports);
+  tns::Assert(success, isolate);
+
+  Local<Value> emitMessage;
+  success = exports->Get(context, tns::ToV8String(isolate, "emitMessage")).ToLocal(&emitMessage) &&
+            emitMessage->IsFunction();
+  tns::Assert(success, isolate);
+
+  Local<Value> emitError;
+  success = exports->Get(context, tns::ToV8String(isolate, "emitError")).ToLocal(&emitError) &&
+            emitError->IsFunction();
+  tns::Assert(success, isolate);
+
+  WorkerEventsState* state = Caches::StateFor<WorkerEventsState>(isolate);
+  tns::Assert(state != nullptr, isolate);
+  state->emitMessage.Reset(isolate, emitMessage.As<v8::Function>());
+  state->emitError.Reset(isolate, emitError.As<v8::Function>());
 }
 
 void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
@@ -372,17 +409,9 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
 
     auto context = Caches::Get(isolate)->GetContext();
     auto message = std::make_shared<worker::Message>();
-    Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
-    Local<Object> obj;
-    bool success = objTemplate->NewInstance(context).ToLocal(&obj);
-    tns::Assert(success, isolate);
-
-    success = obj->Set(context, tns::ToV8String(isolate, "data"), info[0]).FromMaybe(false);
-    tns::Assert(success, isolate);
-
     Local<Value> transferList = info.Length() > 1 ? info[1] : v8::Undefined(isolate).As<Value>();
     if (message
-            ->Serialize(isolate, context, obj, transferList,
+            ->Serialize(isolate, context, info[0], transferList,
                         serialization::HostObjectPolicy::kDegrade)
             .IsNothing()) {
       // The transfer list was rejected or the value could not be cloned; the
@@ -396,8 +425,12 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
       Isolate::Scope isolate_scope(isolate);
       HandleScope handle_scope(isolate);
       Local<Value> workerInstance = state->GetWorker()->Get(isolate);
-      tns::Assert(!workerInstance.IsEmpty() && workerInstance->IsObject(), isolate);
-      Worker::OnMessageCallback(isolate, workerInstance, message);
+      if (workerInstance.IsEmpty() || !workerInstance->IsObject()) {
+        // The parent dropped its reference to the worker object before the
+        // message landed; there is nothing left to dispatch on.
+        return;
+      }
+      Worker::OnMessageCallback(isolate, workerInstance.As<Object>(), message);
     });
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
@@ -428,17 +461,9 @@ void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
 
     auto context = Caches::Get(isolate)->GetContext();
     auto message = std::make_shared<worker::Message>();
-    Local<ObjectTemplate> objTemplate = ObjectTemplate::New(isolate);
-    Local<Object> obj;
-    bool success = objTemplate->NewInstance(context).ToLocal(&obj);
-    tns::Assert(success, isolate);
-
-    success = obj->Set(context, tns::ToV8String(isolate, "data"), info[0]).FromMaybe(false);
-    tns::Assert(success, isolate);
-
     Local<Value> transferList = info.Length() > 1 ? info[1] : v8::Undefined(isolate).As<Value>();
     if (message
-            ->Serialize(isolate, context, obj, transferList,
+            ->Serialize(isolate, context, info[0], transferList,
                         serialization::HostObjectPolicy::kDegrade)
             .IsNothing()) {
       // The transfer list was rejected or the value could not be cloned; the
@@ -452,31 +477,56 @@ void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
   }
 }
 
-void Worker::OnMessageCallback(Isolate* isolate, Local<Value> receiver,
+void Worker::OnMessageCallback(Isolate* isolate, Local<Object> receiver,
                                std::shared_ptr<worker::Message> message) {
+  WorkerEventsState* state = Caches::StateFor<WorkerEventsState>(isolate);
+  if (state == nullptr || state->emitMessage.IsEmpty()) {
+    return;
+  }
   Local<Context> context = Caches::Get(isolate)->GetContext();
-  Local<Value> onMessageValue;
-  bool success = receiver.As<Object>()
-                     ->Get(context, tns::ToV8String(isolate, "onmessage"))
-                     .ToLocal(&onMessageValue);
-  tns::Assert(success, isolate);
 
-  if (!onMessageValue->IsFunction()) {
-    return;
+  Local<Value> data;
+  Local<Value> ports;
+  const char* type = "message";
+  {
+    TryCatch tc(isolate);
+    if (!message->Deserialize(isolate, context, &ports).ToLocal(&data)) {
+      if (tc.HasTerminated()) {
+        return;
+      }
+      // HTML: a message that cannot be read still reaches its target, as a
+      // `messageerror` event carrying nothing.
+      tc.Reset();
+      data = v8::Undefined(isolate);
+      ports = Local<Value>();
+      type = "messageerror";
+    }
   }
 
-  Local<v8::Function> onMessageFunc = onMessageValue.As<v8::Function>();
+  Local<Value> args[3]{data, ports.IsEmpty() ? v8::Undefined(isolate).As<Value>() : ports,
+                       tns::ToV8String(isolate, type)};
   Local<Value> result;
+  // A throw here is left pending on purpose: on the worker side the drain's
+  // TryCatch turns it into the scope's error event, and on the parent side
+  // V8's uncaught-message listener reports it.
+  (void)state->emitMessage.Get(isolate)->Call(context, receiver, 3, args).ToLocal(&result);
+}
 
-  Local<Value> arg;
-  //    TryCatch tc(isolate);
-  if (!message->Deserialize(isolate, context).ToLocal(&arg)) {
-    //        tc.ReThrow();
-    return;
+bool Worker::EmitError(Isolate* isolate, Local<Object> receiver, const std::string& message,
+                       const std::string& source, const std::string& stackTrace, int lineNumber) {
+  WorkerEventsState* state = Caches::StateFor<WorkerEventsState>(isolate);
+  if (state == nullptr || state->emitError.IsEmpty()) {
+    return false;
   }
+  Local<Context> context = Caches::Get(isolate)->GetContext();
 
-  Local<Value> args[1]{arg};
-  success = onMessageFunc->Call(context, receiver, 1, args).ToLocal(&result);
+  Local<Value> args[4]{tns::ToV8String(isolate, message), tns::ToV8String(isolate, source),
+                       Number::New(isolate, lineNumber), tns::ToV8String(isolate, stackTrace)};
+  Local<Value> result;
+  if (!state->emitError.Get(isolate)->Call(context, receiver, 4, args).ToLocal(&result)) {
+    return false;
+  }
+  return result->BooleanValue(isolate);
 }
 
 void Worker::CloseWorkerCallback(const FunctionCallbackInfo<Value>& info) {

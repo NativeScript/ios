@@ -2,6 +2,7 @@ $(SRCROOT)/tools/js2c.mjs
 $(SRCROOT)/NativeScript/runtime/js/abort-signal.js
 $(SRCROOT)/NativeScript/runtime/js/base64.js
 $(SRCROOT)/NativeScript/runtime/js/blob-url.js
+$(SRCROOT)/NativeScript/runtime/js/broadcast-channel.js
 $(SRCROOT)/NativeScript/runtime/js/class-extends.js
 $(SRCROOT)/NativeScript/runtime/js/dom-exception.js
 $(SRCROOT)/NativeScript/runtime/js/error-events.js
@@ -9,9 +10,12 @@ $(SRCROOT)/NativeScript/runtime/js/events.js
 $(SRCROOT)/NativeScript/runtime/js/inline-functions.js
 $(SRCROOT)/NativeScript/runtime/js/primordials.js
 $(SRCROOT)/NativeScript/runtime/js/inspect.js
+$(SRCROOT)/NativeScript/runtime/js/message-channel.js
+$(SRCROOT)/NativeScript/runtime/js/message-event.js
 $(SRCROOT)/NativeScript/runtime/js/node-module.js
 $(SRCROOT)/NativeScript/runtime/js/node-url.js
 $(SRCROOT)/NativeScript/runtime/js/node-util.js
+$(SRCROOT)/NativeScript/runtime/js/node-worker-threads.js
 $(SRCROOT)/NativeScript/runtime/js/ns-module.js
 $(SRCROOT)/NativeScript/runtime/js/ns-runtime.js
 $(SRCROOT)/NativeScript/runtime/js/ns-util.js
@@ -22,3 +26,4 @@ $(SRCROOT)/NativeScript/runtime/js/structured-clone.js
 $(SRCROOT)/NativeScript/runtime/js/text-encoding.js
 $(SRCROOT)/NativeScript/runtime/js/ts-helpers.js
 $(SRCROOT)/NativeScript/runtime/js/weak-ref.js
+$(SRCROOT)/NativeScript/runtime/js/worker-events.js
