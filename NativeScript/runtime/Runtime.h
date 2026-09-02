@@ -159,7 +159,7 @@ class Runtime {
 
   static void DrainRejectionsObserver(CFRunLoopObserverRef observer,
                                       CFRunLoopActivity activity, void* info);
-  v8::Isolate* isolate_;
+  v8::Isolate* isolate_ = nullptr;
   std::atomic<bool> terminationRequested_{false};
   napi_env napiEnv_ = nullptr;
   std::unique_ptr<ModuleInternal> moduleInternal_;
