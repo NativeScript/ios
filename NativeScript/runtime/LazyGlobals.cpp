@@ -3,6 +3,7 @@
 #include "Base64.h"
 #include "BuiltinLoader.h"
 #include "Helpers.h"
+#include "StructuredSerialization.h"
 #include "TextEncoding.h"
 
 using namespace v8;
@@ -34,7 +35,7 @@ constexpr LazyGlobalEntry kLazyGlobals[] = {
     {"TextDecoder", "TextDecoder", TextEncoding::GetExports},
     {"atob", "atob", Base64::GetExports},
     {"btoa", "btoa", Base64::GetExports},
-    {"DOMException", "DOMException", BuiltinExports<BuiltinId::kDomException>},
+    {"DOMException", "DOMException", serialization::GetDomExceptionExports},
     // events.js is an eager builtin (Events::Init), so this row never runs a
     // file: the read hits the exports cache and only the placement is lazy.
     {"CustomEvent", "CustomEvent", BuiltinExports<BuiltinId::kEvents>},

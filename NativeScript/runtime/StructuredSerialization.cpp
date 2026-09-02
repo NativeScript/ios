@@ -1,6 +1,7 @@
 #include "StructuredSerialization.h"
 
 #include "BuiltinLoader.h"
+#include "Caches.h"
 #include "Helpers.h"
 #include "NativeScriptException.h"
 
@@ -8,6 +9,82 @@ using namespace v8;
 
 namespace tns {
 namespace serialization {
+
+namespace {
+
+// The private symbol markCloneable stamps on every DOMException instance.
+// Private, so app code can neither forge the brand onto an impostor nor strip
+// it; per isolate because a worker's instances are branded and checked on its
+// own isolate, and only bytes cross between them. `anyInstances` flips when
+// the first instance is branded and gates HasCustomHostObject: claiming host
+// objects makes V8 consult IsHostObject for every plain JS object in a
+// serialized graph (~25ns each, ~+12% on an object-heavy clone), and an
+// isolate that never constructed a DOMException cannot be holding one, so it
+// keeps serializing on the exact pre-claim path. Every instance passes
+// through markCloneable — deserialization rebuilds via the constructor — so
+// the flag cannot miss one.
+struct DomExceptionBrandState {
+  Persistent<Private> brand;
+  bool anyInstances = false;
+};
+
+// Empty once teardown has begun — callers bail to their fallback.
+Local<Private> DomExceptionBrand(Isolate* isolate) {
+  auto* state = Caches::StateFor<DomExceptionBrandState>(isolate);
+  if (state == nullptr) {
+    return Local<Private>();
+  }
+  if (state->brand.IsEmpty()) {
+    state->brand.Reset(
+        isolate, Private::New(isolate, tns::ToV8String(
+                                           isolate, "domExceptionCloneable")));
+  }
+  return state->brand.Get(isolate);
+}
+
+bool AnyDomExceptionInstances(Isolate* isolate) {
+  auto* state = Caches::StateFor<DomExceptionBrandState>(isolate);
+  return state != nullptr && state->anyInstances;
+}
+
+void MarkCloneableCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  if (info.Length() < 1 || !info[0]->IsObject()) {
+    return;
+  }
+  Local<Private> brand = DomExceptionBrand(isolate);
+  if (brand.IsEmpty()) {
+    return;
+  }
+  if (info[0]
+          .As<Object>()
+          ->SetPrivate(isolate->GetCurrentContext(), brand, v8::True(isolate))
+          .FromMaybe(false)) {
+    Caches::StateFor<DomExceptionBrandState>(isolate)->anyInstances = true;
+  }
+}
+
+}  // namespace
+
+MaybeLocal<Object> DomExceptionBinding(Local<Context> context) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Object> binding = Object::New(isolate);
+  Local<v8::Function> markCloneable;
+  if (!v8::Function::New(context, MarkCloneableCallback)
+           .ToLocal(&markCloneable) ||
+      !binding
+           ->Set(context, tns::ToV8String(isolate, "markCloneable"),
+                 markCloneable)
+           .FromMaybe(false)) {
+    return MaybeLocal<Object>();
+  }
+  return binding;
+}
+
+MaybeLocal<Object> GetDomExceptionExports(Local<Context> context) {
+  return BuiltinLoader::GetExports(context, BuiltinId::kDomException,
+                                   DomExceptionBinding);
+}
 
 void ThrowDataCloneError(Isolate* isolate, const std::string& message) {
   // The spec's DataCloneError is a DOMException; build it through the
@@ -21,8 +98,7 @@ void ThrowDataCloneError(Isolate* isolate, const std::string& message) {
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> exports;
     Local<Value> ctor;
-    if (BuiltinLoader::GetExports(context, BuiltinId::kDomException, nullptr)
-            .ToLocal(&exports) &&
+    if (GetDomExceptionExports(context).ToLocal(&exports) &&
         exports->Get(context, tns::ToV8String(isolate, "DOMException"))
             .ToLocal(&ctor) &&
         ctor->IsFunction()) {
@@ -46,24 +122,73 @@ void ThrowDataCloneError(Isolate* isolate, const std::string& message) {
 
 namespace {
 
+// Every host object's payload starts with one of these, so the reader can
+// dispatch. kHostObjectDegraded carries nothing further;
+// kHostObjectDomException carries a uint32 index into the SerializedValue's
+// out-of-band payload list. The bytes never outlive the process
+// (structuredClone round-trips in one isolate, worker messages cross isolates
+// in the same binary), so the format can evolve freely with this file.
+constexpr uint32_t kHostObjectDegraded = 0;
+constexpr uint32_t kHostObjectDomException = 1;
+
 class SerializerDelegate : public ValueSerializer::Delegate {
  public:
-  SerializerDelegate(Isolate* isolate, HostObjectPolicy hostObjectPolicy,
-                     std::vector<std::shared_ptr<BackingStore>>* sharedBuffers)
+  SerializerDelegate(
+      Isolate* isolate, HostObjectPolicy hostObjectPolicy,
+      std::vector<std::shared_ptr<BackingStore>>* sharedBuffers,
+      std::vector<SerializedValue::DomExceptionPayload>* domExceptions)
       : isolate_(isolate),
         hostObjectPolicy_(hostObjectPolicy),
-        sharedBuffers_(sharedBuffers) {}
+        sharedBuffers_(sharedBuffers),
+        domExceptions_(domExceptions) {}
+
+  void SetSerializer(ValueSerializer* serializer) { serializer_ = serializer; }
 
   void ThrowDataCloneError(Local<v8::String> message) override {
     serialization::ThrowDataCloneError(isolate_,
                                        tns::ToString(isolate_, message));
   }
 
+  // With this returning true, V8 asks IsHostObject about every plain JS
+  // object in the graph — the cost of claiming a plain-JS class as a host
+  // object is one private-symbol lookup per object (Node pays the same for
+  // its JSTransferable protocol). Claimed only once this isolate has actually
+  // constructed a DOMException; until then serialization runs the pre-claim
+  // path untouched. V8 samples this once per ValueSerializer. Accepted edge:
+  // a getter invoked during this very clone could construct the isolate's
+  // FIRST DOMException and return it into the graph after a false sample —
+  // that one instance degrades to a plain object (the pre-feature behavior)
+  // instead of cloning; every later serialization sees the flag.
+  bool HasCustomHostObject(Isolate* isolate) override {
+    return AnyDomExceptionInstances(isolate);
+  }
+
+  Maybe<bool> IsHostObject(Isolate* isolate, Local<Object> object) override {
+    // Only branded DOMException instances are claimed; native-backed wrappers
+    // keep reaching WriteHostObject through V8's embedder-field detection.
+    Local<Private> brand = DomExceptionBrand(isolate);
+    if (brand.IsEmpty()) {
+      return Just(false);
+    }
+    return object->HasPrivate(isolate->GetCurrentContext(), brand);
+  }
+
   Maybe<bool> WriteHostObject(Isolate* isolate, Local<Object> object) override {
+    // DOMException serializes under both policies: it is [Serializable] in
+    // the IDL, and it is a plain JS object with no native half to lose.
+    Local<Private> brand = DomExceptionBrand(isolate);
+    bool isDomException = false;
+    if (!brand.IsEmpty() &&
+        !object->HasPrivate(isolate->GetCurrentContext(), brand)
+             .To(&isDomException)) {
+      return Nothing<bool>();
+    }
+    if (isDomException) {
+      return WriteDomException(isolate, object);
+    }
     if (hostObjectPolicy_ == HostObjectPolicy::kDegrade) {
-      // V8 has already written the kHostObject tag; writing no payload is what
-      // the zero-byte ReadHostObject below expects, and the value surfaces as
-      // an empty object.
+      // Tag only, no payload: the value surfaces as an empty object.
+      serializer_->WriteUint32(kHostObjectDegraded);
       return Just(true);
     }
     std::string name = tns::ToString(isolate, object->GetConstructorName());
@@ -98,21 +223,78 @@ class SerializerDelegate : public ValueSerializer::Delegate {
   }
 
  private:
+  // Web IDL's DOMException serialization steps (name and message), plus the
+  // stack, matching Node. The payload travels out-of-band and only an index
+  // enters the stream: the receiving side must construct instances before
+  // ReadValue runs, because V8 forbids JS execution during deserialization.
+  Maybe<bool> WriteDomException(Isolate* isolate, Local<Object> object) {
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Value> name, message, stack;
+    if (!object->Get(context, tns::ToV8String(isolate, "name"))
+             .ToLocal(&name) ||
+        !object->Get(context, tns::ToV8String(isolate, "message"))
+             .ToLocal(&message) ||
+        !object->Get(context, tns::ToV8String(isolate, "stack"))
+             .ToLocal(&stack)) {
+      return Nothing<bool>();
+    }
+    SerializedValue::DomExceptionPayload payload;
+    payload.name = tns::ToString(isolate, name);
+    payload.message = tns::ToString(isolate, message);
+    // The stack can legitimately be absent or tampered into a non-string;
+    // carry it only when it is the string captureStackTrace left.
+    payload.hasStack = stack->IsString();
+    if (payload.hasStack) {
+      payload.stack = tns::ToString(isolate, stack);
+    }
+    serializer_->WriteUint32(kHostObjectDomException);
+    serializer_->WriteUint32(static_cast<uint32_t>(domExceptions_->size()));
+    domExceptions_->push_back(std::move(payload));
+    return Just(true);
+  }
+
   Isolate* isolate_;
   HostObjectPolicy hostObjectPolicy_;
   std::vector<std::shared_ptr<BackingStore>>* sharedBuffers_;
+  std::vector<SerializedValue::DomExceptionPayload>* domExceptions_;
+  ValueSerializer* serializer_ = nullptr;
 };
 
 class DeserializerDelegate : public ValueDeserializer::Delegate {
  public:
-  explicit DeserializerDelegate(
-      const std::vector<Local<SharedArrayBuffer>>* sharedBuffers)
-      : sharedBuffers_(sharedBuffers) {}
+  DeserializerDelegate(
+      const std::vector<Local<SharedArrayBuffer>>* sharedBuffers,
+      const std::vector<Local<Object>>* domExceptions)
+      : sharedBuffers_(sharedBuffers), domExceptions_(domExceptions) {}
 
-  // Counterpart of the kDegrade branch: consumes no bytes, so the stream stays
-  // balanced. Unreachable for a value written under kReject.
+  void SetDeserializer(ValueDeserializer* deserializer) {
+    deserializer_ = deserializer;
+  }
+
+  // No JS may run in here (V8 forbids it during a read); DOMException
+  // instances were constructed by Deserialize before ReadValue started, and
+  // this only hands them out.
   MaybeLocal<Object> ReadHostObject(Isolate* isolate) override {
-    return Object::New(isolate);
+    uint32_t tag;
+    if (!deserializer_->ReadUint32(&tag)) {
+      return MaybeLocal<Object>();
+    }
+    switch (tag) {
+      case kHostObjectDegraded:
+        // Counterpart of the kDegrade branch: tag only, so the value arrives
+        // as an empty object. Unreachable for a value written under kReject.
+        return Object::New(isolate);
+      case kHostObjectDomException: {
+        uint32_t index;
+        if (!deserializer_->ReadUint32(&index) ||
+            index >= domExceptions_->size()) {
+          return MaybeLocal<Object>();
+        }
+        return (*domExceptions_)[index];
+      }
+      default:
+        return MaybeLocal<Object>();
+    }
   }
 
   MaybeLocal<SharedArrayBuffer> GetSharedArrayBufferFromId(
@@ -125,6 +307,8 @@ class DeserializerDelegate : public ValueDeserializer::Delegate {
 
  private:
   const std::vector<Local<SharedArrayBuffer>>* sharedBuffers_;
+  const std::vector<Local<Object>>* domExceptions_;
+  ValueDeserializer* deserializer_ = nullptr;
 };
 
 // Validates the transfer list and collects it in registration order. The
@@ -193,8 +377,10 @@ Maybe<bool> SerializedValue::Serialize(Isolate* isolate, Local<Context> context,
     return Nothing<bool>();
   }
 
-  SerializerDelegate delegate(isolate, hostObjectPolicy, &sharedBuffers_);
+  SerializerDelegate delegate(isolate, hostObjectPolicy, &sharedBuffers_,
+                              &domExceptions_);
   ValueSerializer serializer(isolate, &delegate);
+  delegate.SetSerializer(&serializer);
   for (size_t i = 0; i < transfers.size(); i++) {
     serializer.TransferArrayBuffer(static_cast<uint32_t>(i), transfers[i]);
   }
@@ -243,9 +429,47 @@ MaybeLocal<Value> SerializedValue::Deserialize(Isolate* isolate,
     sharedBuffers.push_back(SharedArrayBuffer::New(isolate, backingStore));
   }
 
-  DeserializerDelegate delegate(&sharedBuffers);
+  // Construct every DOMException the payload names before the read begins:
+  // JS is allowed here and forbidden inside ReadHostObject. Construction goes
+  // through the real constructor — on a worker isolate that never touched
+  // DOMException this runs the builtin on demand — so each instance is
+  // branded again and re-serializes on the next hop.
+  std::vector<Local<Object>> domExceptions;
+  if (!domExceptions_.empty()) {
+    Local<Object> exports;
+    Local<Value> ctor;
+    if (!GetDomExceptionExports(context).ToLocal(&exports) ||
+        !exports->Get(context, tns::ToV8String(isolate, "DOMException"))
+             .ToLocal(&ctor) ||
+        !ctor->IsFunction()) {
+      return MaybeLocal<Value>();
+    }
+    Local<v8::String> stackKey = tns::ToV8String(isolate, "stack");
+    for (const DomExceptionPayload& payload : domExceptions_) {
+      Local<Value> args[] = {tns::ToV8String(isolate, payload.message),
+                             tns::ToV8String(isolate, payload.name)};
+      Local<Object> exception;
+      if (!ctor.As<v8::Function>()
+               ->NewInstance(context, 2, args)
+               .ToLocal(&exception)) {
+        return MaybeLocal<Value>();
+      }
+      // The sender's stack replaces the one captured just now for the
+      // receiving side's constructor frame, matching Node.
+      if (payload.hasStack &&
+          !exception
+               ->Set(context, stackKey, tns::ToV8String(isolate, payload.stack))
+               .FromMaybe(false)) {
+        return MaybeLocal<Value>();
+      }
+      domExceptions.push_back(exception);
+    }
+  }
+
+  DeserializerDelegate delegate(&sharedBuffers, &domExceptions);
   ValueDeserializer deserializer(isolate, buffer_.get(), bufferSize_,
                                  &delegate);
+  delegate.SetDeserializer(&deserializer);
 
   for (size_t i = 0; i < transferredBuffers_.size(); i++) {
     deserializer.TransferArrayBuffer(
