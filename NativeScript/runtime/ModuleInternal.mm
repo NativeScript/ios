@@ -1915,6 +1915,11 @@ static void WriteScriptCache(const std::string& cachePath, const std::string& so
 
 void ModuleInternal::SaveScriptCache(const ScriptCompiler::CachedData* cache,
                                      const std::string& path, ScriptCacheKind kind) {
+  // CreateCodeCache yields nullptr for a script V8 declines to serialize.
+  if (cache == nullptr) {
+    return;
+  }
+
   std::string canonicalPath = NormalizePath(path);
   std::string cachePath = ModuleInternal::GetCacheFileName(
       canonicalPath + ScriptCacheSuffix(kind == ScriptCacheKind::kEsModule));
@@ -1933,6 +1938,9 @@ void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::stri
   Local<UnboundScript> unboundScript = script->GetUnboundScript();
   // CachedData returned by this function should be owned by the caller (v8 docs)
   ScriptCompiler::CachedData* cachedData = ScriptCompiler::CreateCodeCache(unboundScript);
+  if (cachedData == nullptr) {
+    return;
+  }
 
   // Always a classic script: this overload takes a v8::Script.
   std::string cachePath =

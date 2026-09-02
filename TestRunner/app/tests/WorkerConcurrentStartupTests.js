@@ -6,22 +6,29 @@ describe("Worker startup", function () {
         expected[name] = require("./concurrentStartup/" + name).value;
     });
 
+    // Jasmine arms a spec's async timeout before calling it, so the interval
+    // has to be raised ahead of the spec, not inside it.
+    var originalTimeout;
+    beforeEach(function () {
+        originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
+    });
+    afterEach(function () {
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+    });
+
     // Every worker thread reads script sources and code caches while it starts;
     // a batch started together loads the same files at the same moment, which
     // is how an app that spins up its workers at launch behaves. The entries
     // load the modules in rotated orders, so concurrent workers are reading
     // different files at any instant.
     it("many workers start at once against warm script caches", function (done) {
-        var originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
-
         var finished = false;
         var finish = function () {
             if (finished) {
                 return;
             }
             finished = true;
-            jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
             done();
         };
 
