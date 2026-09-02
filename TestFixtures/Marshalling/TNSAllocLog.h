@@ -10,6 +10,10 @@
 - (instancetype)init;
 - (void)dealloc;
 
+// Creates an instance whose only reference is in the current autorelease pool,
+// so its dealloc log marks when that pool drains.
++ (void)autoreleaseInstance;
+
 @end
 
 #endif /* TNSAllocLog_h */
