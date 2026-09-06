@@ -331,9 +331,9 @@ Isolate* Runtime::CreateIsolate() {
 
     // wrap the default platform so foreground tasks ride each runtime
     // thread's CFRunLoop instead of sitting in never-pumped libplatform queues
-    Runtime::platform_ = std::make_shared<NativeScriptPlatform>(platform::NewDefaultPlatform());
+    Runtime::platform_ = new NativeScriptPlatform(platform::NewDefaultPlatform());
 
-    V8::InitializePlatform(Runtime::platform_.get());
+    V8::InitializePlatform(Runtime::platform_);
     V8::Initialize();
     v8Initialized_ = true;
   }
@@ -781,7 +781,7 @@ napi_env Runtime::GetNapiEnvIfAlive(const Runtime* runtime) {
   return nullptr;
 }
 
-std::shared_ptr<Platform> Runtime::platform_;
+Platform* Runtime::platform_ = nullptr;
 std::vector<Isolate*> Runtime::isolates_;
 bool Runtime::v8Initialized_ = false;
 thread_local Runtime* Runtime::currentRuntime_ = nullptr;

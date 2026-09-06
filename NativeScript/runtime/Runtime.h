@@ -100,7 +100,7 @@ class Runtime {
     return currentRuntime_->IsRuntimeWorker();
   }
 
-  static std::shared_ptr<v8::Platform> GetPlatform() { return platform_; }
+  static v8::Platform* GetPlatform() { return platform_; }
 
   static id GetAppConfigValue(std::string key);
 
@@ -119,9 +119,6 @@ class Runtime {
   static napi_env GetNapiEnvIfAlive(const Runtime* runtime);
 
   // Milliseconds since this runtime's time origin, on the monotonic clock.
-  // Not inline on purpose: an inline definition would have to reach the
-  // platform through GetPlatform(), which copies a shared_ptr on every call,
-  // while the out-of-line definition reads platform_ directly.
   double PerformanceNowMillis();
 
   // Wall-clock milliseconds since the Unix epoch at the moment the time origin
@@ -138,7 +135,10 @@ class Runtime {
 
  private:
   static thread_local Runtime* currentRuntime_;
-  static std::shared_ptr<v8::Platform> platform_;
+  // Lives until the process dies and is never deleted: V8 holds it by raw
+  // pointer for every isolate, and exit() runs static destructors while the
+  // main thread and worker threads are still tearing isolates down.
+  static v8::Platform* platform_;
   static std::vector<v8::Isolate*> isolates_;
   static SpinMutex isolatesMutex_;
   static bool v8Initialized_;
