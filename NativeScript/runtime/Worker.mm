@@ -155,8 +155,9 @@ bool ReadMegabyteLimit(Isolate* isolate, Local<Context> context, Local<Object> r
   return true;
 }
 
-// The JS dispatch table is reserved as one contiguous range at isolate
-// creation, so V8 only accepts whole megabytes up to its own hard ceiling.
+// V8 needs the reservation to be a whole number of table segments and no larger
+// than its compile-time maximum; whole megabytes satisfy the first on every
+// platform's segment size, and 256 is the maximum.
 constexpr double kMaxJsDispatchTableSizeMb = 256;
 
 #ifdef V8_HAS_JS_DISPATCH_TABLE_RESERVATION_PARAM
