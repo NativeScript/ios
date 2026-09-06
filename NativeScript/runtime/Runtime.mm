@@ -316,7 +316,7 @@ Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
   return static_cast<Runtime*>(isolate->GetData(Constants::RUNTIME_SLOT));
 }
 
-Isolate* Runtime::CreateIsolate() {
+Isolate* Runtime::CreateIsolate(const IsolateLimits& limits) {
   if (!v8Initialized_) {
     // Runtime::platform_ = RuntimeConfig.IsDebug
     //     ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
@@ -345,6 +345,19 @@ Isolate* Runtime::CreateIsolate() {
 
   Isolate::CreateParams create_params;
   create_params.array_buffer_allocator = &allocator_;
+  if (limits.maxOldGenerationSizeBytes.has_value()) {
+    create_params.constraints.set_max_old_generation_size_in_bytes(
+        *limits.maxOldGenerationSizeBytes);
+  }
+  if (limits.maxYoungGenerationSizeBytes.has_value()) {
+    create_params.constraints.set_max_young_generation_size_in_bytes(
+        *limits.maxYoungGenerationSizeBytes);
+  }
+#ifdef V8_HAS_JS_DISPATCH_TABLE_RESERVATION_PARAM
+  if (limits.jsDispatchTableReservationBytes.has_value()) {
+    create_params.js_dispatch_table_reservation_size = *limits.jsDispatchTableReservationBytes;
+  }
+#endif
   Isolate* isolate = Isolate::New(create_params);
   runtimeLoop_ = CFRunLoopGetCurrent();
   // v8 already asked for this isolate's task runner during Isolate::New, so

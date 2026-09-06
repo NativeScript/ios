@@ -165,6 +165,15 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
   // is deleted below.
   this->DestroyInspector();
 
+  // The callback closes over this wrapper, which ~Runtime may delete below,
+  // while V8 keeps the registration until the isolate is disposed - and
+  // disposal can be deferred past that point.
+  if (this->heapLimitIsolate_ != nullptr) {
+    v8::Locker locker(this->heapLimitIsolate_);
+    this->heapLimitIsolate_->RemoveNearHeapLimitCallback(WorkerWrapper::OnNearHeapLimit, 0);
+    this->heapLimitIsolate_ = nullptr;
+  }
+
   this->isDisposed_ = true;
   Runtime* runtime = Runtime::GetCurrentRuntime();
   if (runtime != nullptr) {
@@ -219,6 +228,52 @@ void WorkerWrapper::Terminate() {
     this->queue_.Terminate();
     this->isRunning_ = false;
   }
+}
+
+void WorkerWrapper::WatchHeapLimit(Isolate* isolate, const std::string& scriptPath,
+                                   std::optional<size_t> maxOldGenerationSizeBytes) {
+  this->heapLimitIsolate_ = isolate;
+  this->heapLimitSource_ = scriptPath.empty() ? "Worker" : scriptPath;
+  this->heapLimitMessage_ = "Worker JS heap out of memory";
+  if (maxOldGenerationSizeBytes.has_value()) {
+    this->heapLimitMessage_ +=
+        " (maxOldGenerationSizeMb: " + std::to_string(*maxOldGenerationSizeBytes / (1024 * 1024)) +
+        ")";
+  }
+  isolate->AddNearHeapLimitCallback(WorkerWrapper::OnNearHeapLimit, this);
+}
+
+size_t WorkerWrapper::OnNearHeapLimit(void* data, size_t current_heap_limit,
+                                      size_t initial_heap_limit) {
+  auto* worker = static_cast<WorkerWrapper*>(data);
+
+  // Node's allowance: raising the limit lets the in-progress GC finish instead
+  // of aborting the process, and the isolate is being torn down anyway. The
+  // same raised limit has to come back on every later invocation, because
+  // returning a lower one is fatal to V8.
+  constexpr size_t kHeapLimitAllowance = 16 * 1024 * 1024;
+  size_t raisedLimit = current_heap_limit + kHeapLimitAllowance;
+
+  if (worker->heapLimitExceeded_.exchange(true, std::memory_order_acq_rel)) {
+    return raisedLimit;
+  }
+
+  // Marshals strings onto the parent's loop and touches no V8 handle, which is
+  // the only kind of reporting allowed from inside a GC.
+  worker->PassUncaughtExceptionFromWorkerToMain(worker->heapLimitMessage_, worker->heapLimitSource_,
+                                                "", 0, true);
+
+  // Terminate() only reaches an isolate BackgroundLooper has already published,
+  // which happens after the entry script finished evaluating — and a worker
+  // that exhausts its heap usually does so inside that entry. Ask the isolate
+  // this callback belongs to directly.
+  if (Runtime* runtime = Runtime::GetRuntime(worker->heapLimitIsolate_)) {
+    runtime->RequestTermination();
+  }
+  worker->heapLimitIsolate_->TerminateExecution();
+  worker->Terminate();
+
+  return raisedLimit;
 }
 
 void WorkerWrapper::CreateInspector(Isolate* isolate, const std::string& scriptPath) {

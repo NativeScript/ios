@@ -586,6 +586,19 @@ class WorkerWrapper : public BaseDataWrapper {
   void Close();
   void Terminate();
 
+  // Arms the near-heap-limit callback on the worker's own isolate. Runs on the
+  // worker thread right after the isolate exists; without it an isolate that
+  // reaches its heap cap aborts the whole process instead of surfacing as an
+  // error on the parent's Worker object. `maxOldGenerationSizeBytes` is only
+  // used to name the cap in the message forwarded to the parent.
+  void WatchHeapLimit(v8::Isolate* isolate, const std::string& scriptPath,
+                      std::optional<size_t> maxOldGenerationSizeBytes);
+  // Whether the heap cap was hit. The worker startup path checks this to stop
+  // before running anything else in an isolate V8 is terminating.
+  inline bool HeapLimitExceeded() const {
+    return heapLimitExceeded_.load(std::memory_order_acquire);
+  }
+
   const WrapperType Type();
   const int Id();
   const inline bool isDisposed() { return isDisposed_; }
@@ -619,6 +632,19 @@ class WorkerWrapper : public BaseDataWrapper {
   // thread) and DestroyInspector() (worker thread) agree on liveness.
   v8_inspector::WorkerInspectorClient* inspector_ = nullptr;
   std::mutex inspectorMutex_;
+  // The worker isolate as seen from the heap-limit callback. Separate from
+  // workerIsolate_, which BackgroundLooper only publishes once the entry script
+  // has finished evaluating — the point at which a heap cap is most likely to
+  // be hit is inside that entry.
+  v8::Isolate* heapLimitIsolate_ = nullptr;
+  std::string heapLimitMessage_;
+  std::string heapLimitSource_;
+  std::atomic<bool> heapLimitExceeded_{false};
+
+  // Runs on the worker thread from inside a GC, where no JS may run and no
+  // handle may be created.
+  static size_t OnNearHeapLimit(void* data, size_t current_heap_limit,
+                                size_t initial_heap_limit);
 
   void BackgroundLooper(std::function<v8::Isolate*()> func);
   void DrainPendingTasks();
