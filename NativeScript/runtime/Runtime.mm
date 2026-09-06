@@ -193,12 +193,10 @@ bool isErrorDisplayShowing = false;
 // kCFTimeZoneSystemTimeZoneDidChangeNotification, NULL);
 
 void DisposeIsolateWhenPossible(Isolate* isolate) {
-  // most of the time, this will never delay disposal
-  // occasionally this can happen when the runtime is destroyed by actions of its own isolate
-  // as an example: isolate calls exit(0), which in turn destroys the Runtime unique_ptr
-  // another scenario is when embedding nativescript, if the embedder deletes the runtime as a
-  // result of a callback from JS in the case of exit(0), the app will die before actually disposing
-  // the isolate, which isn't a problem
+  // Disposal is deferred only while the isolate is still entered, which happens
+  // when the runtime is deleted by code running inside its own isolate: an
+  // embedder calling shutdownRuntime from a JS callback. exit() never deletes a
+  // runtime, so a process that is dying leaves its isolates to the OS.
   if (isolate->IsInUse()) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_MSEC)),
                    dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
@@ -331,9 +329,9 @@ Isolate* Runtime::CreateIsolate() {
 
     // wrap the default platform so foreground tasks ride each runtime
     // thread's CFRunLoop instead of sitting in never-pumped libplatform queues
-    Runtime::platform_ = std::make_shared<NativeScriptPlatform>(platform::NewDefaultPlatform());
+    Runtime::platform_ = new NativeScriptPlatform(platform::NewDefaultPlatform());
 
-    V8::InitializePlatform(Runtime::platform_.get());
+    V8::InitializePlatform(Runtime::platform_);
     V8::Initialize();
     v8Initialized_ = true;
   }
@@ -781,7 +779,7 @@ napi_env Runtime::GetNapiEnvIfAlive(const Runtime* runtime) {
   return nullptr;
 }
 
-std::shared_ptr<Platform> Runtime::platform_;
+Platform* Runtime::platform_ = nullptr;
 std::vector<Isolate*> Runtime::isolates_;
 bool Runtime::v8Initialized_ = false;
 thread_local Runtime* Runtime::currentRuntime_ = nullptr;

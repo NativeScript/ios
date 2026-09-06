@@ -39,7 +39,18 @@ extern char defaultStartOfMetadataSection __asm("section$start$__DATA$__TNSMetad
   tns::Tasks::Drain();
 }
 
-std::unique_ptr<Runtime> runtime_;
+// A raw pointer so that exit() never runs ~Runtime from a static destructor:
+// exit() can come from any thread while the main thread and every worker are
+// still live, and a teardown then races them and the other static destructors.
+// A dying process needs no teardown; shutdownRuntime is the deliberate path.
+Runtime* runtime_ = nullptr;
+
+// Cleared before ~Runtime runs so no caller sees a runtime mid-destruction.
+static void DestroyMainRuntime() {
+  Runtime* runtime = runtime_;
+  runtime_ = nullptr;
+  delete runtime;
+}
 
 - (void)runMainApplication {
   runtime_->RunMainScript();
@@ -141,9 +152,7 @@ std::unique_ptr<Runtime> runtime_;
     Console::DetachInspectorClient();
   }
   tns::Tasks::ClearTasks();
-  if (runtime_ != nullptr) {
-    runtime_ = nullptr;
-  }
+  DestroyMainRuntime();
 }
 
 - (instancetype)initializeWithConfig:(Config*)config {
@@ -165,8 +174,8 @@ std::unique_ptr<Runtime> runtime_;
     RuntimeConfig.LogToSystemConsole = [config LogToSystemConsole];
 
     Runtime::Initialize();
-    runtime_ = nullptr;
-    runtime_ = std::make_unique<Runtime>();
+    DestroyMainRuntime();
+    runtime_ = new Runtime();
 
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
     Isolate* isolate = runtime_->CreateIsolate();
@@ -181,7 +190,7 @@ std::unique_ptr<Runtime> runtime_;
       Isolate::Scope isolate_scope(isolate);
       HandleScope handle_scope(isolate);
       v8_inspector::JsV8InspectorClient* inspectorClient =
-          new v8_inspector::JsV8InspectorClient(runtime_.get());
+          new v8_inspector::JsV8InspectorClient(runtime_);
       inspectorClient->init();
       inspectorClient->registerModules();
       inspectorClient->connect([config ArgumentsCount], [config Arguments]);
