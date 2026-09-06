@@ -805,6 +805,12 @@ std::string NativeScriptException::GetFullMessage(Isolate* isolate, const TryCat
 
 std::string NativeScriptException::GetFullMessage(Isolate* isolate, Local<v8::Message> message,
                                                   const std::string& jsExceptionMessage) {
+  // An isolate V8 has been told to terminate hands back an exception with no
+  // v8::Message at all, and every read below needs a real handle.
+  if (message.IsEmpty()) {
+    return jsExceptionMessage;
+  }
+
   Local<Context> context = isolate->GetEnteredOrMicrotaskContext();
 
   std::stringstream ss;
@@ -821,7 +827,9 @@ std::string NativeScriptException::GetFullMessage(Isolate* isolate, Local<v8::Me
   } else {
     ss << std::endl << "File: (<unknown>";
   }
-  ss << ":" << message->GetLineNumber(context).ToChecked() << ":" << message->GetStartColumn()
+  // FromMaybe, not ToChecked: a location lookup that fails is not worth
+  // aborting the process over.
+  ss << ":" << message->GetLineNumber(context).FromMaybe(0) << ":" << message->GetStartColumn()
      << ")" << std::endl
      << std::endl;
   ss << "StackTrace: " << std::endl << stackTraceMessage << std::endl;

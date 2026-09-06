@@ -2,6 +2,7 @@
 #define Runtime_h
 
 #include <atomic>
+#include <optional>
 
 #include "Caches.h"
 #include "Common.h"
@@ -17,11 +18,21 @@ typedef struct napi_env__* napi_env;
 
 namespace tns {
 
+// Per-isolate caps handed to Isolate::New. Every entry is optional; an absent
+// one leaves V8's own default in place. Values are bytes.
+struct IsolateLimits {
+  std::optional<size_t> maxOldGenerationSizeBytes;
+  std::optional<size_t> maxYoungGenerationSizeBytes;
+  // Only honored by a V8 build that defines
+  // V8_HAS_JS_DISPATCH_TABLE_RESERVATION_PARAM; ignored otherwise.
+  std::optional<size_t> jsDispatchTableReservationBytes;
+};
+
 class Runtime {
  public:
   Runtime();
   ~Runtime();
-  v8::Isolate* CreateIsolate();
+  v8::Isolate* CreateIsolate(const IsolateLimits& limits = {});
   void Init(v8::Isolate* isolate, bool isWorker = false);
   void RunMainScript();
   v8::Isolate* GetIsolate();

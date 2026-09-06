@@ -1,5 +1,6 @@
 #include "Worker.h"
 #include <pthread.h>
+#include <cmath>
 #include <functional>
 #include <mutex>
 #include <optional>
@@ -47,6 +48,18 @@ bool MapPriorityName(const std::string& name, int& qos) {
   Local<Value> error = Exception::TypeError(tns::ToV8String(isolate, message));
   throw NativeScriptException(isolate, error, message);
 }
+
+[[noreturn]] void ThrowOptionRangeError(Isolate* isolate, const std::string& message) {
+  Local<Value> error = Exception::RangeError(tns::ToV8String(isolate, message));
+  throw NativeScriptException(isolate, error, message);
+}
+
+#ifndef V8_HAS_JS_DISPATCH_TABLE_RESERVATION_PARAM
+[[noreturn]] void ThrowOptionError(Isolate* isolate, const std::string& message) {
+  Local<Value> error = Exception::Error(tns::ToV8String(isolate, message));
+  throw NativeScriptException(isolate, error, message);
+}
+#endif
 
 // Reads `key` from `object`. A false return means the getter threw: the
 // exception is already pending on the isolate and construction must stop
@@ -102,6 +115,114 @@ bool ParseQualityOfService(Isolate* isolate, Local<Context> context, Local<Objec
         MapPriorityName(ToString(isolate, legacyVal), mapped)) {
       qos = mapped;
     }
+  }
+
+  return true;
+}
+
+constexpr double kBytesPerMegabyte = 1024 * 1024;
+// Bounds the double-to-size_t conversion below; V8 clamps heap sizes far under
+// this on every device, so nothing real is excluded.
+constexpr double kMaxLimitMegabytes = 1024.0 * 1024.0;
+
+// Reads one megabyte-valued `resourceLimits` key into `megabytes`, leaving it
+// empty when the key is absent (V8's own default stays in place). Returns false
+// when the getter threw (see ReadOption). A present value must be a finite
+// number worth at least one byte and at most kMaxLimitMegabytes.
+bool ReadMegabyteLimit(Isolate* isolate, Local<Context> context, Local<Object> resourceLimits,
+                       const char* key, std::optional<double>& megabytes) {
+  Local<Value> value;
+  if (!ReadOption(isolate, context, resourceLimits, key, value)) {
+    return false;
+  }
+  if (value->IsUndefined()) {
+    return true;
+  }
+
+  std::string name = std::string("resourceLimits.") + key;
+  if (!value->IsNumber()) {
+    ThrowOptionTypeError(isolate, "Worker option \"" + name + "\" must be a number.");
+  }
+
+  double parsed = value.As<Number>()->Value();
+  if (!std::isfinite(parsed) || parsed * kBytesPerMegabyte < 1 || parsed > kMaxLimitMegabytes) {
+    ThrowOptionRangeError(isolate, "Worker option \"" + name +
+                                       "\" must be a finite number of megabytes worth at least "
+                                       "one byte and at most 1048576.");
+  }
+
+  megabytes = parsed;
+  return true;
+}
+
+// V8 needs the reservation to be a whole number of table segments and no larger
+// than its compile-time maximum; whole megabytes satisfy the first on every
+// platform's segment size, and 256 is the maximum.
+constexpr double kMaxJsDispatchTableSizeMb = 256;
+
+#ifdef V8_HAS_JS_DISPATCH_TABLE_RESERVATION_PARAM
+// iOS caps a process's address space by device RAM, and every isolate reserves
+// 256 MB for its JS dispatch table by default; 64 MB still holds four million
+// dispatch entries, far more than a worker allocates. Only workers get the
+// smaller reservation — the main isolate keeps V8's default.
+constexpr size_t kDefaultWorkerJsDispatchTableBytes = 64 * 1024 * 1024;
+#endif
+
+// Node's `resourceLimits` shape. Unknown keys are ignored, so the options Node
+// has and this runtime cannot honor (codeRangeSizeMb, stackSizeMb) stay
+// harmless to pass. Returns false when a getter threw (see ReadOption).
+bool ParseResourceLimits(Isolate* isolate, Local<Context> context, Local<Object> options,
+                         IsolateLimits& limits) {
+  Local<Value> value;
+  if (!ReadOption(isolate, context, options, "resourceLimits", value)) {
+    return false;
+  }
+  if (value->IsNullOrUndefined()) {
+    return true;
+  }
+
+  if (!value->IsObject()) {
+    ThrowOptionTypeError(isolate, "Worker option \"resourceLimits\" must be an object.");
+  }
+  Local<Object> resourceLimits = value.As<Object>();
+
+  std::optional<double> megabytes;
+
+  if (!ReadMegabyteLimit(isolate, context, resourceLimits, "maxOldGenerationSizeMb", megabytes)) {
+    return false;
+  }
+  if (megabytes) {
+    limits.maxOldGenerationSizeBytes = static_cast<size_t>(*megabytes * kBytesPerMegabyte);
+  }
+
+  megabytes.reset();
+  if (!ReadMegabyteLimit(isolate, context, resourceLimits, "maxYoungGenerationSizeMb",
+                         megabytes)) {
+    return false;
+  }
+  if (megabytes) {
+    limits.maxYoungGenerationSizeBytes = static_cast<size_t>(*megabytes * kBytesPerMegabyte);
+  }
+
+  megabytes.reset();
+  if (!ReadMegabyteLimit(isolate, context, resourceLimits, "jsDispatchTableSizeMb", megabytes)) {
+    return false;
+  }
+  if (megabytes) {
+    if (*megabytes != std::floor(*megabytes) || *megabytes < 1 ||
+        *megabytes > kMaxJsDispatchTableSizeMb) {
+      ThrowOptionRangeError(isolate,
+                            "Worker option \"resourceLimits.jsDispatchTableSizeMb\" must be a "
+                            "whole number of megabytes between 1 and 256.");
+    }
+#ifdef V8_HAS_JS_DISPATCH_TABLE_RESERVATION_PARAM
+    limits.jsDispatchTableReservationBytes =
+        static_cast<size_t>(*megabytes) * static_cast<size_t>(kBytesPerMegabyte);
+#else
+    ThrowOptionError(isolate,
+                     "Worker option \"resourceLimits.jsDispatchTableSizeMb\" requires a V8 build "
+                     "with a configurable JS dispatch table.");
+#endif
   }
 
   return true;
@@ -241,11 +362,20 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     }
 
     std::optional<int> qos;
+    IsolateLimits resourceLimits;
     if (info.Length() >= 2 && info[1]->IsObject()) {
-      if (!ParseQualityOfService(isolate, context, info[1].As<Object>(), qos)) {
+      Local<Object> options = info[1].As<Object>();
+      if (!ParseQualityOfService(isolate, context, options, qos) ||
+          !ParseResourceLimits(isolate, context, options, resourceLimits)) {
         return;
       }
     }
+
+#ifdef V8_HAS_JS_DISPATCH_TABLE_RESERVATION_PARAM
+    if (!resourceLimits.jsDispatchTableReservationBytes.has_value()) {
+      resourceLimits.jsDispatchTableReservationBytes = kDefaultWorkerJsDispatchTableBytes;
+    }
+#endif
 
     WorkerWrapper* worker = new WorkerWrapper(isolate, Worker::OnMessageCallback);
     tns::SetValue(isolate, thiz, worker);
@@ -259,7 +389,7 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     // vocabulary updates).
     tns::LoaderVocabulary inheritedVocabulary = tns::CaptureLoaderVocabulary(isolate);
 
-    std::function<Isolate*()> func([worker, workerPath, inheritedVocabulary]() {
+    std::function<Isolate*()> func([worker, workerPath, inheritedVocabulary, resourceLimits]() {
       // Name the looper thread after its entry script so a crash report
       // identifies which worker died instead of an anonymous NSOperationQueue
       // thread. Darwin caps thread names at 63 bytes; keep the basename only.
@@ -286,8 +416,11 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       }
 
       tns::Runtime* runtime = new tns::Runtime();
-      Isolate* isolate = runtime->CreateIsolate();
+      Isolate* isolate = runtime->CreateIsolate(resourceLimits);
       v8::Locker locker(isolate);
+      // Armed for every worker isolate, capped or not: without it V8 aborts the
+      // whole process when a worker exhausts its heap.
+      worker->WatchHeapLimit(isolate, resolvedPath, resourceLimits.maxOldGenerationSizeBytes);
       runtime->Init(isolate, true);
       // Before any module load runs in this isolate.
       tns::InstallLoaderVocabulary(isolate, inheritedVocabulary);
@@ -324,6 +457,12 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
         Isolate::Scope isolate_scope(isolate);
         HandleScope handle_scope(isolate);
         ex.ReThrowToV8(isolate);
+      }
+
+      // The near-heap-limit callback has already reported to the parent and
+      // asked V8 to terminate this isolate; everything below would run JS on it.
+      if (worker->HeapLimitExceeded()) {
+        return isolate;
       }
 
       // WHATWG parity: enable the implicit port's message queue once the
