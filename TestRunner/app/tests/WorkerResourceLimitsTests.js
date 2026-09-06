@@ -99,6 +99,37 @@ describe("Worker resourceLimits", function () {
         }).toThrowError(RangeError, /"resourceLimits\.maxYoungGenerationSizeMb"/);
     });
 
+    it("throws a RangeError for a maxOldGenerationSizeMb too large to hold in bytes", function () {
+        expect(function () {
+            new Worker(echoEntry, { resourceLimits: { maxOldGenerationSizeMb: Number.MAX_VALUE } });
+        }).toThrowError(RangeError, /"resourceLimits\.maxOldGenerationSizeMb"/);
+    });
+
+    it("throws a RangeError for a maxYoungGenerationSizeMb below one byte", function () {
+        expect(function () {
+            new Worker(echoEntry, { resourceLimits: { maxYoungGenerationSizeMb: 1e-9 } });
+        }).toThrowError(RangeError, /"resourceLimits\.maxYoungGenerationSizeMb"/);
+    });
+
+    it("propagates the error thrown by a resourceLimits getter", function () {
+        var boom = new Error("boom");
+        var options = { resourceLimits: new Proxy({}, {
+            get: function (target, key) {
+                if (key === "maxOldGenerationSizeMb") {
+                    throw boom;
+                }
+                return undefined;
+            }
+        }) };
+        var thrown;
+        try {
+            new Worker(echoEntry, options);
+        } catch (e) {
+            thrown = e;
+        }
+        expect(thrown).toBe(boom);
+    });
+
     it("throws a RangeError for a jsDispatchTableSizeMb above the ceiling", function () {
         expect(function () {
             new Worker(echoEntry, { resourceLimits: { jsDispatchTableSizeMb: 300 } });
