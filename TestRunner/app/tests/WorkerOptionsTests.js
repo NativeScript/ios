@@ -25,13 +25,21 @@ describe("Worker platform options", function () {
             worker.terminate();
             done();
         };
+        // A throw inside either handler must still settle the spec and
+        // terminate the worker; Jasmine only guards the spec body itself.
         worker.onmessage = function (msg) {
-            check(msg.data.qos);
-            finish();
+            try {
+                check(msg.data.qos);
+            } finally {
+                finish();
+            }
         };
         worker.onerror = function (e) {
-            expect(String(e && e.message ? e.message : e)).toBe("<no worker error>");
-            finish();
+            try {
+                expect(String(e && e.message ? e.message : e)).toBe("<no worker error>");
+            } finally {
+                finish();
+            }
         };
     };
 
@@ -90,6 +98,25 @@ describe("Worker platform options", function () {
         reportQos({ ios: null, iosPriority: "utility" }, done, function (qos) {
             expect(qos).toBe(NSQualityOfService.Utility);
         });
+    });
+
+    it("propagates the error thrown by an option getter", function () {
+        var boom = new Error("boom");
+        var options = new Proxy({}, {
+            get: function (target, key) {
+                if (key === "ios") {
+                    throw boom;
+                }
+                return undefined;
+            }
+        });
+        var thrown;
+        try {
+            new Worker(entry, options);
+        } catch (e) {
+            thrown = e;
+        }
+        expect(thrown).toBe(boom);
     });
 
     it("throws a TypeError when ios is not an object", function () {

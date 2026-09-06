@@ -48,24 +48,33 @@ bool MapPriorityName(const std::string& name, int& qos) {
   throw NativeScriptException(isolate, error, message);
 }
 
-// Returns the quality of service the caller asked for, or nullopt to leave the
-// worker thread at the operation queue's own default.
-std::optional<int> ParseQualityOfService(Isolate* isolate, Local<Context> context,
-                                         Local<Object> options) {
-  std::optional<int> qos;
+// Reads `key` from `object`. A false return means the getter threw: the
+// exception is already pending on the isolate and construction must stop
+// without running anything else on it.
+bool ReadOption(Isolate* isolate, Local<Context> context, Local<Object> object, const char* key,
+                Local<Value>& out) {
+  return object->Get(context, tns::ToV8String(isolate, key)).ToLocal(&out);
+}
 
+// Fills `qos` with the quality of service the caller asked for, or leaves it
+// empty for the operation queue's own default. Returns false when a getter
+// threw (see ReadOption).
+bool ParseQualityOfService(Isolate* isolate, Local<Context> context, Local<Object> options,
+                           std::optional<int>& qos) {
   Local<Value> iosVal;
-  if (options->Get(context, tns::ToV8String(isolate, "ios")).ToLocal(&iosVal) &&
-      !iosVal->IsNullOrUndefined()) {
+  if (!ReadOption(isolate, context, options, "ios", iosVal)) {
+    return false;
+  }
+  if (!iosVal->IsNullOrUndefined()) {
     if (!iosVal->IsObject()) {
       ThrowOptionTypeError(isolate, "Worker option \"ios\" must be an object.");
     }
 
     Local<Value> priorityVal;
-    if (iosVal.As<Object>()
-            ->Get(context, tns::ToV8String(isolate, "priority"))
-            .ToLocal(&priorityVal) &&
-        !priorityVal->IsUndefined()) {
+    if (!ReadOption(isolate, context, iosVal.As<Object>(), "priority", priorityVal)) {
+      return false;
+    }
+    if (!priorityVal->IsUndefined()) {
       int mapped;
       if (!IsString(priorityVal) || !MapPriorityName(ToString(isolate, priorityVal), mapped)) {
         ThrowOptionTypeError(isolate,
@@ -77,8 +86,10 @@ std::optional<int> ParseQualityOfService(Isolate* isolate, Local<Context> contex
   }
 
   Local<Value> legacyVal;
-  if (options->Get(context, tns::ToV8String(isolate, "iosPriority")).ToLocal(&legacyVal) &&
-      !legacyVal->IsUndefined()) {
+  if (!ReadOption(isolate, context, options, "iosPriority", legacyVal)) {
+    return false;
+  }
+  if (!legacyVal->IsUndefined()) {
     static std::once_flag warnedDeprecated;
     std::call_once(warnedDeprecated, []() {
       Log(@"NativeScript: the Worker option \"iosPriority\" is deprecated. Use "
@@ -93,7 +104,7 @@ std::optional<int> ParseQualityOfService(Isolate* isolate, Local<Context> contex
     }
   }
 
-  return qos;
+  return true;
 }
 
 }  // namespace
@@ -231,7 +242,9 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
 
     std::optional<int> qos;
     if (info.Length() >= 2 && info[1]->IsObject()) {
-      qos = ParseQualityOfService(isolate, context, info[1].As<Object>());
+      if (!ParseQualityOfService(isolate, context, info[1].As<Object>(), qos)) {
+        return;
+      }
     }
 
     WorkerWrapper* worker = new WorkerWrapper(isolate, Worker::OnMessageCallback);
