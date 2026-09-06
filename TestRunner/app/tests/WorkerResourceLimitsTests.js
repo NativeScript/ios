@@ -142,9 +142,11 @@ describe("Worker resourceLimits", function () {
         }).toThrowError(RangeError, /"resourceLimits\.jsDispatchTableSizeMb"/);
     });
 
-    // Enable once the prebuilt V8 carries the JS dispatch table reservation
-    // parameter; until then the option is rejected as unsupported.
-    xit("starts a worker under a jsDispatchTableSizeMb reservation", function (done) {
+    it("starts a worker under a jsDispatchTableSizeMb reservation", function (done) {
         expectStarts({ resourceLimits: { jsDispatchTableSizeMb: 64 } }, done);
+    });
+
+    it("starts a worker under the smallest jsDispatchTableSizeMb reservation", function (done) {
+        expectStarts({ resourceLimits: { jsDispatchTableSizeMb: 1 } }, done);
     });
 });
