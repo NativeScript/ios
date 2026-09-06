@@ -193,7 +193,9 @@ static void DestroyMainRuntime() {
           new v8_inspector::JsV8InspectorClient(runtime_);
       inspectorClient->init();
       inspectorClient->registerModules();
-      inspectorClient->connect([config ArgumentsCount], [config Arguments]);
+      // A nil Arguments array carries no inspector flags, whatever ArgumentsCount says.
+      inspectorClient->connect(config.Arguments != nullptr ? config.ArgumentsCount : 0,
+                               config.Arguments);
       Console::AttachInspectorClient(inspectorClient);
     }
   }
