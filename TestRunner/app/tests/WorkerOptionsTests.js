@@ -1,0 +1,93 @@
+describe("Worker platform options", function () {
+    var entry = "./workerOptions/qosWorker.js";
+
+    // Jasmine arms a spec's async timeout before calling it, so the interval
+    // has to be raised ahead of the spec, not inside it.
+    var originalTimeout;
+    beforeEach(function () {
+        originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
+    });
+    afterEach(function () {
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+    });
+
+    var reportQos = function (options, done, check) {
+        var worker = options === undefined ? new Worker(entry) : new Worker(entry, options);
+        var settled = false;
+        var finish = function () {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            worker.terminate();
+            done();
+        };
+        worker.onmessage = function (msg) {
+            check(msg.data.qos);
+            finish();
+        };
+        worker.onerror = function (e) {
+            expect(String(e && e.message ? e.message : e)).toBe("<no worker error>");
+            finish();
+        };
+    };
+
+    var priorities = [
+        ["userInteractive", NSQualityOfService.UserInteractive],
+        ["userInitiated", NSQualityOfService.UserInitiated],
+        ["default", NSQualityOfService.Default],
+        ["utility", NSQualityOfService.Utility],
+        ["background", NSQualityOfService.Background]
+    ];
+
+    priorities.forEach(function (pair) {
+        it("runs the worker thread at " + pair[0] + " quality of service", function (done) {
+            reportQos({ ios: { priority: pair[0] } }, done, function (qos) {
+                expect(qos).toBe(pair[1]);
+            });
+        });
+    });
+
+    it("still honors the deprecated iosPriority option", function (done) {
+        reportQos({ iosPriority: "utility" }, done, function (qos) {
+            expect(qos).toBe(NSQualityOfService.Utility);
+        });
+    });
+
+    it("prefers ios.priority over iosPriority when both are given", function (done) {
+        reportQos({ ios: { priority: "userInteractive" }, iosPriority: "background" }, done, function (qos) {
+            expect(qos).toBe(NSQualityOfService.UserInteractive);
+        });
+    });
+
+    it("ignores unknown keys inside ios", function (done) {
+        reportQos({ ios: { priority: "utility", somethingElse: 42 } }, done, function (qos) {
+            expect(qos).toBe(NSQualityOfService.Utility);
+        });
+    });
+
+    it("starts a worker given no options at all", function (done) {
+        reportQos(undefined, done, function (qos) {
+            expect(typeof qos).toBe("number");
+        });
+    });
+
+    it("throws a TypeError when ios is not an object", function () {
+        expect(function () {
+            new Worker(entry, { ios: 42 });
+        }).toThrowError(TypeError, /"ios"/);
+    });
+
+    it("throws a TypeError for an unknown ios.priority", function () {
+        expect(function () {
+            new Worker(entry, { ios: { priority: "highest" } });
+        }).toThrowError(TypeError, /"ios\.priority"/);
+    });
+
+    it("throws a TypeError for a non-string ios.priority", function () {
+        expect(function () {
+            new Worker(entry, { ios: { priority: 3 } });
+        }).toThrowError(TypeError, /"ios\.priority"/);
+    });
+});

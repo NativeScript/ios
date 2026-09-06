@@ -73,7 +73,7 @@ void WorkerWrapper::PostMessage(std::shared_ptr<worker::Message> message) {
 }
 
 void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker,
-                          std::function<Isolate*()> func, int qualityOfService) {
+                          std::function<Isolate*()> func, std::optional<int> qualityOfService) {
   this->poWorker_ = poWorker;
   this->workerId_ = nextId_.fetch_add(1, std::memory_order_relaxed) + 1;
 
@@ -81,8 +81,8 @@ void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker,
     this->BackgroundLooper(func);
   }];
 
-  if (qualityOfService >= 0) {
-    op.qualityOfService = static_cast<NSQualityOfService>(qualityOfService);
+  if (qualityOfService.has_value()) {
+    op.qualityOfService = static_cast<NSQualityOfService>(*qualityOfService);
   }
 
   [workers_ addOperation:op];

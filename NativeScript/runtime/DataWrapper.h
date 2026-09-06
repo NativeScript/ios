@@ -5,6 +5,7 @@
 
 #include <functional>
 #include <mutex>
+#include <optional>
 #include <thread>
 
 #include "Common.h"
@@ -548,7 +549,8 @@ class WorkerWrapper : public BaseDataWrapper {
   void DestroyInspector();
 
   void Start(std::shared_ptr<v8::Persistent<v8::Value>> poWorker,
-             std::function<v8::Isolate*()> func, int qualityOfService = -1);
+             std::function<v8::Isolate*()> func,
+             std::optional<int> qualityOfService = std::nullopt);
   void CallOnErrorHandlers(v8::TryCatch& tc);
   // Reports a rejected entry-evaluation promise. A rejection carries a reason
   // rather than a TryCatch, so it cannot go through CallOnErrorHandlers, but it

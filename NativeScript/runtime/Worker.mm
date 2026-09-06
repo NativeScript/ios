@@ -1,6 +1,8 @@
 #include "Worker.h"
 #include <pthread.h>
 #include <functional>
+#include <mutex>
+#include <optional>
 #include "Caches.h"
 #include "Constants.h"
 #include "Helpers.h"
@@ -16,6 +18,85 @@ using namespace v8;
 namespace tns {
 
 std::vector<std::string> Worker::GlobalFunctions = {"postMessage", "close"};
+
+namespace {
+
+// The five names below are the whole public priority surface; anything else is
+// a caller error under `ios.priority` and ignored under the deprecated
+// `iosPriority`.
+bool MapPriorityName(const std::string& name, int& qos) {
+  if (name == "userInteractive") {
+    qos = NSQualityOfServiceUserInteractive;
+  } else if (name == "userInitiated") {
+    qos = NSQualityOfServiceUserInitiated;
+  } else if (name == "default") {
+    qos = NSQualityOfServiceDefault;
+  } else if (name == "utility") {
+    qos = NSQualityOfServiceUtility;
+  } else if (name == "background") {
+    qos = NSQualityOfServiceBackground;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+// Carries a real TypeError instance so `catch (e) { e instanceof TypeError }`
+// holds in JS; the constructor's catch block rethrows it unchanged.
+[[noreturn]] void ThrowOptionTypeError(Isolate* isolate, const std::string& message) {
+  Local<Value> error = Exception::TypeError(tns::ToV8String(isolate, message));
+  throw NativeScriptException(isolate, error, message);
+}
+
+// Returns the quality of service the caller asked for, or nullopt to leave the
+// worker thread at the operation queue's own default.
+std::optional<int> ParseQualityOfService(Isolate* isolate, Local<Context> context,
+                                         Local<Object> options) {
+  std::optional<int> qos;
+
+  Local<Value> iosVal;
+  if (options->Get(context, tns::ToV8String(isolate, "ios")).ToLocal(&iosVal) &&
+      !iosVal->IsUndefined()) {
+    if (!iosVal->IsObject()) {
+      ThrowOptionTypeError(isolate, "Worker option \"ios\" must be an object.");
+    }
+
+    Local<Value> priorityVal;
+    if (iosVal.As<Object>()
+            ->Get(context, tns::ToV8String(isolate, "priority"))
+            .ToLocal(&priorityVal) &&
+        !priorityVal->IsUndefined()) {
+      int mapped;
+      if (!IsString(priorityVal) || !MapPriorityName(ToString(isolate, priorityVal), mapped)) {
+        ThrowOptionTypeError(isolate,
+                             "Worker option \"ios.priority\" must be one of \"userInteractive\", "
+                             "\"userInitiated\", \"default\", \"utility\" or \"background\".");
+      }
+      qos = mapped;
+    }
+  }
+
+  Local<Value> legacyVal;
+  if (options->Get(context, tns::ToV8String(isolate, "iosPriority")).ToLocal(&legacyVal) &&
+      !legacyVal->IsUndefined()) {
+    static std::once_flag warnedDeprecated;
+    std::call_once(warnedDeprecated, []() {
+      Log(@"NativeScript: the Worker option \"iosPriority\" is deprecated. Use "
+          @"\"ios\": { \"priority\": ... } instead.");
+    });
+
+    int mapped;
+    // Lenient by contract: an unusable legacy value is ignored, never fatal.
+    if (!qos.has_value() && IsString(legacyVal) &&
+        MapPriorityName(ToString(isolate, legacyVal), mapped)) {
+      qos = mapped;
+    }
+  }
+
+  return qos;
+}
+
+}  // namespace
 
 void Worker::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
   Worker::Init(isolate, globalTemplate, Caches::Get(isolate)->isWorker);
@@ -148,25 +229,9 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       }
     }
 
-    int qos = -1;
+    std::optional<int> qos;
     if (info.Length() >= 2 && info[1]->IsObject()) {
-      Local<Object> options = info[1].As<Object>();
-      Local<Value> iosPriorityVal;
-      if (options->Get(context, tns::ToV8String(isolate, "iosPriority")).ToLocal(&iosPriorityVal) &&
-          IsString(iosPriorityVal)) {
-        std::string priority = ToString(isolate, iosPriorityVal);
-        if (priority == "userInteractive") {
-          qos = NSQualityOfServiceUserInteractive;
-        } else if (priority == "userInitiated") {
-          qos = NSQualityOfServiceUserInitiated;
-        } else if (priority == "default") {
-          qos = NSQualityOfServiceDefault;
-        } else if (priority == "utility") {
-          qos = NSQualityOfServiceUtility;
-        } else if (priority == "background") {
-          qos = NSQualityOfServiceBackground;
-        }
-      }
+      qos = ParseQualityOfService(isolate, context, info[1].As<Object>());
     }
 
     WorkerWrapper* worker = new WorkerWrapper(isolate, Worker::OnMessageCallback);
