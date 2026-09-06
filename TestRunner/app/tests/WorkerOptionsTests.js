@@ -2,11 +2,13 @@ describe("Worker platform options", function () {
     var entry = "./workerOptions/qosWorker.js";
 
     // Jasmine arms a spec's async timeout before calling it, so the interval
-    // has to be raised ahead of the spec, not inside it.
+    // has to be raised ahead of the spec, not inside it. A utility or
+    // background thread boots a whole isolate under throttled CPU and I/O, and
+    // on a contended CI host that alone has taken over 30 s.
     var originalTimeout;
     beforeEach(function () {
         originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 120000;
     });
     afterEach(function () {
         jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
