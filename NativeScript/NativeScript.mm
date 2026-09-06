@@ -45,9 +45,11 @@ extern char defaultStartOfMetadataSection __asm("section$start$__DATA$__TNSMetad
 // A dying process needs no teardown; shutdownRuntime is the deliberate path.
 Runtime* runtime_ = nullptr;
 
+// Cleared before ~Runtime runs so no caller sees a runtime mid-destruction.
 static void DestroyMainRuntime() {
-  delete runtime_;
+  Runtime* runtime = runtime_;
   runtime_ = nullptr;
+  delete runtime;
 }
 
 - (void)runMainApplication {
