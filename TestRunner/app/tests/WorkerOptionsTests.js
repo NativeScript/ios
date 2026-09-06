@@ -73,6 +73,12 @@ describe("Worker platform options", function () {
         });
     });
 
+    it("treats ios: null like an absent ios", function (done) {
+        reportQos({ ios: null, iosPriority: "background" }, done, function (qos) {
+            expect(qos).toBe(NSQualityOfService.Background);
+        });
+    });
+
     it("throws a TypeError when ios is not an object", function () {
         expect(function () {
             new Worker(entry, { ios: 42 });

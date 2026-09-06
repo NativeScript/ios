@@ -56,7 +56,7 @@ std::optional<int> ParseQualityOfService(Isolate* isolate, Local<Context> contex
 
   Local<Value> iosVal;
   if (options->Get(context, tns::ToV8String(isolate, "ios")).ToLocal(&iosVal) &&
-      !iosVal->IsUndefined()) {
+      !iosVal->IsNullOrUndefined()) {
     if (!iosVal->IsObject()) {
       ThrowOptionTypeError(isolate, "Worker option \"ios\" must be an object.");
     }
