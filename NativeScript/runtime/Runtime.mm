@@ -285,11 +285,12 @@ Runtime::~Runtime() {
     IsolateTracked::SweepAll(isolate_);
 
     if (IsRuntimeWorker()) {
-      auto currentWorker =
-          static_cast<WorkerWrapper*>(Caches::Workers->Get(this->workerId_)->UserData());
+      std::shared_ptr<Caches::WorkerState> workerState = Caches::Workers->Get(this->workerId_);
+      WorkerWrapper* currentWorker =
+          workerState == nullptr ? nullptr : static_cast<WorkerWrapper*>(workerState->UserData());
       Caches::Workers->Remove(this->workerId_);
       // if the parent isolate is dead then deleting the wrapper is our responsibility
-      if (currentWorker->IsWeak()) {
+      if (currentWorker != nullptr && currentWorker->IsWeak()) {
         delete currentWorker;
       }
     }

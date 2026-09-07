@@ -54,7 +54,8 @@ WorkerWrapper::WorkerWrapper(
       isDisposed_(false),
       isWeak_(false),
       messagesEnabled_(false),
-      onMessage_(onMessage) {}
+      onMessage_(onMessage),
+      workerId_(nextId_.fetch_add(1, std::memory_order_relaxed) + 1) {}
 
 const WrapperType WorkerWrapper::Type() { return WrapperType::Worker; }
 
@@ -75,7 +76,10 @@ void WorkerWrapper::PostMessage(std::shared_ptr<worker::Message> message) {
 void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker,
                           std::function<Isolate*()> func, std::optional<int> qualityOfService) {
   this->poWorker_ = poWorker;
-  this->workerId_ = nextId_.fetch_add(1, std::memory_order_relaxed) + 1;
+  // Set before the operation is queued: a worker that terminates inside its
+  // entry script clears this flag from its own thread, and a store made after
+  // queueing could land on top of that.
+  this->isRunning_ = true;
 
   NSBlockOperation* op = [NSBlockOperation blockOperationWithBlock:^{
     this->BackgroundLooper(func);
@@ -86,8 +90,6 @@ void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker,
   }
 
   [workers_ addOperation:op];
-
-  this->isRunning_ = true;
 }
 
 void WorkerWrapper::DrainPendingTasks() {

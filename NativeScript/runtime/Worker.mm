@@ -550,12 +550,15 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       return isolate;
     });
 
-    worker->Start(poWorker, func, qos);
-
+    // The registry entry has to exist before the worker can run: the worker
+    // removes it from its own thread when its runtime is deleted, and a worker
+    // that closes or hits its heap limit inside its entry script reaches that
+    // teardown without waiting for anyone.
     std::shared_ptr<Caches::WorkerState> state =
         std::make_shared<Caches::WorkerState>(isolate, poWorker, worker);
-    int workerId = worker->Id();
-    Caches::Workers->Insert(workerId, state);
+    Caches::Workers->Insert(worker->Id(), state);
+
+    worker->Start(poWorker, func, qos);
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
   }
