@@ -436,7 +436,9 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       TryCatch tc(isolate);
 
       // If the script can be determined missing up-front, report it through
-      // worker.onerror instead of running (and let the caller terminate us).
+      // worker.onerror instead of running, and stop the worker: there is
+      // nothing left for it to do, so it does not park in its runloop waiting
+      // for the parent to call terminate().
       if (!resolvedPath.empty() && resolvedPath[0] == '/' && !tns::Exists(resolvedPath.c_str())) {
         NSString* path = [NSString stringWithUTF8String:resolvedPath.c_str()];
         if (!tns::Exists([[path stringByAppendingPathExtension:@"js"] fileSystemRepresentation]) &&
@@ -444,6 +446,7 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
                 [[path stringByAppendingPathComponent:@"index.js"] fileSystemRepresentation])) {
           worker->PassUncaughtExceptionFromWorkerToMain(
               "Worker script does not exist: " + resolvedPath, resolvedPath, "", 1, true);
+          worker->Terminate();
           return isolate;
         }
       }
