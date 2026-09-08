@@ -93,3 +93,7 @@ NativeScript/inspector/absl/
 #AI agents
 .claude/*
 !.claude/settings.json
+
+NativeScript/lib/arm64-appletvos/
+NativeScript/lib/arm64-appletvsimulator/
+NativeScript/lib/.tvos-v8-version

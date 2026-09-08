@@ -31,6 +31,7 @@ BUILD_CATALYST=$(to_bool ${BUILD_CATALYST:=true})
 BUILD_IPHONE=$(to_bool ${BUILD_IPHONE:=true})
 BUILD_SIMULATOR=$(to_bool ${BUILD_SIMULATOR:=true})
 BUILD_VISION=$(to_bool ${BUILD_VISION:=true})
+BUILD_TVOS=$(to_bool ${BUILD_TVOS:=false})
 VERBOSE=$(to_bool ${VERBOSE:=false})
 
 for arg in $@; do
@@ -43,6 +44,8 @@ for arg in $@; do
     --no-iphone|--no-device) BUILD_IPHONE=false ;;
     --xr|--vision) BUILD_VISION=true ;;
     --no-xr|--no-vision) BUILD_VISION=false ;;
+    --tv|--tvos) BUILD_TVOS=true ;;
+    --no-tv|--no-tvos) BUILD_TVOS=false ;;
     --verbose|-v) VERBOSE=true ;;
     *) ;;
   esac
@@ -60,14 +63,14 @@ mkdir -p $DIST
 mkdir -p $DIST/intermediates
 
 checkpoint "Cleanup NativeScript"
-xcodebuild -project v8ios.xcodeproj \
+xcodebuild SYMROOT="$DIST/build" -project v8ios.xcodeproj \
            -target "NativeScript" \
            -configuration Release clean \
            $QUIET
 
 if $BUILD_CATALYST; then
 checkpoint "Building NativeScript for Mac Catalyst"
-xcodebuild archive -project v8ios.xcodeproj \
+xcodebuild archive -derivedDataPath "$DIST/DerivedData" -project v8ios.xcodeproj \
                    -scheme "NativeScript" \
                    -configuration Release \
                    -destination "platform=macOS,variant=Mac Catalyst" \
@@ -81,7 +84,7 @@ fi
 
 if $BUILD_SIMULATOR; then
 checkpoint "Building NativeScript for iphone simulators (multi-arch)"
-xcodebuild archive -project v8ios.xcodeproj \
+xcodebuild archive -derivedDataPath "$DIST/DerivedData" -project v8ios.xcodeproj \
                    -scheme "NativeScript" \
                    -configuration Release \
                    -destination "generic/platform=iOS Simulator" \
@@ -96,7 +99,7 @@ fi
 
 if $BUILD_IPHONE; then
 checkpoint "Building NativeScript for ARM64 device"
-xcodebuild archive -project v8ios.xcodeproj \
+xcodebuild archive -derivedDataPath "$DIST/DerivedData" -project v8ios.xcodeproj \
                    -scheme "NativeScript" \
                    -configuration Release \
                    -destination "generic/platform=iOS" \
@@ -111,7 +114,7 @@ fi
 
 if $BUILD_CATALYST; then
 checkpoint "Building NativeScript for Mac Catalyst"
-xcodebuild archive -project v8ios.xcodeproj \
+xcodebuild archive -derivedDataPath "$DIST/DerivedData" -project v8ios.xcodeproj \
                    -scheme "NativeScript" \
                    -configuration Release \
                    -destination "generic/platform=macOS,variant=Mac Catalyst" \
@@ -125,7 +128,7 @@ fi
 if $BUILD_VISION; then
 
 checkpoint "Building NativeScript for visionOS Device"
-xcodebuild archive -project v8ios.xcodeproj \
+xcodebuild archive -derivedDataPath "$DIST/DerivedData" -project v8ios.xcodeproj \
                    -scheme "NativeScript" \
                    -configuration Release \
                    -destination "generic/platform=visionOS" \
@@ -138,7 +141,7 @@ xcodebuild archive -project v8ios.xcodeproj \
                    -archivePath $DIST/intermediates/NativeScript.xros.xcarchive
 
 checkpoint "Building NativeScript for visionOS Simulators"
-xcodebuild archive -project v8ios.xcodeproj \
+xcodebuild archive -derivedDataPath "$DIST/DerivedData" -project v8ios.xcodeproj \
                    -scheme "NativeScript" \
                    -configuration Release \
                    -destination "generic/platform=visionOS Simulator" \
@@ -149,6 +152,35 @@ xcodebuild archive -project v8ios.xcodeproj \
                    SKIP_INSTALL=NO \
                    BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
                    -archivePath $DIST/intermediates/NativeScript.xrsimulator.xcarchive
+fi
+
+if $BUILD_TVOS; then
+
+checkpoint "Building NativeScript for tvOS Device"
+xcodebuild archive -derivedDataPath "$DIST/DerivedData" -project v8ios.xcodeproj \
+                   -scheme "NativeScript" \
+                   -configuration Release \
+                   -destination "generic/platform=tvOS" \
+                   $QUIET \
+                   EXCLUDED_ARCHS="i386 x86_64" \
+                   VALID_ARCHS=arm64 \
+                   DEVELOPMENT_TEAM=$DEV_TEAM \
+                   SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+                   -archivePath $DIST/intermediates/NativeScript.appletvos.xcarchive
+
+checkpoint "Building NativeScript for tvOS Simulators"
+xcodebuild archive -derivedDataPath "$DIST/DerivedData" -project v8ios.xcodeproj \
+                   -scheme "NativeScript" \
+                   -configuration Release \
+                   -destination "generic/platform=tvOS Simulator" \
+                   $QUIET \
+                   EXCLUDED_ARCHS="i386 x86_64" \
+                   VALID_ARCHS=arm64 \
+                   DEVELOPMENT_TEAM=$DEV_TEAM \
+                   SKIP_INSTALL=NO \
+                   BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+                   -archivePath $DIST/intermediates/NativeScript.appletvsimulator.xcarchive
 fi
 
 XCFRAMEWORKS=()
@@ -172,6 +204,13 @@ if $BUILD_VISION; then
                   -debug-symbols "$DIST/intermediates/NativeScript.xros.xcarchive/dSYMs/NativeScript.framework.dSYM" )
   XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.xrsimulator.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
                   -debug-symbols "$DIST/intermediates/NativeScript.xrsimulator.xcarchive/dSYMs/NativeScript.framework.dSYM" )
+fi
+
+if $BUILD_TVOS; then
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.appletvos.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
+                  -debug-symbols "$DIST/intermediates/NativeScript.appletvos.xcarchive/dSYMs/NativeScript.framework.dSYM" )
+  XCFRAMEWORKS+=( -framework "$DIST/intermediates/NativeScript.appletvsimulator.xcarchive/Products/Library/Frameworks/NativeScript.framework" \
+                  -debug-symbols "$DIST/intermediates/NativeScript.appletvsimulator.xcarchive/dSYMs/NativeScript.framework.dSYM" )
 fi
 
 checkpoint "Creating NativeScript.xcframework"

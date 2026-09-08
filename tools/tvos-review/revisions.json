@@ -1,0 +1,38 @@
+{
+  "core": {
+    "url": "https://github.com/LorenzGit/NativeScript.git",
+    "rev": "df7776ba8a9a32900b4d1ac7c8718b3eaa3782d7"
+  },
+  "canvas": {
+    "url": "https://github.com/LorenzGit/canvas.git",
+    "rev": "1dffcabf119046d7bea2c402150be24f0982ff1a"
+  },
+  "cli": {
+    "url": "https://github.com/LorenzGit/nativescript-cli.git",
+    "rev": "56c3a3b0ea8df1ac1e347278ab866a5e7b1cc3b7"
+  },
+  "simulator": {
+    "url": "https://github.com/LorenzGit/ios-sim-portable.git",
+    "rev": "5543c967a620450766136597d8b14bab371f1efc"
+  },
+  "font-manager": {
+    "url": "https://github.com/LorenzGit/font-manager.git",
+    "rev": "44fdb034a64a91107ac0b8831bc9668e1f823475"
+  },
+  "rust-skia": {
+    "url": "https://github.com/LorenzGit/rust-skia.git",
+    "rev": "6dd40c1c5aff99fcc7d0f5f303bda460d6445230"
+  },
+  "v8-buildscripts": {
+    "url": "https://github.com/LorenzGit/v8-buildscripts.git",
+    "rev": "36a75935c032f8ce0715e05ef112a42350d8dce1"
+  },
+  "test-runner": {
+    "url": "https://github.com/LorenzGit/nativescript-unit-test-runner.git",
+    "rev": "a2934e4cfff0d32d099ee82870e430ecd5cc1b4e"
+  },
+  "depot_tools": {
+    "url": "https://chromium.googlesource.com/chromium/tools/depot_tools.git",
+    "rev": "2cea9cdd785391335d448773124631cb711225e2"
+  }
+}
