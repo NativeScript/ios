@@ -54,7 +54,8 @@ WorkerWrapper::WorkerWrapper(
       isDisposed_(false),
       isWeak_(false),
       messagesEnabled_(false),
-      onMessage_(onMessage) {}
+      onMessage_(onMessage),
+      workerId_(nextId_.fetch_add(1, std::memory_order_relaxed) + 1) {}
 
 const WrapperType WorkerWrapper::Type() { return WrapperType::Worker; }
 
@@ -75,7 +76,10 @@ void WorkerWrapper::PostMessage(std::shared_ptr<worker::Message> message) {
 void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker,
                           std::function<Isolate*()> func, std::optional<int> qualityOfService) {
   this->poWorker_ = poWorker;
-  this->workerId_ = nextId_.fetch_add(1, std::memory_order_relaxed) + 1;
+  // Set before the operation is queued: a worker that terminates inside its
+  // entry script clears this flag from its own thread, and a store made after
+  // queueing could land on top of that.
+  this->isRunning_ = true;
 
   NSBlockOperation* op = [NSBlockOperation blockOperationWithBlock:^{
     this->BackgroundLooper(func);
@@ -86,8 +90,6 @@ void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker,
   }
 
   [workers_ addOperation:op];
-
-  this->isRunning_ = true;
 }
 
 void WorkerWrapper::DrainPendingTasks() {
@@ -446,41 +448,7 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Local<Context> context
     }
   }
 
-  auto runtime = static_cast<Runtime*>(mainIsolate_->GetData(Constants::RUNTIME_SLOT));
-  if (runtime == nullptr) {
-    return;
-  }
-  PostToRuntimeLoop(
-      runtime,
-      [this, message, src, stackTrace, lineNumber]() {
-        v8::Locker locker(this->mainIsolate_);
-        Isolate::Scope isolate_scope(this->mainIsolate_);
-        HandleScope handle_scope(this->mainIsolate_);
-        Local<Object> worker = this->poWorker_->Get(this->mainIsolate_).As<Object>();
-        Local<Context> context = Caches::Get(this->mainIsolate_)->GetContext();
-
-        Local<Value> onErrorVal;
-        bool success = worker->Get(context, tns::ToV8String(this->mainIsolate_, "onerror"))
-                           .ToLocal(&onErrorVal);
-        tns::Assert(success, this->mainIsolate_);
-
-        if (!onErrorVal.IsEmpty() && onErrorVal->IsFunction()) {
-          Local<v8::Function> onErrorFunc = onErrorVal.As<v8::Function>();
-          Local<Object> arg =
-              this->ConstructErrorObject(context, message, src, stackTrace, lineNumber);
-          Local<Value> args[1] = {arg};
-          Local<Value> result;
-          TryCatch tc(this->mainIsolate_);
-          bool success = onErrorFunc->Call(context, v8::Undefined(this->mainIsolate_), 1, args)
-                             .ToLocal(&result);
-          if (!success && tc.HasCaught()) {
-            Local<Value> error = tc.Exception();
-            Log(@"%s", tns::ToString(this->mainIsolate_, error).c_str());
-            this->mainIsolate_->ThrowException(error);
-          }
-        }
-      },
-      async);
+  this->ForwardErrorPayloadToMain(message, src, stackTrace, lineNumber, async);
 }
 
 void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(const std::string& message,
@@ -507,33 +475,45 @@ void WorkerWrapper::ForwardErrorPayloadToMain(const std::string& message, const 
   if (runtime == nullptr) {
     return;
   }
+  // The task runs later, on the parent's loop, and this wrapper may be gone by
+  // then: a worker that reports and terminates is disposed on its own thread,
+  // after which the parent's finalizer deletes the wrapper as soon as the
+  // Worker object is collected. So the task captures what it needs by value.
+  // The shared_ptr keeps the persistent itself alive; an emptied handle means
+  // the Worker object is gone and there is nothing left to report to.
+  Isolate* mainIsolate = mainIsolate_;
+  std::shared_ptr<Persistent<Value>> poWorker = poWorker_;
   PostToRuntimeLoop(
       runtime,
-      [this, message, source, stackTrace, lineNumber]() {
-        v8::Locker locker(this->mainIsolate_);
-        Isolate::Scope isolate_scope(this->mainIsolate_);
-        HandleScope handle_scope(this->mainIsolate_);
-        Local<Context> context = Caches::Get(this->mainIsolate_)->GetContext();
-        Local<Object> worker = this->poWorker_->Get(this->mainIsolate_).As<Object>();
+      [mainIsolate, poWorker, message, source, stackTrace, lineNumber]() {
+        v8::Locker locker(mainIsolate);
+        Isolate::Scope isolate_scope(mainIsolate);
+        HandleScope handle_scope(mainIsolate);
+        Local<Context> context = Caches::Get(mainIsolate)->GetContext();
+        Local<Value> workerValue = poWorker->Get(mainIsolate);
+        if (workerValue.IsEmpty() || !workerValue->IsObject()) {
+          return;
+        }
+        Local<Object> worker = workerValue.As<Object>();
 
         Local<Value> onErrorVal;
-        bool success = worker->Get(context, tns::ToV8String(this->mainIsolate_, "onerror"))
-                           .ToLocal(&onErrorVal);
-        tns::Assert(success, this->mainIsolate_);
+        bool success =
+            worker->Get(context, tns::ToV8String(mainIsolate, "onerror")).ToLocal(&onErrorVal);
+        tns::Assert(success, mainIsolate);
 
         if (!onErrorVal.IsEmpty() && onErrorVal->IsFunction()) {
           Local<v8::Function> onErrorFunc = onErrorVal.As<v8::Function>();
           Local<Object> arg =
-              this->ConstructErrorObject(context, message, source, stackTrace, lineNumber);
+              ConstructErrorObject(context, message, source, stackTrace, lineNumber);
           Local<Value> args[1] = {arg};
           Local<Value> result;
-          TryCatch tc(this->mainIsolate_);
-          bool success = onErrorFunc->Call(context, v8::Undefined(this->mainIsolate_), 1, args)
-                             .ToLocal(&result);
+          TryCatch tc(mainIsolate);
+          bool success =
+              onErrorFunc->Call(context, v8::Undefined(mainIsolate), 1, args).ToLocal(&result);
           if (!success && tc.HasCaught()) {
             Local<Value> error = tc.Exception();
-            Log(@"%s", tns::ToString(this->mainIsolate_, error).c_str());
-            this->mainIsolate_->ThrowException(error);
+            Log(@"%s", tns::ToString(mainIsolate, error).c_str());
+            mainIsolate->ThrowException(error);
           }
         }
       },

@@ -436,7 +436,9 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       TryCatch tc(isolate);
 
       // If the script can be determined missing up-front, report it through
-      // worker.onerror instead of running (and let the caller terminate us).
+      // worker.onerror instead of running, and stop the worker: there is
+      // nothing left for it to do, so it does not park in its runloop waiting
+      // for the parent to call terminate().
       if (!resolvedPath.empty() && resolvedPath[0] == '/' && !tns::Exists(resolvedPath.c_str())) {
         NSString* path = [NSString stringWithUTF8String:resolvedPath.c_str()];
         if (!tns::Exists([[path stringByAppendingPathExtension:@"js"] fileSystemRepresentation]) &&
@@ -444,6 +446,7 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
                 [[path stringByAppendingPathComponent:@"index.js"] fileSystemRepresentation])) {
           worker->PassUncaughtExceptionFromWorkerToMain(
               "Worker script does not exist: " + resolvedPath, resolvedPath, "", 1, true);
+          worker->Terminate();
           return isolate;
         }
       }
@@ -547,12 +550,15 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       return isolate;
     });
 
-    worker->Start(poWorker, func, qos);
-
+    // The registry entry has to exist before the worker can run: the worker
+    // removes it from its own thread when its runtime is deleted, and a worker
+    // that closes or hits its heap limit inside its entry script reaches that
+    // teardown without waiting for anyone.
     std::shared_ptr<Caches::WorkerState> state =
         std::make_shared<Caches::WorkerState>(isolate, poWorker, worker);
-    int workerId = worker->Id();
-    Caches::Workers->Insert(workerId, state);
+    Caches::Workers->Insert(worker->Id(), state);
+
+    worker->Start(poWorker, func, qos);
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
   }
