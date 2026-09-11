@@ -240,9 +240,12 @@ default configuration reaches none of it.
 5. **Nested GC inside a finalizer callback.** Allocate heavily in the callback; confirm no
    double-invocation and no collection of the object under inspection.
 
-The runtime's existing GC tests are the acceptance gate for the patch as the runtime uses it,
-and they pass — in particular *"Worker instance should not be garbage collected if the worker
-thread is alive"*, which exercises the `WorkerWrapper` resurrection site directly.
+`TestRunner/app/tests/GCFinalizerTests.js` is the acceptance gate for the patch as the runtime
+uses it. The Worker wrapper no longer depends on resurrection: a running worker's JS object is a
+strong root until its thread ends (`WorkerWrapper::RootWorkerObject`), so the shared test
+*"Worker instance should not be garbage collected if the worker thread is alive"* passes through
+rooting and never reaches the resurrection branch — it must not be read as evidence that a
+re-ported patch works. ObjectManager's refuse-and-re-weaken branch remains only as a fallback.
 
 ## Upgrade cost
 
