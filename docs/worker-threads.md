@@ -234,11 +234,19 @@ a graph therefore leaves **every port and every buffer in the list exactly as
 it found them** — still open, still holding their memory — so a failed
 `postMessage` can be corrected and retried.
 
-The listed ports are re-checked after the write as well, because writing the
-graph runs user getters and one of them may have closed a listed port; that
-late failure is the same `MessagePort in transfer list is already detached`.
-What it undoes is the transfer — nothing is detached, nothing changes hands —
-not what the getters did on the way there: a port a getter closed stays closed.
+The listed ports and buffers are re-checked after the write as well, because
+writing the graph runs user getters and one of them may have closed a listed
+port or detached a listed buffer; those late failures are the same
+`MessagePort in transfer list is already detached` and `An ArrayBuffer in the
+transfer list is detached and cannot be transferred`. What they undo is the
+transfer — nothing is detached, nothing changes hands — not what the getters
+did on the way there: a port a getter closed stays closed.
+
+A listed port that the value itself never names still travels, but on arrival
+it has no way out: a `message` event hands it over in `event.ports`, while
+`structuredClone` and `receiveMessageOnPort` return only the value. Those two
+close such a port as soon as it arrives, so its sibling learns the channel is
+gone instead of queueing into a port nothing can ever read.
 
 ## Worker messages
 

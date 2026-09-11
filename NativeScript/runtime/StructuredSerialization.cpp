@@ -314,10 +314,11 @@ class DeserializerDelegate : public ValueDeserializer::Delegate {
   DeserializerDelegate(
       const std::vector<Local<SharedArrayBuffer>>* sharedBuffers,
       const std::vector<Local<Object>>* domExceptions,
-      const std::vector<Local<Object>>* ports)
+      const std::vector<Local<Object>>* ports, std::vector<bool>* portsRead)
       : sharedBuffers_(sharedBuffers),
         domExceptions_(domExceptions),
-        ports_(ports) {}
+        ports_(ports),
+        portsRead_(portsRead) {}
 
   void SetDeserializer(ValueDeserializer* deserializer) {
     deserializer_ = deserializer;
@@ -349,6 +350,7 @@ class DeserializerDelegate : public ValueDeserializer::Delegate {
         if (!deserializer_->ReadUint32(&index) || index >= ports_->size()) {
           return MaybeLocal<Object>();
         }
+        (*portsRead_)[index] = true;
         return (*ports_)[index];
       }
       default:
@@ -368,8 +370,27 @@ class DeserializerDelegate : public ValueDeserializer::Delegate {
   const std::vector<Local<SharedArrayBuffer>>* sharedBuffers_;
   const std::vector<Local<Object>>* domExceptions_;
   const std::vector<Local<Object>>* ports_;
+  std::vector<bool>* portsRead_;
   ValueDeserializer* deserializer_ = nullptr;
 };
+
+// Closes adopted ports that nothing will ever reach: a port lives in the
+// isolate's registry until it is closed, so one without a JS handle would be
+// pinned for the isolate's lifetime with its sibling queueing into it.
+void CloseUnreachablePorts(Isolate* isolate,
+                           const std::vector<Local<Object>>& ports,
+                           const std::vector<bool>* reachable) {
+  for (size_t i = 0; i < ports.size(); i++) {
+    if (reachable != nullptr && (*reachable)[i]) {
+      continue;
+    }
+    messaging::NativeMessagePort* port =
+        messaging::PortFromWrapper(isolate, ports[i]);
+    if (port != nullptr) {
+      port->Close();
+    }
+  }
+}
 
 // Validates the transfer list and splits it, each half in registration order,
 // because the two are handed over by different mechanisms: buffers by id in
@@ -512,13 +533,23 @@ Maybe<bool> SerializedValue::Serialize(Isolate* isolate, Local<Context> context,
   }
 
   // Revalidated after the write, not before it: writing the graph runs user
-  // getters, and one of them may have closed a listed port. Checked while
-  // nothing has changed hands yet, so a message that cannot be completed
-  // leaves every buffer and every port exactly as it found them.
+  // getters, and one of them may have closed a listed port or detached a
+  // listed buffer (V8 still writes such a buffer as a transfer, and detaching
+  // it again below would succeed on zero bytes). Checked while nothing has
+  // changed hands yet, so a message that cannot be completed leaves every
+  // buffer and every port exactly as it found them.
   for (const std::shared_ptr<messaging::NativeMessagePort>& port : ports) {
     if (port->IsDetached()) {
       ThrowDataCloneError(isolate,
                           "MessagePort in transfer list is already detached");
+      return Nothing<bool>();
+    }
+  }
+  for (const Local<ArrayBuffer>& buffer : transfers) {
+    if (buffer->WasDetached() || !buffer->IsDetachable()) {
+      ThrowDataCloneError(isolate,
+                          "An ArrayBuffer in the transfer list is detached "
+                          "and cannot be transferred");
       return Nothing<bool>();
     }
   }
@@ -641,6 +672,7 @@ MaybeLocal<Value> SerializedValue::Deserialize(Isolate* isolate,
                .ToLocal(&wrapper) ||
           !list->Set(context, static_cast<uint32_t>(i), wrapper)
                .FromMaybe(false)) {
+        CloseUnreachablePorts(isolate, ports, nullptr);
         return MaybeLocal<Value>();
       }
       ports.push_back(wrapper);
@@ -650,7 +682,9 @@ MaybeLocal<Value> SerializedValue::Deserialize(Isolate* isolate,
     }
   }
 
-  DeserializerDelegate delegate(&sharedBuffers, &domExceptions, &ports);
+  std::vector<bool> portsRead(ports.size(), false);
+  DeserializerDelegate delegate(&sharedBuffers, &domExceptions, &ports,
+                                &portsRead);
   ValueDeserializer deserializer(isolate, buffer_.get(), bufferSize_,
                                  &delegate);
   delegate.SetDeserializer(&deserializer);
@@ -661,12 +695,18 @@ MaybeLocal<Value> SerializedValue::Deserialize(Isolate* isolate,
         ArrayBuffer::New(isolate, std::move(transferredBuffers_[i])));
   }
 
-  if (deserializer.ReadHeader(context).IsNothing()) {
+  Local<Value> result;
+  if (deserializer.ReadHeader(context).IsNothing() ||
+      !deserializer.ReadValue(context).ToLocal(&result)) {
+    CloseUnreachablePorts(isolate, ports, nullptr);
     return MaybeLocal<Value>();
   }
-  Local<Value> result;
-  if (!deserializer.ReadValue(context).ToLocal(&result)) {
-    return MaybeLocal<Value>();
+  // A caller that takes no port list (structuredClone, receiveMessageOnPort)
+  // surfaces a transferred port only through the value itself; a listed port
+  // the graph never named has no other way out and is closed here, the way an
+  // unreferenced transferred port is collected on the web.
+  if (portList == nullptr) {
+    CloseUnreachablePorts(isolate, ports, &portsRead);
   }
   return result;
 }
