@@ -28,18 +28,22 @@ struct DomExceptionBrandState {
   bool anyInstances = false;
 };
 
-// Empty once teardown has begun — callers bail to their fallback.
-Local<Private> DomExceptionBrand(Isolate* isolate) {
-  auto* state = Caches::StateFor<DomExceptionBrandState>(isolate);
-  if (state == nullptr) {
-    return Local<Private>();
-  }
+Local<Private> BrandOf(Isolate* isolate, DomExceptionBrandState* state) {
   if (state->brand.IsEmpty()) {
     state->brand.Reset(
         isolate, Private::New(isolate, tns::ToV8String(
                                            isolate, "domExceptionCloneable")));
   }
   return state->brand.Get(isolate);
+}
+
+// Empty once teardown has begun — callers bail to their fallback.
+Local<Private> DomExceptionBrand(Isolate* isolate) {
+  auto* state = Caches::StateFor<DomExceptionBrandState>(isolate);
+  if (state == nullptr) {
+    return Local<Private>();
+  }
+  return BrandOf(isolate, state);
 }
 
 bool AnyDomExceptionInstances(Isolate* isolate) {
@@ -52,15 +56,16 @@ void MarkCloneableCallback(const FunctionCallbackInfo<Value>& info) {
   if (info.Length() < 1 || !info[0]->IsObject()) {
     return;
   }
-  Local<Private> brand = DomExceptionBrand(isolate);
-  if (brand.IsEmpty()) {
+  auto* state = Caches::StateFor<DomExceptionBrandState>(isolate);
+  if (state == nullptr) {
     return;
   }
+  Local<Private> brand = BrandOf(isolate, state);
   if (info[0]
           .As<Object>()
           ->SetPrivate(isolate->GetCurrentContext(), brand, v8::True(isolate))
           .FromMaybe(false)) {
-    Caches::StateFor<DomExceptionBrandState>(isolate)->anyInstances = true;
+    state->anyInstances = true;
   }
 }
 
@@ -164,8 +169,13 @@ class SerializerDelegate : public ValueSerializer::Delegate {
   }
 
   Maybe<bool> IsHostObject(Isolate* isolate, Local<Object> object) override {
-    // Only branded DOMException instances are claimed; native-backed wrappers
-    // keep reaching WriteHostObject through V8's embedder-field detection.
+    // Claiming custom host objects REPLACES V8's own embedder-field detection
+    // rather than adding to it, so anything with a native half has to be
+    // claimed here too — otherwise an ObjC wrapper would be written out as a
+    // plain object, silently losing the half that mattered.
+    if (object->InternalFieldCount() > 0) {
+      return Just(true);
+    }
     Local<Private> brand = DomExceptionBrand(isolate);
     if (brand.IsEmpty()) {
       return Just(false);
