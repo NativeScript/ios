@@ -164,7 +164,7 @@ void Interop::SetFFIParams(Local<Context> context, const TypeEncoding* typeEncod
     enc = enc->next();
     Local<Value> arg = args[i - initialParameterIndex];
     void* argBuffer = call->ArgumentBuffer(i);
-    Interop::WriteValue(context, enc, argBuffer, arg);
+    Interop::WriteValue(context, enc, argBuffer, arg, call);
   }
 }
 
@@ -252,7 +252,7 @@ void Interop::WriteTypeValue(Local<Context> context, BaseDataWrapper* typeWrappe
 }
 
 void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncoding, void* dest,
-                         Local<Value> arg) {
+                         Local<Value> arg, FFICall* callOwner) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   ExecuteWriteValueDebugValidationsIfInDebug(context, typeEncoding, dest, arg);
   ValueCache argHelper(arg);
@@ -429,17 +429,15 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
         tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
         const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
         StructInfo structInfo = FFICall::GetStructInfo(structMeta);
-        // TODO: How to free this?
-        // this is used when you have js obj and wants to pass the data as a struct ponter
-        // (MyStruct*) we create a new MyStruct with a snapshot of the jsObject and pass that in but
-        // when should we delete it? currently it's up to the function called to delete it we could
-        // delete after the function call, but if the fuction stores that then it's a memory leak we
-        // could also just store it as a wrapper in the object, binding it to the object lifecycle
-        // but that also means refactoring a lot of "if(wrapper == nullptr)" because essentially the
-        // wrapper should be treated as a nullptr, except when deating with
-        // StructDeclarationReference
+        // A plain JS object written into a MyStruct* slot is snapshotted into a fresh
+        // buffer. With an owner the callee only borrows it for the duration of the call.
+        // Without one (writes into an interop.Reference slot) the pointer is stored in
+        // memory that outlives any call, so the buffer must stay allocated.
         data = malloc(structInfo.FFIType()->size);
         Interop::InitializeStruct(context, data, structInfo.Fields(), arg);
+        if (callOwner != nullptr) {
+          callOwner->OwnBuffer(data);
+        }
       } else {
         if (wrapper == nullptr) {
           bool isArrayBuffer = false;
