@@ -254,31 +254,48 @@ class ParentPort extends EventTarget {
       throw new TypeError('The "listener" argument must be of type function');
     }
     const self = this;
-    const wrapper = function (event) {
+    const entry = { listener, wrapper: undefined };
+    // A once registration detaches its own entry, not whichever entry happens
+    // to hold the same listener: the same function may be on() and once() at
+    // the same time.
+    entry.wrapper = function (event) {
       if (once) {
-        self.#remove(type, listener);
+        self.#removeEntry(type, entry);
       }
       const arg = type === "message" || type === "messageerror" ? event.data : event;
       FunctionPrototypeCall(listener, self, arg);
     };
     const list = this.#wrappers[type] || (this.#wrappers[type] = []);
-    ArrayPrototypePush(list, { listener, wrapper });
-    FunctionPrototypeCall(addEventListener, this, type, wrapper);
+    ArrayPrototypePush(list, entry);
+    FunctionPrototypeCall(addEventListener, this, type, entry.wrapper);
     return this;
   }
 
+  // Node removes the most recently added registration of a listener.
   #remove(type, listener) {
     const list = this.#wrappers[type];
     if (list === undefined) {
       return;
     }
-    for (let i = 0; i < list.length; i++) {
+    for (let i = list.length - 1; i >= 0; i--) {
       if (list[i].listener === listener) {
-        FunctionPrototypeCall(removeEventListener, this, type, list[i].wrapper);
-        ArrayPrototypeSplice(list, i, 1);
+        this.#removeEntry(type, list[i]);
         return;
       }
     }
+  }
+
+  #removeEntry(type, entry) {
+    const list = this.#wrappers[type];
+    if (list === undefined) {
+      return;
+    }
+    const index = ArrayPrototypeIndexOf(list, entry);
+    if (index === -1) {
+      return;
+    }
+    ArrayPrototypeSplice(list, index, 1);
+    FunctionPrototypeCall(removeEventListener, this, type, entry.wrapper);
   }
 }
 
@@ -298,7 +315,7 @@ if (!isMainThread) {
     FunctionPrototypeCall(
       dispatchEvent,
       parentPort,
-      new (getMessageEvent())(event.type, { data: event.data })
+      new (getMessageEvent())(event.type, { data: event.data, ports: event.ports })
     );
   };
   FunctionPrototypeCall(addEventListener, globalEventTarget, "message", relay);

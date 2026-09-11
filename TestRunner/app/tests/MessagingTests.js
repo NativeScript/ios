@@ -150,6 +150,48 @@ describe("Messaging runtime edges", function () {
             worker.postMessage(2);
         });
 
+        it("lets the same listener be on() and once() at the same time", function (done) {
+            var worker = new wt.Worker("~/tests/messaging/parentPortOnceWorker.js");
+            var got = [];
+            worker.on("message", function (value) {
+                got.push(value);
+                if (got.length === 3) {
+                    setTimeout(function () {
+                        // Three messages: the once() registration fires only
+                        // for the first, the on() one for all three.
+                        expect(got).toEqual([1, 2, 3, 4]);
+                        worker.terminate();
+                        done();
+                    }, SETTLE);
+                }
+            });
+            worker.on("error", function (error) {
+                fail("worker error: " + error.message);
+                worker.terminate();
+                done();
+            });
+            worker.postMessage("a");
+            worker.postMessage("b");
+            worker.postMessage("c");
+        });
+
+        it("relays transferred ports to parentPort message events", function (done) {
+            var worker = new wt.Worker("~/tests/messaging/parentPortPortsWorker.js");
+            var channel = new MessageChannel();
+            worker.on("message", function (value) {
+                expect(value).toBe(1);
+                channel.port1.close();
+                worker.terminate();
+                done();
+            });
+            worker.on("error", function (error) {
+                fail("worker error: " + error.message);
+                worker.terminate();
+                done();
+            });
+            worker.postMessage(channel.port2, [channel.port2]);
+        });
+
         it("forwards the option bag to the runtime's Worker", function () {
             expect(function () {
                 new wt.Worker("~/tests/messaging/parentPortWorker.js", {

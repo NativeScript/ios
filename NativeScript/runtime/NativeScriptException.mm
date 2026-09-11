@@ -660,7 +660,10 @@ void PromiseRejectionTracker::Drain(Local<Context> context) {
                   Local<Value> forwarded = thrown.IsEmpty() ? reason : thrown;
                   std::string forwardedStack = stack;
                   if (!thrown.IsEmpty()) {
+                    // `stack` may be an accessor that throws; that only costs
+                    // the stack, never the forward.
                     forwardedStack = "";
+                    TryCatch stackTc(isolate_);
                     Local<Value> thrownStack;
                     if (thrown->IsObject() &&
                         thrown.As<Object>()
