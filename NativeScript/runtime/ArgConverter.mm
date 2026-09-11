@@ -306,6 +306,15 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
   {
     v8::Locker locker(isolate);
+    // Checked again with the isolate locked: a runtime being destroyed holds
+    // this lock while it removes its caches, so the check above can pass and
+    // the lock then be granted only once the context is gone. ~Runtime drops
+    // the isolate from the live registry before it takes the lock, which is
+    // what makes this second look reliable.
+    if (!data->isolateWrapper_.IsValid()) {
+      memset(retValue, 0, cif->rtype->size);
+      return;
+    }
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
     std::shared_ptr<Caches> cache = Caches::Get(isolate);

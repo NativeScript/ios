@@ -47,22 +47,26 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
             if (wrapper->isolateWrapper_.IsValid()) {
               Isolate* isolate = wrapper->isolateWrapper_.Isolate();
               v8::Locker locker(isolate);
-              Isolate::Scope isolate_scope(isolate);
-              HandleScope handle_scope(isolate);
-              Local<Value> callback = wrapper->callback_->Get(isolate);
-              if (!callback.IsEmpty() && callback->IsObject()) {
-                // The callback's slot is the cache's owner, so only a wrapper
-                // still sitting in it is ours to free.
-                if (tns::GetValue(isolate, callback) == blockWrapper) {
-                  tns::DeleteValue(isolate, callback);
-                } else {
-                  blockWrapper = nullptr;
+              // Re-checked under the lock: ~Runtime holds it while it tears the
+              // isolate's caches down, so the check above can predate that.
+              if (wrapper->isolateWrapper_.IsValid()) {
+                Isolate::Scope isolate_scope(isolate);
+                HandleScope handle_scope(isolate);
+                Local<Value> callback = wrapper->callback_->Get(isolate);
+                if (!callback.IsEmpty() && callback->IsObject()) {
+                  // The callback's slot is the cache's owner, so only a wrapper
+                  // still sitting in it is ours to free.
+                  if (tns::GetValue(isolate, callback) == blockWrapper) {
+                    tns::DeleteValue(isolate, callback);
+                  } else {
+                    blockWrapper = nullptr;
+                  }
                 }
+                // Unconditional: an already-detached callback still owns its
+                // node, and dropping the persistent without a reset would leave
+                // that node rooted forever.
+                wrapper->callback_->Reset();
               }
-              // Unconditional: an already-detached callback still owns its
-              // node, and dropping the persistent without a reset would leave
-              // that node rooted forever.
-              wrapper->callback_->Reset();
             }
             // Outside the isolate guard: once the isolate is gone the cache
             // slot is unreachable and nothing else can free the wrapper.
