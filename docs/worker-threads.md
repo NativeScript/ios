@@ -54,7 +54,7 @@ means deliberately unsupported.
 | `threadName` | shim | Always `undefined`. |
 | `workerData` | shim | Always `null` — see below. |
 | `parentPort` | shim | `null` on the main isolate. Inside a worker, a `MessagePort`-shaped `EventTarget` over the worker's existing parent channel: `postMessage` forwards to the global `postMessage`, `message`/`messageerror` are re-dispatched from the worker global scope, `start()` and `close()` are no-ops. It is **not** a real port: not transferable, no queue of its own. |
-| `Worker` | shim | A class over the runtime's global `Worker` with a small Node-style emitter (`on`/`once`/`off`/`removeListener`) for `message`, `messageerror`, `error`, `online` and `exit`. `postMessage(value, transfer)` and `terminate()` forward. `online` is emitted off a microtask after construction, not from the thread. `exit` (always code `0`) fires exactly once, whether the worker was terminated or ended by its own `close()`. Unsupported options throw a `TypeError` naming the option: `workerData`, `env`, `eval`, `transferList`, and `stdin`/`stdout`/`stderr` when explicitly truthy. |
+| `Worker` | shim | A class over the runtime's global `Worker` with a small Node-style emitter (`on`/`once`/`off`/`removeListener`) for `message`, `messageerror`, `error`, `online` and `exit`. `postMessage(value, transfer)` and `terminate()` forward. `online` is emitted off a microtask after construction, not from the thread. `exit` (always code `0`) fires exactly once, when the thread has ended, whether the worker was terminated or ended by its own `close()`; `terminate()` resolves at the same point. Unsupported options throw a `TypeError` naming the option: `workerData`, `env`, `eval`, `transferList`, and `stdin`/`stdout`/`stderr` when explicitly truthy. |
 | `postMessageToThread` | throws | `Error: postMessageToThread is not supported in this runtime`. |
 | `moveMessagePortToContext` | throws | `Error: moveMessagePortToContext is not supported in this runtime`. |
 | `locks` | absent | Web Locks are not implemented; the property does not exist. |
@@ -72,12 +72,16 @@ Values are cloned on the way in and deserialized fresh on each read, so
 mutating the object you passed does not reach a reader, and two readers never
 share one object.
 
-### `exit` always carries code `0`
+### `exit` fires when the thread has ended, always with code `0`
 
-Node reports the thread's exit code; this runtime has none to report, so `exit`
-is emitted with `0` from both paths that end a worker — `terminate()` (whose
-promise also resolves with `0`) and the worker's own `close()`. Whichever the
-worker took, `exit` fires exactly once.
+`exit` is emitted once, from the runtime's end-of-worker notification, so every
+`message` and `error` the worker produced before it ended has been delivered
+first. Node reports the thread's exit code; this runtime has none to report, so
+the code is `0` whichever way the worker ended — `terminate()`, its own
+`close()`, an uncaught error, a missing entry or its heap limit. `terminate()`
+resolves with `0` at the same moment `exit` fires. A parent that is itself
+tearing down never delivers the notification, so a `terminate()` awaited from a
+dying isolate stays pending, as it does in Node when the parent process exits.
 
 ### A worker error carries no `error` object, and the worker scope's `onerror` is not an event
 

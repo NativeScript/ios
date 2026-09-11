@@ -204,16 +204,26 @@ describe("node:worker_threads Worker exit", function () {
         }, 800);
     });
 
-    it("emits 'exit' once on terminate()", function (done) {
+    it("emits 'exit' once on terminate(), after the thread ended, and resolves then", function (done) {
         const worker = new wt.Worker("~/tests/eventLoopEchoWorker.js");
         const codes = [];
         worker.on("exit", function (code) { codes.push(code); });
 
         setTimeout(function () {
-            worker.terminate();
-            setTimeout(function () {
+            let resolved = null;
+            worker.terminate().then(function (code) {
+                resolved = code;
+                // 'exit' precedes the promise settling.
                 expect(codes).toEqual([0]);
-                done();
+            });
+            setTimeout(function () {
+                expect(resolved).toBe(0);
+                expect(codes).toEqual([0]);
+                worker.terminate().then(function (code) {
+                    expect(code).toBe(0);
+                    expect(codes).toEqual([0]);
+                    done();
+                });
             }, 800);
         }, 150);
     });
