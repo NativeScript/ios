@@ -25,11 +25,8 @@ __attribute__((constructor)) void staticInitMethod() {
 // Posts to the target runtime's internal lane from the worker thread. When
 // async is false, blocks until the entry ran - or until it is destroyed
 // unrun by a shutdown that raced the post, which must release the waiter too.
-static void PostToRuntimeLoop(Runtime* runtime, std::function<void()> fn, bool async) {
-  auto loop = runtime->GetEventLoop();
-  if (loop == nullptr) {
-    return;
-  }
+static void PostToLoop(const std::shared_ptr<EventLoop>& loop, std::function<void()> fn,
+                       bool async) {
   if (async) {
     loop->PostInternal(std::move(fn));
     return;
@@ -58,6 +55,7 @@ WorkerWrapper::WorkerWrapper(
       isWeak_(false),
       messagesEnabled_(false),
       onMessage_(onMessage),
+      mainLoop_(Runtime::GetRuntime(mainIsolate)->GetEventLoop()),
       workerId_(nextId_.fetch_add(1, std::memory_order_relaxed) + 1),
       selfRef_(std::make_shared<std::atomic<WorkerWrapper*>>(this)) {}
 
@@ -202,14 +200,14 @@ void WorkerWrapper::DrainPendingTasks() {
 // may already be gone by the time the parent's loop gets here -- and, when the
 // parent is shutting down, the post is dropped and the parent's teardown
 // cascade owns disposal instead.
-static void PostThreadEndedNotification(Isolate* mainIsolate,
+static void PostThreadEndedNotification(Isolate* mainIsolate, std::weak_ptr<EventLoop> mainLoop,
                                         std::shared_ptr<std::atomic<WorkerWrapper*>> selfRef) {
-  auto runtime = static_cast<Runtime*>(mainIsolate->GetData(Constants::RUNTIME_SLOT));
-  if (runtime == nullptr) {
+  std::shared_ptr<EventLoop> loop = mainLoop.lock();
+  if (loop == nullptr) {
     return;
   }
-  PostToRuntimeLoop(
-      runtime,
+  PostToLoop(
+      loop,
       [mainIsolate, selfRef]() {
         v8::Locker locker(mainIsolate);
         Isolate::Scope isolate_scope(mainIsolate);
@@ -257,13 +255,15 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
     this->heapLimitIsolate_ = nullptr;
   }
 
-  this->isDisposed_ = true;
-
-  // Read before the Runtime goes: its destructor deletes this wrapper when the
-  // parent isolate already tore down and handed ownership over, so nothing
-  // below may touch `this`.
+  // Everything needed below is read first: publishing isDisposed_ is the last
+  // permitted touch of `this`. From that store on, a parent that is tearing
+  // down may delete this wrapper concurrently, and ~Runtime deletes it on this
+  // thread when the parent already handed ownership over.
   Isolate* mainIsolate = this->mainIsolate_;
+  std::weak_ptr<EventLoop> mainLoop = this->mainLoop_;
   std::shared_ptr<std::atomic<WorkerWrapper*>> selfRef = this->selfRef_;
+  int workerId = this->workerId_;
+  this->isDisposed_ = true;
 
   Runtime* runtime = Runtime::GetCurrentRuntime();
   if (runtime != nullptr) {
@@ -271,7 +271,6 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
   } else {
     // Runtime was never created (worker terminated before initialization).
     // The runtime destructor normally handles this cleanup, so do it here.
-    int workerId = this->workerId_;
     bool found;
     auto state = Caches::Workers->Get(workerId, found);
     if (found) {
@@ -279,7 +278,7 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
     }
   }
 
-  PostThreadEndedNotification(mainIsolate, selfRef);
+  PostThreadEndedNotification(mainIsolate, mainLoop, selfRef);
 }
 
 void WorkerWrapper::EnableMessageQueue() {
@@ -558,8 +557,8 @@ void WorkerWrapper::PassUncaughtRejectionToMain(const std::string& message,
 void WorkerWrapper::ForwardErrorPayloadToMain(const std::string& message, const std::string& source,
                                               const std::string& stackTrace, int lineNumber,
                                               bool async) {
-  auto runtime = static_cast<Runtime*>(mainIsolate_->GetData(Constants::RUNTIME_SLOT));
-  if (runtime == nullptr) {
+  std::shared_ptr<EventLoop> loop = mainLoop_.lock();
+  if (loop == nullptr) {
     return;
   }
   // The task runs later, on the parent's loop, and this wrapper may be gone by
@@ -570,8 +569,8 @@ void WorkerWrapper::ForwardErrorPayloadToMain(const std::string& message, const 
   // the Worker object is gone and there is nothing left to report to.
   Isolate* mainIsolate = mainIsolate_;
   std::shared_ptr<Persistent<Value>> poWorker = poWorker_;
-  PostToRuntimeLoop(
-      runtime,
+  PostToLoop(
+      loop,
       [mainIsolate, poWorker, message, source, stackTrace, lineNumber]() {
         v8::Locker locker(mainIsolate);
         Isolate::Scope isolate_scope(mainIsolate);

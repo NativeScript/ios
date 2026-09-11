@@ -21,6 +21,7 @@ namespace tns {
 
 class PrimitiveDataWrapper;
 struct ObjectWeakCallbackState;
+class EventLoop;
 
 enum class WrapperType {
   Base = 1 << 0,
@@ -620,6 +621,8 @@ class WorkerWrapper : public BaseDataWrapper {
   const bool IsClosing();
   const int WorkerId();
   const inline v8::Isolate* GetMainIsolate() { return mainIsolate_; }
+  // The only route from the worker thread to the parent: see mainLoop_.
+  std::weak_ptr<EventLoop> MainLoop() const { return mainLoop_; }
   const inline v8::Isolate* GetWorkerIsolate() { return workerIsolate_; }
   const inline void MakeWeak() { isWeak_ = true; }
   const inline bool IsWeak() { return isWeak_; }
@@ -639,6 +642,12 @@ class WorkerWrapper : public BaseDataWrapper {
                      std::shared_ptr<worker::Message>)>
       onMessage_;
   std::shared_ptr<v8::Persistent<v8::Value>> poWorker_;
+  // The parent's event loop, taken on the parent's thread at construction.
+  // Every worker-thread post to the parent goes through it and never through
+  // the parent isolate: the parent runtime may be mid-teardown or its isolate
+  // already disposed when the post runs, whereas a loop that has shut down
+  // drops the post, and an expired pointer means the parent is gone entirely.
+  std::weak_ptr<EventLoop> mainLoop_;
   ConcurrentQueue queue_;
   static std::atomic<int> nextId_;
   int workerId_;

@@ -636,8 +636,8 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
     // Resolved before anything is serialized: serializing a transfer list
     // detaches the caller's buffers, so bailing out afterwards would destroy
     // their contents without ever delivering the message.
-    auto runtime = static_cast<Runtime*>(state->GetIsolate()->GetData(Constants::RUNTIME_SLOT));
-    if (runtime == nullptr) {
+    std::shared_ptr<EventLoop> mainLoop = worker->MainLoop().lock();
+    if (mainLoop == nullptr) {
       return;
     }
 
@@ -653,7 +653,7 @@ void Worker::PostMessageToMainCallback(const FunctionCallbackInfo<Value>& info) 
       return;
     }
 
-    runtime->GetEventLoop()->PostInternal([state, message]() {
+    mainLoop->PostInternal([state, message]() {
       Isolate* isolate = state->GetIsolate();
       v8::Locker locker(isolate);
       Isolate::Scope isolate_scope(isolate);
