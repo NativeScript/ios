@@ -604,8 +604,8 @@ class WorkerWrapper : public BaseDataWrapper {
   // ends, so a running worker is reachable the way a browser's is rather than
   // depending on its finalizer to keep it. Both of these run on the main
   // isolate's thread only -- they re-arm that isolate's global handle -- and
-  // the unroot is idempotent, since terminate() and the thread-exit
-  // notification can both reach it.
+  // the unroot is idempotent, so an end reached by more than one path re-arms
+  // the finalizer once.
   void RootWorkerObject();
   void UnrootWorkerObject();
   // Dispatches the end-of-worker event and unroots. Main isolate's thread,
