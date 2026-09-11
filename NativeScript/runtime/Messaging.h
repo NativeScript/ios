@@ -181,11 +181,6 @@ bool IsPortWrapper(v8::Isolate* isolate, v8::Local<v8::Object> object);
 v8::MaybeLocal<v8::Object> AdoptPort(v8::Local<v8::Context> context,
                                      std::unique_ptr<PortData> data);
 
-// Whether this isolate has ever created a port or stamped a transfer brand.
-// Gates the serializer's host-object claim: until one of those happens, no
-// value in this isolate can need the messaging hooks.
-bool AnyPortsOrBrands(v8::Isolate* isolate);
-
 // The markAsUntransferable / markAsUncloneable brands. Both answer Just(false)
 // without creating anything when this isolate has never stamped one.
 v8::Maybe<bool> IsMarkedUntransferable(v8::Isolate* isolate,

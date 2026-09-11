@@ -44,7 +44,6 @@ struct MessagingState {
   // plain object in every graph. An isolate that has neither created a port
   // nor stamped a brand cannot be holding either, so it keeps serializing on
   // the cheap path.
-  bool claimHostObjects = false;
 };
 
 // The isolate's Caches is invalidated long before ~Runtime reaches the point
@@ -181,12 +180,8 @@ void StampBrand(const FunctionCallbackInfo<Value>& info,
   if (brand.IsEmpty()) {
     return;
   }
-  if (info[0]
-          .As<Object>()
-          ->SetPrivate(isolate->GetCurrentContext(), brand, v8::True(isolate))
-          .FromMaybe(false)) {
-    State(isolate)->claimHostObjects = true;
-  }
+  (void)info[0].As<Object>()->SetPrivate(isolate->GetCurrentContext(), brand,
+                                         v8::True(isolate));
 }
 
 }  // namespace
@@ -411,7 +406,6 @@ std::shared_ptr<NativeMessagePort> NativeMessagePort::New(
   wrapper->SetAlignedPointerInInternalField(0, port.get(),
                                             v8::kEmbedderDataTypeTagDefault);
   state->livePorts.insert(port);
-  state->claimHostObjects = true;
 
   if (data != nullptr) {
     port->data_ = std::move(data);
@@ -744,11 +738,6 @@ MaybeLocal<Object> AdoptPort(Local<Context> context,
     return MaybeLocal<Object>();
   }
   return port->Wrapper(v8::Isolate::GetCurrent());
-}
-
-bool AnyPortsOrBrands(Isolate* isolate) {
-  MessagingState* state = State(isolate);
-  return state != nullptr && state->claimHostObjects;
 }
 
 Maybe<bool> IsMarkedUntransferable(Isolate* isolate, Local<Object> object) {
