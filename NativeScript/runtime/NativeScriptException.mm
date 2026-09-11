@@ -541,9 +541,12 @@ void PromiseRejectionTracker::OnHandlerAdded(Local<Promise> promise) {
 
 // Gives a worker's global `onerror` a chance to handle a rejected reason,
 // mirroring WorkerWrapper::CallOnErrorHandlers. Returns true when the handler
-// signalled it consumed the error (truthy return).
-static bool GiveWorkerOnErrorAChance(Isolate* isolate, Local<Context> context,
-                                     Local<Value> reason) {
+// signalled it consumed the error (truthy return). A handler that throws
+// replaces the reason: `thrown` receives its exception, and the caller
+// forwards that instead of the original, the way the other worker error
+// paths do.
+static bool GiveWorkerOnErrorAChance(Isolate* isolate, Local<Context> context, Local<Value> reason,
+                                     Local<Value>* thrown) {
   Local<Object> global = context->Global();
   Local<Value> onErrorVal;
   if (!global->Get(context, tns::ToV8String(isolate, "onerror")).ToLocal(&onErrorVal)) {
@@ -558,7 +561,13 @@ static bool GiveWorkerOnErrorAChance(Isolate* isolate, Local<Context> context,
   Local<Value> result;
   TryCatch tc(isolate);
   bool success = onErrorFunc->Call(context, v8::Undefined(isolate), 1, args).ToLocal(&result);
-  return success && !result.IsEmpty() && result->BooleanValue(isolate);
+  if (!success) {
+    if (tc.HasCaught() && !tc.HasTerminated()) {
+      *thrown = tc.Exception();
+    }
+    return false;
+  }
+  return !result.IsEmpty() && result->BooleanValue(isolate);
 }
 
 void PromiseRejectionTracker::Drain(Local<Context> context) {
@@ -638,7 +647,8 @@ void PromiseRejectionTracker::Drain(Local<Context> context) {
         // through to the existing worker channel (worker-global onerror →
         // forward to the main isolate's worker.onerror).
         if (!ErrorEvents::DispatchUnhandledRejection(isolate_, promise, reason)) {
-          if (!GiveWorkerOnErrorAChance(isolate_, context, reason)) {
+          Local<Value> thrown;
+          if (!GiveWorkerOnErrorAChance(isolate_, context, reason, &thrown)) {
             Runtime* runtime = Runtime::GetRuntime(isolate_);
             if (runtime != nullptr) {
               int workerId = runtime->WorkerId();
@@ -647,8 +657,22 @@ void PromiseRejectionTracker::Drain(Local<Context> context) {
               if (found && state != nullptr) {
                 auto* worker = static_cast<WorkerWrapper*>(state->UserData());
                 if (worker != nullptr) {
-                  std::string reasonMessage = tns::ToString(isolate_, reason);
-                  worker->PassUncaughtRejectionToMain(reasonMessage, "Worker script", stack, 1);
+                  Local<Value> forwarded = thrown.IsEmpty() ? reason : thrown;
+                  std::string forwardedStack = stack;
+                  if (!thrown.IsEmpty()) {
+                    forwardedStack = "";
+                    Local<Value> thrownStack;
+                    if (thrown->IsObject() &&
+                        thrown.As<Object>()
+                            ->Get(context, tns::ToV8String(isolate_, "stack"))
+                            .ToLocal(&thrownStack) &&
+                        thrownStack->IsString()) {
+                      forwardedStack = tns::ToString(isolate_, thrownStack);
+                    }
+                  }
+                  std::string reasonMessage = tns::ToString(isolate_, forwarded);
+                  worker->PassUncaughtRejectionToMain(reasonMessage, "Worker script",
+                                                      forwardedStack, 1);
                 }
               }
             }
