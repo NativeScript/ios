@@ -150,8 +150,9 @@ Closing behaves as one channel-wide event:
   the event.)
 - The `close` event reaches a port that was never started. Enabling is about
   *messages*; a port whose sibling died always learns about it.
-- `close` orders behind whatever is already queued, on both ends — messages
-  already sent are still delivered first.
+- On the port being closed the event fires synchronously, inside `close()`.
+  On the sibling it orders behind whatever was already queued to it, so
+  messages already sent are still delivered first.
 - `postMessage` on a closed port is a **silent no-op**. It still serializes:
   the transfer list's side effects and its errors do not depend on delivery, so
   a bad transfer list throws and a good one detaches its buffers, and only then
@@ -169,8 +170,10 @@ Delivery follows HTML's port-enable rules rather than starting automatically:
   assignment, not the handler, that claims the listener slot.
 - It stops when the last `message` listener goes away, and messages queue again
   until one returns.
-- `port.start()` forces delivery on regardless, for code that only uses
-  `addEventListener` and wants control over when the queue drains.
+- `port.start()` enables delivery for code that only uses `addEventListener`
+  and wants control over when the queue drains. As in Node, it does not pin
+  the port on: removing the last `message` listener stops delivery again until
+  a listener returns or `start()` is called once more.
 - `receiveMessageOnPort(port)` bypasses all of it and pops one message
   synchronously.
 
