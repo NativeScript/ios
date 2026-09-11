@@ -685,13 +685,18 @@ MaybeLocal<Value> SerializedValue::Deserialize(Isolate* isolate,
     for (size_t i = 0; i < transferredPorts_.size(); i++) {
       Local<Object> wrapper;
       if (!messaging::AdoptPort(context, std::move(transferredPorts_[i]))
-               .ToLocal(&wrapper) ||
-          !list->Set(context, static_cast<uint32_t>(i), wrapper)
+               .ToLocal(&wrapper)) {
+        CloseUnreachablePorts(isolate, ports, nullptr);
+        return MaybeLocal<Value>();
+      }
+      // Recorded before anything else can fail: an adopted port that is not
+      // in this list would never be closed.
+      ports.push_back(wrapper);
+      if (!list->Set(context, static_cast<uint32_t>(i), wrapper)
                .FromMaybe(false)) {
         CloseUnreachablePorts(isolate, ports, nullptr);
         return MaybeLocal<Value>();
       }
-      ports.push_back(wrapper);
     }
     if (portList != nullptr) {
       *portList = list;

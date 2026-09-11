@@ -104,12 +104,13 @@ class WorkerEmitter {
     return this;
   }
 
+  // Node removes the most recently added registration of a listener.
   removeListener(type, listener) {
     const list = this.#listeners[`${type}`];
     if (list === undefined) {
       return this;
     }
-    for (let i = 0; i < list.length; i++) {
+    for (let i = list.length - 1; i >= 0; i--) {
       if (list[i].listener === listener) {
         ArrayPrototypeSplice(list, i, 1);
         return this;
