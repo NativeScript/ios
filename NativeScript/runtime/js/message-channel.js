@@ -173,6 +173,7 @@ class MessagePort extends EventTarget {
 
 defineEventHandler(MessagePort.prototype, "message");
 defineEventHandler(MessagePort.prototype, "messageerror");
+defineEventHandler(MessagePort.prototype, "close");
 
 ObjectDefineProperty(MessagePort.prototype, kHandlerAssigned, {
   __proto__: null,

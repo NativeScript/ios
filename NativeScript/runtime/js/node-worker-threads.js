@@ -62,6 +62,7 @@ const NativeWorker = g.Worker;
 const globalPostMessage = g.postMessage;
 
 const addEventListener = EventTarget.prototype.addEventListener;
+const removeEventListener = EventTarget.prototype.removeEventListener;
 const dispatchEvent = EventTarget.prototype.dispatchEvent;
 
 // Runs `fn` after the caller returns. Node reports 'online' and 'exit' from
@@ -163,7 +164,12 @@ class Worker extends WorkerEmitter {
       }
     }
 
-    const worker = new NativeWorker(`${filename}`);
+    // The runtime's own options (ios, resourceLimits) ride along; the native
+    // constructor ignores keys it does not know.
+    const worker =
+      options === undefined || options === null
+        ? new NativeWorker(`${filename}`)
+        : new NativeWorker(`${filename}`, options);
     this.#worker = worker;
     const self = this;
     worker.onmessage = function (event) {
@@ -208,6 +214,11 @@ ObjectDefineProperty(Worker.prototype, SymbolToStringTag, {
 // globals the runtime already provides. close() is a no-op — a worker ends
 // through its own close()/terminate().
 class ParentPort extends EventTarget {
+  // Node's parentPort is an EventEmitter as well: on("message") receives the
+  // payload, not the event. Each listener is registered through its own
+  // wrapper so removal by the original function still works.
+  #wrappers = ObjectCreate(null);
+
   postMessage(value, transfer) {
     FunctionPrototypeCall(globalPostMessage, g, value, transfer);
   }
@@ -215,6 +226,60 @@ class ParentPort extends EventTarget {
   start() {}
 
   close() {}
+
+  on(type, listener) {
+    return this.#add(`${type}`, listener, false);
+  }
+
+  addListener(type, listener) {
+    return this.#add(`${type}`, listener, false);
+  }
+
+  once(type, listener) {
+    return this.#add(`${type}`, listener, true);
+  }
+
+  off(type, listener) {
+    this.#remove(`${type}`, listener);
+    return this;
+  }
+
+  removeListener(type, listener) {
+    this.#remove(`${type}`, listener);
+    return this;
+  }
+
+  #add(type, listener, once) {
+    if (typeof listener !== "function") {
+      throw new TypeError('The "listener" argument must be of type function');
+    }
+    const self = this;
+    const wrapper = function (event) {
+      if (once) {
+        self.#remove(type, listener);
+      }
+      const arg = type === "message" || type === "messageerror" ? event.data : event;
+      FunctionPrototypeCall(listener, self, arg);
+    };
+    const list = this.#wrappers[type] || (this.#wrappers[type] = []);
+    ArrayPrototypePush(list, { listener, wrapper });
+    FunctionPrototypeCall(addEventListener, this, type, wrapper);
+    return this;
+  }
+
+  #remove(type, listener) {
+    const list = this.#wrappers[type];
+    if (list === undefined) {
+      return;
+    }
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].listener === listener) {
+        FunctionPrototypeCall(removeEventListener, this, type, list[i].wrapper);
+        ArrayPrototypeSplice(list, i, 1);
+        return;
+      }
+    }
+  }
 }
 
 defineEventHandler(ParentPort.prototype, "message");
