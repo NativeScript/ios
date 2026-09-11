@@ -218,3 +218,31 @@ describe("node:worker_threads Worker exit", function () {
         }, 150);
     });
 });
+
+describe("Worker teardown with a transferred port in flight", function () {
+    // The parent worker's loop still holds a message carrying a port whose
+    // sibling that worker owns; dropping it during shutdown posts the sibling's
+    // close sentinel back into the loop being shut down.
+    it("ends a terminated worker whose dropped message sentinels a port it owns", function (done) {
+        var worker = new Worker("./messaging/deadlockParent.js");
+        var ended = false;
+        worker.addEventListener("nsworkerended", function () { ended = true; });
+        worker.onerror = function (event) {
+            fail("worker error: " + event.message);
+            return true;
+        };
+        worker.onmessage = function (event) {
+            expect(event.data).toBe("ready");
+            worker.terminate();
+            var deadline = Date.now() + 5000;
+            (function poll() {
+                if (ended || Date.now() > deadline) {
+                    expect(ended).toBe(true);
+                    done();
+                    return;
+                }
+                setTimeout(poll, 50);
+            })();
+        };
+    });
+});
