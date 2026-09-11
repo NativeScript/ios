@@ -2,10 +2,13 @@
 #define ConcurrentQueue_h
 
 #include <CoreFoundation/CoreFoundation.h>
-#include <vector>
-#include <string>
-#include <queue>
+
+#include <atomic>
 #include <mutex>
+#include <queue>
+#include <string>
+#include <vector>
+
 #include "Message.hpp"
 
 namespace tns {
@@ -26,7 +29,7 @@ private:
     std::queue<std::shared_ptr<worker::Message>> messagesQueue_;
     CFRunLoopSourceRef runLoopTasksSource_ = nullptr;
     CFRunLoopRef runLoop_ = nullptr;
-    bool terminated = false;
+    std::atomic<bool> terminated{false};
     std::mutex mutex_;
     std::mutex initializationMutex_;
     void SignalAndWakeUp();
