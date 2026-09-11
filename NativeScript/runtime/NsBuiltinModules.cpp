@@ -8,6 +8,7 @@
 #include "Helpers.h"
 #include "ModuleInternalCallbacks.h"
 #include "Runtime.h"
+#include "StructuredSerialization.h"
 #include "TextEncoding.h"
 
 using namespace v8;
@@ -47,7 +48,8 @@ constexpr Registration kRegistry[] = {
     {"node:module", BuiltinId::kNodeModule, nullptr},
     {"node:url", BuiltinId::kNodeUrl, nullptr},
     {"node:util", BuiltinId::kNodeUtil, nullptr},
-    {"internal/dom-exception", BuiltinId::kDomException, nullptr, true},
+    {"internal/dom-exception", BuiltinId::kDomException,
+     serialization::DomExceptionBinding, true},
     {"internal/events", BuiltinId::kEvents, nullptr, true},
 };
 

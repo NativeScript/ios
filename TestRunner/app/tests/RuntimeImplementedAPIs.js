@@ -81,6 +81,47 @@ describe("DOMException canary", () => {
   it("is not reachable as a module from app code", () => {
     expect(() => require("internal/dom-exception")).toThrow();
   });
+
+  it("serializes through structuredClone on this runtime", () => {
+    const clone = structuredClone(new DOMException("x", "AbortError"));
+    expect(clone instanceof DOMException).toBe(true);
+    expect(clone.name).toBe("AbortError");
+  });
+
+  // Once an isolate holds a DOMException the serializer claims host objects
+  // itself, and V8 then stops detecting native wrappers on its own. Wrappers
+  // constructed with `new` carry no interceptors, unlike alloc().init() ones,
+  // so they are the shape that would silently clone as {} if the claim missed.
+  it("clones the isolate's first DOMException even when a getter creates it mid-clone", (done) => {
+    const worker = new Worker("./domExceptionFirstCloneWorker.js");
+    worker.onmessage = (event) => {
+      expect(event.data.isDomException).toBe(true);
+      expect(event.data.name).toBe("AbortError");
+      expect(event.data.message).toBe("first in this isolate");
+      worker.terminate();
+      done();
+    };
+    worker.onerror = (event) => {
+      fail("worker error: " + event.message);
+      worker.terminate();
+      done();
+      return true;
+    };
+  });
+
+  it("still rejects native wrappers once a DOMException exists", () => {
+    new DOMException("x", "AbortError");
+    for (const wrapper of [new NSObject(), new URL("https://example.com/")]) {
+      let error;
+      try {
+        structuredClone(wrapper);
+      } catch (e) {
+        error = e;
+      }
+      expect(error instanceof DOMException).toBe(true);
+      expect(error.name).toBe("DataCloneError");
+    }
+  });
 });
 
 describe("CustomEvent canary", () => {
