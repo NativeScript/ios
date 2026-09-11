@@ -91,15 +91,23 @@ void EventLoop::BindToCurrentThread() {
 }
 
 void EventLoop::Shutdown() {
+  // The dropped entries are moved out and destroyed only after the lock is
+  // released: an entry's destructor may post back into this very loop (a
+  // dropped message carrying a transferred port sentinels the port's sibling,
+  // and that sibling may live here), and mutex_ is not recursive.
+  std::deque<Entry> droppedInternal;
+  std::multimap<double, Entry> droppedInternalDelayed;
+  std::deque<Entry> droppedOrdered;
+  std::multimap<double, Entry> droppedOrderedDelayed;
   std::lock_guard<std::mutex> lock(mutex_);
   if (stopped_) {
     return;
   }
   stopped_ = true;
-  internal_.immediate.clear();
-  internal_.delayed.clear();
-  ordered_.immediate.clear();
-  ordered_.delayed.clear();
+  droppedInternal.swap(internal_.immediate);
+  droppedInternalDelayed.swap(internal_.delayed);
+  droppedOrdered.swap(ordered_.immediate);
+  droppedOrderedDelayed.swap(ordered_.delayed);
   pendingTokens_.clear();
   bufferedTokens_.clear();
   if (internalSource_ != nullptr) {

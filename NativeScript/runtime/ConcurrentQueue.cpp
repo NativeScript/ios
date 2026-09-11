@@ -20,7 +20,13 @@ void ConcurrentQueue::Push(std::shared_ptr<worker::Message> message) {
     }
 
     {
-        std::unique_lock<std::mutex> mlock(this->mutex_);
+      // Checked under the queue mutex, where Terminate() also flips it while
+      // emptying the queue: a push that loses the race is dropped rather than
+      // landing in a queue nothing will ever pop again.
+      std::unique_lock<std::mutex> mlock(this->mutex_);
+      if (this->terminated) {
+        return;
+      }
         this->messagesQueue_.push(message);
     }
 
@@ -67,6 +73,11 @@ void ConcurrentQueue::SignalAndWakeUp() {
 }
 
 void ConcurrentQueue::Terminate() {
+  // Whatever is still queued is destroyed after both locks are released: a
+  // message owns transferred buffers and ports, and destroying a port takes
+  // its sibling group's lock and posts to the sibling's loop.
+  std::queue<std::shared_ptr<worker::Message>> dropped;
+  {
     std::unique_lock<std::mutex> lock(initializationMutex_);
     terminated = true;
     CFRunLoopRef runLoop = this->runLoop_;
@@ -75,14 +86,19 @@ void ConcurrentQueue::Terminate() {
     this->runLoop_ = nullptr;
 
     if (runLoop) {
-        CFRunLoopStop(runLoop);
+      CFRunLoopStop(runLoop);
     }
 
     if (source) {
-        CFRunLoopRemoveSource(runLoop, source, kCFRunLoopCommonModes);
-        CFRunLoopSourceInvalidate(source);
-        CFRelease(source);
+      CFRunLoopRemoveSource(runLoop, source, kCFRunLoopCommonModes);
+      CFRunLoopSourceInvalidate(source);
+      CFRelease(source);
     }
+  }
+  {
+    std::unique_lock<std::mutex> mlock(this->mutex_);
+    dropped.swap(this->messagesQueue_);
+  }
 }
 
 }

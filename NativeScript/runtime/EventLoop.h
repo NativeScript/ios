@@ -69,6 +69,11 @@ class OrderedTaskSource {
  * "message to a terminated runtime" semantics of the mechanisms this
  * replaces. Producers only post; entries run exclusively on the home thread,
  * which is the only place the isolate's Locker is taken.
+ *
+ * No entry is ever destroyed while mutex_ is held: an entry's destructor may
+ * post (a dropped message carrying a transferred port sentinels the port's
+ * sibling, possibly on this loop), so Shutdown moves the lanes out and lets
+ * them die after the unlock.
  */
 class EventLoop {
  public:

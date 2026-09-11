@@ -133,6 +133,7 @@ require("./GCFinalizerTests");
 require("./WorkerConcurrentStartupTests");
 require("./WorkerOptionsTests");
 require("./WorkerResourceLimitsTests");
+require("./MessagingTests");
 require("./DeclarationConflicts");
 //
 require("./Promises");
