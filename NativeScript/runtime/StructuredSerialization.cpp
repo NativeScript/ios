@@ -320,6 +320,11 @@ class DeserializerDelegate : public ValueDeserializer::Delegate {
         ports_(ports),
         portsRead_(portsRead) {}
 
+  // Set when the stream named a host object this side cannot hand out (an
+  // unknown tag or an index past the out-of-band lists). No JS may run inside
+  // the read, so the DataCloneError for it is raised by the caller afterwards.
+  bool HostObjectReadFailed() const { return hostObjectReadFailed_; }
+
   void SetDeserializer(ValueDeserializer* deserializer) {
     deserializer_ = deserializer;
   }
@@ -330,7 +335,7 @@ class DeserializerDelegate : public ValueDeserializer::Delegate {
   MaybeLocal<Object> ReadHostObject(Isolate* isolate) override {
     uint32_t tag;
     if (!deserializer_->ReadUint32(&tag)) {
-      return MaybeLocal<Object>();
+      return Failed();
     }
     switch (tag) {
       case kHostObjectDegraded:
@@ -341,20 +346,20 @@ class DeserializerDelegate : public ValueDeserializer::Delegate {
         uint32_t index;
         if (!deserializer_->ReadUint32(&index) ||
             index >= domExceptions_->size()) {
-          return MaybeLocal<Object>();
+          return Failed();
         }
         return (*domExceptions_)[index];
       }
       case kHostObjectMessagePort: {
         uint32_t index;
         if (!deserializer_->ReadUint32(&index) || index >= ports_->size()) {
-          return MaybeLocal<Object>();
+          return Failed();
         }
         (*portsRead_)[index] = true;
         return (*ports_)[index];
       }
       default:
-        return MaybeLocal<Object>();
+        return Failed();
     }
   }
 
@@ -369,9 +374,15 @@ class DeserializerDelegate : public ValueDeserializer::Delegate {
  private:
   const std::vector<Local<SharedArrayBuffer>>* sharedBuffers_;
   const std::vector<Local<Object>>* domExceptions_;
+  MaybeLocal<Object> Failed() {
+    hostObjectReadFailed_ = true;
+    return MaybeLocal<Object>();
+  }
+
   const std::vector<Local<Object>>* ports_;
   std::vector<bool>* portsRead_;
   ValueDeserializer* deserializer_ = nullptr;
+  bool hostObjectReadFailed_ = false;
 };
 
 // Closes adopted ports that nothing will ever reach: a port lives in the
@@ -605,7 +616,12 @@ MaybeLocal<Value> SerializedValue::Deserialize(Isolate* isolate,
   // sound because a fan-out message carries nothing that can be handed over.
   // Such a message may be read here from several isolates at once, so the
   // consumed flag is written only on the single-receiver path.
-  tns::Assert(!consumed_, isolate);
+  if (consumed_) {
+    ThrowDataCloneError(
+        isolate,
+        "A message carrying transferred objects can only be read once.");
+    return MaybeLocal<Value>();
+  }
   if (HasTransferables()) {
     consumed_ = true;
   }
@@ -694,12 +710,29 @@ MaybeLocal<Value> SerializedValue::Deserialize(Isolate* isolate,
         static_cast<uint32_t>(i),
         ArrayBuffer::New(isolate, std::move(transferredBuffers_[i])));
   }
+  // Handed over above; the vectors would otherwise keep reporting
+  // transferables that are no longer here.
+  transferredBuffers_.clear();
+  transferredPorts_.clear();
 
   Local<Value> result;
-  if (deserializer.ReadHeader(context).IsNothing() ||
-      !deserializer.ReadValue(context).ToLocal(&result)) {
-    CloseUnreachablePorts(isolate, ports, nullptr);
-    return MaybeLocal<Value>();
+  {
+    TryCatch tc(isolate);
+    if (deserializer.ReadHeader(context).IsNothing() ||
+        !deserializer.ReadValue(context).ToLocal(&result)) {
+      CloseUnreachablePorts(isolate, ports, nullptr);
+      if (delegate.HostObjectReadFailed() && !tc.HasTerminated()) {
+        // V8 reports a failed read with its own generic error; a host object
+        // this side could not hand out is a clone failure like every other.
+        tc.Reset();
+        ThrowDataCloneError(isolate,
+                            "A transferred object in the message could not be "
+                            "read on this side.");
+      } else {
+        tc.ReThrow();
+      }
+      return MaybeLocal<Value>();
+    }
   }
   // A caller that takes no port list (structuredClone, receiveMessageOnPort)
   // surfaces a transferred port only through the value itself; a listed port
