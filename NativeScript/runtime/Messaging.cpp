@@ -199,7 +199,8 @@ class SiblingGroup final : public std::enable_shared_from_this<SiblingGroup> {
   static std::shared_ptr<SiblingGroup> Get(const std::string& name);
 
   SiblingGroup() = default;
-  explicit SiblingGroup(std::string name) : name_(std::move(name)) {}
+  explicit SiblingGroup(std::string name)
+      : name_(std::move(name)), named_(true) {}
   ~SiblingGroup();
 
   SiblingGroup(const SiblingGroup&) = delete;
@@ -213,6 +214,9 @@ class SiblingGroup final : public std::enable_shared_from_this<SiblingGroup> {
 
  private:
   const std::string name_;
+  // A BroadcastChannel group, whatever its name ("" included); an anonymous
+  // group is one channel's two ends.
+  const bool named_ = false;
   std::shared_mutex mutex_;
   std::set<PortData*> ports_;
 };
@@ -239,7 +243,7 @@ std::shared_ptr<SiblingGroup> SiblingGroup::Get(const std::string& name) {
 }
 
 SiblingGroup::~SiblingGroup() {
-  if (this->name_.empty()) {
+  if (!this->named_) {
     return;
   }
   std::lock_guard<std::mutex> lock(g_groupsMutex);
@@ -320,7 +324,7 @@ void SiblingGroup::Disentangle(PortData* data) {
   // Queued rather than delivered: a close orders behind everything already
   // sent, on both ends.
   data->AddToIncomingQueue(std::make_shared<Message>());
-  if (this->ports_.size() == 1 && this->name_.empty()) {
+  if (this->ports_.size() == 1 && !this->named_) {
     // A channel with one end left is a channel no more; a named group outlives
     // any number of members joining and leaving.
     (*this->ports_.begin())->AddToIncomingQueue(std::make_shared<Message>());
