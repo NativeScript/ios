@@ -94,6 +94,106 @@ describe("Messaging runtime edges", function () {
         });
     });
 
+    describe("MessagePort surface", function () {
+        it("runs an onclose handler when the port is closed", function () {
+            var channel = new MessageChannel();
+            var seen = null;
+            channel.port1.onclose = function (event) { seen = event.type; };
+            channel.port1.close();
+            expect(seen).toBe("close");
+            channel.port2.close();
+        });
+    });
+
+    describe("BroadcastChannel", function () {
+        it("treats the empty name as a channel like any other", function (done) {
+            var a = new BroadcastChannel("");
+            var b = new BroadcastChannel("");
+            var c = new BroadcastChannel("");
+            var got = [];
+            a.onmessage = function (event) { got.push(event.data); };
+            b.close();
+            setTimeout(function () {
+                c.postMessage("still open");
+                setTimeout(function () {
+                    expect(got).toEqual(["still open"]);
+                    a.close();
+                    c.close();
+                    done();
+                }, SETTLE);
+            }, SETTLE);
+        });
+    });
+
+    describe("node:worker_threads", function () {
+        var wt = require("node:worker_threads");
+
+        it("exposes the emitter surface on parentPort", function (done) {
+            // The shim resolves the entry from the app root, not from the
+            // requiring test file, hence the ~/ form.
+            var worker = new wt.Worker("~/tests/messaging/parentPortWorker.js");
+            var got = [];
+            worker.on("message", function (value) {
+                got.push(value);
+                if (got.length === 3) {
+                    expect(got).toEqual([{ once: 1 }, { on: 1 }, { on: 2 }]);
+                    worker.terminate();
+                    done();
+                }
+            });
+            worker.on("error", function (error) {
+                fail("worker error: " + error.message);
+                worker.terminate();
+                done();
+            });
+            worker.postMessage(1);
+            worker.postMessage(2);
+        });
+
+        it("forwards the option bag to the runtime's Worker", function () {
+            expect(function () {
+                new wt.Worker("~/tests/messaging/parentPortWorker.js", {
+                    resourceLimits: { maxOldGenerationSizeMb: "not a number" },
+                });
+            }).toThrowError(TypeError);
+        });
+    });
+
+    describe("worker error reporting", function () {
+        it("reports an error the Worker object left unhandled to the parent scope", function (done) {
+            var seen = null;
+            var listener = function (event) {
+                seen = event;
+                event.preventDefault();
+            };
+            addEventListener("error", listener);
+            var worker = new Worker("./messaging/throwingWorker.js");
+            setTimeout(function () {
+                removeEventListener("error", listener);
+                expect(seen).not.toBeNull();
+                expect(seen.message).toContain("boom from worker");
+                expect(seen.error instanceof Error).toBe(true);
+                worker.terminate();
+                done();
+            }, SETTLE);
+        });
+
+        it("forwards the error a throwing scope onerror raised for a rejection, once", function (done) {
+            var worker = new Worker("./messaging/rejectingWorker.js");
+            var messages = [];
+            worker.onerror = function (event) {
+                messages.push(event.message);
+                event.preventDefault();
+            };
+            setTimeout(function () {
+                expect(messages.length).toBe(1);
+                expect(messages[0]).toContain("thrown by scope onerror");
+                worker.terminate();
+                done();
+            }, SETTLE * 2);
+        });
+    });
+
     describe("AbortSignal handler attribute accounting", function () {
         function pollGC(predicate, cb) {
             var turns = 0;
