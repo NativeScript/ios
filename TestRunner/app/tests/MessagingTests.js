@@ -202,22 +202,38 @@ describe("Messaging runtime edges", function () {
     });
 
     describe("worker error reporting", function () {
+        // A worker boots on its own thread, so the first error arrives whenever
+        // the runner gets to it; specs wait for it and only then settle for
+        // duplicates.
+        var originalTimeout;
+        beforeEach(function () {
+            originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+            jasmine.DEFAULT_TIMEOUT_INTERVAL = 60000;
+        });
+        afterEach(function () {
+            jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+        });
+
         it("reports an error the Worker object left unhandled to the parent scope", function (done) {
-            var seen = null;
+            var seen = [];
+            var worker = null;
             var listener = function (event) {
-                seen = event;
+                seen.push(event);
                 event.preventDefault();
+                if (seen.length === 1) {
+                    setTimeout(finish, SETTLE);
+                }
             };
-            addEventListener("error", listener);
-            var worker = new Worker("./messaging/throwingWorker.js");
-            setTimeout(function () {
+            var finish = function () {
                 removeEventListener("error", listener);
-                expect(seen).not.toBeNull();
-                expect(seen.message).toContain("boom from worker");
-                expect(seen.error instanceof Error).toBe(true);
+                expect(seen.length).toBe(1);
+                expect(seen[0].message).toContain("boom from worker");
+                expect(seen[0].error instanceof Error).toBe(true);
                 worker.terminate();
                 done();
-            }, SETTLE);
+            };
+            addEventListener("error", listener);
+            worker = new Worker("./messaging/throwingWorker.js");
         });
 
         it("forwards the error a throwing scope onerror raised for a rejection, once", function (done) {
@@ -226,13 +242,15 @@ describe("Messaging runtime edges", function () {
             worker.onerror = function (event) {
                 messages.push(event.message);
                 event.preventDefault();
+                if (messages.length === 1) {
+                    setTimeout(function () {
+                        expect(messages.length).toBe(1);
+                        expect(messages[0]).toContain("thrown by scope onerror");
+                        worker.terminate();
+                        done();
+                    }, SETTLE);
+                }
             };
-            setTimeout(function () {
-                expect(messages.length).toBe(1);
-                expect(messages[0]).toContain("thrown by scope onerror");
-                worker.terminate();
-                done();
-            }, SETTLE * 2);
         });
     });
 
