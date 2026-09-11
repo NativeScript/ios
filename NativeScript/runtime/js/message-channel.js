@@ -46,6 +46,7 @@ const {
   Event,
   EventTarget,
   defineEventHandler,
+  kHandlerAssigned,
   kListenerChanged,
 } = require("internal/events");
 
@@ -136,6 +137,16 @@ function listenerChanged(port, type, count) {
   }
 }
 
+// HTML: the first time onmessage is set the port is enabled, as if start() had
+// been called, even when the value assigned is null and adds no listener.
+function handlerAssigned(port, type) {
+  if (type !== "message" || WeakSetPrototypeHas(startedPorts, port)) {
+    return;
+  }
+  WeakSetPrototypeAdd(startedPorts, port);
+  startPort(port);
+}
+
 class MessagePort extends EventTarget {
   constructor() {
     throw new TypeError("Illegal constructor");
@@ -162,6 +173,14 @@ class MessagePort extends EventTarget {
 
 defineEventHandler(MessagePort.prototype, "message");
 defineEventHandler(MessagePort.prototype, "messageerror");
+
+ObjectDefineProperty(MessagePort.prototype, kHandlerAssigned, {
+  __proto__: null,
+  value: handlerAssigned,
+  writable: false,
+  enumerable: false,
+  configurable: false,
+});
 
 ObjectDefineProperty(MessagePort.prototype, kListenerChanged, {
   __proto__: null,

@@ -65,6 +65,10 @@ function handlersOf(target) {
 // require("internal/events"), so the accounting cannot be bypassed the way an
 // overridable addEventListener could.
 var kListenerChanged = Symbol("listenerChanged");
+// Called on the first handler-attribute assignment, whatever the value: HTML
+// enables a MessagePort the first time onmessage is set, even to null, which
+// the listener count cannot express. Later assignments only move the count.
+var kHandlerAssigned = Symbol("handlerAssigned");
 function notifyListenerChanged(target, type, count) {
   var hook = target[kListenerChanged];
   if (hook === undefined) { return; }
@@ -230,7 +234,9 @@ function makeEventHandler(handler, cancelOnTruthy) {
     return result;
   }
   eventHandler.handler = handler;
-  eventHandler.delta = 0;
+  // A wrapper holds one listener slot for good; an inactive handler cancels
+  // its own slot out of the count the listener-changed hook receives.
+  eventHandler.delta = typeof handler === "function" ? 0 : -1;
   return eventHandler;
 }
 
@@ -258,21 +264,21 @@ function defineEventHandler(target, name, event, cancelOnTruthy) {
     }
     var wrapper = wrappers[event];
     if (wrapper === undefined) {
-      // First assignment ever, `null` included: the slot is claimed now, and
-      // the listener count rises with it (HTML port enabling depends on it).
+      // First assignment ever, `null` included: the slot is claimed now and
+      // kept, interleaved with addEventListener registrations at this point.
       wrapper = wrappers[event] = makeEventHandler(value, cancelOnTruthy);
       FunctionPrototypeCall(addListener, this, event, wrapper);
+      var assigned = this[kHandlerAssigned];
+      if (assigned !== undefined) { assigned(this, event); }
       return;
     }
     var wasActive = typeof wrapper.handler === "function";
     var isActive = typeof value === "function";
     wrapper.handler = value;
     if (wasActive === isActive) { return; }
-    // Absolute, never cumulative: the wrapper holds its one slot for good, so
-    // the correction is all-or-nothing — a cleared handler cancels its slot
-    // out, an active one needs no correction. Accumulating instead drifts a
-    // count that never returns to zero, and the port/signal accounting built
-    // on it then never sees "no listeners left".
+    // Absolute, never cumulative: the correction is the whole slot or nothing,
+    // so the count the hook sees returns to zero when the last active listener
+    // goes.
     wrapper.delta = isActive ? 0 : -1;
     var list = bag[event];
     notifyListenerChanged(this, event, list ? list.length : 0);
@@ -322,6 +328,7 @@ module.exports = {
   globalEventTarget: globalTarget,
   CustomEvent: CustomEvent,
   kListenerChanged: kListenerChanged,
+  kHandlerAssigned: kHandlerAssigned,
   setListenerErrorReporter: setListenerErrorReporter,
   // The base classes and the handler-attribute helper, for the lazy builtins
   // that may not read them off the globals user code can replace.
