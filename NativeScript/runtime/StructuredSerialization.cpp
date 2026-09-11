@@ -145,7 +145,8 @@ class SerializerDelegate : public ValueSerializer::Delegate {
       : isolate_(isolate),
         hostObjectPolicy_(hostObjectPolicy),
         sharedBuffers_(sharedBuffers),
-        domExceptions_(domExceptions) {}
+        domExceptions_(domExceptions),
+        domExceptionBrand_(DomExceptionBrand(isolate)) {}
 
   void SetSerializer(ValueSerializer* serializer) { serializer_ = serializer; }
 
@@ -176,20 +177,18 @@ class SerializerDelegate : public ValueSerializer::Delegate {
     if (object->InternalFieldCount() > 0) {
       return Just(true);
     }
-    Local<Private> brand = DomExceptionBrand(isolate);
-    if (brand.IsEmpty()) {
+    if (domExceptionBrand_.IsEmpty()) {
       return Just(false);
     }
-    return object->HasPrivate(isolate->GetCurrentContext(), brand);
+    return object->HasPrivate(isolate->GetCurrentContext(), domExceptionBrand_);
   }
 
   Maybe<bool> WriteHostObject(Isolate* isolate, Local<Object> object) override {
     // DOMException serializes under both policies: it is [Serializable] in
     // the IDL, and it is a plain JS object with no native half to lose.
-    Local<Private> brand = DomExceptionBrand(isolate);
     bool isDomException = false;
-    if (!brand.IsEmpty() &&
-        !object->HasPrivate(isolate->GetCurrentContext(), brand)
+    if (!domExceptionBrand_.IsEmpty() &&
+        !object->HasPrivate(isolate->GetCurrentContext(), domExceptionBrand_)
              .To(&isDomException)) {
       return Nothing<bool>();
     }
@@ -267,6 +266,10 @@ class SerializerDelegate : public ValueSerializer::Delegate {
   HostObjectPolicy hostObjectPolicy_;
   std::vector<std::shared_ptr<BackingStore>>* sharedBuffers_;
   std::vector<SerializedValue::DomExceptionPayload>* domExceptions_;
+  // Resolved once per serializer: V8 asks about every object in the graph,
+  // and each lookup would otherwise re-resolve the state slot and push a
+  // fresh handle into the caller's scope.
+  Local<Private> domExceptionBrand_;
   ValueSerializer* serializer_ = nullptr;
 };
 
@@ -452,6 +455,12 @@ MaybeLocal<Value> SerializedValue::Deserialize(Isolate* isolate,
         !exports->Get(context, tns::ToV8String(isolate, "DOMException"))
              .ToLocal(&ctor) ||
         !ctor->IsFunction()) {
+      // Only reached with nothing pending (a builtin that cannot load during
+      // teardown); the caller must see a failure, not an undefined result.
+      if (!isolate->HasPendingException()) {
+        ThrowDataCloneError(
+            isolate, "DOMException could not be rebuilt on this isolate.");
+      }
       return MaybeLocal<Value>();
     }
     Local<v8::String> stackKey = tns::ToV8String(isolate, "stack");
