@@ -692,10 +692,17 @@ void Worker::OnMessageCallback(Isolate* isolate, Local<Value> receiver,
   Local<Value> result;
 
   Local<Value> arg;
-  //    TryCatch tc(isolate);
-  if (!message->Deserialize(isolate, context).ToLocal(&arg)) {
-    //        tc.ReThrow();
-    return;
+  {
+    // Reading runs JS (a DOMException is rebuilt through its constructor), so
+    // a failure here must not stay pending on the isolate past this callout.
+    TryCatch tc(isolate);
+    if (!message->Deserialize(isolate, context).ToLocal(&arg)) {
+      if (!tc.HasTerminated() && tc.HasCaught()) {
+        Log(@"Worker message could not be read: %s",
+            tns::ToString(isolate, tc.Exception()).c_str());
+      }
+      return;
+    }
   }
 
   Local<Value> args[1]{arg};
