@@ -2,6 +2,7 @@
 #include "Caches.h"
 #include "Constants.h"
 #include "DataWrapper.h"
+#include "ErrorEvents.h"
 #include "Helpers.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
@@ -503,12 +504,29 @@ void WorkerWrapper::ForwardErrorPayloadToMain(const std::string& message, const 
         }
 
         TryCatch tc(mainIsolate);
-        Worker::EmitError(mainIsolate, worker.As<Object>(), message, source, stackTrace,
-                          lineNumber);
+        bool handled = Worker::EmitError(mainIsolate, worker.As<Object>(), message, source,
+                                         stackTrace, lineNumber);
         if (tc.HasCaught()) {
           Local<Value> error = tc.Exception();
           Log(@"%s", tns::ToString(mainIsolate, error).c_str());
           mainIsolate->ThrowException(error);
+          return;
+        }
+        if (handled) {
+          return;
+        }
+        // HTML: an error the Worker object leaves unhandled is reported to the
+        // parent's global scope. Only primitives crossed the isolate boundary,
+        // so the error object is rebuilt from them here.
+        Local<Context> context = Caches::Get(mainIsolate)->GetContext();
+        Local<Value> error = v8::Exception::Error(tns::ToV8String(mainIsolate, message));
+        if (error->IsObject() && !stackTrace.empty()) {
+          (void)error.As<Object>()->Set(context, tns::ToV8String(mainIsolate, "stack"),
+                                        tns::ToV8String(mainIsolate, stackTrace));
+        }
+        if (!ErrorEvents::DispatchError(mainIsolate, error, message, stackTrace)) {
+          Log(@"Unhandled error in worker %s:%d: %s\n%s", source.c_str(), lineNumber,
+              message.c_str(), stackTrace.c_str());
         }
       },
       async);
