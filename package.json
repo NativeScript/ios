@@ -27,11 +27,11 @@
     "open-xcode": "./tools/update-xcode-env.sh && open v8ios.xcodeproj",
     "build-ios": "node prepare-target ios && ./build_all_ios.sh",
     "build-vision": "node prepare-target visionos && ./build_all_vision.sh",
+    "build-tvos": "node prepare-target tvos && ./build_all_tvos.sh",
     "setup-ci": "./build_metadata_generator.sh",
     "update-version": "./update_version.sh",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
-    "version": "npm run changelog && git add CHANGELOG.md",
-    "build-tvos": "node prepare-target tvos && ./build_all_tvos.sh"
+    "version": "npm run changelog && git add CHANGELOG.md"
   },
   "license": "Apache-2.0",
   "devDependencies": {

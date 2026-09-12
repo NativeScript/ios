@@ -50,4 +50,4 @@ An asleep Apple TV cannot be launched by this workflow; the command reports the 
 TVOS_REVIEW_CLI=/path/to/tvos-review/cli python3 tests/tvos/template.py
 ```
 
-This verifies that conversion preserves the current upstream project's objects, selects tvOS, links the bundled local runtime package, remains idempotent, and parses with the actual CLI project parser. Run it again when upstream changes the iOS template.
+This verifies that `project-template-tvos` is the current upstream iOS template plus the tvOS build settings, agrees with the bundled local runtime package, survives both packaging stamps (the released ios-spm pin and the embedded local package), and parses with the actual CLI project parser. Run it again when upstream changes the iOS template.

@@ -62,6 +62,8 @@ v8_build
 /project-template-ios/__PROJECT_NAME__.xcodeproj/project.xcworkspace/xcshareddata/
 /project-template-vision/.build_env_vars.sh
 /project-template-vision/__PROJECT_NAME__.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+/project-template-tvos/.build_env_vars.sh
+/project-template-tvos/__PROJECT_NAME__.xcodeproj/project.xcworkspace/
 
 # V8 prebuilts, fetched by download_v8.sh from the release
 # pinned in V8_RELEASE. Not committed: the full matrix cannot be built
@@ -93,7 +95,4 @@ NativeScript/inspector/absl/
 #AI agents
 .claude/*
 !.claude/settings.json
-
-NativeScript/lib/arm64-appletvos/
-NativeScript/lib/arm64-appletvsimulator/
 NativeScript/lib/.tvos-v8-version

@@ -26,7 +26,7 @@ permissions:
 # (github.com/NativeScript/ios-spm) at them via binaryTarget(url:checksum:). The
 # slim npm package only carries the Xcode project template + metadata generator.
 #
-# Flow: setup → build (ios, visionos) → test → github-release (assets) →
+# Flow: setup → build (ios, visionos, tvos) → test → github-release (assets) →
 #       spm-update (generate manifest + tag ios-spm) → publish (npm) → verify-spm
 #
 # The release half (github-release, spm-update, publish, verify-spm) is gated on
@@ -74,10 +74,13 @@ jobs:
     needs: setup
     strategy:
       fail-fast: false
-      # Computed in `setup`: ios always; visionos only for real releases
-      # (npm_tag != "next"), never for the rolling "next" channel. Each entry
-      # carries `target` (package identity, @nativescript/<target>) and `script`
-      # (the npm build script; note the vision script is build-vision).
+      # Computed in `setup`: ios always; visionos and tvos only for real
+      # releases (npm_tag != "next"), never for the rolling "next" channel. Each
+      # entry carries `target` (package identity, @nativescript/<target>) and
+      # `script` (the npm build script; note the vision script is build-vision).
+      # The tvos leg installs the pinned V8 release's tvOS slices
+      # (download_v8.sh --tvos), so V8_RELEASE must point at a
+      # v8-buildscripts release that ships them.
       matrix: ${{ fromJSON(needs.setup.outputs.build_matrix) }}
     env:
       NPM_VERSION: ${{ needs.setup.outputs.npm_version }}
@@ -323,9 +326,9 @@ jobs:
       - name: Generate Package.swift
         # The generator emits the WHOLE manifest, shaped by the checksums it
         # finds: "next" builds produce only checksums-ios.env, so the next
-        # manifest omits the visionOS product/targets whose Release assets
-        # don't exist (SwiftPM eagerly downloads every binaryTarget in a
-        # resolved manifest — an unshipped asset 404s for every consumer).
+        # manifest omits the visionOS and tvOS products/targets whose Release
+        # assets don't exist (SwiftPM eagerly downloads every binaryTarget in
+        # a resolved manifest — an unshipped asset 404s for every consumer).
         # Any non-"next" --channel requires the full checksum set, so a real
         # release can never silently ship an iOS-only manifest.
         run: |
@@ -367,9 +370,9 @@ jobs:
       id-token: write
     strategy:
       fail-fast: false
-      # Same targets as the build matrix (computed in `setup`): visionos is
-      # published only for real releases, never for the "next" channel. The
-      # unused `script` key on each entry is harmless here.
+      # Same targets as the build matrix (computed in `setup`): visionos and
+      # tvos are published only for real releases, never for the "next"
+      # channel. The unused `script` key on each entry is harmless here.
       matrix: ${{ fromJSON(needs.setup.outputs.build_matrix) }}
     env:
       NPM_VERSION: ${{ needs.setup.outputs.npm_version }}
@@ -395,8 +398,11 @@ jobs:
           test "$(npm --version)" = "11.5.1"
           test "$(npx --version)" = "11.5.1"
       - name: Resolve package name
-        run: |
-          if [ "${{ matrix.target }}" = "ios" ]; then echo "PKG=ios" >> $GITHUB_ENV; else echo "PKG=visionos" >> $GITHUB_ENV; fi
+        # matrix.target is the package suffix: @nativescript/<target>
+        env:
+          # env indirection keeps matrix values out of shell interpolation
+          TARGET: ${{ matrix.target }}
+        run: echo "PKG=$TARGET" >> $GITHUB_ENV
       - name: Publish package (OIDC trusted publishing)
         if: ${{ vars.USE_NPM_TOKEN != 'true' }}
         run: |
@@ -422,9 +428,10 @@ jobs:
   # One probe for every channel, against the REAL released manifest. The
   # manifest's target set is channel-shaped by generate-spm-manifest.mjs
   # ("next" manifests only declare the iOS targets, because next Releases have
-  # no visionos assets), so resolving ios-spm at the released tag exercises
-  # exactly the artifact set a consumer's xcodebuild will download: iOS-only on
-  # next, iOS + visionos on real releases (v* tag / manual version).
+  # no visionos/tvos assets), so resolving ios-spm at the released tag
+  # exercises exactly the artifact set a consumer's xcodebuild will download:
+  # iOS-only on next, iOS + visionos + tvos on real releases (v* tag / manual
+  # version).
   verify-spm:
     name: Verify SPM resolution
     runs-on: macos-15
@@ -466,6 +473,7 @@ jobs:
           # Resolution fetches each binaryTarget's zip and verifies its SHA-256
           # against the manifest checksum; a mismatch or a missing release asset
           # fails the release here. For next the manifest declares the iOS
-          # artifacts only; real releases also declare (and verify) visionos.
+          # artifacts only; real releases also declare (and verify) visionos
+          # and tvos.
           swift package resolve
           echo "ios-spm@$NPM_VERSION resolved and checksum-verified."

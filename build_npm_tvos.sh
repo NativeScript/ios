@@ -2,23 +2,64 @@
 set -e
 source "$(dirname "$0")/build_utils.sh"
 
-checkpoint "Preparing npm package for tvOS..."
+usage() {
+  echo "Usage: ./build_npm_tvos.sh [--spm-mode <embedded|remote>]"
+  echo ""
+  echo "  --spm-mode embedded  (default) self-contained package: the xcframework zips"
+  echo "                       from dist/artifacts are embedded at"
+  echo "                       framework/internal/local-spm and the app template"
+  echo "                       references them by relative path. Portable — for local"
+  echo "                       testing (ns platform add tvos --framework-path=...)."
+  echo "  --spm-mode remote    deploy shape used by the release workflow: no binaries"
+  echo "                       embedded; the app template pins"
+  echo "                       github.com/NativeScript/ios-spm at exactly this package"
+  echo "                       version. Only resolves for versions shipped by the"
+  echo "                       release pipeline."
+  echo "  -h, --help           show this help"
+}
+
+parse_spm_mode_args "$@"
+
+checkpoint "Preparing npm package for tvOS ($SPM_MODE SwiftPM mode)..."
 OUTPUT_DIR="dist/npm"
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR/framework"
 cp ./package.json "$OUTPUT_DIR"
+cp -r ./types "$OUTPUT_DIR/types"
 
-# Keep the template and runtime linkage in step with upstream iOS.
-cp -r "./project-template-ios/." "$OUTPUT_DIR/framework/"
-swift scripts/prepare-tvos-template.swift "$OUTPUT_DIR/framework"
-LOCAL_SPM_DIR="$OUTPUT_DIR/framework/internal/local-spm"
-mkdir -p "$LOCAL_SPM_DIR"
-cp spm-templates/local-spm-tvos/Package.swift "$LOCAL_SPM_DIR/"
-for framework in NativeScript TKLiveSync; do
-  (cd dist && zip -qr --symlinks "npm/framework/internal/local-spm/$framework.xcframework.zip" "$framework.xcframework")
-done
+cp -r "./project-template-tvos/" "$OUTPUT_DIR/framework"
 
+# The runtime xcframeworks are consumed via SwiftPM in both modes; what differs
+# is where the SwiftPM package lives (see usage above). The zips come from
+# build_spm_artifacts.sh — zipped because npm strips symlinks and SwiftPM
+# extracts local zip binary targets itself.
+if [ "$SPM_MODE" = "embedded" ]; then
+  ARTIFACTS_DIR="dist/artifacts"
+  LOCAL_SPM_DIR="$OUTPUT_DIR/framework/internal/local-spm"
+  for zip in NativeScript.tvos.xcframework.zip TKLiveSync.tvos.xcframework.zip; do
+    if [ ! -f "$ARTIFACTS_DIR/$zip" ]; then
+      echo "Missing $ARTIFACTS_DIR/$zip — run ./build_spm_artifacts.sh tvos first." >&2
+      exit 1
+    fi
+  done
+  mkdir -p "$LOCAL_SPM_DIR"
+  cp "./spm-templates/local-spm-tvos/Package.swift" "$LOCAL_SPM_DIR/"
+  cp "$ARTIFACTS_DIR/NativeScript.tvos.xcframework.zip" \
+     "$ARTIFACTS_DIR/TKLiveSync.tvos.xcframework.zip" \
+     "$LOCAL_SPM_DIR/"
+  node ./scripts/stamp-template-local-spm.mjs \
+    "$OUTPUT_DIR/framework/__PROJECT_NAME__.xcodeproj/project.pbxproj" \
+    "internal/local-spm" \
+    --package-dir "$LOCAL_SPM_DIR"
+else
+  NPM_VERSION=$(node -e "console.log(require('./package.json').version)")
+  node ./scripts/stamp-template-version.mjs \
+    "$OUTPUT_DIR/framework/__PROJECT_NAME__.xcodeproj/project.pbxproj" \
+    "$NPM_VERSION"
+fi
+
+# Build-time metadata generator is still shipped in npm (Phase 1).
 mkdir -p "$OUTPUT_DIR/framework/internal/metadata-generator-x86_64"
 cp -r "metadata-generator/dist/x86_64/." "$OUTPUT_DIR/framework/internal/metadata-generator-x86_64"
 
@@ -26,9 +67,6 @@ mkdir -p "$OUTPUT_DIR/framework/internal/metadata-generator-arm64"
 cp -r "metadata-generator/dist/arm64/." "$OUTPUT_DIR/framework/internal/metadata-generator-arm64"
 
 pushd "$OUTPUT_DIR"
-# Publish as @nativescript/tvos (same version as the iOS runtime it is built from) and drop the husky
-# "prepare" hook, which must not run for the published tarball.
-node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync("package.json"));p.name="@nativescript/tvos";p.description="NativeScript Runtime for tvOS";delete p.scripts.prepare;fs.writeFileSync("package.json",JSON.stringify(p,null,2));'
 npm pack
 mv *.tgz ../
 popd

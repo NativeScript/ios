@@ -5,7 +5,8 @@ OUTFOLDER="./dist/dSYMs"
 
 mkdir -p "$OUTFOLDER"
 
-for framework_path in ./dist/NativeScript.xcframework/ios*; do
+for framework_path in ./dist/NativeScript.xcframework/*/; do
+    framework_path="${framework_path%/}"
     DSYMPATH="$framework_path/dSYMs/NativeScript.framework.dSYM"
     if [ -d "$DSYMPATH" ]; then
         OUTPATH="$OUTFOLDER/$(basename $framework_path)NativeScript.framework.dSYM"

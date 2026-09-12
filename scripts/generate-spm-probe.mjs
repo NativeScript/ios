@@ -9,7 +9,7 @@
 // released manifest's target set is channel-shaped (see
 // generate-spm-manifest.mjs), the SAME probe verifies every channel: "next"
 // manifests only declare the iOS artifacts, real releases also declare (and
-// therefore also verify) the visionOS ones.
+// therefore also verify) the visionOS and tvOS ones.
 //
 // --assert-release-manifest additionally fetches the released manifest and
 // asserts it pins nsVersion to this exact version. This guards against the tag

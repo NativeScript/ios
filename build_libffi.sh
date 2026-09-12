@@ -21,6 +21,8 @@ BUILD_ROOT="$SCRIPT_DIR/build/libffi"
 DIST_DIR="$BUILD_ROOT/dist"
 
 ALL_SLICES=(
+  arm64-appletvos
+  arm64-appletvsimulator
   arm64-iphoneos
   arm64-iphonesimulator
   arm64-xros
@@ -42,8 +44,6 @@ Builds libffi from the ./libffi submodule for the given slices
 (default: all of ${ALL_SLICES[*]}).
 
 Options:
-  tvOS slices: arm64-appletvos arm64-appletvsimulator
-
   --install     also copy the built libraries and generated headers into
                 NativeScript/lib/<slice>/ and NativeScript/include/libffi/<arch>/
   --jobs N      parallel make jobs (default: number of CPUs)
