@@ -10,10 +10,10 @@
 //   * push to main / dispatch w/o input -> rolling "next" prerelease
 //     (get-next-version.js)
 //
-// The build matrix: ios always builds/publishes; visionos only for real
-// releases (npm tag != "next"), never for the rolling next channel. Each entry
-// carries `target` (package identity, @nativescript/<target>) and `script`
-// (the npm build script; note the vision script is build-vision).
+// The build matrix: ios always builds/publishes; visionos and tvos only for
+// real releases (npm tag != "next"), never for the rolling next channel. Each
+// entry carries `target` (package identity, @nativescript/<target>) and
+// `script` (the npm build script; note the vision script is build-vision).
 //
 // GITHUB_REF and GITHUB_OUTPUT are read from the environment (GitHub's
 // contract); the workflow_dispatch version input is a real argument.
@@ -80,6 +80,7 @@ const tag = runScript("get-npm-tag.js", ["--version", version]);
 const targets = [{ target: "ios", script: "build-ios" }];
 if (tag !== "next") {
   targets.push({ target: "visionos", script: "build-vision" });
+  targets.push({ target: "tvos", script: "build-tvos" });
 }
 const matrix = JSON.stringify({ include: targets });
 

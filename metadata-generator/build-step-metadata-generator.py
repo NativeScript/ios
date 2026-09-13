@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -66,17 +67,20 @@ elif effective_platform_name == "-watchsimulator":
 elif effective_platform_name == "-appletvos":
     docset_platform = "tvOS"
     default_deployment_target_flag_name = "-mappletvos-version-min"
-    default_deployment_target_clang_env_name = "APPLETVOS_DEPLOYMENT_TARGET"
+    default_deployment_target_clang_env_name = "TVOS_DEPLOYMENT_TARGET"
 elif effective_platform_name == "-appletvsimulator":
     docset_platform = "tvOS"
     default_deployment_target_flag_name = "-mappletvsimulator-version-min"
-    default_deployment_target_clang_env_name = "APPLETVOS_DEPLOYMENT_TARGET"
+    default_deployment_target_clang_env_name = "TVOS_DEPLOYMENT_TARGET"
 elif effective_platform_name == "-iphoneos":
     default_deployment_target_flag_name = "-miphoneos-version-min"
 
 sdk_version = env("SDK_VERSION") or "13.0"
 llvm_target_triple_suffix = env_or_empty("LLVM_TARGET_TRIPLE_SUFFIX")
-llvm_target_triple_os_version = "ios{}".format(sdk_version)
+# The OS part of the triple ("ios", "tvos", ...) comes from Xcode's LLVM_TARGET_TRIPLE_OS_VERSION
+# (e.g. "tvos16.0"); its version is the deployment target, so the SDK version is substituted instead.
+llvm_target_triple_os = re.sub(r"[0-9.]+$", "", env_or_empty("LLVM_TARGET_TRIPLE_OS_VERSION")) or "ios"
+llvm_target_triple_os_version = "{}{}".format(llvm_target_triple_os, sdk_version)
 # env("LLVM_TARGET_TRIPLE_OS_VERSION") is the deployment target, so doesn't have all APIs
 # usually it's ios9.0 for NativeScript projects
 llvm_target_triple_vendor = env("LLVM_TARGET_TRIPLE_VENDOR") or "apple"

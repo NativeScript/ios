@@ -1,0 +1,3 @@
+// @COCOAPODS_SILENCE_WARNINGS@ //
+#include "build.xcconfig"
+#include "../plugins-release.xcconfig"

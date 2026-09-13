@@ -21,6 +21,8 @@ BUILD_ROOT="$SCRIPT_DIR/build/libffi"
 DIST_DIR="$BUILD_ROOT/dist"
 
 ALL_SLICES=(
+  arm64-appletvos
+  arm64-appletvsimulator
   arm64-iphoneos
   arm64-iphonesimulator
   arm64-xros
@@ -29,6 +31,7 @@ ALL_SLICES=(
   x86_64-maccatalyst
 )
 
+TVOS_MIN=13.0
 IOS_MIN=13.0
 XROS_MIN=2.0
 CATALYST_MIN=13.3
@@ -97,6 +100,12 @@ slice_config() {
       ;;
     arm64-iphonesimulator)
       echo "iphonesimulator|aarch64-apple-darwin|-arch arm64 -mios-simulator-version-min=$IOS_MIN"
+      ;;
+    arm64-appletvos)
+      echo "appletvos|aarch64-apple-darwin|-target arm64-apple-tvos$TVOS_MIN"
+      ;;
+    arm64-appletvsimulator)
+      echo "appletvsimulator|aarch64-apple-darwin|-target arm64-apple-tvos$TVOS_MIN-simulator"
       ;;
     arm64-xros)
       echo "xros|aarch64-apple-darwin|-target arm64-apple-xros$XROS_MIN"

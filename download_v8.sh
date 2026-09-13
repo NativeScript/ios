@@ -16,7 +16,7 @@ set -euo pipefail
 # Set V8_SKIP_DOWNLOAD=1 to make it a no-op -- use that when you have built V8
 # yourself and do not want a pinned release overwriting it.
 #
-# Usage: download_v8.sh [--release <tag>] [--force]
+# Usage: download_v8.sh [--release <tag>] [--tvos] [--force]
 #
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -30,12 +30,16 @@ STAMP="$LIB_DIR/.v8-release-stamp"
 
 RELEASE=""
 FORCE=0
+TVOS=0
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") [--release <tag>] [--force]
+Usage: $(basename "$0") [--release <tag>] [--tvos] [--force]
 
   --release <tag>  Release to install (default: contents of V8_RELEASE)
+  --tvos           Also install the tvOS slices (arm64-appletvos,
+                   arm64-appletvsimulator). Off by default: only the tvOS
+                   runtime build needs them, and not every release ships them.
   --force          Reinstall even if the pinned release is already in place
 
 Downloads are cached in $CACHE_DIR (override with \$V8_PREBUILT_CACHE).
@@ -46,6 +50,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --release)   RELEASE="$2"; shift 2 ;;
         --release=*) RELEASE="${1#*=}"; shift ;;
+        --tvos)      TVOS=1; shift ;;
         --force)     FORCE=1; shift ;;
         -h|--help)   usage; exit 0 ;;
         *)           echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
@@ -62,25 +67,16 @@ if [ -z "$RELEASE" ]; then
     RELEASE="$(tr -d '[:space:]' < "$RELEASE_FILE")"
 fi
 
-# The stamp alone is not enough: it says which release was installed, not that
-# the three trees are still on disk. Re-install rather than leave a half-removed
-# checkout looking up to date.
-installed() {
-    [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$RELEASE" ] \
-        && [ -f "$NS_DIR/include/v8.h" ] && [ -d "$NS_DIR/inspector" ]
-}
-
-if [ "$FORCE" = "0" ] && installed; then
-    echo "V8 $RELEASE already installed. Use --force to reinstall."
-    exit 0
-fi
-
 # V8 has no visionOS target -- target_environment is only simulator, device or
 # catalyst. It does not need one: the platform tag on a member of a static
 # archive is advisory, and only the final linked image carries an
 # LC_BUILD_VERSION, so a visionOS binary links the iOS archives directly. The
 # xros directories are therefore copies of their iOS counterparts, which is
 # exactly what shipped before this change.
+#
+# tvOS is different: V8 does have a tvOS target (target_platform="tvos"), and
+# the build repo ships it as its own variants rather than a relabelled iOS
+# build, so those slices are only installed when asked for.
 VARIANTS=(
     "arm64-device:arm64-iphoneos arm64-xros"
     "arm64-simulator:arm64-iphonesimulator arm64-xrsimulator"
@@ -88,6 +84,32 @@ VARIANTS=(
     "arm64-catalyst:arm64-maccatalyst"
     "x64-catalyst:x86_64-maccatalyst"
 )
+if [ "$TVOS" = "1" ]; then
+    VARIANTS+=(
+        "arm64-tvdevice:arm64-appletvos"
+        "arm64-tvsimulator:arm64-appletvsimulator"
+    )
+fi
+
+# The stamp alone is not enough: it says which release was installed, not that
+# the trees are still on disk, nor which slices -- an iOS-only install stamps
+# the same release a --tvos install does. Re-install rather than leave a
+# half-removed or slice-short checkout looking up to date.
+installed() {
+    [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$RELEASE" ] \
+        && [ -f "$NS_DIR/include/v8.h" ] && [ -d "$NS_DIR/inspector" ] || return 1
+    local entry dest
+    for entry in "${VARIANTS[@]}"; do
+        for dest in ${entry#*:}; do
+            [ -f "$LIB_DIR/$dest/libv8_base_without_compiler.a" ] || return 1
+        done
+    done
+}
+
+if [ "$FORCE" = "0" ] && installed; then
+    echo "V8 $RELEASE already installed. Use --force to reinstall."
+    exit 0
+fi
 
 BASE_URL="https://github.com/$UPSTREAM/releases/download/$RELEASE"
 DL="$CACHE_DIR/$RELEASE"
@@ -107,12 +129,21 @@ fetch SHA256SUMS
 ASSETS=()
 for entry in "${VARIANTS[@]}"; do
     variant="${entry%%:*}"
-    ASSETS+=("$(grep -oE "v8-[^ ]*-ios-$variant\.tar\.gz" "$DL/SHA256SUMS" | head -1)")
+    asset="$(grep -oE "v8-[^ ]*-ios-$variant\.tar\.gz" "$DL/SHA256SUMS" | head -1 || true)"
+    if [ -z "$asset" ]; then
+        echo "Release $RELEASE has no ios-$variant asset." >&2
+        case "$variant" in
+            *-tv*) echo "The tvOS slices need a $UPSTREAM release that builds the arm64-tvdevice and arm64-tvsimulator variants; pin one in V8_RELEASE." >&2 ;;
+        esac
+        exit 1
+    fi
+    ASSETS+=("$asset")
 done
-ASSETS+=("$(grep -oE 'v8-[^ ]*-src-headers\.tar\.gz' "$DL/SHA256SUMS" | head -1)")
+src_headers="$(grep -oE 'v8-[^ ]*-src-headers\.tar\.gz' "$DL/SHA256SUMS" | head -1 || true)"
+[ -n "$src_headers" ] || { echo "Release $RELEASE has no src-headers asset." >&2; exit 1; }
+ASSETS+=("$src_headers")
 
 for a in "${ASSETS[@]}"; do
-    [ -n "$a" ] || { echo "Release $RELEASE is missing an expected asset." >&2; exit 1; }
     fetch "$a"
 done
 

@@ -6,7 +6,7 @@
 # Output goes to dist/artifacts/:
 #   <name>.zip                and a combined checksums.env (KEY=sha256 lines)
 #
-# Usage: ./build_spm_artifacts.sh [ios|visionos]   (default: ios)
+# Usage: ./build_spm_artifacts.sh [ios|visionos|tvos]   (default: ios)
 #
 # These artifacts are uploaded to the GitHub Release and referenced by
 # github.com/NativeScript/ios-spm (see scripts/generate-spm-manifest.mjs).
@@ -31,8 +31,15 @@ case "$TARGET" in
     NS_KEY="NS_CHECKSUM_NATIVESCRIPT_VISIONOS"
     TK_KEY="NS_CHECKSUM_TKLIVESYNC_VISIONOS"
     ;;
+  tvos|tv)
+    TARGET="tvos"
+    NS_ZIP="NativeScript.tvos.xcframework.zip"
+    TK_ZIP="TKLiveSync.tvos.xcframework.zip"
+    NS_KEY="NS_CHECKSUM_NATIVESCRIPT_TVOS"
+    TK_KEY="NS_CHECKSUM_TKLIVESYNC_TVOS"
+    ;;
   *)
-    echo "Unknown target '$TARGET' (expected ios or visionos)" >&2
+    echo "Unknown target '$TARGET' (expected ios, visionos or tvos)" >&2
     exit 1
     ;;
 esac
@@ -69,8 +76,8 @@ zip_xcframework "TKLiveSync.xcframework" "$TK_ZIP"
 NS_SUM="$(compute_checksum "$OUT/$NS_ZIP")"
 TK_SUM="$(compute_checksum "$OUT/$TK_ZIP")"
 
-# Per-target filename so the iOS and visionOS env files don't collide when the
-# release/stamp jobs merge both platforms' artifacts into one directory.
+# Per-target filename so the per-platform env files don't collide when the
+# release/stamp jobs merge every platform's artifacts into one directory.
 CHECKSUMS="$OUT/checksums-$TARGET.env"
 {
   echo "${NS_KEY}=${NS_SUM}"

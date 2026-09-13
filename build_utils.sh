@@ -18,7 +18,7 @@ function checkpoint {
     echo ""
 }
 
-# Shared --spm-mode argument parsing for build_npm_ios.sh / build_npm_vision.sh.
+# Shared --spm-mode argument parsing for the build_npm_<platform>.sh scripts.
 # Sets SPM_MODE (embedded|remote, default embedded). The calling script must
 # define usage(); accepts both "--spm-mode <mode>" and "--spm-mode=<mode>".
 function parse_spm_mode_args {

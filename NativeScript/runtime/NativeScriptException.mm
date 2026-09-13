@@ -1469,8 +1469,11 @@ static void ShowErrorModalSynchronously(const std::string& title, const std::str
                                                  alpha:1.0];  // Terminal green
   stackTraceTextView.backgroundColor = [UIColor clearColor];
   stackTraceTextView.font = [UIFont fontWithName:@"Menlo" size:16];  // Monospace
+#if !TARGET_OS_TV
+  // tvOS UITextView is never editable/selectable; the properties do not exist there.
   stackTraceTextView.editable = NO;
   stackTraceTextView.selectable = YES;
+#endif
   stackTraceTextView.scrollEnabled = YES;
   stackTraceTextView.contentInset = UIEdgeInsetsMake(15, 15, 15, 15);
   stackTraceTextView.translatesAutoresizingMaskIntoConstraints = NO;
