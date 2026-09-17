@@ -553,12 +553,16 @@ class WorkerWrapper : public BaseDataWrapper {
   void Start(std::shared_ptr<v8::Persistent<v8::Value>> poWorker,
              std::function<v8::Isolate*()> func,
              std::optional<int> qualityOfService = std::nullopt);
-  void CallOnErrorHandlers(v8::TryCatch& tc);
+  // Both reporters take the isolate from their caller, which is running on
+  // it: they are reachable while the entry script is still evaluating, before
+  // workerIsolate_ is published.
+  void CallOnErrorHandlers(v8::Isolate* isolate, v8::TryCatch& tc);
   // Reports a rejected entry-evaluation promise. A rejection carries a reason
   // rather than a TryCatch, so it cannot go through CallOnErrorHandlers, but it
   // follows the same web order: the worker scope's `onerror` first, then — only
   // if that did not handle it — the parent's Worker error event.
-  void ReportEntryEvaluationRejection(v8::Local<v8::Context> context,
+  void ReportEntryEvaluationRejection(v8::Isolate* isolate,
+                                      v8::Local<v8::Context> context,
                                       v8::Local<v8::Value> reason);
   void PassUncaughtExceptionFromWorkerToMain(v8::Local<v8::Context> context,
                                              v8::TryCatch& tc,
@@ -629,7 +633,11 @@ class WorkerWrapper : public BaseDataWrapper {
 
  private:
   v8::Isolate* mainIsolate_;
+  // Written by the worker thread only: published once the worker's startup
+  // function returns, withdrawn before the worker's runtime is deleted. Any
+  // other thread reads and uses it under workerIsolateMutex_.
   v8::Isolate* workerIsolate_;
+  std::mutex workerIsolateMutex_;
   std::atomic<bool> isRunning_;
   std::atomic<bool> isClosing_;
   std::atomic<bool> isTerminating_;
