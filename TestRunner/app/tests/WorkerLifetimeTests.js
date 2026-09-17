@@ -256,3 +256,85 @@ describe("Worker teardown with a transferred port in flight", function () {
         };
     });
 });
+
+// A worker that ends with a child still running terminates the child and then
+// disposes the child's Worker object, while the child's own thread is tearing
+// down: both threads are at the end of the child's native wrapper at once.
+describe("Worker teardown with a running child worker", function () {
+    const ROUNDS = 24;
+    let originalTimeout;
+    // The worker of the round in progress, and whether the spec is over: a
+    // spec that failed or timed out must not leave a worker running or start
+    // another round from a late event.
+    let active = null;
+    let finished = false;
+    beforeEach(function () {
+        originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 60000;
+        finished = false;
+    });
+    afterEach(function () {
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+        finished = true;
+        if (active !== null) {
+            active.terminate();
+            active = null;
+        }
+    });
+
+    it("ends the parent whether it is terminated or closes itself", function (done) {
+        function finish() {
+            if (!finished) {
+                finished = true;
+                done();
+            }
+        }
+        (function round(index) {
+            if (index === ROUNDS) {
+                finish();
+                return;
+            }
+            let childUp = false;
+            const worker = new Worker("./workerLifetimeNestedParent.js");
+            active = worker;
+            worker.onerror = function (event) {
+                if (finished) {
+                    return true;
+                }
+                expect("worker error: " + event.message).toBeNull();
+                finish();
+                return true;
+            };
+            worker.onmessage = function (event) {
+                if (finished) {
+                    return;
+                }
+                // Anything else is the fixture reporting that its child failed.
+                expect(event.data).toBe("child up");
+                if (event.data !== "child up") {
+                    finish();
+                    return;
+                }
+                childUp = true;
+                if (index % 2 === 0) {
+                    worker.terminate();
+                } else {
+                    worker.postMessage("close");
+                }
+            };
+            worker.addEventListener("nsworkerended", function () {
+                if (finished) {
+                    return;
+                }
+                active = null;
+                // An end before the child was up did not exercise the teardown.
+                expect(childUp).toBe(true);
+                if (!childUp) {
+                    finish();
+                    return;
+                }
+                round(index + 1);
+            });
+        })(0);
+    });
+});
