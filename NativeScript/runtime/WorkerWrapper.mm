@@ -255,6 +255,12 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
     }
   }
 
+  // The queue borrows this thread's run loop, so it lets go of it before the
+  // thread leaves: a terminate() that made this thread skip the loop above
+  // only reaches its own queue_.Terminate() later, possibly after the thread
+  // and its run loop are gone. A second Terminate() finds nothing set.
+  this->queue_.Terminate();
+
   // Withdrawn before the runtime and its isolate go away below. Terminate()
   // uses the isolate under this mutex, so a terminate that already read it has
   // finished with it by the time this returns, and a later one finds null.

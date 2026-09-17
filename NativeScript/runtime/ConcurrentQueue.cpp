@@ -15,10 +15,6 @@ void ConcurrentQueue::Initialize(CFRunLoopRef runLoop, void (*performWork)(void*
 }
 
 void ConcurrentQueue::Push(std::shared_ptr<worker::Message> message) {
-    if (this->runLoopTasksSource_ != nullptr && !CFRunLoopSourceIsValid(this->runLoopTasksSource_)) {
-        return;
-    }
-
     {
       // Checked under the queue mutex, where Terminate() also flips it while
       // emptying the queue: a push that loses the race is dropped rather than
@@ -30,7 +26,7 @@ void ConcurrentQueue::Push(std::shared_ptr<worker::Message> message) {
         this->messagesQueue_.push(message);
     }
 
-    this->SignalAndWakeUp();
+    this->Signal();
 }
 
 std::vector<std::shared_ptr<worker::Message>> ConcurrentQueue::PopAll() {
@@ -52,20 +48,14 @@ bool ConcurrentQueue::IsEmpty() {
 }
 
 void ConcurrentQueue::Signal() {
-  // Mirrors Push()'s validity handling instead of SignalAndWakeUp()'s
-  // assert: a retry racing Terminate() must be a silent no-op.
-  if (this->runLoopTasksSource_ == nullptr ||
-      !CFRunLoopSourceIsValid(this->runLoopTasksSource_)) {
-    return;
+  // Serializes signaling and waking with Initialize() and Terminate().
+  // Terminate() clears both pointers and invalidates and releases the source;
+  // the run loop is borrowed from the worker thread, which terminates the
+  // queue before it leaves.
+  std::unique_lock<std::mutex> lock(initializationMutex_);
+  if (this->runLoopTasksSource_ != nullptr) {
+    CFRunLoopSourceSignal(this->runLoopTasksSource_);
   }
-  this->SignalAndWakeUp();
-}
-
-void ConcurrentQueue::SignalAndWakeUp() {
-    if (this->runLoopTasksSource_ != nullptr) {
-        tns::Assert(CFRunLoopSourceIsValid(this->runLoopTasksSource_));
-        CFRunLoopSourceSignal(this->runLoopTasksSource_);
-    }
 
     if (this->runLoop_ != nullptr) {
         CFRunLoopWakeUp(this->runLoop_);

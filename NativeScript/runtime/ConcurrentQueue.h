@@ -32,7 +32,6 @@ private:
     std::atomic<bool> terminated{false};
     std::mutex mutex_;
     std::mutex initializationMutex_;
-    void SignalAndWakeUp();
 };
 
 }

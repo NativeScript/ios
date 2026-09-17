@@ -627,7 +627,6 @@ class WorkerWrapper : public BaseDataWrapper {
   const inline v8::Isolate* GetMainIsolate() { return mainIsolate_; }
   // The only route from the worker thread to the parent: see mainLoop_.
   std::weak_ptr<EventLoop> MainLoop() const { return mainLoop_; }
-  const inline v8::Isolate* GetWorkerIsolate() { return workerIsolate_; }
   const inline void MakeWeak() { isWeak_ = true; }
   const inline bool IsWeak() { return isWeak_; }
 
