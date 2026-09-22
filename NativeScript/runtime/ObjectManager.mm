@@ -303,20 +303,21 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
     }
     case WrapperType::Worker: {
       WorkerWrapper* worker = static_cast<WorkerWrapper*>(wrapper);
-      if (!worker->isDisposed()) {
-        // A running worker's Worker object is rooted (WorkerWrapper::
-        // RootWorkerObject), so a weak callback should not reach a live worker
-        // at all. This refusal stays as the floor under that: re-arming keeps
-        // the wrapper alive for another cycle, which is safe, whereas freeing
-        // it while the thread still posts through it is not. Reaching it is not
-        // free either -- a re-armed handle that is also a weak-collection key
-        // can corrupt the collector's ephemeron bookkeeping -- so it is a
-        // fallback, not a mechanism to rely on.
-        //
-        // During final disposal, inform the worker it should delete itself.
-        if (isFinalDisposal) {
-          worker->MakeWeak();
-        }
+      // Final disposal lets go of the wrapper for good, and only deletes it
+      // when the worker thread is done with it; otherwise that thread deletes
+      // it when it ends.
+      //
+      // A weak callback deletes the wrapper only when the worker thread is
+      // done with it, and changes nothing otherwise. A running worker's Worker
+      // object is rooted (WorkerWrapper::RootWorkerObject), so a weak callback
+      // should not reach a live worker at all. The refusal stays as the floor
+      // under that: re-arming keeps the wrapper alive for another cycle, which
+      // is safe, whereas freeing it while the thread still posts through it is
+      // not. Reaching it is not free either -- a re-armed handle that is also a
+      // weak-collection key can corrupt the collector's ephemeron bookkeeping
+      // -- so it is a fallback, not a mechanism to rely on.
+      bool lastHolder = isFinalDisposal ? worker->ReleaseFromParent() : worker->HeldByParentOnly();
+      if (!lastHolder) {
         return false;
       }
       break;

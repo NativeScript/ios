@@ -292,14 +292,9 @@ Runtime::~Runtime() {
     messaging::CloseAllPorts(isolate_);
 
     if (IsRuntimeWorker()) {
-      std::shared_ptr<Caches::WorkerState> workerState = Caches::Workers->Get(this->workerId_);
-      WorkerWrapper* currentWorker =
-          workerState == nullptr ? nullptr : static_cast<WorkerWrapper*>(workerState->UserData());
+      // Only the registry entry: the wrapper outlives this runtime, and the
+      // worker thread lets go of it once this destructor has returned.
       Caches::Workers->Remove(this->workerId_);
-      // if the parent isolate is dead then deleting the wrapper is our responsibility
-      if (currentWorker != nullptr && currentWorker->IsWeak()) {
-        delete currentWorker;
-      }
     }
     Caches::Remove(this->isolate_);
 
