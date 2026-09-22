@@ -58,6 +58,10 @@
 
 + (void)recordsPointer:(TNSSimpleStruct*)object;
 
+// Reads the pointee back out so callers can assert the marshalled values
+// without going through the shared log buffer.
++ (TNSSimpleStruct)recordsPointerEcho:(TNSSimpleStruct*)object;
+
 + (void)apiNSMutableArrayMethods:(NSMutableArray*)object;
 
 + (void)apiSwizzle:(TNSSwizzleKlass*)object;
