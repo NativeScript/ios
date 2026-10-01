@@ -219,6 +219,7 @@ class ValueCache {
 void Interop::WriteTypeValue(Local<Context> context, BaseDataWrapper* typeWrapper, void* dest,
                              Local<Value> arg) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  arg = tns::UnwrapProxyOrThrow(isolate, arg);
   ValueCache argHelper(arg);
   bool isEmptyOrUndefined = arg.IsEmpty() || arg->IsNullOrUndefined();
   bool success = false;
@@ -258,6 +259,9 @@ void Interop::WriteTypeValue(Local<Context> context, BaseDataWrapper* typeWrappe
 void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncoding, void* dest,
                          Local<Value> arg) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  // Every branch below inspects the value's own type and internal fields,
+  // which a Proxy hides.
+  arg = tns::UnwrapProxyOrThrow(isolate, arg);
   ExecuteWriteValueDebugValidationsIfInDebug(context, typeEncoding, dest, arg);
   ValueCache argHelper(arg);
   if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
@@ -729,6 +733,9 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
 
 id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  // Runs inside adapter callbacks invoked by native code, where a C++ throw
+  // cannot propagate; a revoked proxy reads as nil.
+  arg = tns::UnwrapProxy(arg);
   if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
     return nil;
   } else if (tns::IsString(arg)) {
@@ -1559,14 +1566,13 @@ void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrap
 }
 
 Local<v8::Array> Interop::ToArray(Local<Object> object) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  object = tns::UnwrapProxyOrThrow(isolate, object).As<Object>();
   if (object->IsArray()) {
     return object.As<v8::Array>();
   }
 
-  Local<Context> context;
-  bool success = object->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
-  tns::Assert(success);
-  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Context> context = tns::GetCreationContextOrCurrent(isolate, object);
 
   Local<v8::Function> sliceFunc;
   auto cache = Caches::Get(isolate);
@@ -1596,7 +1602,7 @@ Local<v8::Array> Interop::ToArray(Local<Object> object) {
   Local<Value> sliceArgs[1]{object};
 
   Local<Value> result;
-  success = sliceFunc->Call(context, object, 1, sliceArgs).ToLocal(&result);
+  bool success = sliceFunc->Call(context, object, 1, sliceArgs).ToLocal(&result);
   tns::Assert(success, isolate);
 
   return result.As<v8::Array>();
