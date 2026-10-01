@@ -452,6 +452,9 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value>
     return;
   }
 
+  // Runs inside an ffi closure, where a C++ throw cannot propagate; a revoked
+  // proxy returns nil.
+  value = tns::UnwrapProxy(value);
   if (value.IsEmpty() || value->IsNullOrUndefined()) {
     void* nullPtr = nullptr;
     *(ffi_arg*)retValue = (unsigned long)nullPtr;
@@ -647,7 +650,8 @@ const MethodMeta* ArgConverter::FindInitializer(Local<Context> context, Class kl
   std::vector<Local<Value>> initializerArgs;
   std::string constructorTokens;
   if (info.Length() == 1 && info[0]->IsObject() && tns::GetValue(isolate, info[0]) == nullptr) {
-    initializerArgs = GetInitializerArgs(info[0].As<Object>(), constructorTokens);
+    Local<Value> initializer = tns::UnwrapProxyOrThrow(isolate, info[0]);
+    initializerArgs = GetInitializerArgs(initializer.As<Object>(), constructorTokens);
   }
 
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
@@ -729,6 +733,8 @@ bool ArgConverter::CanInvoke(Local<Context> context, const MethodMeta* candidate
 
 bool ArgConverter::CanInvoke(Local<Context> context, const TypeEncoding* typeEncoding,
                              Local<Value> arg) {
+  // A revoked proxy matches anything so marshalling reports it as such.
+  arg = tns::UnwrapProxy(arg);
   if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
     return true;
   }
@@ -807,10 +813,8 @@ std::vector<Local<Value>> ArgConverter::GetInitializerArgs(Local<Object> obj,
                                                            std::string& constructorTokens) {
   std::vector<Local<Value>> args;
   constructorTokens = "";
-  Local<Context> context;
-  bool success = obj->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
-  tns::Assert(success);
   Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Context> context = tns::GetCreationContextOrCurrent(isolate, obj);
   Local<v8::Array> properties;
   if (obj->GetOwnPropertyNames(context).ToLocal(&properties)) {
     std::stringstream ss;
