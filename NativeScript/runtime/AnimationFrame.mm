@@ -225,7 +225,7 @@ class AnimationFrameState {
       }
       entry->scheduled = false;
       Local<v8::Function> cb = entry->callback.Get(isolate);
-      Local<Context> context = cb->GetCreationContextChecked(v8::Isolate::GetCurrent());
+      Local<Context> context = tns::GetCreationContextOrCurrent(isolate, cb);
       Context::Scope contextScope(context);
       if (entry->raf) {
         Local<Value> argv[] = {v8::Number::New(isolate, performanceMillis)};
