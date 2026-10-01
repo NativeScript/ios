@@ -397,10 +397,6 @@ void Reference::RegisterToStringMethod(Local<Context> context,
 }
 
 Reference::DataPair Reference::GetDataPair(Local<Object> obj) {
-  Local<Context> context;
-  bool success =
-      obj->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
-  tns::Assert(success);
   Isolate* isolate = v8::Isolate::GetCurrent();
   BaseDataWrapper* wrapper =
       tns::GetValueOrReport(isolate, obj, "Reference indexed access");
