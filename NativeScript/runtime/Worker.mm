@@ -564,7 +564,7 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
                                       ? info[0]
                                       : Local<Value>(v8::Exception::Error(tns::ToV8String(
                                             iso, "Worker entry module evaluation rejected")));
-            w->ReportEntryEvaluationRejection(ctx, reason);
+            w->ReportEntryEvaluationRejection(iso, ctx, reason);
           };
           Local<v8::Function> onFulfilled;
           Local<v8::Function> onRejected;
@@ -798,7 +798,7 @@ void Worker::CloseWorkerCallback(const FunctionCallbackInfo<Value>& info) {
     TryCatch tc(isolate);
     success = onCloseFunc->Call(context, v8::Undefined(isolate), 0, args).ToLocal(&result);
     if (!success && tc.HasCaught()) {
-      worker->CallOnErrorHandlers(tc);
+      worker->CallOnErrorHandlers(isolate, tc);
     }
   }
 }
