@@ -311,9 +311,9 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         /// instances map), we unprotect the corresponding JavaScript object in order to make both
         /// of them destroyable/GC-able. When the JavaScript object is GC-ed we release the native
         /// counterpart as well.
-        void (*retain)(id, SEL) =
-            (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(retain));
-        IMP newRetain = imp_implementationWithBlock(^(id self) {
+        id (*retain)(id, SEL) =
+            (id (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(retain));
+        IMP newRetain = imp_implementationWithBlock(^id(id self) {
           if (!isolateWrapper.IsValid()) {
             return retain(self, @selector(retain));
           }
