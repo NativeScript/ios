@@ -729,9 +729,11 @@ void Worker::OnMessageCallback(Isolate* isolate, Local<Object> receiver,
         return;
       }
       // HTML: a message that cannot be read still reaches its target, as a
-      // `messageerror` event carrying nothing.
+      // `messageerror` event carrying nothing, which leaves `data` at the
+      // null it defaults to. Delivery stores what it is given, so an
+      // undefined here would surface as undefined.
       tc.Reset();
-      data = v8::Undefined(isolate);
+      data = v8::Null(isolate);
       ports = Local<Value>();
       type = "messageerror";
     }
