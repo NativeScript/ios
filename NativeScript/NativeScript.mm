@@ -1,5 +1,6 @@
 #include "NativeScript.h"
 #include <Foundation/Foundation.h>
+#include <dlfcn.h>
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
 #include "inspector/JsV8InspectorClient.h"
@@ -27,8 +28,6 @@ namespace tns {}
 @end
 
 @implementation NativeScript
-
-extern char defaultStartOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");
 
 static void* HostExecutableMetadata() {
   // Debug builds with ENABLE_DEBUG_DYLIB link the app's code and linker flags
@@ -60,6 +59,29 @@ static void* HostExecutableMetadata() {
   return nullptr;
 }
 
+// NativeScriptDefaultMetadata.framework ships only with the NativeScriptSDK
+// package product, embedded next to NativeScript.framework.
+static void* DefaultFrameworkMetadata() {
+  const char* accessorName = "NativeScriptDefaultMetadata";
+  void* accessor = dlsym(RTLD_DEFAULT, accessorName);
+  if (accessor == nullptr) {
+    NSString* frameworksDir = [[[NSBundle bundleForClass:[NativeScript class]] bundlePath]
+        stringByDeletingLastPathComponent];
+    NSBundle* bundle =
+        [NSBundle bundleWithPath:[frameworksDir stringByAppendingPathComponent:
+                                                    @"NativeScriptDefaultMetadata.framework"]];
+    // executablePath, unlike a hand-built path, follows Mac Catalyst's versioned layout.
+    NSString* executable = [bundle executablePath];
+    void* handle =
+        executable != nil ? dlopen(executable.fileSystemRepresentation, RTLD_NOW) : nullptr;
+    accessor = handle != nullptr ? dlsym(handle, accessorName) : nullptr;
+  }
+  if (accessor == nullptr) {
+    return nullptr;
+  }
+  return const_cast<void*>(reinterpret_cast<const void* (*)(void)>(accessor)());
+}
+
 static void* ResolveMetadataPtr(Config* config) {
   if (config.MetadataPtr != nil) {
     return config.MetadataPtr;
@@ -67,7 +89,15 @@ static void* ResolveMetadataPtr(Config* config) {
   if (void* hostMetadata = HostExecutableMetadata()) {
     return hostMetadata;
   }
-  return &defaultStartOfMetadataSection;
+  if (void* defaultMetadata = DefaultFrameworkMetadata()) {
+    return defaultMetadata;
+  }
+  std::string fatal =
+      "no NativeScript metadata found. Pass Config.MetadataPtr, link a __DATA,__TNSMetadata "
+      "section into the app executable (-sectcreate __DATA __TNSMetadata <metadata.bin>), or "
+      "depend on the NativeScriptSDK package product, which bundles default metadata.";
+  Log(@"Fatal: %s", fatal.c_str());
+  throw tns::NativeScriptException("Fatal: " + fatal);
 }
 
 - (void)runScriptString:(NSString*)script runLoop:(BOOL)runLoop {

@@ -340,6 +340,7 @@
 		F6191AB229C0FCE8003F588F /* InspectorServer.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AAA29C0FCE7003F588F /* InspectorServer.mm */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
 		F6191AB629C0FF87003F588F /* utils.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AB429C0FF86003F588F /* utils.h */; };
 		F6191AB729C0FF87003F588F /* utils.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AB529C0FF86003F588F /* utils.mm */; };
+		D3FA1E7A0000000000000004 /* NativeScriptDefaultMetadata.c in Sources */ = {isa = PBXBuildFile; fileRef = D3FA1E7A0000000000000002 /* NativeScriptDefaultMetadata.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -871,6 +872,9 @@
 		F6191AAA29C0FCE7003F588F /* InspectorServer.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = InspectorServer.mm; sourceTree = "<group>"; };
 		F6191AB429C0FF86003F588F /* utils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
 		F6191AB529C0FF86003F588F /* utils.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = utils.mm; sourceTree = "<group>"; };
+		D3FA1E7A0000000000000001 /* NativeScriptDefaultMetadata.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NativeScriptDefaultMetadata.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		D3FA1E7A0000000000000002 /* NativeScriptDefaultMetadata.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = NativeScriptDefaultMetadata.c; sourceTree = "<group>"; };
+		D3FA1E7A0000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -921,6 +925,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C2F4CBB022C60BFD0036B56F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D3FA1E7A0000000000000008 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -1102,6 +1113,7 @@
 				C27E5D8C22F31CCA00498ED0 /* AppWithModules */,
 				C29374E3229FC0F60075CB16 /* TestFixtures */,
 				C2A5DFE62328C4B900A91A76 /* TKLiveSync */,
+				D3FA1E7A0000000000000005 /* NativeScriptDefaultMetadata */,
 				C27E278122202664009C10A3 /* Products */,
 				C2FF3016225203FD00933782 /* Frameworks */,
 			);
@@ -1117,6 +1129,7 @@
 				C27E5D8B22F31CC900498ED0 /* AppWithModules.app */,
 				C23992C7236C2D6E00D2F720 /* TestRunnerTests.xctest */,
 				C2253782241A41C500192740 /* TKLiveSync.framework */,
+				D3FA1E7A0000000000000001 /* NativeScriptDefaultMetadata.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -1249,6 +1262,16 @@
 				C22536D2241A3D8B00192740 /* Info.plist */,
 			);
 			path = TKLiveSync;
+			sourceTree = "<group>";
+		};
+		D3FA1E7A0000000000000005 /* NativeScriptDefaultMetadata */ = {
+			isa = PBXGroup;
+			children = (
+				D3FA1E7A0000000000000002 /* NativeScriptDefaultMetadata.c */,
+				2BFE22052AC1C93100307752 /* metadata-arm64.bin */,
+				D3FA1E7A0000000000000003 /* Info.plist */,
+			);
+			path = NativeScriptDefaultMetadata;
 			sourceTree = "<group>";
 		};
 		C2A5DFF12328CA6F00A91A76 /* libzip */ = {
@@ -1409,7 +1432,6 @@
 			isa = PBXGroup;
 			children = (
 				3C48F68C2F57905500C14231 /* third_party */,
-				2BFE22052AC1C93100307752 /* metadata-arm64.bin */,
 				2BFE21F12AC1B79F00307752 /* embedding */,
 				F1F30E862B58FE28006A62C0 /* ada */,
 				F6191AA529C0FCE7003F588F /* inspector */,
@@ -1871,6 +1893,22 @@
 			productReference = C2F4CBB322C60BFD0036B56F /* metadata-generator */;
 			productType = "com.apple.product-type.tool";
 		};
+		D3FA1E7A0000000000000006 /* NativeScriptDefaultMetadata */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D3FA1E7A0000000000000009 /* Build configuration list for PBXNativeTarget "NativeScriptDefaultMetadata" */;
+			buildPhases = (
+				D3FA1E7A0000000000000007 /* Sources */,
+				D3FA1E7A0000000000000008 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NativeScriptDefaultMetadata;
+			productName = NativeScriptDefaultMetadata;
+			productReference = D3FA1E7A0000000000000001 /* NativeScriptDefaultMetadata.framework */;
+			productType = "com.apple.product-type.framework";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1903,6 +1941,9 @@
 					C2F4CBB222C60BFD0036B56F = {
 						CreatedOnToolsVersion = 10.2.1;
 					};
+					D3FA1E7A0000000000000006 = {
+						CreatedOnToolsVersion = 26.3;
+					};
 				};
 			};
 			buildConfigurationList = C27E277B22202663009C10A3 /* Build configuration list for PBXProject "v8ios" */;
@@ -1925,6 +1966,7 @@
 				C2F4CBB222C60BFD0036B56F /* metadata-generator */,
 				C23992C6236C2D6E00D2F720 /* TestRunnerTests */,
 				C2253781241A41C500192740 /* TKLiveSync */,
+				D3FA1E7A0000000000000006 /* NativeScriptDefaultMetadata */,
 			);
 		};
 /* End PBXProject section */
@@ -2345,6 +2387,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D3FA1E7A0000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D3FA1E7A0000000000000004 /* NativeScriptDefaultMetadata.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2960,10 +3010,6 @@
 					"-lcrdtp_platform",
 					"-linspector",
 					"-linspector_string_conversions",
-					"-sectcreate",
-					__DATA,
-					__TNSMetadata,
-					"\"$(SRCROOT)/NativeScript/metadata-arm64.bin\"",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
@@ -3058,10 +3104,6 @@
 					"-lcrdtp_platform",
 					"-linspector",
 					"-linspector_string_conversions",
-					"-sectcreate",
-					__DATA,
-					__TNSMetadata,
-					"\"$(SRCROOT)/NativeScript/metadata-arm64.bin\"",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScript;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
@@ -3112,6 +3154,78 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				VALID_ARCHS = x86_64;
+			};
+			name = Release;
+		};
+		D3FA1E7A000000000000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = NO;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				INFOPLIST_FILE = NativeScriptDefaultMetadata/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"-sectcreate",
+					__DATA,
+					__TNSMetadata,
+					"\"$(SRCROOT)/NativeScriptDefaultMetadata/metadata-arm64.bin\"",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScriptDefaultMetadata;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Debug;
+		};
+		D3FA1E7A000000000000000B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = NO;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				INFOPLIST_FILE = NativeScriptDefaultMetadata/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"-sectcreate",
+					__DATA,
+					__TNSMetadata,
+					"\"$(SRCROOT)/NativeScriptDefaultMetadata/metadata-arm64.bin\"",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScriptDefaultMetadata;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
 			};
 			name = Release;
 		};
@@ -3186,6 +3300,15 @@
 			buildConfigurations = (
 				C2F4CBB822C60BFD0036B56F /* Debug */,
 				C2F4CBB922C60BFD0036B56F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D3FA1E7A0000000000000009 /* Build configuration list for PBXNativeTarget "NativeScriptDefaultMetadata" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D3FA1E7A000000000000000A /* Debug */,
+				D3FA1E7A000000000000000B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
