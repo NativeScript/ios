@@ -66,6 +66,7 @@ _zip_crypto_aes_free(_zip_crypto_aes_t *aes) {
 
     _zip_crypto_clear(aes, sizeof(*aes));
     free(aes);
+    aes = NULL;
 }
 
 
@@ -119,6 +120,7 @@ _zip_crypto_hmac_free(_zip_crypto_hmac_t *hmac) {
 #else
     HMAC_CTX_free(hmac);
 #endif
+    hmac = NULL;
 }
 
 
