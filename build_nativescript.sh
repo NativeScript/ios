@@ -75,7 +75,6 @@ xcodebuild archive -project v8ios.xcodeproj \
                    EXCLUDED_ARCHS="x86_64" \
                    SKIP_INSTALL=NO \
                    BUILD_LIBRARIES_FOR_DISTRIBUTION=YES \
-                   INCLUDE_DEFAULT_METADATA=$INCLUDE_DEFAULT_METADATA\
                    -archivePath $DIST/intermediates/NativeScript.maccatalyst.xcarchive
 fi
 
@@ -90,7 +89,6 @@ xcodebuild archive -project v8ios.xcodeproj \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
                    BUILD_LIBRARIES_FOR_DISTRIBUTION=YES \
-                   INCLUDE_DEFAULT_METADATA=$INCLUDE_DEFAULT_METADATA\
                    -archivePath $DIST/intermediates/NativeScript.iphonesimulator.xcarchive
 fi
 
@@ -105,7 +103,6 @@ xcodebuild archive -project v8ios.xcodeproj \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
                    BUILD_LIBRARIES_FOR_DISTRIBUTION=YES \
-                   INCLUDE_DEFAULT_METADATA=$INCLUDE_DEFAULT_METADATA\
                    -archivePath $DIST/intermediates/NativeScript.iphoneos.xcarchive
 fi
 

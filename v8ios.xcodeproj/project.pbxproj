@@ -19,7 +19,6 @@
 		2B5088A72BBEC1BC00F6EB68 /* TNSWidgets.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20525A72577D86600C12A5C /* TNSWidgets.xcframework */; };
 		2B7EA6AF2353477000E5184E /* NativeScriptException.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */; };
 		2B7EA6B02353477000E5184E /* NativeScriptException.h in Headers */ = {isa = PBXBuildFile; fileRef = 2B7EA6AE2353477000E5184E /* NativeScriptException.h */; };
-		2BFE22062AC1C93100307752 /* metadata-arm64.bin in Resources */ = {isa = PBXBuildFile; fileRef = 2BFE22052AC1C93100307752 /* metadata-arm64.bin */; };
 		3C1850542A6DCB2D002ACC81 /* Timers.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C1850522A6DCB2D002ACC81 /* Timers.cpp */; };
 		3C1850552A6DCB2D002ACC81 /* Timers.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3C1850532A6DCB2D002ACC81 /* Timers.hpp */; };
 		3CAE10112F900001002ACC81 /* TextEncoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3CAE10012F900001002ACC81 /* TextEncoding.cpp */; };
@@ -1844,7 +1843,6 @@
 				C2DDEB2F229EAB3B00345BFE /* Frameworks */,
 				C2DDEB30229EAB3B00345BFE /* Resources */,
 				65A6D684291F63A30074DF31 /* ShellScript */,
-				2BFE21F02AC1B28000307752 /* Add default metadata */,
 			);
 			buildRules = (
 			);
@@ -1969,7 +1967,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2BFE22062AC1C93100307752 /* metadata-arm64.bin in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1995,24 +1992,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "set -e\ncd \"${SRCROOT}\"\n[ -f .xcode.env ] && . ./.xcode.env\n[ -f .xcode.env.local ] && . ./.xcode.env.local\nif [ -z \"${NODE_BINARY:-}\" ] || [ ! -x \"${NODE_BINARY:-}\" ]; then\n  echo \"error: no usable node for tools/js2c.mjs (NODE_BINARY='${NODE_BINARY:-}'). Run 'npm run setup-xcode-env' in the runtime repo to record your node in .xcode.env.local\" >&2\n  exit 1\nfi\n\"$NODE_BINARY\" tools/js2c.mjs --out-dir NativeScript/runtime/generated --filelist tools/js2c-inputs.xcfilelist NativeScript/runtime/js/*.js\n";
-		};
-		2BFE21F02AC1B28000307752 /* Add default metadata */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Add default metadata";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "echo \"Checking flags to determine whether to copy default metadata\"\nif [ \"$INCLUDE_DEFAULT_METADATA\" = true ] ; then\necho \"Copying ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-arm64.bin directory to ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework\"\ncp ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-arm64.bin ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework/metadata-arm64.bin\necho \"metadata-arm64.bin has been copied.\"\necho \"Copying ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-x86_64.bin directory to ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework\"\ncp ${SRCROOT}/${PRODUCT_NAME}/metadata/metadata-x86_64.bin ${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.framework/metadata-x86_64.bin\necho \"metadata-x86_64.bin has been copied.\"\nelse\necho \"Skipped copying metadata binaries.\"\nfi\n\n";
 		};
 		65A6D684291F63A30074DF31 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
