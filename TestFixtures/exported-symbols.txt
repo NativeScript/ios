@@ -56,6 +56,7 @@ _functionWithUnichar
 _functionWithUShort
 _functionWithUShortPtr
 _TNSIsConfigurationDebug
+_TNSIsAddressSanitizerEnabled
 _TNSClearOutput
 _TNSConstant
 _TNSConstant10_0Plus
