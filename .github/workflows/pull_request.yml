@@ -56,9 +56,23 @@ jobs:
           name: NativeScript-dSYMs
           path: dist/dSYMs
   test:
-    name: Test
+    name: ${{ matrix.name }}
     runs-on: macos-15
     needs: build
+    strategy:
+      # The two variants answer different questions; one failing must not
+      # cancel the other.
+      fail-fast: false
+      matrix:
+        include:
+          - name: Test
+            xcodebuild-args: ""
+            artifact-suffix: ""
+          # Only code compiled here is instrumented: the runtime and the test
+          # fixtures, not the prebuilt V8 archives.
+          - name: Test (ASan)
+            xcodebuild-args: "-enableAddressSanitizer YES"
+            artifact-suffix: "-asan"
     steps:
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
@@ -89,13 +103,13 @@ jobs:
           # TestRunnerTests.swift) need more than 20m headroom per attempt.
           timeout_minutes: 40
           max_attempts: 2
-          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test | xcpretty
+          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro ${{ matrix.xcodebuild-args }} build test | xcpretty
           # Keep the failed attempt's bundle — it holds the diagnostics of the
           # failure being retried. Everything else at the result path must go
           # (including extensionless staging leftovers), or the retry dies with
           # "Existing file at -resultBundlePath".
           on_retry_command: rm -rf $TEST_FOLDER/test_results_attempt1.xcresult; mv $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test_results_attempt1.xcresult 2>/dev/null; for f in $TEST_FOLDER/test_results*; do [ "$f" = "$TEST_FOLDER/test_results_attempt1.xcresult" ] || rm -rf "$f"; done; xcrun simctl shutdown all
-          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test
+          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro ${{ matrix.xcodebuild-args }} build test
       - name: Extract test results
         # Runs even when the test step failed: the xcresult usually still
         # carries the JS suite's junit attachments for the report step below.
@@ -122,11 +136,12 @@ jobs:
         uses: ./.github/actions/collect-test-diagnostics
         with:
           test-folder: ${{env.TEST_FOLDER}}
+          artifact-name: test-diagnostics${{ matrix.artifact-suffix }}
       - name: Archive Test Result Data
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: test-results
+          name: test-results${{ matrix.artifact-suffix }}
           path: |
             ${{env.TEST_FOLDER}}/test_results.xcresult
             ${{env.TEST_FOLDER}}/test_results_attempt1.xcresult
