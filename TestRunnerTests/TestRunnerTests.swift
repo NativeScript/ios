@@ -193,6 +193,7 @@ class TestRunnerTests: XCTestCase {
         }
 
         try! server.start()
+        print("ModuleTestServer listening on 127.0.0.1:\(server.port)")
     }
 
     override func tearDown() {
