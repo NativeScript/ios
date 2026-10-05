@@ -22,21 +22,57 @@ final class ModuleTestServer {
     private let handler: Handler
     private var connections: [ObjectIdentifier: NWConnection] = [:]
 
-    init(port: UInt16, handler: @escaping Handler) throws {
+    enum StartError: Error {
+        case timedOut
+        case noPort
+    }
+
+    /// The loopback port the system assigned; valid once `start()` returned.
+    private(set) var port: UInt16 = 0
+
+    /// The port is left to the system rather than fixed: simulators share the
+    /// host's loopback interface, so two test runs on one machine would
+    /// otherwise answer each other's requests.
+    init(handler: @escaping Handler) throws {
         self.handler = handler
         let params = NWParameters.tcp
-        params.allowLocalEndpointReuse = true
         params.requiredLocalEndpoint = NWEndpoint.hostPort(
             host: NWEndpoint.Host("127.0.0.1"),
-            port: NWEndpoint.Port(rawValue: port)!)
+            port: .any)
         listener = try NWListener(using: params)
         listener.newConnectionHandler = { [weak self] connection in
             self?.accept(connection)
         }
     }
 
-    func start() {
+    /// Blocks until the listener is bound, because the port is only known then.
+    func start() throws {
+        let settled = DispatchSemaphore(value: 0)
+        var failure: Error?
+        listener.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                settled.signal()
+            case .failed(let error):
+                failure = error
+                settled.signal()
+            default:
+                break
+            }
+        }
         listener.start(queue: queue)
+        let outcome = settled.wait(timeout: .now() + 10)
+        listener.stateUpdateHandler = nil
+        if outcome == .timedOut {
+            throw StartError.timedOut
+        }
+        if let failure = failure {
+            throw failure
+        }
+        guard let bound = listener.port?.rawValue, bound != 0 else {
+            throw StartError.noPort
+        }
+        port = bound
     }
 
     func stop() {
