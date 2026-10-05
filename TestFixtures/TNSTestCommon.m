@@ -11,6 +11,14 @@ bool TNSIsConfigurationDebug() {
 #endif
 }
 
+bool TNSIsAddressSanitizerEnabled() {
+#if __has_feature(address_sanitizer)
+  return true;
+#else
+  return false;
+#endif
+}
+
 NSString* TNSGetOutput() {
     if (TNSTestOutput == nil) {
         TNSTestOutput = [NSMutableString new];

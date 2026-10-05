@@ -43,6 +43,19 @@ describe("Worker platform options", function () {
         };
     };
 
+    // In an AddressSanitizer build a worker thread asked for anything below
+    // user-initiated still reads back user-initiated, so those classes cannot
+    // be observed there.
+    var expectQos = function (options, expected, done) {
+        if (TNSIsAddressSanitizerEnabled() && expected < NSQualityOfService.UserInitiated) {
+            pending("quality of service below user-initiated is not observable under AddressSanitizer");
+            return;
+        }
+        reportQos(options, done, function (qos) {
+            expect(qos).toBe(expected);
+        });
+    };
+
     // Background is deliberately absent: the system defines that class as work
     // that may take minutes, and on a loaded host a background thread has not
     // finished booting an isolate within two minutes. It is covered below
@@ -56,9 +69,7 @@ describe("Worker platform options", function () {
 
     priorities.forEach(function (pair) {
         it("runs the worker thread at " + pair[0] + " quality of service", function (done) {
-            reportQos({ ios: { priority: pair[0] } }, done, function (qos) {
-                expect(qos).toBe(pair[1]);
-            });
+            expectQos({ ios: { priority: pair[0] } }, pair[1], done);
         });
     });
 
@@ -71,21 +82,16 @@ describe("Worker platform options", function () {
     });
 
     it("still honors the deprecated iosPriority option", function (done) {
-        reportQos({ iosPriority: "utility" }, done, function (qos) {
-            expect(qos).toBe(NSQualityOfService.Utility);
-        });
+        expectQos({ iosPriority: "utility" }, NSQualityOfService.Utility, done);
     });
 
     it("prefers ios.priority over iosPriority when both are given", function (done) {
-        reportQos({ ios: { priority: "userInteractive" }, iosPriority: "background" }, done, function (qos) {
-            expect(qos).toBe(NSQualityOfService.UserInteractive);
-        });
+        expectQos({ ios: { priority: "userInteractive" }, iosPriority: "background" },
+            NSQualityOfService.UserInteractive, done);
     });
 
     it("ignores unknown keys inside ios", function (done) {
-        reportQos({ ios: { priority: "utility", somethingElse: 42 } }, done, function (qos) {
-            expect(qos).toBe(NSQualityOfService.Utility);
-        });
+        expectQos({ ios: { priority: "utility", somethingElse: 42 } }, NSQualityOfService.Utility, done);
     });
 
     it("starts a worker given no options at all", function (done) {
@@ -95,9 +101,7 @@ describe("Worker platform options", function () {
     });
 
     it("treats ios: null like an absent ios", function (done) {
-        reportQos({ ios: null, iosPriority: "utility" }, done, function (qos) {
-            expect(qos).toBe(NSQualityOfService.Utility);
-        });
+        expectQos({ ios: null, iosPriority: "utility" }, NSQualityOfService.Utility, done);
     });
 
     it("propagates the error thrown by an option getter", function () {

@@ -4,6 +4,8 @@ extern "C" {
 
 bool TNSIsConfigurationDebug();
 
+bool TNSIsAddressSanitizerEnabled();
+
 NSString* TNSGetOutput();
 
 void TNSLog(NSString*);

@@ -1,7 +1,6 @@
 import XCTest
 
 class TestRunnerTests: XCTestCase {
-    private let port = 63846
     private var server: ModuleTestServer!
     private var runtimeUnitTestsExpectation: XCTestExpectation!
     private var reportDeliveryFailureReason: String?
@@ -12,7 +11,7 @@ class TestRunnerTests: XCTestCase {
     private let progressLock = NSLock()
     private var lastSpecSeen = "(no spec reported yet)"
 
-    override func setUp() {
+    override func setUpWithError() throws {
         continueAfterFailure = false
 
         // Standalone (not via self.expectation(...)) so we can drive it through
@@ -20,7 +19,7 @@ class TestRunnerTests: XCTestCase {
         // XCTestCase "must waitForExpectations" rule.
         runtimeUnitTestsExpectation = XCTestExpectation(description: "Jasmine tests")
 
-        self.server = try! ModuleTestServer(port: UInt16(port)) {
+        self.server = try ModuleTestServer {
             (
                 environ: [String: Any],
                 startResponse: @escaping ((String, [(String, String)]) -> Void),
@@ -193,11 +192,12 @@ class TestRunnerTests: XCTestCase {
             sendBody(Data("Not Found".utf8))
         }
 
-        server.start()
+        try server.start()
+        print("ModuleTestServer listening on 127.0.0.1:\(server.port)")
     }
 
     override func tearDown() {
-        server.stop()
+        server?.stop()
     }
 
     func testRuntime() {
@@ -210,7 +210,7 @@ class TestRunnerTests: XCTestCase {
         let jasmineTestsTimeout: TimeInterval = 600
 
         let app = XCUIApplication()
-        app.launchEnvironment["REPORT_BASEURL"] = "http://127.0.0.1:\(port)/junit_report"
+        app.launchEnvironment["REPORT_BASEURL"] = "http://127.0.0.1:\(server.port)/junit_report"
         // The app's report retries and delivery_failed sentinel count from its
         // launch, which precedes the wait below — keep a margin so delivery
         // gives up (and the sentinel lands) before our timeout fires.
