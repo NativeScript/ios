@@ -729,11 +729,16 @@ void Worker::OnMessageCallback(Isolate* isolate, Local<Object> receiver,
         return;
       }
       // HTML: a message that cannot be read still reaches its target, as a
-      // `messageerror` event carrying nothing, which leaves `data` at the
-      // null it defaults to. Delivery stores what it is given, so an
-      // undefined here would surface as undefined.
+      // `messageerror` event. Its `data` is the failure, the same as a port's
+      // (NativeMessagePort::Drain) and as what Node hands
+      // `worker.on("messageerror")`; null when nothing was thrown, since
+      // delivery stores the payload as given and a bare undefined would
+      // surface as such.
+      data = tc.HasCaught() ? tc.Exception() : Local<Value>();
+      if (data.IsEmpty() || data->IsUndefined()) {
+        data = v8::Null(isolate);
+      }
       tc.Reset();
-      data = v8::Null(isolate);
       ports = Local<Value>();
       type = "messageerror";
     }
