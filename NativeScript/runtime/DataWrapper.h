@@ -616,7 +616,6 @@ class WorkerWrapper : public BaseDataWrapper {
 
   const WrapperType Type();
   const int Id();
-  const inline bool isDisposed() { return isDisposed_; }
   const bool IsRunning();
   const bool IsClosing();
   const int WorkerId();
@@ -624,17 +623,38 @@ class WorkerWrapper : public BaseDataWrapper {
   // The only route from the worker thread to the parent: see mainLoop_.
   std::weak_ptr<EventLoop> MainLoop() const { return mainLoop_; }
   const inline v8::Isolate* GetWorkerIsolate() { return workerIsolate_; }
-  const inline void MakeWeak() { isWeak_ = true; }
-  const inline bool IsWeak() { return isWeak_; }
+
+  // Deletion is decided by who still holds the wrapper. The parent's Worker
+  // object holds it from construction; Start() adds the worker thread. Each
+  // side lets go exactly once, with a compare-and-swap out of Holders::Both,
+  // so exactly one of them finds itself the last holder and deletes.
+  //
+  // Parent's thread, during the final disposal of the parent isolate. Returns
+  // true when the worker thread is already done with the wrapper (or never
+  // had it), which leaves the delete to the caller; false when the worker
+  // thread still uses it and deletes it when it ends.
+  bool ReleaseFromParent();
+  // Parent's thread, from the Worker object's finalizer. True when the worker
+  // thread is done with the wrapper (or never had it), so the caller may
+  // delete; nothing changes when false.
+  bool HeldByParentOnly() const;
+  // Worker thread, as its last touch of the wrapper and after it removed the
+  // wrapper's Caches::Workers entry. Deletes the wrapper when the parent has
+  // already let go; otherwise the parent may delete it from here on.
+  void ReleaseFromWorkerThread();
 
  private:
+  enum class Holders : uint8_t { Parent, Both, WorkerThread };
+
   v8::Isolate* mainIsolate_;
   v8::Isolate* workerIsolate_;
   std::atomic<bool> isRunning_;
   std::atomic<bool> isClosing_;
   std::atomic<bool> isTerminating_;
+  // The worker thread has started tearing down. Worker thread only; who
+  // deletes the wrapper is holders_, not this.
   std::atomic<bool> isDisposed_;
-  std::atomic<bool> isWeak_;
+  std::atomic<Holders> holders_;
   // False until the entry script has finished evaluating (EnableMessageQueue);
   // DrainPendingTasks leaves the queue untouched while disabled.
   std::atomic<bool> messagesEnabled_;
@@ -674,8 +694,10 @@ class WorkerWrapper : public BaseDataWrapper {
   bool workerObjectRooted_ = false;
   // Cleared by the destructor, so a task posted from the worker thread can tell
   // whether this wrapper still exists once it reaches the main isolate. The
-  // wrapper is only ever destroyed with that isolate locked, which is what the
-  // task takes before reading this.
+  // parent deletes the wrapper with that isolate locked, which is what the task
+  // takes before reading this. The worker thread only deletes it after the
+  // parent's final disposal, which follows the shutdown of the loop such a
+  // task would run on.
   std::shared_ptr<std::atomic<WorkerWrapper*>> selfRef_;
 
   void BackgroundLooper(std::function<v8::Isolate*()> func);

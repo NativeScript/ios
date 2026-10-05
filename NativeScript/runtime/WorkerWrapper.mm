@@ -52,7 +52,7 @@ WorkerWrapper::WorkerWrapper(
       isClosing_(false),
       isTerminating_(false),
       isDisposed_(false),
-      isWeak_(false),
+      holders_(Holders::Parent),
       messagesEnabled_(false),
       onMessage_(onMessage),
       mainLoop_(Runtime::GetRuntime(mainIsolate)->GetEventLoop()),
@@ -84,6 +84,8 @@ void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker,
   // entry script clears this flag from its own thread, and a store made after
   // queueing could land on top of that.
   this->isRunning_ = true;
+  // Also before queueing: the operation's last act is to let go of the wrapper.
+  this->holders_.store(Holders::Both, std::memory_order_release);
 
   NSBlockOperation* op = [NSBlockOperation blockOperationWithBlock:^{
     this->BackgroundLooper(func);
@@ -246,39 +248,60 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
   // is deleted below.
   this->DestroyInspector();
 
-  // The callback closes over this wrapper, which ~Runtime may delete below,
-  // while V8 keeps the registration until the isolate is disposed - and
-  // disposal can be deferred past that point.
+  // The callback closes over this wrapper, which may be deleted at the end of
+  // this function, while V8 keeps the registration until the isolate is
+  // disposed - and disposal can be deferred past that point.
   if (this->heapLimitIsolate_ != nullptr) {
     v8::Locker locker(this->heapLimitIsolate_);
     this->heapLimitIsolate_->RemoveNearHeapLimitCallback(WorkerWrapper::OnNearHeapLimit, 0);
     this->heapLimitIsolate_ = nullptr;
   }
 
-  // Everything needed below is read first: publishing isDisposed_ is the last
-  // permitted touch of `this`. From that store on, a parent that is tearing
-  // down may delete this wrapper concurrently, and ~Runtime deletes it on this
-  // thread when the parent already handed ownership over.
+  // Read before ReleaseFromWorkerThread below, after which `this` may be gone.
   Isolate* mainIsolate = this->mainIsolate_;
   std::weak_ptr<EventLoop> mainLoop = this->mainLoop_;
   std::shared_ptr<std::atomic<WorkerWrapper*>> selfRef = this->selfRef_;
-  int workerId = this->workerId_;
   this->isDisposed_ = true;
 
   Runtime* runtime = Runtime::GetCurrentRuntime();
   if (runtime != nullptr) {
+    // Removes this worker's Caches::Workers entry.
     delete runtime;
   } else {
-    // Runtime was never created (worker terminated before initialization).
-    // The runtime destructor normally handles this cleanup, so do it here.
-    bool found;
-    auto state = Caches::Workers->Get(workerId, found);
-    if (found) {
-      Caches::Workers->Remove(workerId);
-    }
+    // Runtime was never created (worker terminated before initialization), so
+    // the entry its destructor removes is removed here.
+    Caches::Workers->Remove(this->workerId_);
   }
 
+  // The registry entry is gone, so no other runtime's teardown can reach the
+  // wrapper through it any more, and nothing on this thread needs it again.
+  this->ReleaseFromWorkerThread();
+
   PostThreadEndedNotification(mainIsolate, mainLoop, selfRef);
+}
+
+bool WorkerWrapper::ReleaseFromParent() {
+  Holders expected = Holders::Both;
+  if (this->holders_.compare_exchange_strong(expected, Holders::WorkerThread,
+                                             std::memory_order_acq_rel)) {
+    return false;
+  }
+  // A failed exchange leaves the value found in `expected`. Anything but
+  // Parent means the parent let go earlier and the worker thread still has it.
+  return expected == Holders::Parent;
+}
+
+bool WorkerWrapper::HeldByParentOnly() const {
+  return this->holders_.load(std::memory_order_acquire) == Holders::Parent;
+}
+
+void WorkerWrapper::ReleaseFromWorkerThread() {
+  Holders expected = Holders::Both;
+  if (!this->holders_.compare_exchange_strong(expected, Holders::Parent,
+                                              std::memory_order_acq_rel) &&
+      expected == Holders::WorkerThread) {
+    delete this;
+  }
 }
 
 void WorkerWrapper::EnableMessageQueue() {
