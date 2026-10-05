@@ -11,7 +11,7 @@ class TestRunnerTests: XCTestCase {
     private let progressLock = NSLock()
     private var lastSpecSeen = "(no spec reported yet)"
 
-    override func setUp() {
+    override func setUpWithError() throws {
         continueAfterFailure = false
 
         // Standalone (not via self.expectation(...)) so we can drive it through
@@ -19,7 +19,7 @@ class TestRunnerTests: XCTestCase {
         // XCTestCase "must waitForExpectations" rule.
         runtimeUnitTestsExpectation = XCTestExpectation(description: "Jasmine tests")
 
-        self.server = try! ModuleTestServer {
+        self.server = try ModuleTestServer {
             (
                 environ: [String: Any],
                 startResponse: @escaping ((String, [(String, String)]) -> Void),
@@ -192,12 +192,12 @@ class TestRunnerTests: XCTestCase {
             sendBody(Data("Not Found".utf8))
         }
 
-        try! server.start()
+        try server.start()
         print("ModuleTestServer listening on 127.0.0.1:\(server.port)")
     }
 
     override func tearDown() {
-        server.stop()
+        server?.stop()
     }
 
     func testRuntime() {
