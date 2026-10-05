@@ -1,5 +1,8 @@
 #include "NativeScript.h"
 #include <Foundation/Foundation.h>
+#include <dlfcn.h>
+#include <mach-o/dyld.h>
+#include <mach-o/getsect.h>
 #include "inspector/JsV8InspectorClient.h"
 #include "runtime/Console.h"
 #include "runtime/Helpers.h"
@@ -26,7 +29,76 @@ namespace tns {}
 
 @implementation NativeScript
 
-extern char defaultStartOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");
+static void* HostExecutableMetadata() {
+  // Debug builds with ENABLE_DEBUG_DYLIB link the app's code and linker flags
+  // into <executable>.debug.dylib and leave the executable a stub.
+  NSString* debugDylibName = [[[[NSBundle mainBundle] executablePath] lastPathComponent]
+      stringByAppendingString:@".debug.dylib"];
+  for (uint32_t i = 0, count = _dyld_image_count(); i < count; i++) {
+    const struct mach_header* header = _dyld_get_image_header(i);
+    if (header == nullptr) {
+      continue;
+    }
+    if (header->filetype != MH_EXECUTE) {
+      const char* path = _dyld_get_image_name(i);
+      const char* name = path != nullptr ? strrchr(path, '/') : nullptr;
+      if (debugDylibName == nil || name == nullptr ||
+          strcmp(name + 1, debugDylibName.UTF8String) != 0) {
+        continue;
+      }
+    }
+    unsigned long size = 0;
+    uint8_t* data = getsectiondata(reinterpret_cast<const struct mach_header_64*>(header), "__DATA",
+                                   "__TNSMetadata", &size);
+    // The app template creates an empty metadata file before the generator
+    // runs, so an empty section means the host carries no metadata.
+    if (data != nullptr && size > 0) {
+      return data;
+    }
+  }
+  return nullptr;
+}
+
+// NativeScriptDefaultMetadata.framework ships only with the NativeScriptSDK
+// package product, embedded next to NativeScript.framework.
+static void* DefaultFrameworkMetadata() {
+  const char* accessorName = "NativeScriptDefaultMetadata";
+  void* accessor = dlsym(RTLD_DEFAULT, accessorName);
+  if (accessor == nullptr) {
+    NSString* frameworksDir = [[[NSBundle bundleForClass:[NativeScript class]] bundlePath]
+        stringByDeletingLastPathComponent];
+    NSBundle* bundle =
+        [NSBundle bundleWithPath:[frameworksDir stringByAppendingPathComponent:
+                                                    @"NativeScriptDefaultMetadata.framework"]];
+    // executablePath, unlike a hand-built path, follows Mac Catalyst's versioned layout.
+    NSString* executable = [bundle executablePath];
+    void* handle =
+        executable != nil ? dlopen(executable.fileSystemRepresentation, RTLD_NOW) : nullptr;
+    accessor = handle != nullptr ? dlsym(handle, accessorName) : nullptr;
+  }
+  if (accessor == nullptr) {
+    return nullptr;
+  }
+  return const_cast<void*>(reinterpret_cast<const void* (*)(void)>(accessor)());
+}
+
+static void* ResolveMetadataPtr(Config* config) {
+  if (config.MetadataPtr != nil) {
+    return config.MetadataPtr;
+  }
+  if (void* hostMetadata = HostExecutableMetadata()) {
+    return hostMetadata;
+  }
+  if (void* defaultMetadata = DefaultFrameworkMetadata()) {
+    return defaultMetadata;
+  }
+  std::string fatal =
+      "no NativeScript metadata found. Pass Config.MetadataPtr, link a __DATA,__TNSMetadata "
+      "section into the app executable (-sectcreate __DATA __TNSMetadata <metadata.bin>), or "
+      "depend on the NativeScriptSDK package product, which bundles default metadata.";
+  Log(@"Fatal: %s", fatal.c_str());
+  throw tns::NativeScriptException("Fatal: " + fatal);
+}
 
 - (void)runScriptString:(NSString*)script runLoop:(BOOL)runLoop {
   std::string cppString = std::string([script UTF8String]);
@@ -165,11 +237,7 @@ static void DestroyMainRuntime() {
       RuntimeConfig.ApplicationPath =
           [[config.BaseDir stringByAppendingPathComponent:@"app"] UTF8String];
     }
-    if (config.MetadataPtr != nil) {
-      RuntimeConfig.MetadataPtr = [config MetadataPtr];
-    } else {
-      RuntimeConfig.MetadataPtr = &defaultStartOfMetadataSection;
-    }
+    RuntimeConfig.MetadataPtr = ResolveMetadataPtr(config);
     RuntimeConfig.IsDebug = [config IsDebug];
     RuntimeConfig.LogToSystemConsole = [config LogToSystemConsole];
 

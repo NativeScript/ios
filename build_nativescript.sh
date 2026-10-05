@@ -9,20 +9,21 @@ source "$(dirname "$0")/build_utils.sh"
 function to_bool() {
   local arg="$1"
   case "$(echo "$arg" | tr '[:upper:]' '[:lower:]')" in
-    [0-9]+)
-      if [ $arg -eq 0 ]; then
-        echo false
-      else
-        echo true
-      fi
-      ;;
     n|no|f|false) echo false ;;
     y|yes|t|true) echo true ;;
-    * )
+    # case patterns are globs, not regexes: whatever gets past this arm is all digits
+    ''|*[!0-9]*)
       if [ -n "$arg" ]; then
         echo "warning: invalid boolean argument ('$arg'). Expected true or false" >&2
       fi
       echo false
+      ;;
+    * )
+      if [ "$arg" -eq 0 ]; then
+        echo false
+      else
+        echo true
+      fi
       ;;
   esac;
 }
@@ -54,7 +55,7 @@ if ! $VERBOSE; then
 fi
 
 DEV_TEAM=${DEVELOPMENT_TEAM:-}
-DIST=$(PWD)/dist
+DIST="$PWD/dist"
 mkdir -p $DIST
 
 mkdir -p $DIST/intermediates
@@ -75,7 +76,6 @@ xcodebuild archive -project v8ios.xcodeproj \
                    EXCLUDED_ARCHS="x86_64" \
                    SKIP_INSTALL=NO \
                    BUILD_LIBRARIES_FOR_DISTRIBUTION=YES \
-                   INCLUDE_DEFAULT_METADATA=$INCLUDE_DEFAULT_METADATA\
                    -archivePath $DIST/intermediates/NativeScript.maccatalyst.xcarchive
 fi
 
@@ -90,7 +90,6 @@ xcodebuild archive -project v8ios.xcodeproj \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
                    BUILD_LIBRARIES_FOR_DISTRIBUTION=YES \
-                   INCLUDE_DEFAULT_METADATA=$INCLUDE_DEFAULT_METADATA\
                    -archivePath $DIST/intermediates/NativeScript.iphonesimulator.xcarchive
 fi
 
@@ -105,7 +104,6 @@ xcodebuild archive -project v8ios.xcodeproj \
                    DEVELOPMENT_TEAM=$DEV_TEAM \
                    SKIP_INSTALL=NO \
                    BUILD_LIBRARIES_FOR_DISTRIBUTION=YES \
-                   INCLUDE_DEFAULT_METADATA=$INCLUDE_DEFAULT_METADATA\
                    -archivePath $DIST/intermediates/NativeScript.iphoneos.xcarchive
 fi
 

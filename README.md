@@ -165,6 +165,20 @@ package can be built in two modes (`--spm-mode`, see `./build_npm_ios.sh --help`
   so a remote-mode package only resolves for versions that shipped through
   `.github/workflows/npm_release.yml` — don't use this mode for local builds.
 
+ios-spm exposes two iOS products:
+
+- **`NativeScript`** — the runtime and TKLiveSync. {N} CLI apps use this product and link
+  the metadata generated for them into their own executable.
+- **`NativeScriptSDK`** — additionally links `NativeScriptDefaultMetadata`, a separate
+  framework carrying a default snapshot of iOS SDK metadata, for apps that embed NativeScript
+  without generating metadata of their own. Built by `./build_default_metadata.sh` (iOS
+  family only; there is no visionOS build).
+
+At startup the runtime uses `Config.MetadataPtr` if set, otherwise a `__DATA,__TNSMetadata`
+section linked into the host executable, otherwise `NativeScriptDefaultMetadata.framework` if
+it is embedded next to `NativeScript.framework`, and fails to start if none is found. The
+embedded local package only serves CLI apps, so it does not include the default metadata.
+
 # Local Development & Linking
 
 To use a locally built runtime in an app, build the default (embedded) package and point

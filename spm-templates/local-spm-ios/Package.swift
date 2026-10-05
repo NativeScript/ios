@@ -1,10 +1,12 @@
 // swift-tools-version: 5.10
 // Local SwiftPM package embedded in @nativescript/ios packages built with
 // NS_SPM_MODE=embedded (the default outside the release pipeline). Same
-// product shape as the released github.com/NativeScript/ios-spm manifest, but
+// product names as the released github.com/NativeScript/ios-spm manifest, but
 // the binary targets point at the xcframework zips packed next to this
 // manifest (framework/internal/local-spm), so the npm package is fully
-// self-contained and portable.
+// self-contained and portable. Only CLI apps consume this package, and they
+// link their own metadata, so unlike ios-spm's NativeScriptSDK product nothing
+// here bundles NativeScriptDefaultMetadata.
 //
 // The frameworks are zipped because npm strips symlinks (the Mac Catalyst
 // slices contain them); SwiftPM extracts local zip binary targets itself.

@@ -89,7 +89,11 @@ if (!VERSION_RE.test(opts.version)) {
   process.exit(1);
 }
 
-const IOS_KEYS = ["NS_CHECKSUM_NATIVESCRIPT_IOS", "NS_CHECKSUM_TKLIVESYNC_IOS"];
+const IOS_KEYS = [
+  "NS_CHECKSUM_NATIVESCRIPT_IOS",
+  "NS_CHECKSUM_TKLIVESYNC_IOS",
+  "NS_CHECKSUM_DEFAULTMETADATA_IOS",
+];
 const VISION_KEYS = [
   "NS_CHECKSUM_NATIVESCRIPT_VISIONOS",
   "NS_CHECKSUM_TKLIVESYNC_VISIONOS",
@@ -209,10 +213,12 @@ let package = Package(
         .macCatalyst(.v13),${visionPlatform}
     ],
     products: [
-        // iOS family (iphoneos + iphonesimulator + Mac Catalyst)
+        // iOS family (iphoneos + iphonesimulator + Mac Catalyst). Apps built by
+        // the NativeScript CLI link their own metadata and use this product.
         .library(name: "NativeScript", targets: ["NativeScript", "TKLiveSync"]),
-        // Backwards-compatible alias for the historical product name.
-        .library(name: "NativeScriptSDK", targets: ["NativeScript", "TKLiveSync"]),${visionProduct}
+        // For embedding NativeScript into an existing app: also bundles default
+        // iOS SDK metadata, used when the host provides none of its own.
+        .library(name: "NativeScriptSDK", targets: ["NativeScript", "TKLiveSync", "NativeScriptDefaultMetadata"]),${visionProduct}
     ],
     dependencies: [],
     targets: [
@@ -225,6 +231,11 @@ let package = Package(
             name: "TKLiveSync",
             url: "\\(releaseBase)/TKLiveSync.xcframework.zip",
             checksum: "${checksums.NS_CHECKSUM_TKLIVESYNC_IOS}"
+        ),
+        .binaryTarget(
+            name: "NativeScriptDefaultMetadata",
+            url: "\\(releaseBase)/NativeScriptDefaultMetadata.xcframework.zip",
+            checksum: "${checksums.NS_CHECKSUM_DEFAULTMETADATA_IOS}"
         ),${visionTargets}
     ]
 )

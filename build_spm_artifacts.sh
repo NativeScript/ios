@@ -69,12 +69,22 @@ zip_xcframework "TKLiveSync.xcframework" "$TK_ZIP"
 NS_SUM="$(compute_checksum "$OUT/$NS_ZIP")"
 TK_SUM="$(compute_checksum "$OUT/$TK_ZIP")"
 
+# Default metadata ships for the iOS family only.
+if [ "$TARGET" = "ios" ]; then
+  DM_ZIP="NativeScriptDefaultMetadata.xcframework.zip"
+  zip_xcframework "NativeScriptDefaultMetadata.xcframework" "$DM_ZIP"
+  DM_SUM="$(compute_checksum "$OUT/$DM_ZIP")"
+fi
+
 # Per-target filename so the iOS and visionOS env files don't collide when the
 # release/stamp jobs merge both platforms' artifacts into one directory.
 CHECKSUMS="$OUT/checksums-$TARGET.env"
 {
   echo "${NS_KEY}=${NS_SUM}"
   echo "${TK_KEY}=${TK_SUM}"
+  if [ -n "${DM_SUM:-}" ]; then
+    echo "NS_CHECKSUM_DEFAULTMETADATA_IOS=${DM_SUM}"
+  fi
 } > "$CHECKSUMS"
 
 checkpoint "SwiftPM artifacts ready in $OUT:"
