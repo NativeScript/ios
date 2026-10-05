@@ -265,10 +265,18 @@ bool tns::DeleteWrapperIfUnused(Isolate* isolate, const Local<Value>& obj, BaseD
   return false;
 }
 
-void tns::SetValue(Isolate* isolate, const Local<Object>& obj, BaseDataWrapper* value) {
-  if (obj.IsEmpty() || obj->IsNullOrUndefined()) {
+void tns::SetValue(Isolate* isolate, const Local<Object>& val, BaseDataWrapper* value) {
+  if (val.IsEmpty() || val->IsNullOrUndefined()) {
     return;
   }
+
+  // Wrapper state lives on the Proxy target so that it is found by the same
+  // identity GetValue resolves to.
+  Local<Value> target = tns::UnwrapProxy(val);
+  if (target.IsEmpty()) {
+    return;
+  }
+  Local<Object> obj = target.As<Object>();
 
   Local<External> ext = External::New(isolate, value, v8::kExternalPointerTypeTagDefault);
 
@@ -531,11 +539,12 @@ tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>
 }
 
 void tns::DeleteValue(Isolate* isolate, const Local<Value>& val) {
-  if (val.IsEmpty() || val->IsNullOrUndefined() || !val->IsObject()) {
+  Local<Value> target = tns::UnwrapProxy(val);
+  if (target.IsEmpty() || target->IsNullOrUndefined() || !target->IsObject()) {
     return;
   }
 
-  Local<Object> obj = val.As<Object>();
+  Local<Object> obj = target.As<Object>();
   if (obj->InternalFieldCount() > 0) {
     obj->SetInternalField(0, v8::Undefined(isolate));
     return;

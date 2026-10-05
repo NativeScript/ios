@@ -280,8 +280,9 @@ v8::Local<v8::Value> UnwrapProxyOrThrow(v8::Isolate* isolate, v8::Local<v8::Valu
 v8::Local<v8::Context> GetCreationContextOrCurrent(v8::Isolate* isolate,
                                                    const v8::Local<v8::Object>& obj);
 
+// Set/Get/DeleteValue all resolve through proxies: wrapper state is keyed by
+// the Proxy target, so a proxied wrapper yields its target's wrapper.
 void SetValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, BaseDataWrapper* value);
-// Resolves through proxies: a proxied wrapper yields its target's wrapper.
 BaseDataWrapper* GetValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
 
 // What happens when JS touches a wrapper whose native counterpart has already

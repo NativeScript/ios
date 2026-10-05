@@ -140,6 +140,23 @@ describe(module.id, function () {
         expect(function () {
             findAccessor(NSOperation.prototype, "name").set.call(proxy, "x");
         }).toThrowError(TypeError, /not a native object/);
+        expect(function () {
+            NSString.stringWithString.call(new Proxy(function () {}, {}), "x");
+        }).toThrowError(TypeError, /not a native object/);
+    });
+
+    it("releases the native counterpart of the proxy target", function () {
+        var target = NSMutableString.alloc().init();
+        var proxy = new Proxy(target, {});
+
+        __releaseNativeCounterpart(proxy);
+
+        expect(function () {
+            __releaseNativeCounterpart(target);
+        }).toThrowError(/not a native wrapper/);
+        expect(function () {
+            __releaseNativeCounterpart(proxy);
+        }).toThrowError(/not a native wrapper/);
     });
 
     it("consults proxy traps for the lookup and calls the target natively", function () {
