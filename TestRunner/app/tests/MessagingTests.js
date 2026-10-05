@@ -252,6 +252,16 @@ describe("Messaging runtime edges", function () {
                 }
             };
         });
+
+        it("reports an error onclose threw while the entry script was still running", function (done) {
+            var worker = new Worker("./messaging/throwingOncloseWorker.js");
+            worker.onerror = function (event) {
+                event.preventDefault();
+                expect(event.message).toContain("boom from onclose");
+                worker.terminate();
+                done();
+            };
+        });
     });
 
     describe("AbortSignal handler attribute accounting", function () {

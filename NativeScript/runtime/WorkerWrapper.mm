@@ -122,16 +122,25 @@ void WorkerWrapper::UnrootWorkerObject() {
 }
 
 void WorkerWrapper::EndWrapperLifetime() {
-  Local<Value> worker =
-      this->poWorker_ != nullptr ? this->poWorker_->Get(this->mainIsolate_) : Local<Value>();
+  // The dispatch below runs listeners, and a listener may shut the runtime
+  // down, whose teardown deletes this wrapper. Everything the dispatch needs is
+  // read first, and the liveness token says afterwards whether `this` is still
+  // there to unroot.
+  Isolate* isolate = this->mainIsolate_;
+  std::shared_ptr<std::atomic<WorkerWrapper*>> selfRef = this->selfRef_;
+  Local<Value> worker = this->poWorker_ != nullptr ? this->poWorker_->Get(isolate) : Local<Value>();
   if (!worker.IsEmpty() && worker->IsObject()) {
-    TryCatch tc(this->mainIsolate_);
-    Worker::EmitEnded(this->mainIsolate_, worker.As<Object>());
+    TryCatch tc(isolate);
+    Worker::EmitEnded(isolate, worker.As<Object>());
     if (tc.HasCaught()) {
       Local<Value> error = tc.Exception();
-      Log(@"%s", tns::ToString(this->mainIsolate_, error).c_str());
-      this->mainIsolate_->ThrowException(error);
+      Log(@"%s", tns::ToString(isolate, error).c_str());
+      isolate->ThrowException(error);
     }
+  }
+  if (selfRef->load(std::memory_order_acquire) == nullptr) {
+    // Deleted during the dispatch; that teardown released the Worker object.
+    return;
   }
   this->UnrootWorkerObject();
 }
@@ -183,7 +192,7 @@ void WorkerWrapper::DrainPendingTasks() {
     this->onMessage_(this->workerIsolate_, globalTarget, message);
 
     if (tc.HasCaught()) {
-      this->CallOnErrorHandlers(tc);
+      this->CallOnErrorHandlers(this->workerIsolate_, tc);
     }
   }
 
@@ -234,7 +243,11 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
         },
         this);
 
-    this->workerIsolate_ = func();
+    Isolate* workerIsolate = func();
+    {
+      std::lock_guard<std::mutex> lock(this->workerIsolateMutex_);
+      this->workerIsolate_ = workerIsolate;
+    }
 
     this->DrainPendingTasks();
 
@@ -242,6 +255,20 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
     if (!this->isTerminating_) {
       CFRunLoopRun();
     }
+  }
+
+  // The queue borrows this thread's run loop, so it lets go of it before the
+  // thread leaves: a terminate() that made this thread skip the loop above
+  // only reaches its own queue_.Terminate() later, possibly after the thread
+  // and its run loop are gone. A second Terminate() finds nothing set.
+  this->queue_.Terminate();
+
+  // Withdrawn before the runtime and its isolate go away below. Terminate()
+  // uses the isolate under this mutex, so a terminate that already read it has
+  // finished with it by the time this returns, and a later one finds null.
+  {
+    std::lock_guard<std::mutex> lock(this->workerIsolateMutex_);
+    this->workerIsolate_ = nullptr;
   }
 
   // The inspector must be gone before the Runtime (and with it the isolate)
@@ -315,20 +342,25 @@ void WorkerWrapper::Terminate() {
   // set terminating to true atomically
   bool wasTerminating = this->isTerminating_.exchange(true);
   if (!wasTerminating) {
-    if (this->workerIsolate_ != nullptr) {
-      // Flagged before the request so a pump that is between iterations sees
-      // it on its next check, rather than only once V8 has some JS to
-      // interrupt — which a parked graph never provides.
-      //
-      // NOTE: `workerIsolate_` is assigned only after the worker's ENTRY has
-      // finished evaluating, so a worker still parked in its entry is not
-      // reachable from here at all and terminate() does nothing for it. That
-      // is a pre-existing worker-lifecycle gap, not something this flag can
-      // close — see the follow-up filed for it.
-      if (Runtime* workerRuntime = Runtime::GetRuntime(this->workerIsolate_)) {
-        workerRuntime->RequestTermination();
+    {
+      // Held across the use, not just the read: the worker thread withdraws
+      // the isolate under the same mutex before deleting its runtime.
+      std::lock_guard<std::mutex> lock(this->workerIsolateMutex_);
+      if (this->workerIsolate_ != nullptr) {
+        // Flagged before the request so a pump that is between iterations sees
+        // it on its next check, rather than only once V8 has some JS to
+        // interrupt — which a parked graph never provides.
+        //
+        // NOTE: `workerIsolate_` is assigned only after the worker's ENTRY has
+        // finished evaluating, so a worker still parked in its entry is not
+        // reachable from here at all and terminate() does nothing for it. That
+        // is a pre-existing worker-lifecycle gap, not something this flag can
+        // close — see the follow-up filed for it.
+        if (Runtime* workerRuntime = Runtime::GetRuntime(this->workerIsolate_)) {
+          workerRuntime->RequestTermination();
+        }
+        this->workerIsolate_->TerminateExecution();
       }
-      this->workerIsolate_->TerminateExecution();
     }
     {
       // A worker paused at a breakpoint sits in the inspector's nested pause
@@ -437,11 +469,10 @@ void WorkerWrapper::DestroyInspector() {
   delete client;
 }
 
-void WorkerWrapper::CallOnErrorHandlers(TryCatch& tc) {
+void WorkerWrapper::CallOnErrorHandlers(Isolate* isolate, TryCatch& tc) {
   if (this->isTerminating_) {
     return;
   }
-  Isolate* isolate = this->workerIsolate_;
   Local<Context> context = Caches::Get(isolate)->GetContext();
   Local<Object> global = context->Global();
 
@@ -470,11 +501,11 @@ void WorkerWrapper::CallOnErrorHandlers(TryCatch& tc) {
   this->PassUncaughtExceptionFromWorkerToMain(context, tc);
 }
 
-void WorkerWrapper::ReportEntryEvaluationRejection(Local<Context> context, Local<Value> reason) {
+void WorkerWrapper::ReportEntryEvaluationRejection(Isolate* isolate, Local<Context> context,
+                                                   Local<Value> reason) {
   if (this->isTerminating_) {
     return;
   }
-  Isolate* isolate = this->workerIsolate_;
   Local<Object> global = context->Global();
 
   Local<Value> onErrorVal;
