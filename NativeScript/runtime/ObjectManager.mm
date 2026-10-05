@@ -350,7 +350,9 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
     return;
   }
 
-  Local<Value> value = info[0];
+  // The lookup, the Instances key and the final SetValue must all address the
+  // same object, so a Proxy is resolved once here.
+  Local<Value> value = tns::UnwrapProxy(info[0]);
   BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
 
   if (wrapper == nullptr) {

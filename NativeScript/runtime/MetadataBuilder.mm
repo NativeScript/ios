@@ -34,11 +34,14 @@ bool ResolveProxyReceiver(Isolate* isolate, Local<Object>& receiver, const char*
   const char* reason = nullptr;
   if (target.IsEmpty()) {
     reason = "on a revoked Proxy";
-  } else if (!(allowClass && target->IsFunction())) {
-    BaseDataWrapper* wrapper =
-        target.As<Object>()->InternalFieldCount() > 0 ? tns::GetValue(isolate, target) : nullptr;
-    if (wrapper == nullptr || (wrapper->Type() != WrapperType::ObjCObject &&
-                               wrapper->Type() != WrapperType::ObjCAllocObject)) {
+  } else {
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, target);
+    bool isClass = allowClass && target->IsFunction() && wrapper != nullptr &&
+                   wrapper->Type() == WrapperType::ObjCClass;
+    bool isInstance = target.As<Object>()->InternalFieldCount() > 0 && wrapper != nullptr &&
+                      (wrapper->Type() == WrapperType::ObjCObject ||
+                       wrapper->Type() == WrapperType::ObjCAllocObject);
+    if (!isClass && !isInstance) {
       reason = "on a Proxy whose target is not a native object";
     }
   }
