@@ -31,7 +31,7 @@ private:
     CFRunLoopRef runLoop_ = nullptr;
     std::atomic<bool> terminated{false};
     std::mutex mutex_;
-    std::mutex initializationMutex_;
+    std::mutex runLoopMutex_;
 };
 
 }

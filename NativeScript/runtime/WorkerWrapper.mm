@@ -342,25 +342,26 @@ void WorkerWrapper::Terminate() {
   // set terminating to true atomically
   bool wasTerminating = this->isTerminating_.exchange(true);
   if (!wasTerminating) {
-    // Held across the use, not just the read: the worker thread withdraws the
-    // isolate under the same mutex before deleting its runtime.
-    std::unique_lock<std::mutex> isolateLock(this->workerIsolateMutex_);
-    if (this->workerIsolate_ != nullptr) {
-      // Flagged before the request so a pump that is between iterations sees
-      // it on its next check, rather than only once V8 has some JS to
-      // interrupt — which a parked graph never provides.
-      //
-      // NOTE: `workerIsolate_` is assigned only after the worker's ENTRY has
-      // finished evaluating, so a worker still parked in its entry is not
-      // reachable from here at all and terminate() does nothing for it. That
-      // is a pre-existing worker-lifecycle gap, not something this flag can
-      // close — see the follow-up filed for it.
-      if (Runtime* workerRuntime = Runtime::GetRuntime(this->workerIsolate_)) {
-        workerRuntime->RequestTermination();
+    {
+      // Held across the use, not just the read: the worker thread withdraws
+      // the isolate under the same mutex before deleting its runtime.
+      std::lock_guard<std::mutex> lock(this->workerIsolateMutex_);
+      if (this->workerIsolate_ != nullptr) {
+        // Flagged before the request so a pump that is between iterations sees
+        // it on its next check, rather than only once V8 has some JS to
+        // interrupt — which a parked graph never provides.
+        //
+        // NOTE: `workerIsolate_` is assigned only after the worker's ENTRY has
+        // finished evaluating, so a worker still parked in its entry is not
+        // reachable from here at all and terminate() does nothing for it. That
+        // is a pre-existing worker-lifecycle gap, not something this flag can
+        // close — see the follow-up filed for it.
+        if (Runtime* workerRuntime = Runtime::GetRuntime(this->workerIsolate_)) {
+          workerRuntime->RequestTermination();
+        }
+        this->workerIsolate_->TerminateExecution();
       }
-      this->workerIsolate_->TerminateExecution();
     }
-    isolateLock.unlock();
     {
       // A worker paused at a breakpoint sits in the inspector's nested pause
       // loop, not in the CFRunLoop — kick it loose so TerminateExecution and
