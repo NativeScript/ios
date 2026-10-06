@@ -1220,7 +1220,7 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
           memset(retValue, 0, cif->rtype->size);
         } else {
           const TypeEncoding* typeEncoding = context->meta_->getter()->encodings()->first();
-          ArgConverter::SetValue(v8Context, retValue, res, typeEncoding);
+          ArgConverter::SetValue(v8Context, retValue, cif->rtype->size, res, typeEncoding);
         }
       }
       if (pendingThrow != nil) {

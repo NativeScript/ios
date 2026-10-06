@@ -1,5 +1,6 @@
 #include "ArgConverter.h"
 #include <Foundation/Foundation.h>
+#include <algorithm>
 #include <sstream>
 #include "DictionaryAdapter.h"
 #include "Helpers.h"
@@ -434,7 +435,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
       if (!success) {
         memset(retValue, 0, cif->rtype->size);
       } else {
-        ArgConverter::SetValue(context, retValue, result, data->typeEncoding_);
+        ArgConverter::SetValue(context, retValue, cif->rtype->size, result, data->typeEncoding_);
       }
     } else {
       memset(retValue, 0, cif->rtype->size);
@@ -446,18 +447,18 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
   }
 }
 
-void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value> value,
-                            const TypeEncoding* typeEncoding) {
+void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t returnSize,
+                            Local<Value> value, const TypeEncoding* typeEncoding) {
   if (typeEncoding->type == BinaryTypeEncodingType::VoidEncoding) {
     return;
   }
 
   // Runs inside an ffi closure, where a C++ throw cannot propagate; a revoked
-  // proxy returns nil.
+  // proxy returns nil. libffi sizes the return slot to at least ffi_arg even
+  // for narrower types, and the full slot must be written.
   value = tns::UnwrapProxy(value);
   if (value.IsEmpty() || value->IsNullOrUndefined()) {
-    void* nullPtr = nullptr;
-    *(ffi_arg*)retValue = (unsigned long)nullPtr;
+    memset(retValue, 0, std::max(returnSize, sizeof(ffi_arg)));
     return;
   }
 
