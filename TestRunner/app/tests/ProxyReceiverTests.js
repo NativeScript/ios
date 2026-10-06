@@ -145,6 +145,23 @@ describe(module.id, function () {
         }).toThrowError(TypeError, /not a native object/);
     });
 
+    it("zeroes a struct return when a callback returns a revoked proxy", function () {
+        var revocable = Proxy.revocable(CGRectMake(1, 2, 3, 4), {});
+        revocable.revoke();
+
+        [revocable.proxy, null].forEach(function (returned) {
+            var rect = getStructFromCallback(new interop.FunctionReference(function () {
+                return returned;
+            }));
+
+            expect(rect instanceof CGRect).toBe(true);
+            expect(rect.origin.x).toBe(0);
+            expect(rect.origin.y).toBe(0);
+            expect(rect.size.width).toBe(0);
+            expect(rect.size.height).toBe(0);
+        });
+    });
+
     it("releases the native counterpart of the proxy target", function () {
         var target = NSMutableString.alloc().init();
         var proxy = new Proxy(target, {});
