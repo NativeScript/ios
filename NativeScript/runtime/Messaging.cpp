@@ -958,13 +958,28 @@ void SetEmitMessageCallback(const FunctionCallbackInfo<Value>& info) {
   state->emitMessage.Reset(isolate, info[0].As<v8::Function>());
 }
 
+// The key as the string the store files it under. A key whose conversion throws
+// leaves that exception pending for the caller rather than standing in for "".
+static bool EnvironmentDataKey(Isolate* isolate, Local<Value> value,
+                               std::string& key) {
+  Local<v8::String> str;
+  if (!value->ToString(isolate->GetCurrentContext()).ToLocal(&str)) {
+    return false;
+  }
+  key = tns::ToString(isolate, str);
+  return true;
+}
+
 void SetEnvironmentDataCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   if (info.Length() < 1) {
     return;
   }
   Local<Context> context = isolate->GetCurrentContext();
-  std::string key = tns::ToString(isolate, info[0]);
+  std::string key;
+  if (!EnvironmentDataKey(isolate, info[0], key)) {
+    return;
+  }
   if (info.Length() < 2 || info[1]->IsUndefined()) {
     std::lock_guard<std::mutex> lock(g_environmentDataMutex);
     g_environmentData.erase(key);
@@ -988,7 +1003,10 @@ void GetEnvironmentDataCallback(const FunctionCallbackInfo<Value>& info) {
   if (info.Length() < 1) {
     return;
   }
-  std::string key = tns::ToString(isolate, info[0]);
+  std::string key;
+  if (!EnvironmentDataKey(isolate, info[0], key)) {
+    return;
+  }
   std::shared_ptr<serialization::SerializedValue> stored;
   {
     std::lock_guard<std::mutex> lock(g_environmentDataMutex);
