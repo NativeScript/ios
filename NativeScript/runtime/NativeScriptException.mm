@@ -85,6 +85,15 @@ NativeScriptException::NativeScriptException(const std::string& message) {
 
 NativeScriptException::NativeScriptException(Isolate* isolate, TryCatch& tc,
                                              const std::string& message) {
+  // A caught termination has no exception value, message or stack to read:
+  // V8 hands back a sentinel, and formatting it would run JS on an isolate
+  // that must not run any.
+  if (tc.HasTerminated()) {
+    this->javascriptException_ = nullptr;
+    this->message_ = message;
+    this->name_ = "NativeScriptException";
+    return;
+  }
   Local<Value> error = tc.Exception();
   this->javascriptException_ = new Persistent<Value>(isolate, tc.Exception());
   this->message_ = GetErrorMessage(isolate, error, message);
@@ -333,7 +342,7 @@ void NativeScriptException::ReportFatalTail(Isolate* isolate, Local<Value> error
   if (error->IsObject()) {
     auto errObject = error.As<Object>();
     auto fullMessageString = tns::ToV8String(isolate, "fullMessage");
-    if (errObject->HasOwnProperty(context, fullMessageString).ToChecked()) {
+    if (errObject->HasOwnProperty(context, fullMessageString).FromMaybe(false)) {
       // check if we have a "fullMessage" on the error, and log that instead - since it includes
       // more info about the exception.
       v8::Local<v8::Value> fullMessage_;
@@ -765,7 +774,7 @@ std::string NativeScriptException::GetErrorMessage(Isolate* isolate, Local<Value
   std::string errMessage;
   bool hasFullErrorMessage = false;
   auto v8FullMessage = tns::ToV8String(isolate, "fullMessage");
-  if (error->IsObject() && error.As<Object>()->Has(context, v8FullMessage).ToChecked()) {
+  if (error->IsObject() && error.As<Object>()->Has(context, v8FullMessage).FromMaybe(false)) {
     hasFullErrorMessage = true;
     Local<Value> errMsgVal;
     bool success = error.As<Object>()->Get(context, v8FullMessage).ToLocal(&errMsgVal);

@@ -558,12 +558,20 @@ class WorkerWrapper : public BaseDataWrapper {
   void CreateInspector(v8::Isolate* isolate, const std::string& scriptPath);
   void DestroyInspector();
 
+  // `func` runs on the worker thread: it creates the worker's runtime, hands
+  // the isolate to PublishIsolate once the runtime is initialized, and runs
+  // the entry script.
   void Start(std::shared_ptr<v8::Persistent<v8::Value>> poWorker,
-             std::function<v8::Isolate*()> func,
+             std::function<void()> func,
              std::optional<int> qualityOfService = std::nullopt);
+  // Worker thread, once the runtime is initialized and before the entry script
+  // runs. From here Terminate() reaches V8: it interrupts whatever JS the
+  // worker runs, the entry script included, and flags the module pumps so a
+  // parked graph stops waiting. A terminate() that landed earlier is honored by
+  // the caller checking IsTerminating() right after this, before any app code.
+  void PublishIsolate(v8::Isolate* isolate);
   // Both reporters take the isolate from their caller, which is running on
-  // it: they are reachable while the entry script is still evaluating, before
-  // workerIsolate_ is published.
+  // it: they are reachable while the entry script is still evaluating.
   void CallOnErrorHandlers(v8::Isolate* isolate, v8::TryCatch& tc);
   // Reports a rejected entry-evaluation promise. A rejection carries a reason
   // rather than a TryCatch, so it cannot go through CallOnErrorHandlers, but it
@@ -607,11 +615,6 @@ class WorkerWrapper : public BaseDataWrapper {
   // used to name the cap in the message forwarded to the parent.
   void WatchHeapLimit(v8::Isolate* isolate, const std::string& scriptPath,
                       std::optional<size_t> maxOldGenerationSizeBytes);
-  // Whether the heap cap was hit. The worker startup path checks this to stop
-  // before running anything else in an isolate V8 is terminating.
-  inline bool HeapLimitExceeded() const {
-    return heapLimitExceeded_.load(std::memory_order_acquire);
-  }
   // The JS Worker object is a GC root from a successful start until the worker
   // ends, so a running worker is reachable the way a browser's is rather than
   // depending on its finalizer to keep it. Both of these run on the main
@@ -630,6 +633,9 @@ class WorkerWrapper : public BaseDataWrapper {
   const int Id();
   const bool IsRunning();
   const bool IsClosing();
+  // Set by Terminate() from any thread, by the near-heap-limit callback, and by
+  // the worker thread itself once a close() takes effect. One-way.
+  const bool IsTerminating();
   const int WorkerId();
   const inline v8::Isolate* GetMainIsolate() { return mainIsolate_; }
   // The only route from the worker thread to the parent: see mainLoop_.
@@ -658,9 +664,13 @@ class WorkerWrapper : public BaseDataWrapper {
   enum class Holders : uint8_t { Parent, Both, WorkerThread };
 
   v8::Isolate* mainIsolate_;
-  // Written by the worker thread only: published once the worker's startup
-  // function returns, withdrawn before the worker's runtime is deleted. Any
-  // other thread reads and uses it under workerIsolateMutex_.
+  // Written by the worker thread only: published by PublishIsolate once the
+  // worker's runtime is initialized and before its entry script runs,
+  // withdrawn before the runtime is deleted. Any other thread reads and uses
+  // it under workerIsolateMutex_. Null while the runtime is being set up, so a
+  // Terminate() in that window cannot interrupt the builtins Runtime::Init
+  // evaluates; the startup function checks the terminating flag right after
+  // publishing instead.
   v8::Isolate* workerIsolate_;
   std::mutex workerIsolateMutex_;
   std::atomic<bool> isRunning_;
@@ -690,10 +700,11 @@ class WorkerWrapper : public BaseDataWrapper {
   // thread) and DestroyInspector() (worker thread) agree on liveness.
   v8_inspector::WorkerInspectorClient* inspector_ = nullptr;
   std::mutex inspectorMutex_;
-  // The worker isolate as seen from the heap-limit callback. Separate from
-  // workerIsolate_, which BackgroundLooper only publishes once the entry script
-  // has finished evaluating — the point at which a heap cap is most likely to
-  // be hit is inside that entry.
+  // The isolate the near-heap-limit callback is armed on. Worker thread only.
+  // Kept apart from workerIsolate_ because the callback is armed before the
+  // isolate is published and can fire during Runtime::Init, and because
+  // removing a callback V8 never had registered is fatal: non-null here means
+  // exactly "armed, remove at teardown".
   v8::Isolate* heapLimitIsolate_ = nullptr;
   std::string heapLimitMessage_;
   std::string heapLimitSource_;
@@ -715,7 +726,7 @@ class WorkerWrapper : public BaseDataWrapper {
   // task would run on.
   std::shared_ptr<std::atomic<WorkerWrapper*>> selfRef_;
 
-  void BackgroundLooper(std::function<v8::Isolate*()> func);
+  void BackgroundLooper(std::function<void()> func);
   void DrainPendingTasks();
   void ForwardErrorPayloadToMain(const std::string& message,
                                  const std::string& source,
