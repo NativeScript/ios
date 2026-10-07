@@ -198,24 +198,46 @@ bool tns::WriteBinary(const std::string& path, const void* data, long length,
   return ok;
 }
 
+Local<Value> tns::UnwrapProxyOrThrow(Isolate* isolate, Local<Value> value) {
+  if (value.IsEmpty() || !value->IsProxy()) {
+    return value;
+  }
+  Local<Value> target = tns::UnwrapProxy(value);
+  if (target.IsEmpty()) {
+    std::string message = "Cannot pass a revoked Proxy to native code";
+    throw NativeScriptException(
+        isolate, v8::Exception::TypeError(tns::ToV8String(isolate, message)), message);
+  }
+  return target;
+}
+
+Local<Context> tns::GetCreationContextOrCurrent(Isolate* isolate, const Local<Object>& obj) {
+  Local<Context> context;
+  if (obj->GetCreationContext(isolate).ToLocal(&context)) {
+    return context;
+  }
+  context = isolate->GetCurrentContext();
+  if (context.IsEmpty()) {
+    context = Caches::Get(isolate)->GetContext();
+  }
+  return context;
+}
+
 void tns::SetPrivateValue(const Local<Object>& obj, const Local<v8::String>& propName,
                           const Local<Value>& value) {
-  Local<Context> context;
-  bool success = obj->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
-  tns::Assert(success);
   Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Context> context = tns::GetCreationContextOrCurrent(isolate, obj);
   Local<Private> privateKey = Private::ForApi(isolate, propName);
 
+  bool success = false;
   if (!obj->SetPrivate(context, privateKey, value).To(&success) || !success) {
     tns::Assert(false, isolate);
   }
 }
 
 Local<Value> tns::GetPrivateValue(const Local<Object>& obj, const Local<v8::String>& propName) {
-  Local<Context> context;
-  bool success = obj->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
-  tns::Assert(success);
   Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Context> context = tns::GetCreationContextOrCurrent(isolate, obj);
   Local<Private> privateKey = Private::ForApi(isolate, propName);
 
   Maybe<bool> hasPrivate = obj->HasPrivate(context, privateKey);
@@ -243,10 +265,18 @@ bool tns::DeleteWrapperIfUnused(Isolate* isolate, const Local<Value>& obj, BaseD
   return false;
 }
 
-void tns::SetValue(Isolate* isolate, const Local<Object>& obj, BaseDataWrapper* value) {
-  if (obj.IsEmpty() || obj->IsNullOrUndefined()) {
+void tns::SetValue(Isolate* isolate, const Local<Object>& val, BaseDataWrapper* value) {
+  if (val.IsEmpty() || val->IsNullOrUndefined()) {
     return;
   }
+
+  // Wrapper state lives on the Proxy target so that it is found by the same
+  // identity GetValue resolves to.
+  Local<Value> target = tns::UnwrapProxy(val);
+  if (target.IsEmpty()) {
+    return;
+  }
+  Local<Object> obj = target.As<Object>();
 
   Local<External> ext = External::New(isolate, value, v8::kExternalPointerTypeTagDefault);
 
@@ -263,6 +293,13 @@ tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
   }
 
   Local<Object> obj = val.As<Object>();
+  if (obj->IsProxy()) {
+    Local<Value> target = tns::UnwrapProxy(obj);
+    if (target.IsEmpty()) {
+      return nullptr;
+    }
+    obj = target.As<Object>();
+  }
   if (obj->InternalFieldCount() > 0) {
     Local<Value> field = obj->GetInternalField(0).As<v8::Value>();
     if (field.IsEmpty() || field->IsNullOrUndefined() || !field->IsExternal()) {
@@ -502,11 +539,12 @@ tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>
 }
 
 void tns::DeleteValue(Isolate* isolate, const Local<Value>& val) {
-  if (val.IsEmpty() || val->IsNullOrUndefined() || !val->IsObject()) {
+  Local<Value> target = tns::UnwrapProxy(val);
+  if (target.IsEmpty() || target->IsNullOrUndefined() || !target->IsObject()) {
     return;
   }
 
-  Local<Object> obj = val.As<Object>();
+  Local<Object> obj = target.As<Object>();
   if (obj->InternalFieldCount() > 0) {
     obj->SetInternalField(0, v8::Undefined(isolate));
     return;
@@ -518,12 +556,10 @@ void tns::DeleteValue(Isolate* isolate, const Local<Value>& val) {
     return;
   }
 
-  Local<Context> context;
-  bool success = obj->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
-  tns::Assert(success, isolate);
+  Local<Context> context = tns::GetCreationContextOrCurrent(isolate, obj);
   Local<Private> privateKey = Private::ForApi(isolate, metadataKey);
 
-  success = obj->DeletePrivate(context, privateKey).FromMaybe(false);
+  bool success = obj->DeletePrivate(context, privateKey).FromMaybe(false);
   tns::Assert(success, isolate);
 }
 
@@ -537,18 +573,21 @@ std::vector<Local<Value>> tns::ArgsToVector(const FunctionCallbackInfo<Value>& i
 }
 
 bool tns::IsArrayOrArrayLike(Isolate* isolate, const Local<Value>& value) {
-  if (value->IsArray()) {
-    return true;
-  }
-
-  if (!value->IsObject()) {
+  Local<Value> target = tns::UnwrapProxy(value);
+  if (target.IsEmpty()) {
     return false;
   }
 
-  Local<Object> obj = value.As<Object>();
-  Local<Context> context;
-  bool success = obj->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
-  tns::Assert(success, isolate);
+  if (target->IsArray()) {
+    return true;
+  }
+
+  if (!target->IsObject()) {
+    return false;
+  }
+
+  Local<Object> obj = target.As<Object>();
+  Local<Context> context = tns::GetCreationContextOrCurrent(isolate, obj);
   return obj->Has(context, ToV8String(isolate, "length")).FromMaybe(false);
 }
 

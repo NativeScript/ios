@@ -70,8 +70,10 @@ class ArgConverter {
   static const ProtocolMeta* FindProtocolMeta(Protocol* protocol);
   static void MethodCallback(ffi_cif* cif, void* retValue, void** argValues,
                              void* userData);
+  // returnSize is the ABI size of the return slot (cif->rtype->size); an
+  // empty, null or undefined value zeroes all of it.
   static void SetValue(v8::Local<v8::Context> context, void* retValue,
-                       v8::Local<v8::Value> value,
+                       size_t returnSize, v8::Local<v8::Value> value,
                        const TypeEncoding* typeEncoding);
   // Returns (lazily creating) the per-isolate interop.escapeException brand
   // private stored in Caches. Empty handle if the isolate cache is invalid.

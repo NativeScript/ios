@@ -19,6 +19,45 @@ using namespace v8;
 
 namespace tns {
 
+namespace {
+
+// Swaps a Proxy receiver for the native object at the end of its chain, so the
+// call dispatches as if made on that object directly. On failure a TypeError is
+// thrown and false returned. `allowClass` admits a class constructor target.
+bool ResolveProxyReceiver(Isolate* isolate, Local<Object>& receiver, const char* action,
+                          const char* memberName, bool allowClass) {
+  if (!receiver->IsProxy()) {
+    return true;
+  }
+
+  Local<Value> target = tns::UnwrapProxy(receiver);
+  const char* reason = nullptr;
+  if (target.IsEmpty()) {
+    reason = "on a revoked Proxy";
+  } else {
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, target);
+    bool isClass = allowClass && target->IsFunction() && wrapper != nullptr &&
+                   wrapper->Type() == WrapperType::ObjCClass;
+    bool isInstance = target.As<Object>()->InternalFieldCount() > 0 && wrapper != nullptr &&
+                      (wrapper->Type() == WrapperType::ObjCObject ||
+                       wrapper->Type() == WrapperType::ObjCAllocObject);
+    if (!isClass && !isInstance) {
+      reason = "on a Proxy whose target is not a native object";
+    }
+  }
+
+  if (reason != nullptr) {
+    std::string message = std::string("Cannot ") + action + " '" + memberName + "' " + reason;
+    isolate->ThrowException(Exception::TypeError(tns::ToV8String(isolate, message)));
+    return false;
+  }
+
+  receiver = target.As<Object>();
+  return true;
+}
+
+}  // namespace
+
 void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate,
                                                       Local<ObjectTemplate> globalTemplate,
                                                       bool isWorkerThread) {
@@ -251,14 +290,14 @@ void MetadataBuilder::StructEqualsCallback(const FunctionCallbackInfo<Value>& in
   Local<Context> context = isolate->GetCurrentContext();
   tns::Assert(info.Length() == 2, isolate);
 
-  Local<Object> arg1 = info[0].As<Object>();
-  Local<Object> arg2 = info[1].As<Object>();
-
-  if (arg1.IsEmpty() || !arg1->IsObject() || arg1->IsNullOrUndefined() || arg2.IsEmpty() ||
-      !arg2->IsObject() || arg2->IsNullOrUndefined()) {
+  Local<Value> value1 = tns::UnwrapProxy(info[0]);
+  Local<Value> value2 = tns::UnwrapProxy(info[1]);
+  if (value1.IsEmpty() || !value1->IsObject() || value2.IsEmpty() || !value2->IsObject()) {
     info.GetReturnValue().Set(false);
     return;
   }
+  Local<Object> arg1 = value1.As<Object>();
+  Local<Object> arg2 = value2.As<Object>();
 
   BaseDataWrapper* wrapper = tns::GetValue(isolate, info.This());
   if (wrapper == nullptr || wrapper->Type() != WrapperType::StructType) {
@@ -472,6 +511,9 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
 void MetadataBuilder::ToStringFunctionCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Object> thiz = info.This();
+  if (!ResolveProxyReceiver(isolate, thiz, "call native method", "toString", false)) {
+    return;
+  }
   BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
 
   if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject) {
@@ -764,7 +806,12 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
   CacheItem<MethodMeta>* item = static_cast<CacheItem<MethodMeta>*>(
       info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
-  bool instanceMethod = info.This()->InternalFieldCount() > 0;
+  Local<Object> thiz = info.This();
+  if (!ResolveProxyReceiver(isolate, thiz, "call native method", item->meta_->jsName(), true)) {
+    return;
+  }
+
+  bool instanceMethod = thiz->InternalFieldCount() > 0;
   V8FunctionCallbackArgs args(info);
 
   // Only the class-side call rewrites the name, so the common path reads
@@ -772,7 +819,6 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
   const std::string* className = &item->className_;
   std::string classWrapperName;
 
-  Local<Object> thiz = info.This();
   if (thiz->IsFunction()) {
     if (BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz)) {
       ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
@@ -784,7 +830,7 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
   Local<Context> context = isolate->GetCurrentContext();
   Local<Value> result =
       instanceMethod
-          ? MetadataBuilder::InvokeMethod(context, item->meta_, info.This(), args, *className, true)
+          ? MetadataBuilder::InvokeMethod(context, item->meta_, thiz, args, *className, true)
           : MetadataBuilder::InvokeMethod(context, item->meta_, Local<Object>(), args, *className,
                                           true);
 
@@ -794,15 +840,19 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
 }
 
 void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
   Local<Object> receiver = info.This();
+  if (!ResolveProxyReceiver(isolate, receiver, "read native property", item->meta_->jsName(),
+                            false)) {
+    return;
+  }
 
   if (receiver->InternalFieldCount() < 1) {
     return;
   }
 
-  Isolate* isolate = info.GetIsolate();
-  CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(
-      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
   if (!item->meta_->hasGetter()) {
     Local<Value> error = Exception::Error(tns::ToV8String(isolate, "Property is not readable."));
     isolate->ThrowException(error);
@@ -830,6 +880,10 @@ void MetadataBuilder::PropertySetterCallback(const FunctionCallbackInfo<Value>& 
   }
 
   Local<Object> receiver = info.This();
+  if (!ResolveProxyReceiver(isolate, receiver, "set native property", item->meta_->jsName(),
+                            false)) {
+    return;
+  }
   Local<Value> value = info[0];
   V8SimpleValueArgs args(value);
   Local<Context> context = isolate->GetCurrentContext();
@@ -1166,7 +1220,7 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
           memset(retValue, 0, cif->rtype->size);
         } else {
           const TypeEncoding* typeEncoding = context->meta_->getter()->encodings()->first();
-          ArgConverter::SetValue(v8Context, retValue, res, typeEncoding);
+          ArgConverter::SetValue(v8Context, retValue, cif->rtype->size, res, typeEncoding);
         }
       }
       if (pendingThrow != nil) {

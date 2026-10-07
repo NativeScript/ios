@@ -207,7 +207,7 @@ class TimerState : public OrderedTaskSource {
 
     v8::Local<v8::Function> cb = task->callback_.Get(isolate);
     v8::Local<v8::Context> context =
-        cb->GetCreationContextChecked(v8::Isolate::GetCurrent());
+        tns::GetCreationContextOrCurrent(isolate, cb);
     Context::Scope context_scope(context);
     int argc = task->args_ ? static_cast<int>(task->args_->size()) : 0;
     if (argc > 0) {
