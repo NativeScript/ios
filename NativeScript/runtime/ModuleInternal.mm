@@ -894,7 +894,9 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
         moduleFunc->Call(context, thiz, sizeof(requireArgs) / sizeof(Local<Value>), requireArgs)
             .ToLocal(&result);
     if (!success || tc.HasCaught()) {
-      if (tc.HasTerminated()) {
+      Runtime* runtime = Runtime::GetRuntime(isolate);
+      if (tc.HasTerminated() || isolate->IsExecutionTerminating() ||
+          (runtime != nullptr && runtime->IsTerminationRequested())) {
         throw NativeScriptException("Module evaluation interrupted by isolate termination: " +
                                     modulePath);
       }
@@ -1295,7 +1297,9 @@ MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context
     RemoveModuleFromRegistry(isolate, canonicalPath);
     // Same rule as the pump below: a termination outranks any failure detail,
     // and reading the TryCatch as an error would run JS on the dying isolate.
-    if (tcEval.HasTerminated() || isolate->IsExecutionTerminating()) {
+    Runtime* runtime = Runtime::GetRuntime(isolate);
+    if (tcEval.HasTerminated() || isolate->IsExecutionTerminating() ||
+        (runtime != nullptr && runtime->IsTerminationRequested())) {
       LogEsmPhase(canonicalPath, "evaluate", "terminated");
       throw NativeScriptException("Module evaluation interrupted by isolate termination: " +
                                   canonicalPath);
