@@ -154,12 +154,14 @@ void WorkerWrapper::EndWrapperLifetime() {
 
 void WorkerWrapper::DrainPendingTasks() {
   // The drain source is armed (and can be signaled by a main-thread
-  // PostMessage) BEFORE `workerIsolate_` is assigned in BackgroundLooper, and
-  // worker creation spins this runloop inside that window: the entry's module
-  // graph load pumps it while waiting on fetches, which fires this source with
-  // a null isolate (crash in v8::Locker::Initialize). Bail until the isolate
-  // exists — the messages stay queued and the explicit DrainPendingTasks()
-  // call right after isolate creation delivers them.
+  // PostMessage) before the worker's runtime exists, and the entry's module
+  // graph load pumps this runloop while waiting on fetches. A fire that
+  // arrives before the isolate is published has nothing to lock (a null
+  // isolate crashes v8::Locker::Initialize); one that arrives during the entry
+  // locks and then leaves at the messagesEnabled_ gate below, since the queue
+  // is only enabled once the entry has finished evaluating. Either way the
+  // messages stay queued for the explicit DrainPendingTasks() call after the
+  // startup function returns.
   if (this->workerIsolate_ == nullptr) {
     return;
   }

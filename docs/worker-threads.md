@@ -307,8 +307,9 @@ new Worker("./w.js", {
 
 Node's `stackSizeMb` and `codeRangeSizeMb` are ignored like any other unknown
 key. A `resourceLimits` that is not an object, or a key that is not a number,
-throws a `TypeError`; a non-finite, non-positive or oversized value throws a
-`RangeError`, as does a fractional or out-of-range `jsDispatchTableSizeMb`.
+throws a `TypeError`; a non-finite value, one worth less than a byte, or one
+too large to hold in bytes throws a `RangeError`, as does a fractional or
+out-of-range `jsDispatchTableSizeMb`.
 `resourceLimits: null` is the same as omitting it.
 
 Exhausting a worker's heap does not take the process down. Every worker

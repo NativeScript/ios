@@ -15,8 +15,7 @@ describe("Worker terminate during entry evaluation", function () {
     });
 
     // Resolves once the worker's thread has ended; rejects when it has not
-    // within `limitMs`, which is the old behaviour for an entry that never
-    // returns.
+    // within `limitMs`.
     function waitForEnd(worker, limitMs) {
         return new Promise(function (resolve, reject) {
             var timer = setTimeout(function () {
@@ -68,9 +67,11 @@ describe("Worker terminate during entry evaluation", function () {
         };
     });
 
-    // Round i terminates i milliseconds after construction, which lands
-    // anywhere from before the thread has started, through runtime setup, to
-    // inside the entry's settle pump.
+    // Round i terminates 25·i milliseconds after construction. Runtime setup
+    // takes a few hundred milliseconds on a simulator and the local entry's
+    // settle pump lasts one second after it, so the rounds land anywhere from
+    // before the thread has started, through runtime setup, to inside the
+    // pump.
     it("ends a worker terminated at any point of its startup", function (done) {
         var ROUNDS = 16;
         (function round(i) {
@@ -84,7 +85,7 @@ describe("Worker terminate during entry evaluation", function () {
             if (i === 0) {
                 worker.terminate();
             } else {
-                setTimeout(function () { worker.terminate(); }, i);
+                setTimeout(function () { worker.terminate(); }, i * 25);
             }
             ended.then(function () { round(i + 1); }, settle(done));
         })(0);

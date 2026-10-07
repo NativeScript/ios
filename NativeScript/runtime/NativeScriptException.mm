@@ -714,6 +714,15 @@ void PromiseRejectionTracker::Drain(Local<Context> context) {
 }
 
 void NativeScriptException::ReThrowToV8(Isolate* isolate) {
+  // An isolate that is terminating keeps its termination pending until the JS
+  // frames below unwind; throwing on it would replace that with an ordinary
+  // error, and building the error allocates on a heap that may have just hit
+  // its cap. The failure being re-armed here is the termination itself.
+  Runtime* runtime = Runtime::GetRuntime(isolate);
+  if (isolate->IsExecutionTerminating() ||
+      (runtime != nullptr && runtime->IsTerminationRequested())) {
+    return;
+  }
   @try {
     // The Isolate::Scope here is necessary because the Exception::Error method internally relies on
     // the Isolate::GetCurrent method which might return null if we do not use the proper scope

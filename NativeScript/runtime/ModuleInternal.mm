@@ -258,7 +258,10 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
       moduleNamespace =
           ModuleInternal::LoadESModule(isolate, path, BootEntryEvaluationOptions(isHttpModule));
     } catch (const NativeScriptException& ex) {
-      if (RuntimeConfig.IsDebug) {
+      Runtime* runtime = Runtime::GetRuntime(isolate);
+      bool terminating = isolate->IsExecutionTerminating() ||
+                         (runtime != nullptr && runtime->IsTerminationRequested());
+      if (RuntimeConfig.IsDebug && !terminating) {
         Log(@"***** JavaScript exception occurred *****");
         Log(@"Error loading ES module: %s", path.c_str());
         Log(@"Exception: %s", ex.getMessage().c_str());
@@ -294,8 +297,12 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
 
   if (!success || tc.HasCaught()) {
     // A termination is caught like an exception but carries no error value;
-    // naming it as the failure keeps it from being reported as one.
-    if (tc.HasTerminated()) {
+    // naming it as the failure keeps it from being reported as one. All three
+    // signals, as in the settle pump: a native frame between here and the
+    // interrupted JS may have swallowed the sentinel on its way out.
+    Runtime* runtime = Runtime::GetRuntime(isolate);
+    if (tc.HasTerminated() || isolate->IsExecutionTerminating() ||
+        (runtime != nullptr && runtime->IsTerminationRequested())) {
       throw NativeScriptException("Module evaluation interrupted by isolate termination: " + path);
     }
     if (RuntimeConfig.IsDebug) {
@@ -1461,6 +1468,21 @@ MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context
   return MaybeLocal<Promise>();
 }
 
+// A pumped graph walk bails on a termination request but reports nothing;
+// what follows it would compile, fetch synchronously or evaluate on an
+// isolate that must not run anything more.
+static void ThrowIfLoadInterruptedByTermination(Isolate* isolate,
+                                                const std::string& canonicalPath) {
+  Runtime* runtime = Runtime::GetRuntime(isolate);
+  if (!isolate->IsExecutionTerminating() &&
+      (runtime == nullptr || !runtime->IsTerminationRequested())) {
+    return;
+  }
+  LogEsmPhase(canonicalPath, "load", "terminated");
+  throw NativeScriptException("Module evaluation interrupted by isolate termination: " +
+                              canonicalPath);
+}
+
 Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path,
                                           const ModuleEvaluationOptions& options) {
   bool isHttpModule = IsHttpModulePath(path);
@@ -1540,6 +1562,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     // registry hit and instantiation resolves as pure lookup. On timeout or
     // partial coverage the legacy synchronous path still owns correctness.
     RunModuleGraphLoadPumped(isolate, context, requestPath, kModuleEvaluateDeadlineSeconds);
+    ThrowIfLoadInterruptedByTermination(isolate, canonicalPath);
     MaybeLocal<Module> maybeMod = LoadHttpModuleForUrl(isolate, context, requestPath);
     if (!maybeMod.ToLocal(&module)) {
       logPhase("compile", "fail", "http-loader");
@@ -1563,6 +1586,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     // async fetch, so it legitimately waits here and then evaluates
     // synchronously.
     RunModuleGraphLoadPumped(isolate, context, canonicalPath, kModuleEvaluateDeadlineSeconds);
+    ThrowIfLoadInterruptedByTermination(isolate, canonicalPath);
     auto walkedIt = registry.find(canonicalPath);
     if (walkedIt != registry.end()) {
       Local<Module> walked = walkedIt->second.Get(isolate);
