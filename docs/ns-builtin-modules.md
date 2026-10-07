@@ -399,6 +399,33 @@ workers for the change to reach them.** A worker started after the
 `configureLoader` call resolves through the new vocabulary; a live worker
 never observes a later reconfiguration.
 
+### `ns:worker_threads`
+
+The runtime's own `Worker`, reachable by specifier; the `node:worker_threads`
+shim adapts it. **Experimental, iOS-only** until the Android runtime ships it.
+
+| export | description |
+|---|---|
+| `Worker` | The runtime's `Worker` constructor: the very function the global of that name was created with, so `require("ns:worker_threads").Worker === globalThis.Worker` unless the app has reassigned the global. Its constructor options — `ios.priority` and Node's `resourceLimits` — are described in [worker-threads.md](worker-threads.md#worker-options). |
+
+```js
+import { Worker } from "ns:worker_threads";
+
+const worker = new Worker("./heavy.js", {
+  ios: { priority: "utility" },
+  resourceLimits: { maxOldGenerationSizeMb: 64 },
+});
+```
+
+The module exists so that typed code can name the runtime's constructor and
+its options without depending on what `globalThis.Worker` resolves to in the
+program's type environment. `types/ns-worker-threads.d.ts` declares the module and,
+at script level, merges the two options into the global `WorkerOptions` and
+declares the global `Worker` the way `@types/node` declares its own globals:
+a program with a DOM lib keeps the lib's declaration, so
+`new Worker(path, { ios })` type-checks either way without a conflicting
+redeclaration.
+
 ### `node:` compatibility shims
 
 The same registry serves the `node:` scheme with **compatibility shims** so
@@ -440,7 +467,7 @@ unmodified where a shim exists:
 | `node:util` | `inspect`, `format`, `TextEncoder`, `TextDecoder` | Re-exports `ns:util`'s members unchanged (`nodeUtil.inspect === nsUtil.inspect`) from a **distinct, separately frozen module object**. `TextEncoder`/`TextDecoder` are the globals of those names, as they are in Node. Documented as partial. |
 | `node:url` | `fileURLToPath`, `pathToFileURL` | Node-strict converters between `file:` URLs and paths. Documented as partial — no `URL`/`URLSearchParams` re-exports (both are globals), no legacy `url.parse`/`format`/`resolve`. |
 | `node:module` | `createRequire` | Re-exports `ns:module`'s `createRequire` unchanged from a **distinct, separately frozen module object**. `createPumpingRequire` is deliberately absent: it has no Node counterpart, so code written against this shim keeps running on Node. `require.resolve`/`.cache`/`.main` are not implemented, and neither is any other `node:module` member (`Module`, `builtinModules`, `isBuiltin`, `register`, `syncBuiltinESMExports`). Documented as partial. |
-| `node:worker_threads` | the messaging and thread surface — see [worker-threads.md](worker-threads.md) | The channel half (`MessagePort`, `MessageChannel`, `BroadcastChannel`, `receiveMessageOnPort`) is the real implementation, the same objects the globals of those names hold; the thread half is a bridge over the runtime's own `Worker`. It has no `ns:` counterpart — the surface tracks Node's, so there is nothing for a standard module to own. The one place it breaks the absent-not-throwing rule below is deliberate: `postMessageToThread` and `moveMessagePortToContext` are present and throw an `Error` naming themselves, because silently missing thread-addressed messaging reads as a delivery bug rather than as an unsupported call. Documented as partial. |
+| `node:worker_threads` | the messaging and thread surface — see [worker-threads.md](worker-threads.md) | The channel half (`MessagePort`, `MessageChannel`, `BroadcastChannel`, `receiveMessageOnPort`) is the real implementation, the same objects the globals of those names hold; the thread half is a bridge over the `Worker` that `ns:worker_threads` exports. The channel half has no `ns:` counterpart — its surface tracks Node's, so there is nothing for a standard module to own. The one place it breaks the absent-not-throwing rule below is deliberate: `postMessageToThread` and `moveMessagePortToContext` are present and throw an `Error` naming themselves, because silently missing thread-addressed messaging reads as a delivery bug rather than as an unsupported call. Documented as partial. |
 
 `node:url`'s parsing goes through the URL intrinsic, so `file://localhost/x` is
 accepted (the URL spec folds a `localhost` authority to none) while any other
@@ -755,8 +782,9 @@ resolvers read the same table differently:
 - The **`ns:`/`node:` resolver** — the app-facing one, behind `require()`,
   `import` and `import()` — serves only rows *not* marked internal-only. An
   internal-only specifier fails exactly as a name absent from the table does.
-  Seven rows are public today: `ns:module`, `ns:runtime`, `ns:util`,
-  `node:module`, `node:url`, `node:util`, `node:worker_threads`.
+  Eight rows are public today: `ns:module`, `ns:runtime`, `ns:util`,
+  `ns:worker_threads`, `node:module`, `node:url`, `node:util`,
+  `node:worker_threads`.
 - The **internal require** builtins receive (previous section) is the only
   thing that can name an internal-only row. Five rows are marked that way:
   `internal/broadcast-channel`, `internal/dom-exception`, `internal/events`,

@@ -11,6 +11,7 @@
 #include "Runtime.h"
 #include "StructuredSerialization.h"
 #include "TextEncoding.h"
+#include "Worker.h"
 
 using namespace v8;
 
@@ -25,6 +26,7 @@ constexpr const char* kNodePrefix = "node:";
 MaybeLocal<Object> NsModuleBinding(Local<Context> context);
 MaybeLocal<Object> NsRuntimeBinding(Local<Context> context);
 MaybeLocal<Object> NsUtilBinding(Local<Context> context);
+MaybeLocal<Object> NsWorkerThreadsBinding(Local<Context> context);
 
 struct Registration {
   const char* specifier;
@@ -46,6 +48,7 @@ constexpr Registration kRegistry[] = {
     {"ns:module", BuiltinId::kNsModule, NsModuleBinding},
     {"ns:runtime", BuiltinId::kNsRuntime, NsRuntimeBinding},
     {"ns:util", BuiltinId::kNsUtil, NsUtilBinding},
+    {"ns:worker_threads", BuiltinId::kNsWorkerThreads, NsWorkerThreadsBinding},
     {"node:module", BuiltinId::kNodeModule, nullptr},
     {"node:url", BuiltinId::kNodeUrl, nullptr},
     {"node:util", BuiltinId::kNodeUtil, nullptr},
@@ -191,6 +194,21 @@ MaybeLocal<Object> NsRuntimeBinding(Local<Context> context) {
       !binding->Set(context, tns::ToV8String(isolate, "setConfig"), setConfig)
            .FromMaybe(false) ||
       !binding->Set(context, tns::ToV8String(isolate, "getConfig"), getConfig)
+           .FromMaybe(false)) {
+    return MaybeLocal<Object>();
+  }
+  return binding;
+}
+
+// The Worker constructor for ns:worker_threads: the context's own, from the
+// template Worker::Init installed, rather than whatever `globalThis.Worker`
+// names by the time the module is first required.
+MaybeLocal<Object> NsWorkerThreadsBinding(Local<Context> context) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Object> binding = Object::New(isolate);
+  Local<v8::Function> worker;
+  if (!Worker::Constructor(context).ToLocal(&worker) ||
+      !binding->Set(context, tns::ToV8String(isolate, "Worker"), worker)
            .FromMaybe(false)) {
     return MaybeLocal<Object>();
   }

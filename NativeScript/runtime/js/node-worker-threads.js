@@ -57,9 +57,11 @@ function getCreateMessageEvent() {
 }
 
 const g = globalThis;
-// The platform constructor this shim wraps, and the worker scope's channel
-// back to its parent.
-const NativeWorker = g.Worker;
+// The platform constructor this shim wraps, taken from the standard module
+// rather than from the global so an app that reassigns `globalThis.Worker`
+// does not redirect the shim, and the worker scope's channel back to its
+// parent.
+const { Worker: NativeWorker } = require("ns:worker_threads");
 const globalPostMessage = g.postMessage;
 
 const addEventListener = EventTarget.prototype.addEventListener;
