@@ -12,6 +12,13 @@ describe(module.id, function () {
         expect(object.hash).toBe(3);
     });
 
+    it("exposes a C function listed in metadata but missing at runtime as undefined", function () {
+        expect(typeof TNSFunctionMissingAtRuntime).toBe("undefined");
+        expect(global.TNSFunctionMissingAtRuntime).toBeUndefined();
+        expect("TNSFunctionMissingAtRuntime" in global).toBe(false);
+        expect(function () { TNSFunctionMissingAtRuntime(); }).toThrowError(ReferenceError);
+    });
+
     it("preserves a lone high surrogate when bridging a JS string to NSString", function () {
         // A lone high surrogate (U+D834, range U+D800-U+DBFF) is a valid JS string
         // code unit but has no UTF-8 encoding. The old UTF-8 round-trip replaced it
