@@ -58,4 +58,11 @@ describe("URL", function () {
     expect(url.searchParams.get("q")).toBe("hello");
     expect(url.pathname).toBe("/some/path");
   });
+
+  it("serializes to JSON as its href", function () {
+    const url = new URL("https://x.test/a?b#c");
+    expect(url.toJSON()).toBe(url.href);
+    expect(JSON.stringify(url)).toBe(JSON.stringify(url.href));
+    expect(JSON.stringify({ u: url })).toBe(JSON.stringify({ u: url.href }));
+  });
 });

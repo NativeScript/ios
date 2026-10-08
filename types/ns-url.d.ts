@@ -22,6 +22,8 @@ declare module "ns:url" {
     username: string;
     /** Returns `href`. */
     toString(): string;
+    /** Returns `href`, so `JSON.stringify` serializes a URL as its href. */
+    toJSON(): string;
   }
 
   /** The WHATWG `URLSearchParams` surface the runtime implements. */

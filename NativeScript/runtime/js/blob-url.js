@@ -105,9 +105,15 @@ ObjectDefineProperty(URL.prototype, 'searchParams', {
                 writeBack(this);
             };
             params._delete = params.delete;
-            params.delete = function (name) {
+            params.delete = function (name, value) {
                 resync(this);
-                this._delete(name);
+                // An explicitly passed undefined must still reach the native
+                // coercion, so forward by arity rather than by value.
+                if (arguments.length > 1) {
+                    this._delete(name, value);
+                } else {
+                    this._delete(name);
+                }
                 writeBack(this);
             };
             params._set = params.set;

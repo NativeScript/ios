@@ -93,6 +93,10 @@ v8::Local<v8::FunctionTemplate> URLImpl::GetCtor(v8::Isolate* isolate) {
   tmpl->Set(ToV8String(isolate, "toString"),
             v8::FunctionTemplate::New(isolate, &ToString));
 
+  // WHATWG defines toJSON as the href serialization, the same as toString.
+  tmpl->Set(ToV8String(isolate, "toJSON"),
+            v8::FunctionTemplate::New(isolate, &ToString));
+
   ctorTmpl->Set(ToV8String(isolate, "canParse"),
                 v8::FunctionTemplate::New(isolate, &CanParse));
 
