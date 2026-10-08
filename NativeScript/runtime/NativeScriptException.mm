@@ -714,13 +714,12 @@ void PromiseRejectionTracker::Drain(Local<Context> context) {
 }
 
 void NativeScriptException::ReThrowToV8(Isolate* isolate) {
-  // An isolate that is terminating keeps its termination pending until the JS
-  // frames below unwind; throwing on it would replace that with an ordinary
-  // error, and building the error allocates on a heap that may have just hit
-  // its cap. The failure being re-armed here is the termination itself.
-  Runtime* runtime = Runtime::GetRuntime(isolate);
-  if (isolate->IsExecutionTerminating() ||
-      (runtime != nullptr && runtime->IsTerminationRequested())) {
+  // A materialized termination stays pending until the JS frames below
+  // unwind; throwing would replace it with an ordinary error. Only the V8
+  // signal counts here, not the runtime's termination-requested flag: while
+  // the request has not materialized, JS still runs, and an ordinary failure
+  // must still throw or the caller would continue with a bogus result.
+  if (isolate->IsExecutionTerminating()) {
     return;
   }
   @try {

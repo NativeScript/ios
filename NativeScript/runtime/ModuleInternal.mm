@@ -1652,6 +1652,13 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
 
     if (!linked) {
       RemoveModuleFromRegistry(isolate, canonicalPath);
+      Runtime* runtime = Runtime::GetRuntime(isolate);
+      if (tcLink.HasTerminated() || isolate->IsExecutionTerminating() ||
+          (runtime != nullptr && runtime->IsTerminationRequested())) {
+        logPhase("instantiate", "terminated");
+        throw NativeScriptException("Module evaluation interrupted by isolate termination: " +
+                                    canonicalPath);
+      }
       const char* classification = "unknown";
       if (tcLink.HasCaught()) {
         Local<Message> msg = tcLink.Message();
