@@ -96,6 +96,29 @@ class Interop {
       std::shared_ptr<v8::Persistent<v8::Value>> parentStruct = nullptr,
       bool isStructMember = false, bool ownsReturnedObject = false,
       bool returnsUnmanaged = false, bool isInitializer = false);
+  // Converts an object returned by native code to its JS value. typeEncoding
+  // is the declared return type and may be null; without it NSMutableString
+  // returns are marshalled like NSString, NSProxy results get no metadata
+  // from the declared type, and id<Protocol> conformances are not attached.
+  static v8::Local<v8::Value> ObjectToJsValue(v8::Local<v8::Context> context,
+                                              id value,
+                                              const TypeEncoding* typeEncoding,
+                                              bool marshalToPrimitive,
+                                              bool ownsReturnedObject,
+                                              bool isInitializer);
+  static v8::Local<v8::Value> ClassToJsValue(v8::Local<v8::Context> context,
+                                             Class value);
+  // Builds the JS Error for an NSException raised by a native call: name and
+  // reason copied over, the exception itself attached as `nativeException`.
+  // Returns an empty handle if no Error could be created. `message` receives
+  // the text the error was created with.
+  static v8::Local<v8::Value> NSExceptionToJsError(
+      v8::Local<v8::Context> context, id exception, std::string& message);
+  static v8::Local<v8::Value> StructToValue(
+      v8::Local<v8::Context> context, void* result, const StructInfo& structInfo,
+      std::shared_ptr<v8::Persistent<v8::Value>> parentStruct);
+  static SEL GetSwizzledMethodSelector(SEL selector);
+  static bool IsNumbericType(BinaryTypeEncodingType type);
   static void SetStructPropertyValue(v8::Local<v8::Context> context,
                                      StructWrapper* wrapper,
                                      const StructField& field,
@@ -160,20 +183,14 @@ class Interop {
   static bool isRefTypeEqual(const TypeEncoding* typeEncoding,
                              const char* clazz);
   static v8::Local<v8::Array> ToArray(v8::Local<v8::Object> object);
-  static v8::Local<v8::Value> StructToValue(
-      v8::Local<v8::Context> context, void* result,
-      const StructInfo& structInfo,
-      std::shared_ptr<v8::Persistent<v8::Value>> parentStruct);
   static const TypeEncoding* CreateEncoding(BinaryTypeEncodingType type);
   static v8::Local<v8::Value> HandleOf(v8::Local<v8::Context> context,
                                        v8::Local<v8::Value> value);
   static v8::Local<v8::Value> CallFunctionInternal(MethodCall& methodCall);
-  static bool IsNumbericType(BinaryTypeEncodingType type);
   static v8::Local<v8::Object> GetInteropType(v8::Local<v8::Context> context,
                                               BinaryTypeEncodingType type);
   static std::vector<std::string> GetAdditionalProtocols(
       const TypeEncoding* typeEncoding);
-  static SEL GetSwizzledMethodSelector(SEL selector);
 
   template <typename T>
   static inline void SetValue(void* dest, T value) {

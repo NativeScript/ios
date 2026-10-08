@@ -1,5 +1,6 @@
 #include "MetadataBuilder.h"
 #include <Foundation/Foundation.h>
+#include "AOTCalls.h"
 #include "ArgConverter.h"
 #include "Caches.h"
 #include "Constants.h"
@@ -7,6 +8,7 @@
 #include "InlineFunctions.h"
 #include "Interop.h"
 #include "LazyGlobals.h"
+#include "MethodCallProfiler.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
@@ -456,7 +458,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
 
   MetadataBuilder::RegisterInstanceProperties(context, ctorFuncTemplate, meta, meta->name(), pair,
                                               instanceMembers);
-  MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, meta, pair, instanceMembers);
+  MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, meta, meta->name(), pair,
+                                           instanceMembers);
   MetadataBuilder::RegisterInstanceProtocols(context, ctorFuncTemplate, meta, meta->name(), pair,
                                              instanceMembers);
   MetadataBuilder::RegisterAdditionalProtocols(context, ctorFuncTemplate, pair, additionalProtocols,
@@ -515,7 +518,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
     }
   }
 
-  MetadataBuilder::RegisterStaticMethods(context, ctorFunc, meta, pair, staticMembers);
+  MetadataBuilder::RegisterStaticMethods(context, ctorFunc, meta, meta->name(), pair,
+                                         staticMembers);
   MetadataBuilder::RegisterStaticProperties(context, ctorFunc, meta, meta->name(), pair,
                                             staticMembers);
   MetadataBuilder::RegisterStaticProtocols(context, ctorFunc, meta, meta->name(), pair,
@@ -566,9 +570,11 @@ void MetadataBuilder::RegisterAllocMethod(Isolate* isolate,
 
 void MetadataBuilder::RegisterInstanceMethods(
     Local<Context> context, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta,
-    KnownUnknownClassPair pair, robin_hood::unordered_map<std::string, uint8_t>& names) {
+    const char* className, KnownUnknownClassPair pair,
+    robin_hood::unordered_map<std::string, uint8_t>& names) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
+  const aot::StubScope stubs = aot::FindStubScope(className);
 
   for (auto it = meta->instanceMethods->begin(); it != meta->instanceMethods->end(); it++) {
     const MethodMeta* methodMeta = (*it).valuePtr();
@@ -582,8 +588,14 @@ void MetadataBuilder::RegisterInstanceMethods(
       CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, meta->name());
       Caches::Get(isolate)->registerCacheBoundObject(item);
       Local<External> ext = External::New(isolate, item, v8::kExternalPointerTypeTagDefault);
+      FunctionCallback callback = MethodCallback;
+      aot::Binding binding;
+      if (!stubs.empty() && aot::FindInstanceMethod(stubs, methodMeta->selector(), binding)) {
+        callback = binding.callback;
+        item->userData_ = binding.handler;
+      }
       Local<FunctionTemplate> instanceMethodTemplate =
-          FunctionTemplate::New(isolate, MethodCallback, ext);
+          FunctionTemplate::New(isolate, callback, ext);
       proto->Set(tns::ToV8String(isolate, methodMeta->jsName()), instanceMethodTemplate);
       names.emplace(methodName, 0);
     }
@@ -596,6 +608,7 @@ void MetadataBuilder::RegisterInstanceProperties(
     robin_hood::unordered_map<std::string, uint8_t>& names) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
+  const aot::StubScope stubs = aot::FindStubScope(className.c_str());
 
   for (auto it = meta->instanceProps->begin(); it != meta->instanceProps->end(); it++) {
     const PropertyMeta* propMeta = (*it).valuePtr();
@@ -617,7 +630,14 @@ void MetadataBuilder::RegisterInstanceProperties(
       CacheItem<PropertyMeta>* item = new CacheItem<PropertyMeta>(propMeta, className);
       Caches::Get(isolate)->registerCacheBoundObject(item);
       Local<External> ext = External::New(isolate, item, v8::kExternalPointerTypeTagDefault);
-      Local<FunctionTemplate> getter = FunctionTemplate::New(isolate, PropertyGetterCallback, ext);
+      FunctionCallback getterCallback = PropertyGetterCallback;
+      aot::Binding binding;
+      if (!stubs.empty() && propMeta->hasGetter() &&
+          aot::FindInstanceGetter(stubs, propMeta->getter()->selector(), binding)) {
+        getterCallback = binding.callback;
+        item->userData_ = binding.handler;
+      }
+      Local<FunctionTemplate> getter = FunctionTemplate::New(isolate, getterCallback, ext);
       Local<FunctionTemplate> setter = FunctionTemplate::New(isolate, PropertySetterCallback, ext);
       proto->SetAccessorProperty(tns::ToV8String(isolate, propMeta->jsName()), getter, setter,
                                  PropertyAttribute::None);
@@ -631,7 +651,8 @@ void MetadataBuilder::RegisterInstanceProtocols(
     const std::string className, KnownUnknownClassPair pair,
     robin_hood::unordered_map<std::string, uint8_t>& names) {
   if (meta->type() == MetaType::ProtocolType) {
-    MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, meta, pair, names);
+    MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, meta, className.c_str(),
+                                             pair, names);
     MetadataBuilder::RegisterInstanceProperties(context, ctorFuncTemplate, meta, className, pair,
                                                 names);
   }
@@ -655,7 +676,8 @@ void MetadataBuilder::RegisterAdditionalProtocols(
     const Meta* meta = ArgConverter::GetMeta(protocolName.c_str());
     if (meta != nullptr) {
       const BaseClassMeta* baseMeta = static_cast<const BaseClassMeta*>(meta);
-      MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, baseMeta, pair, names);
+      MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, baseMeta,
+                                               baseMeta->name(), pair, names);
       MetadataBuilder::RegisterInstanceProperties(context, ctorFuncTemplate, baseMeta,
                                                   baseMeta->name(), pair, names);
 
@@ -673,8 +695,10 @@ void MetadataBuilder::RegisterAdditionalProtocols(
 
 void MetadataBuilder::RegisterStaticMethods(
     Local<Context> context, Local<v8::Function> ctorFunc, const BaseClassMeta* meta,
-    KnownUnknownClassPair pair, robin_hood::unordered_map<std::string, uint8_t>& names) {
+    const char* className, KnownUnknownClassPair pair,
+    robin_hood::unordered_map<std::string, uint8_t>& names) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  const aot::StubScope stubs = aot::FindStubScope(className);
   for (auto it = meta->staticMethods->begin(); it != meta->staticMethods->end(); it++) {
     const MethodMeta* methodMeta = (*it).valuePtr();
     if (!methodMeta->isAvailableInClasses(pair, true)) {
@@ -687,8 +711,13 @@ void MetadataBuilder::RegisterStaticMethods(
       CacheItem<MethodMeta>* item = new CacheItem<MethodMeta>(methodMeta, meta->name());
       Caches::Get(isolate)->registerCacheBoundObject(item);
       Local<External> ext = External::New(isolate, item, v8::kExternalPointerTypeTagDefault);
-      Local<FunctionTemplate> staticMethodTemplate =
-          FunctionTemplate::New(isolate, MethodCallback, ext);
+      FunctionCallback callback = MethodCallback;
+      aot::Binding binding;
+      if (!stubs.empty() && aot::FindStaticMethod(stubs, methodMeta->selector(), binding)) {
+        callback = binding.callback;
+        item->userData_ = binding.handler;
+      }
+      Local<FunctionTemplate> staticMethodTemplate = FunctionTemplate::New(isolate, callback, ext);
       Local<v8::Function> staticMethod;
       if (!staticMethodTemplate->GetFunction(context).ToLocal(&staticMethod)) {
         tns::Assert(false, isolate);
@@ -713,6 +742,7 @@ void MetadataBuilder::RegisterStaticProperties(
     const std::string className, KnownUnknownClassPair pair,
     robin_hood::unordered_map<std::string, uint8_t>& names) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  const aot::StubScope stubs = aot::FindStubScope(className.c_str());
 
   for (auto it = meta->staticProps->begin(); it != meta->staticProps->end(); it++) {
     const PropertyMeta* propMeta = (*it).valuePtr();
@@ -736,6 +766,14 @@ void MetadataBuilder::RegisterStaticProperties(
       Caches::Get(isolate)->registerCacheBoundObject(item);
       Local<External> ext = External::New(isolate, item, v8::kExternalPointerTypeTagDefault);
 
+      FunctionCallback getterCallback = PropertyNameGetterCallback;
+      aot::Binding binding;
+      if (!stubs.empty() && propMeta->hasGetter() &&
+          aot::FindStaticGetter(stubs, propMeta->getter()->selector(), binding)) {
+        getterCallback = binding.callback;
+        item->userData_ = binding.handler;
+      }
+
       Local<v8::String> propName = tns::ToV8String(isolate, propMeta->jsName());
       // A real accessor pair, not SetNativeDataProperty: a derived class
       // inherits this from the base constructor, and assigning through the
@@ -743,7 +781,7 @@ void MetadataBuilder::RegisterStaticProperties(
       // data property.
       Local<v8::Function> propGetter;
       Local<v8::Function> propSetter;
-      if (!FunctionTemplate::New(isolate, PropertyNameGetterCallback, ext)
+      if (!FunctionTemplate::New(isolate, getterCallback, ext)
                ->GetFunction(context)
                .ToLocal(&propGetter) ||
           !FunctionTemplate::New(isolate, PropertyNameSetterCallback, ext)
@@ -763,7 +801,7 @@ void MetadataBuilder::RegisterStaticProtocols(
     const std::string className, KnownUnknownClassPair pair,
     robin_hood::unordered_map<std::string, uint8_t>& names) {
   if (meta->type() == MetaType::ProtocolType) {
-    MetadataBuilder::RegisterStaticMethods(context, ctorFunc, meta, pair, names);
+    MetadataBuilder::RegisterStaticMethods(context, ctorFunc, meta, className.c_str(), pair, names);
     MetadataBuilder::RegisterStaticProperties(context, ctorFunc, meta, className, pair, names);
   }
 
@@ -843,6 +881,11 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
     }
   }
 
+  if (MethodCallProfiler::IsEnabled()) {
+    MethodCallProfiler::RecordCall(klass ? std::string(class_getName(klass)) : item->className_,
+                                   item->meta_, !instanceMethod);
+  }
+
   Local<Context> context = isolate->GetCurrentContext();
   Local<Value> result =
       instanceMethod
@@ -868,6 +911,10 @@ void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value>& 
     Local<Value> error = Exception::Error(tns::ToV8String(isolate, "Property is not readable."));
     isolate->ThrowException(error);
     return;
+  }
+
+  if (MethodCallProfiler::IsEnabled()) {
+    MethodCallProfiler::RecordCall(item->className_, item->meta_->getter());
   }
 
   V8EmptyValueArgs args;
@@ -906,6 +953,10 @@ void MetadataBuilder::PropertyNameGetterCallback(const FunctionCallbackInfo<Valu
     Local<Value> error = Exception::Error(tns::ToV8String(isolate, "Property is not readable."));
     isolate->ThrowException(error);
     return;
+  }
+
+  if (MethodCallProfiler::IsEnabled()) {
+    MethodCallProfiler::RecordCall(item->className_, item->meta_->getter(), true);
   }
 
   V8EmptyValueArgs args;

@@ -1059,37 +1059,10 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
   }
 
   if (typeEncoding->type == BinaryTypeEncodingType::ClassEncoding) {
-    Class result = call->GetResult<Class>();
-    if (result == nil) {
-      return Null(isolate);
+    Local<Value> klass = Interop::ClassToJsValue(context, call->GetResult<Class>());
+    if (!klass.IsEmpty()) {
+      return klass;
     }
-
-    std::shared_ptr<Caches> cache = Caches::Get(isolate);
-    while (true) {
-      const char* name = class_getName(result);
-
-      const Meta* meta = ArgConverter::GetMeta(name);
-      if (meta != nullptr &&
-          (meta->type() == MetaType::Interface || meta->type() == MetaType::ProtocolType)) {
-        const BaseClassMeta* baseMeta = static_cast<const BaseClassMeta*>(meta);
-        Class knownClass = meta->type() == MetaType::Interface ? objc_getClass(meta->name()) : nil;
-        KnownUnknownClassPair pair(knownClass);
-        std::vector<std::string> emptyProtocols;
-        cache->ObjectCtorInitializer(context, baseMeta, pair, emptyProtocols);
-      }
-
-      auto it = cache->CtorFuncs.find(name);
-      if (it != cache->CtorFuncs.end()) {
-        return it->second->Get(isolate);
-      }
-
-      result = class_getSuperclass(result);
-      if (!result) {
-        break;
-      }
-    }
-
-    tns::Assert(false, isolate);
   }
 
   if (typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
@@ -1240,88 +1213,167 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
   if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
       typeEncoding->type == BinaryTypeEncodingType::IdEncoding ||
       typeEncoding->type == BinaryTypeEncodingType::InstanceTypeEncoding) {
-    id result = call->GetResult<id>();
-
-    if (result == nil) {
-      return Null(isolate);
-    }
-
-    if (marshalToPrimitive && result == [NSNull null]) {
-      return Null(isolate);
-    }
-
-    if ([result isKindOfClass:[@YES class]]) {
-      return v8::Boolean::New(isolate, [result boolValue]);
-    }
-
-    if (marshalToPrimitive && [result isKindOfClass:[NSDate class]]) {
-      double time = [result timeIntervalSince1970] * 1000.0;
-      Local<Value> date;
-      if (Date::New(context, time).ToLocal(&date)) {
-        return date;
-      }
-
-      std::ostringstream errorStream;
-      errorStream << "Unable to convert " << [result description] << " to a Date object";
-      std::string errorMessage = errorStream.str();
-      Local<Value> error = Exception::Error(tns::ToV8String(isolate, errorMessage));
-      isolate->ThrowException(error);
-      return Local<Value>();
-    }
-
-    if (marshalToPrimitive && [result isKindOfClass:[NSString class]]) {
-      if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
-        const char* returnClassName = typeEncoding->details.declarationReference.name.valuePtr();
-        Class returnClass = objc_getClass(returnClassName);
-        if (returnClass != nil && returnClass == [NSMutableString class]) {
-          marshalToPrimitive = false;
-        }
-      }
-
-      if (marshalToPrimitive) {
-        // Convert NSString instances to javascript strings for all instance method calls
-        return tns::ToV8String(isolate, result);
-      }
-    }
-
-    if (marshalToPrimitive && [result isKindOfClass:[NSNumber class]] &&
-        ![result isKindOfClass:[NSDecimalNumber class]]) {
-      // Convert NSNumber instances to javascript numbers for all instance method calls
-      double value = [result doubleValue];
-      return Number::New(isolate, value);
-    }
-
-    auto cache = Caches::Get(isolate);
-    auto poInstance = ArgConverter::FindCachedInstance(isolate, cache, result);
-    if (poInstance != nullptr) {
-      return poInstance->Get(isolate);
-    }
-
-    // For NSProxy we will try to read the metadata from
-    // typeEncoding->details.interfaceDeclarationReference.name because class_getSuperclass will
-    // directly return NSProxy and thus missing to attach all instance members
-    const TypeEncoding* te = [result isProxy] ? typeEncoding : nullptr;
-
-    ObjCDataWrapper* wrapper = new ObjCDataWrapper(result, te);
-    std::vector<std::string> additionalProtocols = Interop::GetAdditionalProtocols(typeEncoding);
-    Local<Value> jsResult =
-        ArgConverter::ConvertArgument(context, wrapper, false, additionalProtocols);
-
-    if (ownsReturnedObject || isInitializer) {
-      [result release];
-    }
-
-    if ([result isKindOfClass:[NSArray class]]) {
-      // attach Symbol.iterator to the instance
-      SymbolIterator::Set(context, jsResult);
-    }
-
-    tns::DeleteWrapperIfUnused(isolate, jsResult, wrapper);
-
-    return jsResult;
+    return Interop::ObjectToJsValue(context, call->GetResult<id>(), typeEncoding,
+                                    marshalToPrimitive, ownsReturnedObject, isInitializer);
   }
 
   return Interop::GetPrimitiveReturnType(context, typeEncoding->type, call);
+}
+
+Local<Value> Interop::ObjectToJsValue(Local<Context> context, id result,
+                                      const TypeEncoding* typeEncoding, bool marshalToPrimitive,
+                                      bool ownsReturnedObject, bool isInitializer) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+
+  if (result == nil) {
+    return Null(isolate);
+  }
+
+  if (marshalToPrimitive && result == [NSNull null]) {
+    return Null(isolate);
+  }
+
+  if ([result isKindOfClass:[@YES class]]) {
+    return v8::Boolean::New(isolate, [result boolValue]);
+  }
+
+  if (marshalToPrimitive && [result isKindOfClass:[NSDate class]]) {
+    double time = [result timeIntervalSince1970] * 1000.0;
+    Local<Value> date;
+    if (Date::New(context, time).ToLocal(&date)) {
+      return date;
+    }
+
+    std::ostringstream errorStream;
+    errorStream << "Unable to convert " << [result description] << " to a Date object";
+    std::string errorMessage = errorStream.str();
+    Local<Value> error = Exception::Error(tns::ToV8String(isolate, errorMessage));
+    isolate->ThrowException(error);
+    return Local<Value>();
+  }
+
+  if (marshalToPrimitive && [result isKindOfClass:[NSString class]]) {
+    if (typeEncoding != nullptr &&
+        typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
+      const char* returnClassName = typeEncoding->details.declarationReference.name.valuePtr();
+      Class returnClass = objc_getClass(returnClassName);
+      if (returnClass != nil && returnClass == [NSMutableString class]) {
+        marshalToPrimitive = false;
+      }
+    }
+
+    if (marshalToPrimitive) {
+      // Convert NSString instances to javascript strings for all instance method calls
+      return tns::ToV8String(isolate, result);
+    }
+  }
+
+  if (marshalToPrimitive && [result isKindOfClass:[NSNumber class]] &&
+      ![result isKindOfClass:[NSDecimalNumber class]]) {
+    // Convert NSNumber instances to javascript numbers for all instance method calls
+    double value = [result doubleValue];
+    return Number::New(isolate, value);
+  }
+
+  auto cache = Caches::Get(isolate);
+  auto poInstance = ArgConverter::FindCachedInstance(isolate, cache, result);
+  if (poInstance != nullptr) {
+    return poInstance->Get(isolate);
+  }
+
+  // For NSProxy we will try to read the metadata from
+  // typeEncoding->details.interfaceDeclarationReference.name because class_getSuperclass will
+  // directly return NSProxy and thus missing to attach all instance members
+  const TypeEncoding* te = [result isProxy] ? typeEncoding : nullptr;
+
+  ObjCDataWrapper* wrapper = new ObjCDataWrapper(result, te);
+  std::vector<std::string> additionalProtocols = typeEncoding != nullptr
+                                                     ? Interop::GetAdditionalProtocols(typeEncoding)
+                                                     : std::vector<std::string>();
+  Local<Value> jsResult =
+      ArgConverter::ConvertArgument(context, wrapper, false, additionalProtocols);
+
+  if (ownsReturnedObject || isInitializer) {
+    [result release];
+  }
+
+  if ([result isKindOfClass:[NSArray class]]) {
+    // attach Symbol.iterator to the instance
+    SymbolIterator::Set(context, jsResult);
+  }
+
+  tns::DeleteWrapperIfUnused(isolate, jsResult, wrapper);
+
+  return jsResult;
+}
+
+Local<Value> Interop::ClassToJsValue(Local<Context> context, Class result) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  if (result == nil) {
+    return Null(isolate);
+  }
+
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  while (true) {
+    const char* name = class_getName(result);
+
+    const Meta* meta = ArgConverter::GetMeta(name);
+    if (meta != nullptr &&
+        (meta->type() == MetaType::Interface || meta->type() == MetaType::ProtocolType)) {
+      const BaseClassMeta* baseMeta = static_cast<const BaseClassMeta*>(meta);
+      Class knownClass = meta->type() == MetaType::Interface ? objc_getClass(meta->name()) : nil;
+      KnownUnknownClassPair pair(knownClass);
+      std::vector<std::string> emptyProtocols;
+      cache->ObjectCtorInitializer(context, baseMeta, pair, emptyProtocols);
+    }
+
+    auto it = cache->CtorFuncs.find(name);
+    if (it != cache->CtorFuncs.end()) {
+      return it->second->Get(isolate);
+    }
+
+    result = class_getSuperclass(result);
+    if (!result) {
+      break;
+    }
+  }
+
+  tns::Assert(false, isolate);
+  return Local<Value>();
+}
+
+Local<Value> Interop::NSExceptionToJsError(Local<Context> context, id exception,
+                                           std::string& message) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  NSException* e = (NSException*)exception;
+
+  NSString* nsName = [e name];
+  NSString* nsReason = [e reason];
+  Local<v8::String> messageV8 = tns::ToV8String(isolate, nsReason ?: (nsName ?: @"NSException"));
+  message = tns::ToString(isolate, messageV8);
+
+  Local<Value> jsErrVal = Exception::Error(messageV8);
+  if (jsErrVal.IsEmpty() || !jsErrVal->IsObject()) {
+    return Local<Value>();
+  }
+
+  Local<Object> jsErrObj = jsErrVal.As<Object>();
+  if (nsName != nil) {
+    jsErrObj->Set(context, tns::ToV8String(isolate, "name"), tns::ToV8String(isolate, nsName))
+        .FromMaybe(false);
+  }
+  if (nsReason != nil) {
+    jsErrObj->Set(context, tns::ToV8String(isolate, "message"), tns::ToV8String(isolate, nsReason))
+        .FromMaybe(false);
+  }
+
+  ObjCDataWrapper* wrapper = new ObjCDataWrapper((id)e);
+  Local<Value> nativeWrapper =
+      ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true);
+  jsErrObj->Set(context, tns::ToV8String(isolate, "nativeException"), nativeWrapper)
+      .FromMaybe(false);
+
+  return jsErrObj;
 }
 
 Local<Value> Interop::GetPrimitiveReturnType(Local<Context> context, BinaryTypeEncodingType type,
@@ -1714,35 +1766,14 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     Isolate* isolate = v8::Isolate::GetCurrent();
     Local<Context> context = isolate->GetCurrentContext();
 
-    NSString* nsName = [e name];
-    NSString* nsReason = [e reason];
-    Local<v8::String> messageV8 = tns::ToV8String(isolate, nsReason ?: (nsName ?: @"NSException"));
-    std::string message = tns::ToString(isolate, messageV8);
-
-    Local<Value> jsErrVal = Exception::Error(messageV8);
-    if (jsErrVal.IsEmpty() || !jsErrVal->IsObject()) {
+    std::string message;
+    Local<Value> jsError = Interop::NSExceptionToJsError(context, e, message);
+    if (jsError.IsEmpty()) {
       // Fallback: keep the description-only behavior if Error creation fails.
       throw NativeScriptException(tns::ToString(isolate, [e description]));
     }
 
-    Local<Object> jsErrObj = jsErrVal.As<Object>();
-    if (nsName != nil) {
-      jsErrObj->Set(context, tns::ToV8String(isolate, "name"), tns::ToV8String(isolate, nsName))
-          .FromMaybe(false);
-    }
-    if (nsReason != nil) {
-      jsErrObj
-          ->Set(context, tns::ToV8String(isolate, "message"), tns::ToV8String(isolate, nsReason))
-          .FromMaybe(false);
-    }
-
-    ObjCDataWrapper* wrapper = new ObjCDataWrapper((id)e);
-    Local<Value> nativeWrapper =
-        ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true);
-    jsErrObj->Set(context, tns::ToV8String(isolate, "nativeException"), nativeWrapper)
-        .FromMaybe(false);
-
-    throw NativeScriptException(isolate, jsErrObj.As<Value>(), message);
+    throw NativeScriptException(isolate, jsError, message);
   }
 
   if (errorRef != nullptr) {

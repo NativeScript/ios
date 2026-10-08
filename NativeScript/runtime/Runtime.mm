@@ -1,6 +1,7 @@
 #include "Runtime.h"
 #include <chrono>
 #include <string>
+#include "AOTCalls.h"
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
 #include "Caches.h"
@@ -417,6 +418,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   }
   ObjectManager::Init(isolate, globalTemplate);
   LazyGlobals::Init(isolate, globalTemplate);
+  aot::DiscoverExternalStubs();
   MetadataBuilder::RegisterConstantsOnGlobalObject(isolate, globalTemplate, isWorker);
 
   isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);

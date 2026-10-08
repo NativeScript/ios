@@ -12,7 +12,13 @@
 
 namespace tns {
 
+namespace aot {
+struct Trampolines;
+}
+
 class MetadataBuilder {
+  friend struct aot::Trampolines;
+
  public:
   static void RegisterConstantsOnGlobalObject(
       v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate,
@@ -80,7 +86,8 @@ class MetadataBuilder {
   static void RegisterInstanceMethods(
       v8::Local<v8::Context> context,
       v8::Local<v8::FunctionTemplate> ctorFuncTemplate,
-      const BaseClassMeta* meta, KnownUnknownClassPair pair,
+      const BaseClassMeta* meta, const char* className,
+      KnownUnknownClassPair pair,
       robin_hood::unordered_map<std::string, uint8_t>& names);
   static void RegisterInstanceProperties(
       v8::Local<v8::Context> context,
@@ -102,7 +109,8 @@ class MetadataBuilder {
       robin_hood::unordered_map<std::string, uint8_t>& names);
   static void RegisterStaticMethods(
       v8::Local<v8::Context> context, v8::Local<v8::Function> ctorFunc,
-      const BaseClassMeta* meta, KnownUnknownClassPair pair,
+      const BaseClassMeta* meta, const char* className,
+      KnownUnknownClassPair pair,
       robin_hood::unordered_map<std::string, uint8_t>& names);
   static void RegisterStaticProperties(
       v8::Local<v8::Context> context, v8::Local<v8::Function> ctorFunc,

@@ -4,6 +4,7 @@
 #include "BuiltinLoader.h"
 #include "Helpers.h"
 #include "Messaging.h"
+#include "MethodCallProfiler.h"
 #include "StructuredSerialization.h"
 #include "TextEncoding.h"
 
@@ -45,6 +46,7 @@ constexpr LazyGlobalEntry kLazyGlobals[] = {
     {"MessageChannel", "MessageChannel", messaging::GetMessageChannelExports},
     {"BroadcastChannel", "BroadcastChannel",
      messaging::GetBroadcastChannelExports},
+    {"__native_call_profiler", "profiler", MethodCallProfiler::GetExports},
 };
 
 void LazyGlobalGetter(Local<v8::Name> property,
