@@ -785,21 +785,20 @@ void Worker::OnMessageCallback(Isolate* isolate, Local<Object> receiver,
   (void)state->emitMessage.Get(isolate)->Call(context, receiver, 3, args).ToLocal(&result);
 }
 
-bool Worker::EmitError(Isolate* isolate, Local<Object> receiver, const std::string& message,
-                       const std::string& source, const std::string& stackTrace, int lineNumber) {
+MaybeLocal<Value> Worker::EmitError(Isolate* isolate, Local<Object> receiver,
+                                    const std::string& message, const std::string& source,
+                                    const std::string& stackTrace, int lineNumber,
+                                    const std::string& errorName, const std::string& errorMessage) {
   WorkerEventsState* state = Caches::StateFor<WorkerEventsState>(isolate);
   if (state == nullptr || state->emitError.IsEmpty()) {
-    return false;
+    return MaybeLocal<Value>();
   }
   Local<Context> context = Caches::Get(isolate)->GetContext();
 
-  Local<Value> args[4]{tns::ToV8String(isolate, message), tns::ToV8String(isolate, source),
-                       Number::New(isolate, lineNumber), tns::ToV8String(isolate, stackTrace)};
-  Local<Value> result;
-  if (!state->emitError.Get(isolate)->Call(context, receiver, 4, args).ToLocal(&result)) {
-    return false;
-  }
-  return result->BooleanValue(isolate);
+  Local<Value> args[6]{tns::ToV8String(isolate, message),   tns::ToV8String(isolate, source),
+                       Number::New(isolate, lineNumber),    tns::ToV8String(isolate, stackTrace),
+                       tns::ToV8String(isolate, errorName), tns::ToV8String(isolate, errorMessage)};
+  return state->emitError.Get(isolate)->Call(context, receiver, 6, args);
 }
 
 void Worker::EmitEnded(Isolate* isolate, Local<Object> receiver) {

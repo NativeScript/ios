@@ -684,7 +684,7 @@ void PromiseRejectionTracker::Drain(Local<Context> context) {
                   }
                   std::string reasonMessage = tns::ToString(isolate_, forwarded);
                   worker->PassUncaughtRejectionToMain(reasonMessage, "Worker script",
-                                                      forwardedStack, 1);
+                                                      forwardedStack, 1, true, forwarded);
                 }
               }
             }

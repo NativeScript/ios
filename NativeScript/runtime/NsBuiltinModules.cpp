@@ -66,6 +66,7 @@ constexpr Registration kRegistry[] = {
     {"internal/message-channel", BuiltinId::kMessageChannel,
      messaging::CreateBinding, true},
     {"internal/message-event", BuiltinId::kMessageEvent, nullptr, true},
+    {"internal/worker-events", BuiltinId::kWorkerEvents, nullptr, true},
 };
 
 // ns:runtime config keys. Each key defines its value domain and scope here;

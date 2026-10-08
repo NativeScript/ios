@@ -583,20 +583,22 @@ class WorkerWrapper : public BaseDataWrapper {
   void PassUncaughtExceptionFromWorkerToMain(v8::Local<v8::Context> context,
                                              v8::TryCatch& tc,
                                              bool async = true);
-  // Overload to pass a pre-built error payload when a TryCatch isn't available
-  // Note: this overload accepts only primitive types to avoid passing V8
-  // handles across isolates/threads.
-  void PassUncaughtExceptionFromWorkerToMain(const std::string& message,
-                                             const std::string& source,
-                                             const std::string& stackTrace,
-                                             int lineNumber, bool async = true);
+  // Overload to pass a pre-built error payload when a TryCatch isn't available.
+  // `thrown` is the value the worker threw, when there is one: its name and
+  // message are read here, on the worker's isolate, for the parent to rebuild
+  // the error from. Without it the parent's error is an Error carrying
+  // `message`. Only strings cross to the parent's isolate.
+  void PassUncaughtExceptionFromWorkerToMain(
+      const std::string& message, const std::string& source,
+      const std::string& stackTrace, int lineNumber, bool async = true,
+      v8::Local<v8::Value> thrown = v8::Local<v8::Value>());
   // Forwards a drained unhandled promise rejection to the main isolate's
   // worker.onerror, guarded against teardown. Shares marshaling with the
   // exception overload above.
-  void PassUncaughtRejectionToMain(const std::string& message,
-                                   const std::string& source,
-                                   const std::string& stackTrace,
-                                   int lineNumber, bool async = true);
+  void PassUncaughtRejectionToMain(
+      const std::string& message, const std::string& source,
+      const std::string& stackTrace, int lineNumber, bool async = true,
+      v8::Local<v8::Value> thrown = v8::Local<v8::Value>());
   void PostMessage(std::shared_ptr<worker::Message> message);
   // WHATWG parity: the worker's implicit port message queue starts disabled;
   // Worker.mm calls this once the entry script has finished evaluating
@@ -731,7 +733,7 @@ class WorkerWrapper : public BaseDataWrapper {
   void ForwardErrorPayloadToMain(const std::string& message,
                                  const std::string& source,
                                  const std::string& stackTrace, int lineNumber,
-                                 bool async);
+                                 bool async, v8::Local<v8::Value> thrown);
 };
 
 }  // namespace tns
