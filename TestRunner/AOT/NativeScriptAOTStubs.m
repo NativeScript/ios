@@ -844,6 +844,356 @@ static bool AOT_NSObject_isKindOfClass(NSAOTCallInfo info) {
   return true;
 }
 
+static bool AOT_NSObject_isEqual(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 1) return false;
+  SEL sel = @selector(isEqual:);
+  bool callSuper = false;
+  id target = __ns_aot_get_target(info, sel, &sel, &callSuper);
+  if (target == nil) return false;
+  id a0 = nil;
+  if (!__ns_aot_arg_object(info, 0, &a0)) return true;
+  BOOL r = NO;
+  @try {
+    if (callSuper) {
+      struct objc_super sup = {target, class_getSuperclass(object_getClass(target))};
+      r = ((BOOL (*)(struct objc_super*, SEL, id))objc_msgSendSuper)(&sup, sel, a0);
+    } else {
+      r = ((BOOL (*)(id, SEL, id))objc_msgSend)(target, sel, a0);
+    }
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  __ns_aot_return_bool(info, r);
+  return true;
+}
+
+static bool AOT_NSArray_count(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 0) return false;
+  SEL sel = @selector(count);
+  bool callSuper = false;
+  id target = __ns_aot_get_target(info, sel, &sel, &callSuper);
+  if (target == nil) return false;
+  unsigned long r = 0;
+  @try {
+    if (callSuper) {
+      struct objc_super sup = {target, class_getSuperclass(object_getClass(target))};
+      r = ((unsigned long (*)(struct objc_super*, SEL))objc_msgSendSuper)(&sup, sel);
+    } else {
+      r = ((unsigned long (*)(id, SEL))objc_msgSend)(target, sel);
+    }
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  __ns_aot_return_uint64(info, (uint64_t)r);
+  return true;
+}
+
+static bool AOT_NSArray_objectAtIndex(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 1) return false;
+  SEL sel = @selector(objectAtIndex:);
+  bool callSuper = false;
+  id target = __ns_aot_get_target(info, sel, &sel, &callSuper);
+  if (target == nil) return false;
+  uint64_t raw0 = 0;
+  if (!__ns_aot_arg_uint64(info, 0, &raw0)) return true;
+  unsigned long a0 = (unsigned long)raw0;
+  id r = nil;
+  @try {
+    if (callSuper) {
+      struct objc_super sup = {target, class_getSuperclass(object_getClass(target))};
+      r = ((id (*)(struct objc_super*, SEL, unsigned long))objc_msgSendSuper)(&sup, sel, a0);
+    } else {
+      r = ((id (*)(id, SEL, unsigned long))objc_msgSend)(target, sel, a0);
+    }
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  __ns_aot_return_object(info, r, false, true);
+  return true;
+}
+
+static bool AOT_NSMutableArray_addObject(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 1) return false;
+  SEL sel = @selector(addObject:);
+  bool callSuper = false;
+  id target = __ns_aot_get_target(info, sel, &sel, &callSuper);
+  if (target == nil) return false;
+  id a0 = nil;
+  if (!__ns_aot_arg_object(info, 0, &a0)) return true;
+  @try {
+    if (callSuper) {
+      struct objc_super sup = {target, class_getSuperclass(object_getClass(target))};
+      ((void (*)(struct objc_super*, SEL, id))objc_msgSendSuper)(&sup, sel, a0);
+    } else {
+      ((void (*)(id, SEL, id))objc_msgSend)(target, sel, a0);
+    }
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  return true;
+}
+
+static bool AOT_NSMutableArray_removeLastObject(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 0) return false;
+  SEL sel = @selector(removeLastObject);
+  bool callSuper = false;
+  id target = __ns_aot_get_target(info, sel, &sel, &callSuper);
+  if (target == nil) return false;
+  @try {
+    if (callSuper) {
+      struct objc_super sup = {target, class_getSuperclass(object_getClass(target))};
+      ((void (*)(struct objc_super*, SEL))objc_msgSendSuper)(&sup, sel);
+    } else {
+      ((void (*)(id, SEL))objc_msgSend)(target, sel);
+    }
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  return true;
+}
+
+static bool AOT_NSArray_indexOfObject(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 1) return false;
+  SEL sel = @selector(indexOfObject:);
+  bool callSuper = false;
+  id target = __ns_aot_get_target(info, sel, &sel, &callSuper);
+  if (target == nil) return false;
+  id a0 = nil;
+  if (!__ns_aot_arg_object(info, 0, &a0)) return true;
+  unsigned long r = 0;
+  @try {
+    if (callSuper) {
+      struct objc_super sup = {target, class_getSuperclass(object_getClass(target))};
+      r = ((unsigned long (*)(struct objc_super*, SEL, id))objc_msgSendSuper)(&sup, sel, a0);
+    } else {
+      r = ((unsigned long (*)(id, SEL, id))objc_msgSend)(target, sel, a0);
+    }
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  __ns_aot_return_uint64(info, (uint64_t)r);
+  return true;
+}
+
+static bool AOT_NSDictionary_objectForKey(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 1) return false;
+  SEL sel = @selector(objectForKey:);
+  bool callSuper = false;
+  id target = __ns_aot_get_target(info, sel, &sel, &callSuper);
+  if (target == nil) return false;
+  id a0 = nil;
+  if (!__ns_aot_arg_object(info, 0, &a0)) return true;
+  id r = nil;
+  @try {
+    if (callSuper) {
+      struct objc_super sup = {target, class_getSuperclass(object_getClass(target))};
+      r = ((id (*)(struct objc_super*, SEL, id))objc_msgSendSuper)(&sup, sel, a0);
+    } else {
+      r = ((id (*)(id, SEL, id))objc_msgSend)(target, sel, a0);
+    }
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  __ns_aot_return_object(info, r, false, true);
+  return true;
+}
+
+static bool AOT_NSString_length(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 0) return false;
+  SEL sel = @selector(length);
+  bool callSuper = false;
+  id target = __ns_aot_get_target(info, sel, &sel, &callSuper);
+  if (target == nil) return false;
+  unsigned long r = 0;
+  @try {
+    if (callSuper) {
+      struct objc_super sup = {target, class_getSuperclass(object_getClass(target))};
+      r = ((unsigned long (*)(struct objc_super*, SEL))objc_msgSendSuper)(&sup, sel);
+    } else {
+      r = ((unsigned long (*)(id, SEL))objc_msgSend)(target, sel);
+    }
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  __ns_aot_return_uint64(info, (uint64_t)r);
+  return true;
+}
+
+static bool AOT_NSString_isEqualToString(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 1) return false;
+  SEL sel = @selector(isEqualToString:);
+  bool callSuper = false;
+  id target = __ns_aot_get_target(info, sel, &sel, &callSuper);
+  if (target == nil) return false;
+  id a0 = nil;
+  if (!__ns_aot_arg_object(info, 0, &a0)) return true;
+  BOOL r = NO;
+  @try {
+    if (callSuper) {
+      struct objc_super sup = {target, class_getSuperclass(object_getClass(target))};
+      r = ((BOOL (*)(struct objc_super*, SEL, id))objc_msgSendSuper)(&sup, sel, a0);
+    } else {
+      r = ((BOOL (*)(id, SEL, id))objc_msgSend)(target, sel, a0);
+    }
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  __ns_aot_return_bool(info, r);
+  return true;
+}
+
+static bool AOT_NSNumber_numberWithInt_static(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 1) return false;
+  SEL sel = @selector(numberWithInt:);
+  Class cls = __ns_aot_get_static_class(info);
+  if (cls == nil) return false;
+  int64_t raw0 = 0;
+  if (!__ns_aot_arg_int64(info, 0, &raw0)) return true;
+  int a0 = (int)raw0;
+  id r = nil;
+  @try {
+    r = ((id (*)(id, SEL, int))objc_msgSend)((id)cls, sel, a0);
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  __ns_aot_return_object(info, r, false, true);
+  return true;
+}
+
+static bool AOT_NSNumber_numberWithDouble_static(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 1) return false;
+  SEL sel = @selector(numberWithDouble:);
+  Class cls = __ns_aot_get_static_class(info);
+  if (cls == nil) return false;
+  double raw0 = 0;
+  if (!__ns_aot_arg_double(info, 0, &raw0)) return true;
+  double a0 = (double)raw0;
+  id r = nil;
+  @try {
+    r = ((id (*)(id, SEL, double))objc_msgSend)((id)cls, sel, a0);
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  __ns_aot_return_object(info, r, false, true);
+  return true;
+}
+
+static bool AOT_NSNumber_doubleValue(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 0) return false;
+  SEL sel = @selector(doubleValue);
+  bool callSuper = false;
+  id target = __ns_aot_get_target(info, sel, &sel, &callSuper);
+  if (target == nil) return false;
+  double r = 0;
+  @try {
+    if (callSuper) {
+      struct objc_super sup = {target, class_getSuperclass(object_getClass(target))};
+      r = ((double (*)(struct objc_super*, SEL))objc_msgSendSuper)(&sup, sel);
+    } else {
+      r = ((double (*)(id, SEL))objc_msgSend)(target, sel);
+    }
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  __ns_aot_return_double(info, r);
+  return true;
+}
+
+static bool AOT_NSProcessInfo_processInfo_static(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 0) return false;
+  SEL sel = @selector(processInfo);
+  Class cls = __ns_aot_get_static_class(info);
+  if (cls == nil) return false;
+  id r = nil;
+  @try {
+    r = ((id (*)(id, SEL))objc_msgSend)((id)cls, sel);
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  __ns_aot_return_object(info, r, false, true);
+  return true;
+}
+
+static bool AOT_UIView_setNeedsLayout(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 0) return false;
+  SEL sel = @selector(setNeedsLayout);
+  bool callSuper = false;
+  id target = __ns_aot_get_target(info, sel, &sel, &callSuper);
+  if (target == nil) return false;
+  @try {
+    if (callSuper) {
+      struct objc_super sup = {target, class_getSuperclass(object_getClass(target))};
+      ((void (*)(struct objc_super*, SEL))objc_msgSendSuper)(&sup, sel);
+    } else {
+      ((void (*)(id, SEL))objc_msgSend)(target, sel);
+    }
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  return true;
+}
+
+static bool AOT_UIColor_colorWithRed_green_blue_alpha_static(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 4) return false;
+  SEL sel = @selector(colorWithRed:green:blue:alpha:);
+  Class cls = __ns_aot_get_static_class(info);
+  if (cls == nil) return false;
+  double raw0 = 0;
+  if (!__ns_aot_arg_double(info, 0, &raw0)) return true;
+  double a0 = (double)raw0;
+  double raw1 = 0;
+  if (!__ns_aot_arg_double(info, 1, &raw1)) return true;
+  double a1 = (double)raw1;
+  double raw2 = 0;
+  if (!__ns_aot_arg_double(info, 2, &raw2)) return true;
+  double a2 = (double)raw2;
+  double raw3 = 0;
+  if (!__ns_aot_arg_double(info, 3, &raw3)) return true;
+  double a3 = (double)raw3;
+  id r = nil;
+  @try {
+    r = ((id (*)(id, SEL, double, double, double, double))objc_msgSend)((id)cls, sel, a0, a1, a2, a3);
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  __ns_aot_return_object(info, r, false, true);
+  return true;
+}
+
+static bool AOT_TNSPrimitives_methodWithInt_static(NSAOTCallInfo info) {
+  if (__ns_aot_arg_count(info) != 1) return false;
+  SEL sel = @selector(methodWithInt:);
+  Class cls = __ns_aot_get_static_class(info);
+  if (cls == nil) return false;
+  int64_t raw0 = 0;
+  if (!__ns_aot_arg_int64(info, 0, &raw0)) return true;
+  int a0 = (int)raw0;
+  int r = 0;
+  @try {
+    r = ((int (*)(id, SEL, int))objc_msgSend)((id)cls, sel, a0);
+  } @catch (NSException* e) {
+    __ns_aot_throw_exception(info, e);
+    return true;
+  }
+  __ns_aot_return_int64(info, (int64_t)r);
+  return true;
+}
+
 __attribute__((visibility("default")))
 void __ns_register_aot_calls(void (*reg)(const char*, const char*, bool, NSAOTCallHandler)) {
   reg("TNSBaseInterface", "baseMethod", false, AOT_TNSBaseInterface_baseMethod);
@@ -883,4 +1233,24 @@ void __ns_register_aot_calls(void (*reg)(const char*, const char*, bool, NSAOTCa
   reg("NSObject", "description", false, AOT_NSObject_description);
   reg("NSObject", "respondsToSelector:", false, AOT_NSObject_respondsToSelector);
   reg("NSObject", "isKindOfClass:", false, AOT_NSObject_isKindOfClass);
+  reg("NSObject", "isEqual:", false, AOT_NSObject_isEqual);
+  reg("NSArray", "count", false, AOT_NSArray_count);
+  reg("NSMutableArray", "count", false, AOT_NSArray_count);
+  reg("NSArray", "objectAtIndex:", false, AOT_NSArray_objectAtIndex);
+  reg("NSMutableArray", "objectAtIndex:", false, AOT_NSArray_objectAtIndex);
+  reg("NSMutableArray", "addObject:", false, AOT_NSMutableArray_addObject);
+  reg("NSMutableArray", "removeLastObject", false, AOT_NSMutableArray_removeLastObject);
+  reg("NSArray", "indexOfObject:", false, AOT_NSArray_indexOfObject);
+  reg("NSMutableArray", "indexOfObject:", false, AOT_NSArray_indexOfObject);
+  reg("NSDictionary", "objectForKey:", false, AOT_NSDictionary_objectForKey);
+  reg("NSMutableDictionary", "objectForKey:", false, AOT_NSDictionary_objectForKey);
+  reg("NSString", "length", false, AOT_NSString_length);
+  reg("NSString", "isEqualToString:", false, AOT_NSString_isEqualToString);
+  reg("NSNumber", "numberWithInt:", true, AOT_NSNumber_numberWithInt_static);
+  reg("NSNumber", "numberWithDouble:", true, AOT_NSNumber_numberWithDouble_static);
+  reg("NSNumber", "doubleValue", false, AOT_NSNumber_doubleValue);
+  reg("NSProcessInfo", "processInfo", true, AOT_NSProcessInfo_processInfo_static);
+  reg("UIView", "setNeedsLayout", false, AOT_UIView_setNeedsLayout);
+  reg("UIColor", "colorWithRed:green:blue:alpha:", true, AOT_UIColor_colorWithRed_green_blue_alpha_static);
+  reg("TNSPrimitives", "methodWithInt:", true, AOT_TNSPrimitives_methodWithInt_static);
 }
