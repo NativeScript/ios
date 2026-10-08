@@ -18,6 +18,7 @@ $(SRCROOT)/NativeScript/runtime/js/node-util.js
 $(SRCROOT)/NativeScript/runtime/js/node-worker-threads.js
 $(SRCROOT)/NativeScript/runtime/js/ns-module.js
 $(SRCROOT)/NativeScript/runtime/js/ns-runtime.js
+$(SRCROOT)/NativeScript/runtime/js/ns-url.js
 $(SRCROOT)/NativeScript/runtime/js/ns-util.js
 $(SRCROOT)/NativeScript/runtime/js/ns-worker-threads.js
 $(SRCROOT)/NativeScript/runtime/js/performance.js

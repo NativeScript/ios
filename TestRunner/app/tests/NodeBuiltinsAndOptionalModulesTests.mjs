@@ -10,7 +10,12 @@ describe("Node built-in and optional module resolution", function () {
     expect(ns.default).toBe(required);
     expect(ns.fileURLToPath).toBe(required.fileURLToPath);
     expect(Object.isFrozen(required)).toBe(true);
-    expect(Object.keys(required).sort()).toEqual(["fileURLToPath", "pathToFileURL"]);
+    expect(Object.keys(required).sort()).toEqual([
+      "URL",
+      "URLSearchParams",
+      "fileURLToPath",
+      "pathToFileURL",
+    ]);
   });
 
   it("converts file URLs to paths the way Node does", function () {

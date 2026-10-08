@@ -4,12 +4,24 @@
 
 #include "URLSearchParamsImpl.h"
 
+#include "Caches.h"
 #include "Helpers.h"
 #include "ModuleBinding.hpp"
 
 using namespace ada;
 
 namespace tns {
+
+namespace {
+
+// The constructor template Init put on the global template; see
+// URLConstructorState in URLImpl.cpp.
+struct URLSearchParamsConstructorState {
+  v8::Global<v8::FunctionTemplate> constructor;
+};
+
+}  // namespace
+
 URLSearchParamsImpl::URLSearchParamsImpl(ada::url_search_params params)
     : params_(params) {}
 
@@ -20,6 +32,21 @@ void URLSearchParamsImpl::Init(v8::Isolate* isolate,
   v8::Local<v8::String> urlSearchParamsPropertyName =
       ToV8String(isolate, "URLSearchParams");
   globalTemplate->Set(urlSearchParamsPropertyName, URLSearchParamsTemplate);
+
+  if (auto* state =
+          Caches::StateFor<URLSearchParamsConstructorState>(isolate)) {
+    state->constructor.Reset(isolate, URLSearchParamsTemplate);
+  }
+}
+
+v8::MaybeLocal<v8::Function> URLSearchParamsImpl::Constructor(
+    v8::Local<v8::Context> context) {
+  v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  auto* state = Caches::StateFor<URLSearchParamsConstructorState>(isolate);
+  if (state == nullptr || state->constructor.IsEmpty()) {
+    return v8::MaybeLocal<v8::Function>();
+  }
+  return state->constructor.Get(isolate)->GetFunction(context);
 }
 
 URLSearchParamsImpl* URLSearchParamsImpl::GetPointer(

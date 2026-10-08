@@ -11,6 +11,8 @@
 #include "Runtime.h"
 #include "StructuredSerialization.h"
 #include "TextEncoding.h"
+#include "URLImpl.h"
+#include "URLSearchParamsImpl.h"
 #include "Worker.h"
 
 using namespace v8;
@@ -25,6 +27,7 @@ constexpr const char* kNodePrefix = "node:";
 // Defined below, each next to the natives it gathers.
 MaybeLocal<Object> NsModuleBinding(Local<Context> context);
 MaybeLocal<Object> NsRuntimeBinding(Local<Context> context);
+MaybeLocal<Object> NsUrlBinding(Local<Context> context);
 MaybeLocal<Object> NsUtilBinding(Local<Context> context);
 MaybeLocal<Object> NsWorkerThreadsBinding(Local<Context> context);
 
@@ -47,6 +50,7 @@ struct Registration {
 constexpr Registration kRegistry[] = {
     {"ns:module", BuiltinId::kNsModule, NsModuleBinding},
     {"ns:runtime", BuiltinId::kNsRuntime, NsRuntimeBinding},
+    {"ns:url", BuiltinId::kNsUrl, NsUrlBinding},
     {"ns:util", BuiltinId::kNsUtil, NsUtilBinding},
     {"ns:worker_threads", BuiltinId::kNsWorkerThreads, NsWorkerThreadsBinding},
     {"node:module", BuiltinId::kNodeModule, nullptr},
@@ -194,6 +198,27 @@ MaybeLocal<Object> NsRuntimeBinding(Local<Context> context) {
       !binding->Set(context, tns::ToV8String(isolate, "setConfig"), setConfig)
            .FromMaybe(false) ||
       !binding->Set(context, tns::ToV8String(isolate, "getConfig"), getConfig)
+           .FromMaybe(false)) {
+    return MaybeLocal<Object>();
+  }
+  return binding;
+}
+
+// URL and URLSearchParams for ns:url: the context's own, from the templates
+// their Init installed, rather than whatever the globals name by the time the
+// module is first required.
+MaybeLocal<Object> NsUrlBinding(Local<Context> context) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Object> binding = Object::New(isolate);
+  Local<v8::Function> url;
+  Local<v8::Function> searchParams;
+  if (!URLImpl::Constructor(context).ToLocal(&url) ||
+      !URLSearchParamsImpl::Constructor(context).ToLocal(&searchParams) ||
+      !binding->Set(context, tns::ToV8String(isolate, "URL"), url)
+           .FromMaybe(false) ||
+      !binding
+           ->Set(context, tns::ToV8String(isolate, "URLSearchParams"),
+                 searchParams)
            .FromMaybe(false)) {
     return MaybeLocal<Object>();
   }

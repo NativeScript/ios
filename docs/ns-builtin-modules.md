@@ -426,6 +426,60 @@ a program with a DOM lib keeps the lib's declaration, so
 `new Worker(path, { ios })` type-checks either way without a conflicting
 redeclaration.
 
+### `ns:url`
+
+The runtime's own `URL` and `URLSearchParams`, reachable by specifier, and the
+converters between `file:` URLs and paths. The surface is the same as
+`node:url`'s, which is a re-export shim over this module. **Experimental,
+iOS-only** until the Android runtime ships it.
+
+| export | description |
+|---|---|
+| `URL` | The runtime's `URL` constructor: the very function the global of that name was created with, so `require("ns:url").URL === globalThis.URL` unless the app has reassigned the global. |
+| `URLSearchParams` | The runtime's `URLSearchParams` constructor, with the same identity guarantee. |
+| `fileURLToPath(url)` | Converts a `file:` URL — a string or a URL-like object with a string `href` — to a path. |
+| `pathToFileURL(path)` | Converts an absolute path to a `file:` URL, returned as an instance of this module's `URL`. |
+
+`URLPattern` remains a global only for now; it has no `node:url` counterpart,
+and nothing in the module needs it.
+
+The converters parse through `URL`, so `file://localhost/x` is accepted (the
+URL spec folds a `localhost` authority to none) while any other host throws,
+and the query and fragment are never part of the path. `fileURLToPath`
+rejects a non-`file:` scheme and rejects `%2F` in the path rather than
+decoding a separator into it. `pathToFileURL` requires an **absolute** path:
+Node resolves a relative one against the process working directory, and there
+is no such thing here.
+
+```js
+import { URL, fileURLToPath, pathToFileURL } from "ns:url";
+
+fileURLToPath("file:///app/src/main.js"); // "/app/src/main.js"
+fileURLToPath("file://localhost/app/a.js"); // "/app/a.js"
+fileURLToPath("file:///app/a.js?v=2#frag"); // "/app/a.js"
+
+pathToFileURL("/app/my file.js").href; // "file:///app/my%20file.js"
+new URL("./b.js", pathToFileURL("/app/a.js")).pathname; // "/app/b.js"
+```
+
+The converters' `TypeError` messages are Node's:
+
+| condition | message |
+|---|---|
+| argument is neither a string nor a URL-like object, or is unparseable | `The "path" argument must be of type string or an instance of URL.` |
+| non-`file:` scheme | `The URL must be of scheme file` |
+| a host other than `localhost` or empty | `File URL host must be "localhost" or empty` |
+| `%2F` in the path | `File URL path must not include encoded / characters` |
+| `pathToFileURL` given a non-string | `The "path" argument must be of type string.` |
+| `pathToFileURL` given a relative path | `The "path" argument must be an absolute path.` |
+
+The module exists so that typed code can name the runtime's URL classes
+without depending on what `globalThis.URL` resolves to in the program's type
+environment. `types/ns-url.d.ts` declares the module and, at script level,
+declares the global `URL` and `URLSearchParams` the way `@types/node` declares
+its own globals: a program with a DOM lib keeps the lib's declarations, and a
+program without one gets the module's constructors as the globals.
+
 ### `node:` compatibility shims
 
 The same registry serves the `node:` scheme with **compatibility shims** so
@@ -465,38 +519,9 @@ unmodified where a shim exists:
 | module | exports | notes |
 |---|---|---|
 | `node:util` | `inspect`, `format`, `TextEncoder`, `TextDecoder` | Re-exports `ns:util`'s members unchanged (`nodeUtil.inspect === nsUtil.inspect`) from a **distinct, separately frozen module object**. `TextEncoder`/`TextDecoder` are the globals of those names, as they are in Node. Documented as partial. |
-| `node:url` | `fileURLToPath`, `pathToFileURL` | Node-strict converters between `file:` URLs and paths. Documented as partial — no `URL`/`URLSearchParams` re-exports (both are globals), no legacy `url.parse`/`format`/`resolve`. |
+| `node:url` | `URL`, `URLSearchParams`, `fileURLToPath`, `pathToFileURL` | Re-exports all four of [`ns:url`](#nsurl)'s members unchanged (`nodeUrl.fileURLToPath === nsUrl.fileURLToPath`) from a **distinct, separately frozen module object**; the converters' behavior and error messages are specified there. Documented as partial — no legacy `url.parse`/`format`/`resolve`, and no `URLPattern` (Node's `node:url` has none either). |
 | `node:module` | `createRequire` | Re-exports `ns:module`'s `createRequire` unchanged from a **distinct, separately frozen module object**. `createPumpingRequire` is deliberately absent: it has no Node counterpart, so code written against this shim keeps running on Node. `require.resolve`/`.cache`/`.main` are not implemented, and neither is any other `node:module` member (`Module`, `builtinModules`, `isBuiltin`, `register`, `syncBuiltinESMExports`). Documented as partial. |
 | `node:worker_threads` | the messaging and thread surface — see [worker-threads.md](worker-threads.md) | The channel half (`MessagePort`, `MessageChannel`, `BroadcastChannel`, `receiveMessageOnPort`) is the real implementation, the same objects the globals of those names hold; the thread half is a bridge over the `Worker` that `ns:worker_threads` exports. The channel half has no `ns:` counterpart — its surface tracks Node's, so there is nothing for a standard module to own. The one place it breaks the absent-not-throwing rule below is deliberate: `postMessageToThread` and `moveMessagePortToContext` are present and throw an `Error` naming themselves, because silently missing thread-addressed messaging reads as a delivery bug rather than as an unsupported call. Documented as partial. |
-
-`node:url`'s parsing goes through the URL intrinsic, so `file://localhost/x` is
-accepted (the URL spec folds a `localhost` authority to none) while any other
-host throws, and the query and fragment are never part of the path.
-`fileURLToPath` rejects a non-`file:` scheme and rejects `%2F` in the path
-rather than decoding a separator into it. `pathToFileURL` returns a real `URL`
-and requires an **absolute** path: Node resolves a relative one against the
-process working directory, and there is no such thing here.
-
-```js
-const { fileURLToPath, pathToFileURL } = require("node:url");
-
-fileURLToPath("file:///app/src/main.js"); // "/app/src/main.js"
-fileURLToPath("file://localhost/app/a.js"); // "/app/a.js"
-fileURLToPath("file:///app/a.js?v=2#frag"); // "/app/a.js"
-
-pathToFileURL("/app/my file.js").href; // "file:///app/my%20file.js"
-```
-
-Its `TypeError` messages are Node's:
-
-| condition | message |
-|---|---|
-| argument is neither a string nor a URL-like object, or is unparseable | `The "path" argument must be of type string or an instance of URL.` |
-| non-`file:` scheme | `The URL must be of scheme file` |
-| a host other than `localhost` or empty | `File URL host must be "localhost" or empty` |
-| `%2F` in the path | `File URL path must not include encoded / characters` |
-| `pathToFileURL` given a non-string | `The "path" argument must be of type string.` |
-| `pathToFileURL` given a relative path | `The "path" argument must be an absolute path.` |
 
 ## Loading ES modules
 
@@ -782,7 +807,7 @@ resolvers read the same table differently:
 - The **`ns:`/`node:` resolver** — the app-facing one, behind `require()`,
   `import` and `import()` — serves only rows *not* marked internal-only. An
   internal-only specifier fails exactly as a name absent from the table does.
-  Eight rows are public today: `ns:module`, `ns:runtime`, `ns:util`,
+  Nine rows are public today: `ns:module`, `ns:runtime`, `ns:url`, `ns:util`,
   `ns:worker_threads`, `node:module`, `node:url`, `node:util`,
   `node:worker_threads`.
 - The **internal require** builtins receive (previous section) is the only
