@@ -813,8 +813,11 @@ Local<Value> Interop::StructToValue(Local<Context> context, void* result,
     return it->second->Get(isolate);
   }
 
-  Local<Value> res = ArgConverter::ConvertArgument(context, wrapper);
-  if (parentStruct == nullptr) {
+  // The root's registration handle is the one StructInstances and child views'
+  // Parent() hold; child views are registered by ConvertArgument.
+  bool isRoot = parentStruct == nullptr;
+  Local<Value> res = ArgConverter::ConvertArgument(context, wrapper, isRoot);
+  if (isRoot) {
     std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(context, res);
     cache->StructInstances.emplace(key, poResult);
   }

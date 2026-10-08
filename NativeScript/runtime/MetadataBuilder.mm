@@ -295,7 +295,7 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
 
     StructWrapper* wrapper = new StructWrapper(structInfo, dest, nullptr);
     Local<Context> context = isolate->GetCurrentContext();
-    Local<Value> result = ArgConverter::ConvertArgument(context, wrapper);
+    Local<Value> result = ArgConverter::ConvertArgument(context, wrapper, true);
 
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(context, result);

@@ -842,8 +842,14 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
 
   if (wrapper->Type() == WrapperType::Struct) {
     if (receiver.IsEmpty()) {
-      std::shared_ptr<Persistent<Value>> poStruct = CreateEmptyStruct(context);
-      receiver = poStruct->Get(isolate).As<Object>();
+      Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyStructCtorFunc.get();
+      tns::Assert(ctorFunc != nullptr, isolate);
+      receiver = NewEmptyInstance(context, ctorFunc);
+      // A struct object must carry exactly one finalizer registration; callers
+      // passing skipGCRegistration keep the handle and register it themselves.
+      if (!skipGCRegistration) {
+        ObjectManager::Register(context, receiver);
+      }
     }
 
     StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
@@ -1083,15 +1089,8 @@ std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyObject(Local<Context
   return ArgConverter::CreateEmptyInstance(context, ctorFunc, skipGCRegistration);
 }
 
-std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyStruct(Local<Context> context) {
-  Isolate* isolate = v8::Isolate::GetCurrent();
-  Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyStructCtorFunc.get();
-  tns::Assert(ctorFunc != nullptr, isolate);
-  return ArgConverter::CreateEmptyInstance(context, ctorFunc);
-}
-
-std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(
-    Local<Context> context, Persistent<v8::Function>* ctorFunc, bool skipGCRegistration) {
+Local<Object> ArgConverter::NewEmptyInstance(Local<Context> context,
+                                             Persistent<v8::Function>* ctorFunc) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   Local<v8::Function> emptyCtorFunc = ctorFunc->Get(isolate);
   Local<Value> value;
@@ -1099,7 +1098,13 @@ std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(
       !value->IsObject()) {
     tns::Assert(false, isolate);
   }
-  Local<Object> result = value.As<Object>();
+  return value.As<Object>();
+}
+
+std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(
+    Local<Context> context, Persistent<v8::Function>* ctorFunc, bool skipGCRegistration) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Object> result = NewEmptyInstance(context, ctorFunc);
 
   std::shared_ptr<Persistent<Value>> poValue;
   if (!skipGCRegistration) {
