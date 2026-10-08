@@ -1,6 +1,8 @@
 #ifndef MetadataBuilder_h
 #define MetadataBuilder_h
 
+#include <objc/runtime.h>
+
 #include "ClassBuilder.h"
 #include "Common.h"
 #include "DataWrapper.h"
@@ -21,7 +23,9 @@ class MetadataBuilder {
       const std::vector<std::string>& additionalProtocols =
           std::vector<std::string>());
   static v8::Local<v8::Function> GetOrCreateStructCtorFunction(
-      v8::Local<v8::Context> context, StructInfo structInfo);
+      v8::Local<v8::Context> context, const StructInfo& structInfo);
+  static v8::Local<v8::Object> GetOrCreateStructPrototype(
+      v8::Local<v8::Context> context, const StructInfo& structInfo);
   static v8::Intercepted StructPropertyGetterCallback(
       v8::Local<v8::Name> property,
       const v8::PropertyCallbackInfo<v8::Value>& info);
@@ -63,13 +67,12 @@ class MetadataBuilder {
       const v8::FunctionCallbackInfo<v8::Value>& info);
   static std::pair<ffi_type*, void*> GetStructData(
       v8::Local<v8::Context> context, v8::Local<v8::Object> initializer,
-      StructInfo structInfo);
+      const StructInfo& structInfo);
 
   static v8::Local<v8::Value> InvokeMethod(v8::Local<v8::Context> context,
                                            const MethodMeta* meta,
                                            v8::Local<v8::Object> receiver,
-                                           V8Args& args,
-                                           const std::string& containingClass,
+                                           V8Args& args, Class klass,
                                            bool isMethodCallback);
   static void RegisterAllocMethod(
       v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> ctorFuncTemplate,
@@ -145,6 +148,18 @@ class MetadataBuilder {
     const T* meta_;
     const std::string className_;
     void* userData_;
+
+    // Metadata can describe classes that are not loaded yet, so a nil
+    // lookup is retried on the next call instead of being cached.
+    Class ResolveClass() {
+      if (this->klass_ == nil && !this->className_.empty()) {
+        this->klass_ = objc_getClass(this->className_.c_str());
+      }
+      return this->klass_;
+    }
+
+   private:
+    Class klass_ = nil;
   };
 };
 

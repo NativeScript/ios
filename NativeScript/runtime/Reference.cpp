@@ -305,7 +305,7 @@ void* Reference::GetWrappedPointer(Local<Context> context,
     StructTypeWrapper* structTypeWrapper =
         static_cast<StructTypeWrapper*>(refWrapper->TypeWrapper());
 
-    StructInfo structInfo = structTypeWrapper->StructInfo();
+    const StructInfo& structInfo = structTypeWrapper->StructInfo();
     void* data = malloc(structInfo.FFIType()->size);
     Interop::InitializeStruct(context, data, structInfo.Fields(), value);
     refWrapper->SetData(data, true);
@@ -429,7 +429,7 @@ Reference::DataPair Reference::GetDataPair(Local<Object> obj) {
         case WrapperType::StructType: {
           StructTypeWrapper* structTypeWrapper =
               static_cast<StructTypeWrapper*>(refWrapper->TypeWrapper());
-          StructInfo structInfo = structTypeWrapper->StructInfo();
+          const StructInfo& structInfo = structTypeWrapper->StructInfo();
 
           size = structInfo.FFIType()->size;
           break;

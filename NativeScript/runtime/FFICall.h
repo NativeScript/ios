@@ -4,6 +4,7 @@
 #include <malloc/malloc.h>
 
 #include <map>
+#include <memory>
 
 #include "DataWrapper.h"
 #include "Metadata.h"
@@ -104,12 +105,14 @@ class FFICall : public BaseCall {
   static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding,
                                    bool isStructMember = false);
   static void DisposeFFIType(ffi_type* type, const TypeEncoding* typeEncoding);
-  static StructInfo GetStructInfo(const StructMeta* structMeta,
-                                  std::string structName = "");
-  static StructInfo GetStructInfo(size_t fieldsCount,
-                                  const TypeEncoding* fieldEncoding,
-                                  const String* fieldNames,
-                                  std::string structName = "");
+  // The returned reference points into a process-wide cache that is never
+  // pruned, so it stays valid for the lifetime of the process.
+  static const StructInfo& GetStructInfo(const StructMeta* structMeta,
+                                         std::string structName = "");
+  static const StructInfo& GetStructInfo(size_t fieldsCount,
+                                         const TypeEncoding* fieldEncoding,
+                                         const String* fieldNames,
+                                         std::string structName = "");
 
   inline void* ArgumentBuffer(unsigned index) {
     return this->argsArray_[index];
@@ -118,7 +121,8 @@ class FFICall : public BaseCall {
   inline void** ArgsArray() { return this->argsArray_; }
 
  private:
-  static robin_hood::unordered_map<std::string, StructInfo> structInfosCache_;
+  static robin_hood::unordered_map<std::string, std::unique_ptr<StructInfo>>
+      structInfosCache_;
   static SpinMutex structInfosCacheMutex_;
   void** argsArray_;
   bool useDynamicBuffer_;

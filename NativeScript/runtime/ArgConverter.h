@@ -42,6 +42,9 @@ class ArgConverter {
                                      v8::Local<v8::Object> receiver,
                                      V8Args& args, const MethodMeta* meta,
                                      bool isMethodCallback);
+  // skipGCRegistration: for ObjC wrappers the object gets a strong handle and
+  // no finalizer; for Struct wrappers the caller must call
+  // ObjectManager::Register itself, exactly once.
   static v8::Local<v8::Value> ConvertArgument(
       v8::Local<v8::Context> context, BaseDataWrapper* wrapper,
       bool skipGCRegistration = false,
@@ -54,8 +57,6 @@ class ArgConverter {
           std::vector<std::string>());
   static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyObject(
       v8::Local<v8::Context> context, bool skipGCRegistration = false);
-  static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyStruct(
-      v8::Local<v8::Context> context);
   static const Meta* FindMeta(Class klass,
                               const TypeEncoding* typeEncoding = nullptr);
   // Looks up the JS wrapper cached for `target` in Caches::Instances, dropping
@@ -101,6 +102,8 @@ class ArgConverter {
       v8::Local<v8::Context> context,
       v8::NamedPropertyGetterCallback propertyGetter = nullptr,
       v8::NamedPropertySetterCallbackV2 propertySetter = nullptr);
+  static v8::Local<v8::Object> NewEmptyInstance(
+      v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc);
   static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyInstance(
       v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc,
       bool skipGCRegistration = false);

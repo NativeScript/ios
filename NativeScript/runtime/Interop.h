@@ -97,10 +97,11 @@ class Interop {
       bool isStructMember = false, bool ownsReturnedObject = false,
       bool returnsUnmanaged = false, bool isInitializer = false);
   static void SetStructPropertyValue(v8::Local<v8::Context> context,
-                                     StructWrapper* wrapper, StructField field,
+                                     StructWrapper* wrapper,
+                                     const StructField& field,
                                      v8::Local<v8::Value> value);
   static void InitializeStruct(v8::Local<v8::Context> context, void* destBuffer,
-                               std::vector<StructField> fields,
+                               const std::vector<StructField>& fields,
                                v8::Local<v8::Value> inititalizer);
   static void WriteTypeValue(v8::Local<v8::Context> context,
                              BaseDataWrapper* typeWrapper, void* dest,
@@ -129,7 +130,7 @@ class Interop {
   static void SetStructValue(v8::Local<v8::Value> value, void* destBuffer,
                              ptrdiff_t position);
   static void InitializeStruct(v8::Local<v8::Context> context, void* destBuffer,
-                               std::vector<StructField> fields,
+                               const std::vector<StructField>& fields,
                                v8::Local<v8::Value> inititalizer,
                                ptrdiff_t& position);
   static void RegisterInteropType(v8::Local<v8::Context> context,
@@ -160,7 +161,8 @@ class Interop {
                              const char* clazz);
   static v8::Local<v8::Array> ToArray(v8::Local<v8::Object> object);
   static v8::Local<v8::Value> StructToValue(
-      v8::Local<v8::Context> context, void* result, StructInfo structInfo,
+      v8::Local<v8::Context> context, void* result,
+      const StructInfo& structInfo,
       std::shared_ptr<v8::Persistent<v8::Value>> parentStruct);
   static const TypeEncoding* CreateEncoding(BinaryTypeEncodingType type);
   static v8::Local<v8::Value> HandleOf(v8::Local<v8::Context> context,

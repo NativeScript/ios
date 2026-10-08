@@ -386,7 +386,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
       Caches::Init(isolate, nextIsolateId.fetch_add(1, std::memory_order_relaxed));
   cache->isWorker = isWorker;
   cache->ObjectCtorInitializer = MetadataBuilder::GetOrCreateConstructorFunctionTemplate;
-  cache->StructCtorInitializer = MetadataBuilder::GetOrCreateStructCtorFunction;
+  cache->StructPrototypeInitializer = MetadataBuilder::GetOrCreateStructPrototype;
 
   Isolate::Scope isolate_scope(isolate);
   HandleScope handle_scope(isolate);

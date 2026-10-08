@@ -109,13 +109,13 @@ struct StructField {
               const TypeEncoding* encoding)
       : offset_(offset), ffiType_(ffiType), name_(name), encoding_(encoding) {}
 
-  ptrdiff_t Offset() { return this->offset_; }
+  ptrdiff_t Offset() const { return this->offset_; }
 
-  ffi_type* FFIType() { return this->ffiType_; }
+  ffi_type* FFIType() const { return this->ffiType_; }
 
-  std::string Name() { return this->name_; }
+  const std::string& Name() const { return this->name_; }
 
-  const TypeEncoding* Encoding() { return this->encoding_; }
+  const TypeEncoding* Encoding() const { return this->encoding_; }
 
  private:
   ptrdiff_t offset_;
@@ -124,17 +124,24 @@ struct StructField {
   const TypeEncoding* encoding_;
 };
 
+// Owned by FFICall's process-wide struct-info cache and immutable once
+// built, so every consumer (wrappers, call sites) holds a pointer or
+// reference into that cache instead of a copy. Non-copyable to keep it that
+// way: a copy would make the wrappers' pointers dangle.
 struct StructInfo {
  public:
   StructInfo(std::string name, ffi_type* ffiType,
              std::vector<StructField> fields)
-      : name_(name), ffiType_(ffiType), fields_(fields) {}
+      : name_(std::move(name)), ffiType_(ffiType), fields_(std::move(fields)) {}
 
-  std::string Name() const { return this->name_; }
+  StructInfo(const StructInfo&) = delete;
+  StructInfo& operator=(const StructInfo&) = delete;
+
+  const std::string& Name() const { return this->name_; }
 
   ffi_type* FFIType() const { return this->ffiType_; }
 
-  std::vector<StructField> Fields() { return this->fields_; }
+  const std::vector<StructField>& Fields() const { return this->fields_; }
 
  private:
   std::string name_;
@@ -296,19 +303,20 @@ class PrimitiveDataWrapper : public BaseDataWrapper {
 
 class StructTypeWrapper : public BaseDataWrapper {
  public:
-  StructTypeWrapper(StructInfo structInfo) : structInfo_(structInfo) {}
+  StructTypeWrapper(const struct StructInfo& structInfo)
+      : structInfo_(&structInfo) {}
 
   const WrapperType Type() { return WrapperType::StructType; }
 
-  const StructInfo StructInfo() { return this->structInfo_; }
+  const struct StructInfo& StructInfo() const { return *this->structInfo_; }
 
  private:
-  struct StructInfo structInfo_;
+  const struct StructInfo* structInfo_;
 };
 
 class StructWrapper : public StructTypeWrapper {
  public:
-  StructWrapper(struct StructInfo structInfo, void* data,
+  StructWrapper(const struct StructInfo& structInfo, void* data,
                 std::shared_ptr<v8::Persistent<v8::Value>> parent)
       : StructTypeWrapper(structInfo),
         data_(data),
