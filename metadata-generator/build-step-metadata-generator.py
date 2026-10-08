@@ -113,6 +113,7 @@ docset_path = os.path.join(os.path.expanduser("~"),
                            "Library/Developer/Shared/Documentation/DocSets/com.apple.adc.documentation.{}.docset"
                            .format(docset_platform))
 yaml_output_folder = env_or_none("NS_DEBUG_METADATA_PATH") or env_or_none("TNS_DEBUG_METADATA_PATH")
+json_output_folder = env_or_none("NS_JSON_METADATA_PATH")
 strict_includes = env_or_none("NS_DEBUG_METADATA_STRICT_INCLUDES") or env_or_none("TNS_DEBUG_METADATA_STRICT_INCLUDES")
 
 
@@ -145,6 +146,12 @@ def generate_metadata(arch):
         current_yaml_output_folder = yaml_output_folder + "-" + arch
         generator_call.extend(["-output-yaml", current_yaml_output_folder])
         print("Generating debug metadata in: \"{}\"".format(current_yaml_output_folder))
+
+    # optionally add json output folder
+    if json_output_folder is not None:
+        current_json_output_folder = os.path.join(json_output_folder, arch)
+        generator_call.extend(["-output-json", current_json_output_folder])
+        print("Generating JSON metadata in: \"{}\"".format(current_json_output_folder))
 
     whitelist_file_name = os.path.join(src_root, "whitelist.mdg")
     if os.path.exists(whitelist_file_name):
