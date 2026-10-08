@@ -788,16 +788,19 @@ void Worker::OnMessageCallback(Isolate* isolate, Local<Object> receiver,
 MaybeLocal<Value> Worker::EmitError(Isolate* isolate, Local<Object> receiver,
                                     const std::string& message, const std::string& source,
                                     const std::string& stackTrace, int lineNumber,
-                                    const std::string& errorName, const std::string& errorMessage) {
+                                    Local<v8::String> errorName, Local<v8::String> errorMessage) {
   WorkerEventsState* state = Caches::StateFor<WorkerEventsState>(isolate);
   if (state == nullptr || state->emitError.IsEmpty()) {
     return MaybeLocal<Value>();
   }
   Local<Context> context = Caches::Get(isolate)->GetContext();
 
-  Local<Value> args[6]{tns::ToV8String(isolate, message),   tns::ToV8String(isolate, source),
-                       Number::New(isolate, lineNumber),    tns::ToV8String(isolate, stackTrace),
-                       tns::ToV8String(isolate, errorName), tns::ToV8String(isolate, errorMessage)};
+  Local<Value> args[6]{tns::ToV8String(isolate, message),
+                       tns::ToV8String(isolate, source),
+                       Number::New(isolate, lineNumber),
+                       tns::ToV8String(isolate, stackTrace),
+                       errorName,
+                       errorMessage};
   return state->emitError.Get(isolate)->Call(context, receiver, 6, args);
 }
 
