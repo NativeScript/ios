@@ -578,7 +578,7 @@ void Interop::RegisterSizeOfFunction(Local<Context> context, Local<Object> inter
                              }
                              case WrapperType::StructType: {
                                StructTypeWrapper* sw = static_cast<StructTypeWrapper*>(wrapper);
-                               StructInfo structInfo = sw->StructInfo();
+                               const StructInfo& structInfo = sw->StructInfo();
                                size = structInfo.FFIType()->size;
                                break;
                              }

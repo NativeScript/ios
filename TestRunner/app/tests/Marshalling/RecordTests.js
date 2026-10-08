@@ -4,6 +4,22 @@ describe(module.id, function () {
         gc();
     });
 
+    it("shares one prototype per struct type and keeps it read-only", function () {
+        var fromNative = CGRectMake(1, 2, 3, 4);
+        var fromJs = new CGRect({ origin: { x: 1, y: 2 }, size: { width: 3, height: 4 } });
+        expect(Object.getPrototypeOf(fromNative)).toBe(CGRect.prototype);
+        expect(Object.getPrototypeOf(fromJs)).toBe(CGRect.prototype);
+        expect(fromNative instanceof CGRect).toBe(true);
+        expect(fromJs instanceof CGRect).toBe(true);
+        expect(Object.getPrototypeOf(fromNative.origin)).toBe(CGPoint.prototype);
+        expect(fromNative.origin instanceof CGPoint).toBe(true);
+
+        var descriptor = Object.getOwnPropertyDescriptor(CGRect, "prototype");
+        expect(descriptor.writable).toBe(false);
+        expect(function () { "use strict"; CGRect.prototype = {}; }).toThrow();
+        expect(Object.getPrototypeOf(CGRectMake(0, 0, 0, 0))).toBe(CGRect.prototype);
+    });
+
     it("SimpleRecord", function () {
         var record = new TNSSimpleStruct();
         expect(record instanceof TNSSimpleStruct).toBe(true);

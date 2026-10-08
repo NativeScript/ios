@@ -216,8 +216,8 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
         }
       } else {
         if (structWrapper->ChildCount() == 0) {
-          std::pair<void*, std::string> key =
-              std::make_pair(data, structWrapper->StructInfo().Name());
+          std::pair<void*, const StructInfo*> key =
+              std::make_pair(data, &structWrapper->StructInfo());
           cache->StructInstances.erase(key);
           std::free(data);
         } else {

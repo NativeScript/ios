@@ -226,7 +226,7 @@ void Interop::WriteTypeValue(Local<Context> context, BaseDataWrapper* typeWrappe
   if (typeWrapper->Type() == WrapperType::StructType) {
     if (isEmptyOrUndefined) {
       StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(typeWrapper);
-      StructInfo structInfo = structTypeWrapper->StructInfo();
+      const StructInfo& structInfo = structTypeWrapper->StructInfo();
 
       memset(dest, 0, structInfo.FFIType()->size);
       success = true;
@@ -243,7 +243,7 @@ void Interop::WriteTypeValue(Local<Context> context, BaseDataWrapper* typeWrappe
       } else {
         // Create the structure using the struct initializer syntax
         StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(typeWrapper);
-        StructInfo structInfo = structTypeWrapper->StructInfo();
+        const StructInfo& structInfo = structTypeWrapper->StructInfo();
         Interop::InitializeStruct(context, dest, structInfo.Fields(), arg.As<Object>());
         success = true;
       }
@@ -432,7 +432,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
             ArgConverter::GetMeta(innerType->details.declarationReference.name.valuePtr());
         tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
         const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-        StructInfo structInfo = FFICall::GetStructInfo(structMeta);
+        const StructInfo& structInfo = FFICall::GetStructInfo(structMeta);
         // TODO: How to free this?
         // this is used when you have js obj and wants to pass the data as a struct ponter
         // (MyStruct*) we create a new MyStruct with a snapshot of the jsObject and pass that in but
@@ -582,7 +582,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       const Meta* meta = ArgConverter::GetMeta(structName);
       tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
       const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-      StructInfo structInfo = FFICall::GetStructInfo(structMeta);
+      const StructInfo& structInfo = FFICall::GetStructInfo(structMeta);
       Interop::InitializeStruct(context, dest, structInfo.Fields(), obj);
     }
   } else if (argHelper.isObject() &&
@@ -594,7 +594,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       const TypeEncoding* fieldEncoding =
           typeEncoding->details.anonymousRecord.getFieldsEncodings();
       const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
-      StructInfo structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
+      const StructInfo& structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
 
       StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
       void* data = structWrapper->Data();
@@ -607,7 +607,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       const TypeEncoding* fieldEncoding =
           typeEncoding->details.anonymousRecord.getFieldsEncodings();
       const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
-      StructInfo structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
+      const StructInfo& structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
       Interop::InitializeStruct(context, dest, structInfo.Fields(), obj);
     }
   } else if (arg->IsFunction() && typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
@@ -785,7 +785,8 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
   return nil;
 }
 
-Local<Value> Interop::StructToValue(Local<Context> context, void* result, StructInfo structInfo,
+Local<Value> Interop::StructToValue(Local<Context> context, void* result,
+                                    const StructInfo& structInfo,
                                     std::shared_ptr<Persistent<Value>> parentStruct) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   StructWrapper* wrapper = nullptr;
@@ -806,7 +807,7 @@ Local<Value> Interop::StructToValue(Local<Context> context, void* result, Struct
   }
 
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
-  std::pair<void*, std::string> key = std::make_pair(wrapper->Data(), structInfo.Name());
+  std::pair<void*, const StructInfo*> key = std::make_pair(wrapper->Data(), &structInfo);
   auto it = cache->StructInstances.find(key);
   if (it != cache->StructInstances.end()) {
     return it->second->Get(isolate);
@@ -821,17 +822,17 @@ Local<Value> Interop::StructToValue(Local<Context> context, void* result, Struct
 }
 
 void Interop::InitializeStruct(Local<Context> context, void* destBuffer,
-                               std::vector<StructField> fields, Local<Value> inititalizer) {
+                               const std::vector<StructField>& fields, Local<Value> inititalizer) {
   ptrdiff_t position = 0;
   Interop::InitializeStruct(context, destBuffer, fields, inititalizer, position);
 }
 
 void Interop::InitializeStruct(Local<Context> context, void* destBuffer,
-                               std::vector<StructField> fields, Local<Value> inititalizer,
+                               const std::vector<StructField>& fields, Local<Value> inititalizer,
                                ptrdiff_t& position) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   for (auto it = fields.begin(); it != fields.end(); it++) {
-    StructField field = *it;
+    const StructField& field = *it;
 
     Local<Value> value;
     if (!inititalizer.IsEmpty() && !inititalizer->IsNullOrUndefined() && inititalizer->IsObject()) {
@@ -848,7 +849,7 @@ void Interop::InitializeStruct(Local<Context> context, void* destBuffer,
           ArgConverter::GetMeta(field.Encoding()->details.declarationReference.name.valuePtr());
       tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
       const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-      StructInfo nestedStructInfo = FFICall::GetStructInfo(structMeta);
+      const StructInfo& nestedStructInfo = FFICall::GetStructInfo(structMeta);
       Interop::InitializeStruct(context, destBuffer, nestedStructInfo.Fields(), value, position);
       position += nestedStructInfo.FFIType()->size;
     } else if (type == BinaryTypeEncodingType::AnonymousStructEncoding) {
@@ -856,7 +857,8 @@ void Interop::InitializeStruct(Local<Context> context, void* destBuffer,
       const TypeEncoding* fieldEncoding =
           field.Encoding()->details.anonymousRecord.getFieldsEncodings();
       const String* fieldNames = field.Encoding()->details.anonymousRecord.getFieldNames();
-      StructInfo nestedStructInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
+      const StructInfo& nestedStructInfo =
+          FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
       ptrdiff_t offset = position + field.Offset();
       uint8_t* dst = (uint8_t*)destBuffer + offset;
       Interop::InitializeStruct(context, dst, nestedStructInfo.Fields(), value, position);
@@ -941,7 +943,7 @@ Local<Value> Interop::GetResultByType(Local<Context> context, BaseDataWrapper* t
 
   if (typeWrapper->Type() == WrapperType::StructType) {
     StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(typeWrapper);
-    StructInfo structInfo = structTypeWrapper->StructInfo();
+    const StructInfo& structInfo = structTypeWrapper->StructInfo();
 
     void* result = call->ResultBuffer();
     Local<Value> value = Interop::StructToValue(context, result, structInfo, parentStruct);
@@ -986,7 +988,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     void* result = call->ResultBuffer();
 
     const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-    StructInfo structInfo = FFICall::GetStructInfo(structMeta, structName);
+    const StructInfo& structInfo = FFICall::GetStructInfo(structMeta, structName);
     Local<Value> value = Interop::StructToValue(context, result, structInfo, parentStruct);
     return value;
   }
@@ -995,7 +997,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     size_t fieldsCount = typeEncoding->details.anonymousRecord.fieldsCount;
     const TypeEncoding* fieldEncoding = typeEncoding->details.anonymousRecord.getFieldsEncodings();
     const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
-    StructInfo structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
+    const StructInfo& structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
     void* result = call->ResultBuffer();
     Local<Value> value = Interop::StructToValue(context, result, structInfo, parentStruct);
     return value;
@@ -1461,7 +1463,7 @@ bool Interop::IsNumbericType(BinaryTypeEncodingType type) {
 }
 
 void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrapper,
-                                     StructField field, Local<Value> value) {
+                                     const StructField& field, Local<Value> value) {
   if (value.IsEmpty()) {
     return;
   }

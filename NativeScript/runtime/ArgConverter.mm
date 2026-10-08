@@ -550,7 +550,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value>
         const Meta* meta = ArgConverter::GetMeta(structName);
         tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
         const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-        StructInfo structInfo = FFICall::GetStructInfo(structMeta);
+        const StructInfo& structInfo = FFICall::GetStructInfo(structMeta);
         Interop::InitializeStruct(context, retValue, structInfo.Fields(), value);
         return;
       } else if (baseWrapper->Type() == WrapperType::Struct) {
@@ -847,15 +847,14 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
     }
 
     StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
-    StructInfo structInfo = structWrapper->StructInfo();
+    const StructInfo& structInfo = structWrapper->StructInfo();
     auto cache = Caches::Get(isolate);
-    Local<v8::Function> structCtorFunc = cache->StructCtorInitializer(context, structInfo);
-    Local<Value> proto;
-    bool success =
-        structCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&proto);
-
-    if (success && !proto.IsEmpty()) {
-      success = receiver->SetPrototype(context, proto).FromMaybe(false);
+    Local<Object> proto;
+    if (cache->StructPrototypeInitializer) {
+      proto = cache->StructPrototypeInitializer(context, structInfo);
+    }
+    if (!proto.IsEmpty()) {
+      bool success = receiver->SetPrototype(context, proto).FromMaybe(false);
       tns::Assert(success, isolate);
     }
 

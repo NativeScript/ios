@@ -104,7 +104,8 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStru
             tns::Assert(meta->type() == MetaType::Struct);
             const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
 
-            StructInfo structInfo = FFICall::GetStructInfo(structMeta, structName);
+            const StructInfo& structInfo =
+                FFICall::GetStructInfo(structMeta, structName);
             return structInfo.FFIType();
         }
         case BinaryTypeEncodingType::ConstantArrayEncoding: {
@@ -127,7 +128,8 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStru
             size_t count = typeEncoding->details.anonymousRecord.fieldsCount;
             const TypeEncoding* fieldEncoding = typeEncoding->details.anonymousRecord.getFieldsEncodings();
             const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
-            StructInfo structInfo = FFICall::GetStructInfo(count, fieldEncoding, fieldNames);
+            const StructInfo& structInfo =
+                FFICall::GetStructInfo(count, fieldEncoding, fieldNames);
             return structInfo.FFIType();
         }
         default: {
@@ -172,42 +174,47 @@ void FFICall::DisposeFFIType(ffi_type* type, const TypeEncoding* typeEncoding) {
     
 }
 
-StructInfo FFICall::GetStructInfo(const StructMeta* structMeta, std::string structName) {
-    size_t fieldsCount = structMeta->fieldsCount();
-    const TypeEncoding* fieldEncoding = structMeta->fieldsEncodings()->first();
-    const String* fieldNames = structMeta->fieldNames().first();
-    if (structName.empty()) {
-        structName = structMeta->name();
-    }
-    StructInfo structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames, structName);
-    return structInfo;
+const StructInfo& FFICall::GetStructInfo(const StructMeta* structMeta,
+                                         std::string structName) {
+  size_t fieldsCount = structMeta->fieldsCount();
+  const TypeEncoding* fieldEncoding = structMeta->fieldsEncodings()->first();
+  const String* fieldNames = structMeta->fieldNames().first();
+  if (structName.empty()) {
+    structName = structMeta->name();
+  }
+  return FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames,
+                                structName);
 }
 
-StructInfo FFICall::GetStructInfo(size_t fieldsCount, const TypeEncoding* fieldEncoding, const String* fieldNames, std::string structName) {
-    if (structName.empty()) {
-        const TypeEncoding* temp = fieldEncoding;
-        std::stringstream ss;
-        for (int i = 0; i < fieldsCount; i++) {
-            std::string fieldName = fieldNames[i].valuePtr();
-            ss << fieldName << "_" << temp->type;
-            temp = temp->next();
-        }
-        structName = ss.str();
+const StructInfo& FFICall::GetStructInfo(size_t fieldsCount,
+                                         const TypeEncoding* fieldEncoding,
+                                         const String* fieldNames,
+                                         std::string structName) {
+  if (structName.empty()) {
+    const TypeEncoding* temp = fieldEncoding;
+    std::stringstream ss;
+    for (int i = 0; i < fieldsCount; i++) {
+      std::string fieldName = fieldNames[i].valuePtr();
+      ss << fieldName << "_" << temp->type;
+      temp = temp->next();
     }
+    structName = ss.str();
+  }
 
-    {
-      SpinLock lock(structInfosCacheMutex_);
-      auto it = structInfosCache_.find(structName);
-      if (it != structInfosCache_.end()) {
-        return it->second;
-      }
+  {
+    SpinLock lock(structInfosCacheMutex_);
+    auto it = structInfosCache_.find(structName);
+    if (it != structInfosCache_.end()) {
+      return *it->second;
     }
+  }
 
-    std::vector<StructField> fields;
-    fields.reserve(fieldsCount);
-    ffi_type* ffiType = new ffi_type({ .size = 0, .alignment = 0, .type = FFI_TYPE_STRUCT });
+  std::vector<StructField> fields;
+  fields.reserve(fieldsCount);
+  ffi_type* ffiType =
+      new ffi_type({.size = 0, .alignment = 0, .type = FFI_TYPE_STRUCT});
 
-    ffiType->elements = new ffi_type*[fieldsCount + 1];
+  ffiType->elements = new ffi_type*[fieldsCount + 1];
 
 #if defined(__x86_64__)
     bool hasNestedStruct = false;
@@ -272,14 +279,16 @@ StructInfo FFICall::GetStructInfo(size_t fieldsCount, const TypeEncoding* fieldE
     }
 #endif
 
-    StructInfo structInfo(structName, ffiType, fields);
+    auto structInfo =
+        std::make_unique<StructInfo>(structName, ffiType, std::move(fields));
 
     // The lock cannot be held while building: nested struct fields recurse
     // through GetArgumentType back into GetStructInfo. Concurrent builders are
     // therefore possible; the first emplace wins and everyone returns the
     // cached entry (the loser's ffi_type allocations are abandoned).
     SpinLock lock(structInfosCacheMutex_);
-    return structInfosCache_.emplace(structName, structInfo).first->second;
+    return *structInfosCache_.emplace(structName, std::move(structInfo))
+                .first->second;
 }
 
 ParametrizedCall* ParametrizedCall::Get(const TypeEncoding* typeEncoding, const int initialParameterIndex, const int argsCount) {
@@ -319,6 +328,7 @@ ParametrizedCall* ParametrizedCall::Get(const TypeEncoding* typeEncoding, const 
 
 robin_hood::unordered_map<const TypeEncoding*, ParametrizedCall*> ParametrizedCall::callsCache_;
 SpinMutex ParametrizedCall::callsCacheMutex_;
-robin_hood::unordered_map<std::string, StructInfo> FFICall::structInfosCache_;
+robin_hood::unordered_map<std::string, std::unique_ptr<StructInfo>>
+    FFICall::structInfosCache_;
 SpinMutex FFICall::structInfosCacheMutex_;
 }

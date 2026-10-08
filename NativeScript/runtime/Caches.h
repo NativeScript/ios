@@ -155,9 +155,6 @@ class Caches {
   robin_hood::unordered_map<std::string,
                             std::unique_ptr<v8::Persistent<v8::Function>>>
       ProtocolCtorFuncs;
-  robin_hood::unordered_map<std::string,
-                            std::unique_ptr<v8::Persistent<v8::Function>>>
-      StructConstructorFunctions;
   robin_hood::unordered_map<BinaryTypeEncodingType,
                             std::unique_ptr<v8::Persistent<v8::Object>>>
       PrimitiveInteropTypes;
@@ -167,7 +164,9 @@ class Caches {
 
   robin_hood::unordered_map<id, std::shared_ptr<v8::Persistent<v8::Value>>>
       Instances;
-  robin_hood::unordered_map<std::pair<void*, std::string>,
+  // Root struct objects by (backing buffer, struct type). Child views created
+  // for nested-struct fields are never entered here.
+  robin_hood::unordered_map<std::pair<void*, const StructInfo*>,
                             std::shared_ptr<v8::Persistent<v8::Value>>,
                             pair_hash>
       StructInstances;
@@ -184,8 +183,12 @@ class Caches {
       v8::Local<v8::Context>, const BaseClassMeta*, KnownUnknownClassPair,
       const std::vector<std::string>&)>
       ObjectCtorInitializer;
-  std::function<v8::Local<v8::Function>(v8::Local<v8::Context>, StructInfo)>
-      StructCtorInitializer;
+  // Resolves the prototype a struct instance of the given type must carry.
+  // Indirected through std::function so this header stays free of
+  // MetadataBuilder.
+  std::function<v8::Local<v8::Object>(v8::Local<v8::Context>,
+                                      const StructInfo&)>
+      StructPrototypeInitializer;
   robin_hood::unordered_map<const InterfaceMeta*,
                             std::vector<const MethodMeta*>>
       Initializers;

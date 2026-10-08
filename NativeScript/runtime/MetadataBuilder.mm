@@ -19,6 +19,21 @@ using namespace v8;
 
 namespace tns {
 
+namespace {
+struct StructTypeEntry {
+  std::unique_ptr<Persistent<v8::Function>> ctor;
+  std::unique_ptr<Persistent<Object>> prototype;
+};
+
+// Per-isolate struct constructor functions and their prototypes, keyed by the
+// process-wide StructInfo (see FFICall.h), whose address is stable for the
+// lifetime of the process. The prototype is cached because the constructor's
+// `prototype` property is made read-only, so it cannot be swapped from JS.
+struct StructTypeState {
+  robin_hood::unordered_map<const StructInfo*, StructTypeEntry> types;
+};
+}  // namespace
+
 void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate,
                                                       Local<ObjectTemplate> globalTemplate,
                                                       bool isWorkerThread) {
@@ -160,7 +175,7 @@ v8::Intercepted MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property,
     info.GetReturnValue().Set(result);
   } else if (meta->type() == MetaType::Struct) {
     const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-    StructInfo structInfo = FFICall::GetStructInfo(structMeta);
+    const StructInfo& structInfo = FFICall::GetStructInfo(structMeta);
     Local<v8::Function> structCtorFunc =
         MetadataBuilder::GetOrCreateStructCtorFunction(context, structInfo);
     info.GetReturnValue().Set(structCtorFunc);
@@ -169,12 +184,14 @@ v8::Intercepted MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property,
 }
 
 Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Local<Context> context,
-                                                                   StructInfo structInfo) {
+                                                                   const StructInfo& structInfo) {
   Isolate* isolate = v8::Isolate::GetCurrent();
-  auto cache = Caches::Get(isolate);
-  auto it = cache->StructConstructorFunctions.find(structInfo.Name());
-  if (it != cache->StructConstructorFunctions.end()) {
-    return it->second->Get(isolate);
+  StructTypeState* state = Caches::StateFor<StructTypeState>(isolate);
+  if (state != nullptr) {
+    auto it = state->types.find(&structInfo);
+    if (it != state->types.end()) {
+      return it->second.ctor->Get(isolate);
+    }
   }
 
   StructTypeWrapper* wrapper = new StructTypeWrapper(structInfo);
@@ -194,10 +211,56 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Local<Context
       structCtorFunc->Set(context, tns::ToV8String(isolate, "equals"), equalsFunc).FromMaybe(false);
   tns::Assert(success, isolate);
 
-  cache->StructConstructorFunctions.emplace(
-      structInfo.Name(), std::make_unique<Persistent<v8::Function>>(isolate, structCtorFunc));
+  // Like interface constructors (built from templates with a read-only
+  // prototype), a struct constructor's prototype can be extended but not
+  // replaced.
+  Local<v8::String> prototypeKey = tns::ToV8String(isolate, "prototype");
+  Local<Value> proto;
+  success = structCtorFunc->Get(context, prototypeKey).ToLocal(&proto);
+  tns::Assert(success && proto->IsObject(), isolate);
+  const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(
+      PropertyAttribute::DontEnum | PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
+  success = structCtorFunc->DefineOwnProperty(context, prototypeKey, proto, readOnlyFlags)
+                .FromMaybe(false);
+  tns::Assert(success, isolate);
+
+  if (state != nullptr) {
+    StructTypeEntry entry;
+    entry.ctor = std::make_unique<Persistent<v8::Function>>(isolate, structCtorFunc);
+    entry.prototype = std::make_unique<Persistent<Object>>(isolate, proto.As<Object>());
+    state->types.emplace(&structInfo, std::move(entry));
+  }
 
   return structCtorFunc;
+}
+
+Local<Object> MetadataBuilder::GetOrCreateStructPrototype(Local<Context> context,
+                                                          const StructInfo& structInfo) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  StructTypeState* state = Caches::StateFor<StructTypeState>(isolate);
+  if (state != nullptr) {
+    auto it = state->types.find(&structInfo);
+    if (it == state->types.end()) {
+      MetadataBuilder::GetOrCreateStructCtorFunction(context, structInfo);
+      it = state->types.find(&structInfo);
+    }
+    if (it != state->types.end()) {
+      return it->second.prototype->Get(isolate);
+    }
+  }
+
+  // No per-isolate state (teardown has begun): resolve without caching. Each
+  // call here builds a fresh constructor, so instances created in this window
+  // do not share a prototype with earlier ones; only finalizer-driven
+  // conversions can reach it.
+  Local<v8::Function> structCtorFunc =
+      MetadataBuilder::GetOrCreateStructCtorFunction(context, structInfo);
+  Local<Value> proto;
+  if (!structCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&proto) ||
+      !proto->IsObject()) {
+    return Local<Object>();
+  }
+  return proto.As<Object>();
 }
 
 void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value>& info) {
@@ -207,7 +270,7 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
     StructTypeWrapper* typeWrapper = static_cast<StructTypeWrapper*>(
         info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
-    StructInfo structInfo = typeWrapper->StructInfo();
+    const StructInfo& structInfo = typeWrapper->StructInfo();
 
     void* dest = nullptr;
 
@@ -236,7 +299,7 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
 
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(context, result);
-    std::pair<void*, std::string> key = std::make_pair(wrapper->Data(), structInfo.Name());
+    std::pair<void*, const StructInfo*> key = std::make_pair(wrapper->Data(), &structInfo);
     cache->StructInstances.emplace(key, poResult);
     tns::DeleteWrapperIfUnused(isolate, result, wrapper);
 
@@ -267,7 +330,7 @@ void MetadataBuilder::StructEqualsCallback(const FunctionCallbackInfo<Value>& in
   }
 
   StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(wrapper);
-  StructInfo structInfo = structTypeWrapper->StructInfo();
+  const StructInfo& structInfo = structTypeWrapper->StructInfo();
 
   std::pair<ffi_type*, void*> pair1 = MetadataBuilder::GetStructData(context, arg1, structInfo);
   std::pair<ffi_type*, void*> pair2 = MetadataBuilder::GetStructData(context, arg2, structInfo);
@@ -298,7 +361,7 @@ void MetadataBuilder::StructEqualsCallback(const FunctionCallbackInfo<Value>& in
 
 std::pair<ffi_type*, void*> MetadataBuilder::GetStructData(Local<Context> context,
                                                            Local<Object> initializer,
-                                                           StructInfo structInfo) {
+                                                           const StructInfo& structInfo) {
   ffi_type* ffiType = nullptr;
   void* data = nullptr;
 
@@ -767,26 +830,24 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
   bool instanceMethod = info.This()->InternalFieldCount() > 0;
   V8FunctionCallbackArgs args(info);
 
-  // Only the class-side call rewrites the name, so the common path reads
-  // item->className_ in place rather than copying it on every invocation.
-  const std::string* className = &item->className_;
-  std::string classWrapperName;
+  // A class-side call through a subclass constructor targets that subclass,
+  // not the class the metadata item was registered for.
+  Class klass = item->ResolveClass();
 
   Local<Object> thiz = info.This();
   if (thiz->IsFunction()) {
-    if (BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz)) {
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
+    if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCClass) {
       ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
-      classWrapperName = class_getName(classWrapper->Klass());
-      className = &classWrapperName;
+      klass = classWrapper->Klass();
     }
   }
 
   Local<Context> context = isolate->GetCurrentContext();
   Local<Value> result =
       instanceMethod
-          ? MetadataBuilder::InvokeMethod(context, item->meta_, info.This(), args, *className, true)
-          : MetadataBuilder::InvokeMethod(context, item->meta_, Local<Object>(), args, *className,
-                                          true);
+          ? MetadataBuilder::InvokeMethod(context, item->meta_, info.This(), args, klass, true)
+          : MetadataBuilder::InvokeMethod(context, item->meta_, Local<Object>(), args, klass, true);
 
   if (!result.IsEmpty()) {
     info.GetReturnValue().Set(result);
@@ -812,7 +873,7 @@ void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value>& 
   V8EmptyValueArgs args;
   Local<Context> context = isolate->GetCurrentContext();
   Local<Value> result = MetadataBuilder::InvokeMethod(context, item->meta_->getter(), receiver,
-                                                      args, item->className_, true);
+                                                      args, item->ResolveClass(), true);
   if (!result.IsEmpty()) {
     info.GetReturnValue().Set(result);
   }
@@ -833,8 +894,8 @@ void MetadataBuilder::PropertySetterCallback(const FunctionCallbackInfo<Value>& 
   Local<Value> value = info[0];
   V8SimpleValueArgs args(value);
   Local<Context> context = isolate->GetCurrentContext();
-  MetadataBuilder::InvokeMethod(context, item->meta_->setter(), receiver, args, item->className_,
-                                true);
+  MetadataBuilder::InvokeMethod(context, item->meta_->setter(), receiver, args,
+                                item->ResolveClass(), true);
 }
 
 void MetadataBuilder::PropertyNameGetterCallback(const FunctionCallbackInfo<Value>& info) {
@@ -850,7 +911,7 @@ void MetadataBuilder::PropertyNameGetterCallback(const FunctionCallbackInfo<Valu
   V8EmptyValueArgs args;
   Local<Context> context = isolate->GetCurrentContext();
   Local<Value> result = MetadataBuilder::InvokeMethod(
-      context, item->meta_->getter(), Local<Object>(), args, item->className_, false);
+      context, item->meta_->getter(), Local<Object>(), args, item->ResolveClass(), false);
   if (!result.IsEmpty()) {
     info.GetReturnValue().Set(result);
   }
@@ -871,7 +932,7 @@ void MetadataBuilder::PropertyNameSetterCallback(const FunctionCallbackInfo<Valu
   V8SimpleValueArgs args(value);
   Local<Context> context = isolate->GetCurrentContext();
   MetadataBuilder::InvokeMethod(context, item->meta_->setter(), Local<Object>(), args,
-                                item->className_, false);
+                                item->ResolveClass(), false);
 }
 
 Intercepted MetadataBuilder::StructPropertyGetterCallback(Local<v8::Name> property,
@@ -894,25 +955,26 @@ Intercepted MetadataBuilder::StructPropertyGetterCallback(Local<v8::Name> proper
   tns::Assert(baseWrapper->Type() == WrapperType::Struct, isolate);
   StructWrapper* wrapper = static_cast<StructWrapper*>(baseWrapper);
 
-  StructInfo structInfo = wrapper->StructInfo();
+  const StructInfo& structInfo = wrapper->StructInfo();
 
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
-  std::pair<void*, std::string> key = std::make_pair(wrapper->Data(), structInfo.Name());
+  std::pair<void*, const StructInfo*> key = std::make_pair(wrapper->Data(), &structInfo);
   std::shared_ptr<Persistent<Value>> parentStruct = nullptr;
   auto x = cache->StructInstances.find(key);
   if (x != cache->StructInstances.end()) {
     parentStruct = x->second;
   }
 
-  std::vector<StructField> fields = structInfo.Fields();
-  auto it = std::find_if(fields.begin(), fields.end(),
-                         [&propertyName](StructField& f) { return f.Name() == propertyName; });
+  const std::vector<StructField>& fields = structInfo.Fields();
+  auto it = std::find_if(fields.begin(), fields.end(), [&propertyName](const StructField& f) {
+    return f.Name() == propertyName;
+  });
   if (it == fields.end()) {
     info.GetReturnValue().SetUndefined();
     return Intercepted::kYes;
   }
 
-  StructField field = *it;
+  const StructField& field = *it;
   const TypeEncoding* fieldEncoding = field.Encoding();
   ptrdiff_t offset = field.Offset();
   void* buffer = wrapper->Data();
@@ -945,17 +1007,17 @@ Intercepted MetadataBuilder::StructPropertySetterCallback(
   tns::Assert(baseWrapper->Type() == WrapperType::Struct, isolate);
   StructWrapper* wrapper = static_cast<StructWrapper*>(baseWrapper);
 
-  StructInfo structInfo = wrapper->StructInfo();
-  std::vector<StructField> fields = structInfo.Fields();
+  const StructInfo& structInfo = wrapper->StructInfo();
+  const std::vector<StructField>& fields = structInfo.Fields();
 
-  auto it = std::find_if(fields.begin(), fields.end(),
-                         [&propertyName](StructField& f) { return f.Name() == propertyName; });
+  auto it = std::find_if(fields.begin(), fields.end(), [&propertyName](const StructField& f) {
+    return f.Name() == propertyName;
+  });
   if (it == fields.end()) {
     return Intercepted::kNo;
   }
 
-  StructField field = *it;
-  Interop::SetStructPropertyValue(context, wrapper, field, value);
+  Interop::SetStructPropertyValue(context, wrapper, *it, value);
   return Intercepted::kYes;
 }
 
@@ -973,10 +1035,8 @@ void MetadataBuilder::DefineFunctionLengthProperty(Local<Context> context,
 }
 
 Local<Value> MetadataBuilder::InvokeMethod(Local<Context> context, const MethodMeta* meta,
-                                           Local<Object> receiver, V8Args& args,
-                                           const std::string& containingClass,
+                                           Local<Object> receiver, V8Args& args, Class klass,
                                            bool isMethodCallback) {
-  Class klass = objc_getClass(containingClass.c_str());
   // TODO: Find out if the isMethodCallback property can be determined based on a
   // UITableViewController.prototype.viewDidLoad.call(this) or super.viewDidLoad() call
 
@@ -985,12 +1045,12 @@ Local<Value> MetadataBuilder::InvokeMethod(Local<Context> context, const MethodM
   bool logRuntimeDetail = value ? [value boolValue] : false;
   if (logRuntimeDetail) {
     // NOTE: stringWithFormat is slow, perhaps use different c string concatenation?
-    NSString* message =
-        [NSString stringWithFormat:@"MetadataBuilder::InvokeMethod: class {%s}, selector {%s}, "
-                                   @"isInitializer {%s}, type {%s}, lib {%s}",
-                                   containingClass.c_str(), meta->selectorAsString(),
-                                   meta->isInitializer() ? "true" : "false", meta->typeName(),
-                                   meta->topLevelModule()->getName()];
+    NSString* message = [NSString
+        stringWithFormat:@"MetadataBuilder::InvokeMethod: class {%s}, selector {%s}, "
+                         @"isInitializer {%s}, type {%s}, lib {%s}",
+                         klass ? class_getName(klass) : "<unknown>", meta->selectorAsString(),
+                         meta->isInitializer() ? "true" : "false", meta->typeName(),
+                         meta->topLevelModule()->getName()];
     Log(@"%@", message);
   }
 #endif

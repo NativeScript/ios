@@ -24,7 +24,6 @@ Caches::~Caches() {
   this->CtorFuncTemplates.clear();
   this->CtorFuncs.clear();
   this->ProtocolCtorFuncs.clear();
-  this->StructConstructorFunctions.clear();
   this->PrimitiveInteropTypes.clear();
   this->CFunctions.clear();
 
