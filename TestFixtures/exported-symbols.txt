@@ -221,3 +221,4 @@ __SCNVector3FromFloat3
 __SCNVector4FromFloat4
 __SCNMatrix4FromMat4
 _getStructFromCallback
+___ns_register_aot_calls
