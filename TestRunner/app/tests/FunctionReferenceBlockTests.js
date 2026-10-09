@@ -42,6 +42,15 @@ describe("Function used as a block and as a function pointer", function () {
         expect(TNSGetOutput()).toBe("4");
     });
 
+    it("keeps its function pointer across a second interop.FunctionReference", function () {
+        var fn = new interop.FunctionReference(square);
+        functionWithSimpleFunctionPointer(fn);
+        var trampoline = interop.handleof(fn).toNumber();
+
+        expect(new interop.FunctionReference(fn)).toBe(fn);
+        expect(interop.handleof(fn).toNumber()).toBe(trampoline);
+    });
+
     it("keeps its cached block across interop.FunctionReference", function () {
         var fn = function () {};
         TNSTestNativeCallbacks.keepBlockForMilliseconds(fn, 1000);

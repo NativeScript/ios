@@ -527,6 +527,46 @@ void tns::DeleteValue(Isolate* isolate, const Local<Value>& val) {
   tns::Assert(success, isolate);
 }
 
+namespace {
+
+constexpr const char* kJSBlockKey = "jsBlock";
+
+}  // namespace
+
+void tns::SetJSBlockWrapper(Isolate* isolate, const Local<v8::Function>& fn,
+                            BlockWrapper* wrapper) {
+  Local<External> ext = External::New(isolate, wrapper, v8::kExternalPointerTypeTagDefault);
+  tns::SetPrivateValue(fn, tns::ToV8String(isolate, kJSBlockKey), ext);
+}
+
+tns::BlockWrapper* tns::GetJSBlockWrapper(Isolate* isolate, const Local<Value>& val) {
+  if (val.IsEmpty() || !val->IsFunction()) {
+    return nullptr;
+  }
+
+  Local<Value> prop = tns::GetPrivateValue(val.As<Object>(), tns::ToV8String(isolate, kJSBlockKey));
+  if (prop.IsEmpty() || !prop->IsExternal()) {
+    return nullptr;
+  }
+
+  return static_cast<BlockWrapper*>(prop.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+}
+
+void tns::DeleteJSBlockWrapper(Isolate* isolate, const Local<Value>& val) {
+  if (val.IsEmpty() || !val->IsFunction()) {
+    return;
+  }
+
+  Local<Object> obj = val.As<Object>();
+  Local<Context> context;
+  bool success = obj->GetCreationContext(isolate).ToLocal(&context);
+  tns::Assert(success, isolate);
+  Local<Private> privateKey = Private::ForApi(isolate, tns::ToV8String(isolate, kJSBlockKey));
+
+  success = obj->DeletePrivate(context, privateKey).FromMaybe(false);
+  tns::Assert(success, isolate);
+}
+
 std::vector<Local<Value>> tns::ArgsToVector(const FunctionCallbackInfo<Value>& info) {
   std::vector<Local<Value>> args;
   args.reserve(info.Length());
