@@ -117,6 +117,11 @@ class Caches {
 
   inline int getIsolateId() { return isolateId_; }
 
+  // The id assigned at Init; unlike getIsolateId() it survives
+  // InvalidateIsolate, so it still names this isolate's gate during teardown.
+  // -1 for the stand-in Get() returns once the isolate's Caches is gone.
+  inline int getGateId() const { return gateId_; }
+
   inline void InvalidateIsolate() { isolateId_ = -1; }
 
   inline bool IsValid() { return isolateId_ != -1; }
@@ -317,6 +322,7 @@ class Caches {
   v8::Isolate* isolate_;
   std::shared_ptr<v8::Persistent<v8::Context>> context_;
   int isolateId_;
+  const int gateId_;
 };
 
 }  // namespace tns

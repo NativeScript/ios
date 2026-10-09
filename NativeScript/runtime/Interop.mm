@@ -44,30 +44,36 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
             // resetting it never touches the finalizer drain's bookkeeping,
             // and a foreign-thread Locker into the block's own isolate is
             // legitimate now that extended class names are worker-scoped.
-            if (wrapper->isolateWrapper_.IsValid()) {
-              Isolate* isolate = wrapper->isolateWrapper_.Isolate();
-              v8::Locker locker(isolate);
-              // Re-checked under the lock: ~Runtime holds it while it tears the
-              // isolate's caches down, so the check above can predate that.
-              if (wrapper->isolateWrapper_.IsValid()) {
-                Isolate::Scope isolate_scope(isolate);
-                HandleScope handle_scope(isolate);
-                Local<Value> callback = wrapper->callback_->Get(isolate);
-                if (!callback.IsEmpty() && callback->IsObject()) {
-                  // The slot may hold another wrapper by now; only our own is
-                  // cleared from it.
-                  if (tns::GetValue(isolate, callback) == blockWrapper) {
-                    tns::DeleteValue(isolate, callback);
+            //
+            // Validity is not the test here: the slot stays reachable after
+            // the isolate is invalidated, by JS still running under the Locker
+            // and by the teardown's own walk of registered objects. Until the
+            // gate closes, the wrapper is only freed once the slot is cleared.
+            {
+              IsolatePin pin = wrapper->isolateWrapper_.Pin();
+              if (pin) {
+                Isolate* isolate = wrapper->isolateWrapper_.Isolate();
+                v8::Locker locker(isolate);
+                if (!wrapper->isolateWrapper_.IsTornDown()) {
+                  Isolate::Scope isolate_scope(isolate);
+                  HandleScope handle_scope(isolate);
+                  Local<Value> callback = wrapper->callback_->Get(isolate);
+                  if (!callback.IsEmpty() && callback->IsObject()) {
+                    // The slot may hold another wrapper by now; only our own is
+                    // cleared from it.
+                    if (tns::GetValue(isolate, callback) == blockWrapper) {
+                      tns::DeleteValue(isolate, callback);
+                    }
                   }
+                  // Unconditional: an already-detached callback still owns its
+                  // node, and dropping the persistent without a reset would leave
+                  // that node rooted forever.
+                  wrapper->callback_->Reset();
                 }
-                // Unconditional: an already-detached callback still owns its
-                // node, and dropping the persistent without a reset would leave
-                // that node rooted forever.
-                wrapper->callback_->Reset();
               }
             }
-            // Outside the isolate guard: once the isolate is gone the cache
-            // slot is unreachable and nothing else can free the wrapper.
+            // Outside the gate: once the teardown is done the cache slot is
+            // unreachable and nothing else can free the wrapper.
             delete blockWrapper;
             delete wrapper;
             ffi_closure_free(block->ffiClosure);
@@ -570,8 +576,9 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
         blockPtr = CFAutorelease(Block_copy(wrapper->Block()));
       } else if (TryRetainJSBlock(static_cast<JSBlock*>(wrapper->Block()))) {
         // Reading the block is safe even when its last release raced ahead:
-        // while the isolate is valid, dispose clears this slot under the
-        // Locker this thread holds, before libclosure frees the block.
+        // until the isolate's teardown closes its gate, dispose clears this
+        // slot under the Locker this thread holds, before libclosure frees
+        // the block.
         blockPtr = CFAutorelease(wrapper->Block());
       }
     }

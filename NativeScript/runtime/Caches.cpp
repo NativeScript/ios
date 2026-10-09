@@ -12,7 +12,8 @@ namespace tns {
 Caches::Caches(Isolate* isolate, const int& isolateId)
     : PromiseRejections(std::make_unique<PromiseRejectionTracker>(isolate)),
       isolate_(isolate),
-      isolateId_(isolateId) {}
+      isolateId_(isolateId),
+      gateId_(isolateId) {}
 
 Caches::~Caches() {
   // Subsystem state may hold v8 handles and reference the core caches below;

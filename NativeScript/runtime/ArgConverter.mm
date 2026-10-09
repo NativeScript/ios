@@ -293,11 +293,6 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
   Isolate* isolate = data->isolateWrapper_.Isolate();
 
-  if (!data->isolateWrapper_.IsValid()) {
-    memset(retValue, 0, cif->rtype->size);
-    return;
-  }
-
   // Declared before all V8 scopes: an ObjC exception must never unwind through a
   // live V8 scope (Locker/HandleScope/Context::Scope). A branded escape caught
   // below is captured here and @thrown only after the inner block closes every
@@ -305,6 +300,15 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
   NSException* __strong pendingThrow = nil;
 
   {
+    // Outlives the Locker: a runtime torn down while this thread waits for the
+    // lock cannot dispose the isolate before the wait is over. Free when this
+    // thread has already entered the isolate.
+    IsolatePin pin = data->isolateWrapper_.Pin();
+    if (!pin || !data->isolateWrapper_.IsValid()) {
+      memset(retValue, 0, cif->rtype->size);
+      return;
+    }
+
     v8::Locker locker(isolate);
     // Checked again with the isolate locked: a runtime being destroyed holds
     // this lock while it removes its caches, so the check above can pass and
