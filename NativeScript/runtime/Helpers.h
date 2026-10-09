@@ -285,6 +285,13 @@ void SetReleasedObjectPolicy(ReleasedObjectPolicy policy);
 BaseDataWrapper* GetValueOrReport(v8::Isolate* isolate, const v8::Local<v8::Value>& val,
                                   const char* operation);
 void DeleteValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
+// The block a JS function was last marshalled as (see Interop::JSBlock, which
+// owns the wrapper). Kept apart from GetValue's slot so the function's own
+// wrapper and its block never evict each other.
+void SetJSBlockWrapper(v8::Isolate* isolate, const v8::Local<v8::Function>& fn,
+                       BlockWrapper* wrapper);
+BlockWrapper* GetJSBlockWrapper(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
+void DeleteJSBlockWrapper(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
 bool DeleteWrapperIfUnused(v8::Isolate* isolate, const v8::Local<v8::Value>& obj,
                            BaseDataWrapper* value);
 std::vector<v8::Local<v8::Value>> ArgsToVector(const v8::FunctionCallbackInfo<v8::Value>& info);

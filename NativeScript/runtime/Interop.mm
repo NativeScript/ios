@@ -30,6 +30,10 @@ static constexpr int64_t kMinSafeInteger =
     static_cast<int64_t>(kUint64AllBitsSet << 53) + 1;        // -9007199254740991 (-(2^53-1))
 static constexpr int64_t kMaxSafeInteger = -kMinSafeInteger;  // 9007199254740991 (2^53-1)
 
+static constexpr const char* kNotAFunctionPointer =
+    "A function pointer argument takes an interop.Pointer, a native function pointer or a "
+    "function wrapped in interop.FunctionReference.";
+
 Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
     .reserved = 0,
     .size = sizeof(JSBlock),
@@ -61,8 +65,8 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
                   if (!callback.IsEmpty() && callback->IsObject()) {
                     // The slot may hold another wrapper by now; only our own is
                     // cleared from it.
-                    if (tns::GetValue(isolate, callback) == blockWrapper) {
-                      tns::DeleteValue(isolate, callback);
+                    if (tns::GetJSBlockWrapper(isolate, callback) == blockWrapper) {
+                      tns::DeleteJSBlockWrapper(isolate, callback);
                     }
                   }
                   // Unconditional: an already-detached callback still owns its
@@ -518,7 +522,9 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
   } else if (argHelper.isObject() &&
              typeEncoding->type == BinaryTypeEncodingType::FunctionPointerEncoding) {
     BaseDataWrapper* wrapper = tns::GetValue(isolate, arg.As<Object>());
-    tns::Assert(wrapper != nullptr, isolate);
+    if (wrapper == nullptr) {
+      throw NativeScriptException(kNotAFunctionPointer);
+    }
     if (wrapper->Type() == WrapperType::Pointer) {
       PointerWrapper* pointerWrapper = static_cast<PointerWrapper*>(wrapper);
       void* data = pointerWrapper->Data();
@@ -528,7 +534,6 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       void* data = functionWrapper->Data();
       Interop::SetValue(dest, data);
     } else if (wrapper->Type() == WrapperType::FunctionReference) {
-      tns::Assert(wrapper != nullptr && wrapper->Type() == WrapperType::FunctionReference, isolate);
       FunctionReferenceWrapper* funcWrapper = static_cast<FunctionReferenceWrapper*>(wrapper);
       const TypeEncoding* functionTypeEncoding =
           typeEncoding->details.functionPointer.signature.first();
@@ -557,28 +562,28 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
 
       Interop::SetValue(dest, functionPointer);
     } else {
-      tns::Assert(false, isolate);
+      throw NativeScriptException(kNotAFunctionPointer);
     }
   } else if (arg->IsFunction() && typeEncoding->type == BinaryTypeEncodingType::BlockEncoding) {
     const TypeEncoding* blockTypeEncoding = typeEncoding->details.block.signature.first();
     int argsCount = typeEncoding->details.block.signature.count - 1;
 
     CFTypeRef blockPtr = nullptr;
+    // The callee takes the block at +0 and copies it if it needs to keep it,
+    // so the reference that keeps it alive across the call must be balanced:
+    // the JSBlock dispose helper owns the ffi closure and the callback wrapper
+    // and only runs once the last reference goes away.
     BaseDataWrapper* baseWrapper = tns::GetValue(isolate, arg);
-    if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Block) {
-      BlockWrapper* wrapper = static_cast<BlockWrapper*>(baseWrapper);
-      // The callee takes the block at +0 and copies it if it needs to keep it,
-      // so the reference that keeps it alive across the call must be balanced:
-      // the JSBlock dispose helper owns the ffi closure and the callback wrapper
-      // and only runs once the last reference goes away.
-      if (wrapper->OwnsBlock()) {
-        // A native block; the wrapper's own Block_copy keeps it alive.
-        blockPtr = CFAutorelease(Block_copy(wrapper->Block()));
-      } else if (TryRetainJSBlock(static_cast<JSBlock*>(wrapper->Block()))) {
-        // Reading the block is safe even when its last release raced ahead:
-        // until the isolate's teardown closes its gate, dispose clears this
-        // slot under the Locker this thread holds, before libclosure frees
-        // the block.
+    if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Block &&
+        static_cast<BlockWrapper*>(baseWrapper)->OwnsBlock()) {
+      // A native block; the wrapper's own Block_copy keeps it alive.
+      blockPtr = CFAutorelease(Block_copy(static_cast<BlockWrapper*>(baseWrapper)->Block()));
+    } else if (BlockWrapper* wrapper = tns::GetJSBlockWrapper(isolate, arg)) {
+      // Reading the block is safe even when its last release raced ahead:
+      // until the isolate's teardown closes its gate, dispose clears this
+      // slot under the Locker this thread holds, before libclosure frees
+      // the block.
+      if (TryRetainJSBlock(static_cast<JSBlock*>(wrapper->Block()))) {
         blockPtr = CFAutorelease(wrapper->Block());
       }
     }
@@ -592,7 +597,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
 
       BlockWrapper* wrapper = new BlockWrapper((void*)blockPtr, blockTypeEncoding, false);
       reinterpret_cast<JSBlock*>((void*)blockPtr)->blockWrapper = wrapper;
-      tns::SetValue(isolate, arg.As<v8::Function>(), wrapper);
+      tns::SetJSBlockWrapper(isolate, arg.As<v8::Function>(), wrapper);
     }
 
     Interop::SetValue(dest, blockPtr);

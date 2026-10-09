@@ -131,6 +131,7 @@ require("./ApiTests");
 require("./NsRuntimeTests");
 require("./GCFinalizerTests");
 require("./BlockCacheRaceTests");
+require("./FunctionReferenceBlockTests");
 require("./WorkerConcurrentStartupTests");
 require("./WorkerOptionsTests");
 require("./WorkerResourceLimitsTests");
