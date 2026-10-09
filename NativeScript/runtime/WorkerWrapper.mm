@@ -42,6 +42,55 @@ static void PostToLoop(const std::shared_ptr<EventLoop>& loop, std::function<voi
   }
 }
 
+// The `name` and `message` the parent rebuilds the worker's error from. They
+// stay UTF-16 on the way, so both arrive exactly as thrown, embedded NULs and
+// unpaired surrogates included.
+struct ThrownErrorText {
+  std::u16string name = u"Error";
+  std::u16string message;
+};
+
+static std::u16string ToUtf16(Isolate* isolate, Local<v8::String> value) {
+  std::u16string result(value->Length(), u'\0');
+  value->WriteV2(isolate, 0, value->Length(), reinterpret_cast<uint16_t*>(result.data()));
+  return result;
+}
+
+static Local<v8::String> FromUtf16(Isolate* isolate, const std::u16string& value) {
+  return v8::String::NewFromTwoByte(isolate, reinterpret_cast<const uint16_t*>(value.data()),
+                                    v8::NewStringType::kNormal, static_cast<int>(value.size()))
+      .ToLocalChecked();
+}
+
+// Reads the text off the value the worker threw. An object's `name` and
+// `message` are taken when they are strings, so an Error or a DOMException
+// keeps both; anything else becomes an Error whose message is the value's
+// string form. Either property may be a getter, and one that throws leaves the
+// default in place.
+static ThrownErrorText DescribeThrownValue(Isolate* isolate, Local<Context> context,
+                                           Local<Value> thrown) {
+  HandleScope handleScope(isolate);
+  TryCatch tc(isolate);
+  ThrownErrorText text;
+  Local<v8::String> detail;
+  if (thrown->ToDetailString(context).ToLocal(&detail)) {
+    text.message = ToUtf16(isolate, detail);
+  }
+  if (!thrown->IsObject() || thrown->IsFunction()) {
+    return text;
+  }
+  Local<Object> object = thrown.As<Object>();
+  Local<Value> value;
+  if (object->Get(context, tns::ToV8String(isolate, "name")).ToLocal(&value) && value->IsString()) {
+    text.name = ToUtf16(isolate, value.As<v8::String>());
+  }
+  if (object->Get(context, tns::ToV8String(isolate, "message")).ToLocal(&value) &&
+      value->IsString()) {
+    text.message = ToUtf16(isolate, value.As<v8::String>());
+  }
+  return text;
+}
+
 WorkerWrapper::WorkerWrapper(
     v8::Isolate* mainIsolate,
     std::function<void(v8::Isolate*, v8::Local<v8::Object> thiz, std::shared_ptr<worker::Message>)>
@@ -543,6 +592,8 @@ void WorkerWrapper::ReportEntryEvaluationRejection(Isolate* isolate, Local<Conte
   if (!reason.IsEmpty()) {
     message = tns::ToString(isolate, reason);
     if (reason->IsObject()) {
+      // `stack` may be an accessor that throws; that only costs the stack.
+      TryCatch stackTc(isolate);
       Local<Object> reasonObj = reason.As<Object>();
       Local<Value> stackVal;
       if (reasonObj->Get(context, tns::ToV8String(isolate, "stack")).ToLocal(&stackVal) &&
@@ -551,7 +602,8 @@ void WorkerWrapper::ReportEntryEvaluationRejection(Isolate* isolate, Local<Conte
       }
     }
   }
-  this->PassUncaughtExceptionFromWorkerToMain(message, source, stackTrace, lineNumber, true);
+  this->PassUncaughtExceptionFromWorkerToMain(message, source, stackTrace, lineNumber, true,
+                                              reason);
 }
 
 void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Local<Context> context, TryCatch& tc,
@@ -589,41 +641,55 @@ void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Local<Context> context
 
   std::string stackTrace = "";
 
-  Local<Value> stackTraceVal = tc.StackTrace(context).FromMaybe(Local<Value>());
-  if (!stackTraceVal.IsEmpty()) {
-    Local<v8::String> stackTraceStr =
-        stackTraceVal->ToDetailString(context).FromMaybe(Local<v8::String>());
-    if (!stackTraceStr.IsEmpty()) {
-      stackTrace = tns::ToString(workerIsolate, stackTraceStr);
+  {
+    // `stack` may be an accessor. One that throws only costs the stack: caught
+    // here, its exception cannot replace the one `tc` holds.
+    TryCatch stackTc(workerIsolate);
+    Local<Value> stackTraceVal = tc.StackTrace(context).FromMaybe(Local<Value>());
+    if (!stackTraceVal.IsEmpty()) {
+      Local<v8::String> stackTraceStr =
+          stackTraceVal->ToDetailString(context).FromMaybe(Local<v8::String>());
+      if (!stackTraceStr.IsEmpty()) {
+        stackTrace = tns::ToString(workerIsolate, stackTraceStr);
+      }
     }
   }
 
-  this->ForwardErrorPayloadToMain(message, src, stackTrace, lineNumber, async);
+  this->ForwardErrorPayloadToMain(message, src, stackTrace, lineNumber, async, tc.Exception());
 }
 
 void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(const std::string& message,
                                                           const std::string& source,
                                                           const std::string& stackTrace,
-                                                          int lineNumber, bool async) {
-  this->ForwardErrorPayloadToMain(message, source, stackTrace, lineNumber, async);
+                                                          int lineNumber, bool async,
+                                                          Local<Value> thrown) {
+  this->ForwardErrorPayloadToMain(message, source, stackTrace, lineNumber, async, thrown);
 }
 
 void WorkerWrapper::PassUncaughtRejectionToMain(const std::string& message,
                                                 const std::string& source,
                                                 const std::string& stackTrace, int lineNumber,
-                                                bool async) {
+                                                bool async, Local<Value> thrown) {
   if (this->isTerminating_ || this->isDisposed_) {
     return;
   }
-  this->ForwardErrorPayloadToMain(message, source, stackTrace, lineNumber, async);
+  this->ForwardErrorPayloadToMain(message, source, stackTrace, lineNumber, async, thrown);
 }
 
 void WorkerWrapper::ForwardErrorPayloadToMain(const std::string& message, const std::string& source,
                                               const std::string& stackTrace, int lineNumber,
-                                              bool async) {
+                                              bool async, Local<Value> thrown) {
   std::shared_ptr<EventLoop> loop = mainLoop_.lock();
   if (loop == nullptr) {
     return;
+  }
+  // Read here, on the worker's isolate. A report with no thrown value, such
+  // as the heap-limit one made from inside a GC, touches no V8 handle.
+  std::optional<ThrownErrorText> thrownText;
+  if (!thrown.IsEmpty()) {
+    Isolate* workerIsolate = v8::Isolate::GetCurrent();
+    thrownText =
+        DescribeThrownValue(workerIsolate, Caches::Get(workerIsolate)->GetContext(), thrown);
   }
   // The task runs later, on the parent's loop, and this wrapper may be gone by
   // then: a worker that reports and terminates is disposed on its own thread,
@@ -635,7 +701,7 @@ void WorkerWrapper::ForwardErrorPayloadToMain(const std::string& message, const 
   std::shared_ptr<Persistent<Value>> poWorker = poWorker_;
   PostToLoop(
       loop,
-      [mainIsolate, poWorker, message, source, stackTrace, lineNumber]() {
+      [mainIsolate, poWorker, message, source, stackTrace, lineNumber, thrownText]() {
         v8::Locker locker(mainIsolate);
         Isolate::Scope isolate_scope(mainIsolate);
         HandleScope handle_scope(mainIsolate);
@@ -644,28 +710,32 @@ void WorkerWrapper::ForwardErrorPayloadToMain(const std::string& message, const 
           return;
         }
 
+        // Without a thrown value, the error is an Error carrying the report's
+        // message.
+        Local<v8::String> errorName = thrownText ? FromUtf16(mainIsolate, thrownText->name)
+                                                 : tns::ToV8String(mainIsolate, "Error");
+        Local<v8::String> errorMessage = thrownText ? FromUtf16(mainIsolate, thrownText->message)
+                                                    : tns::ToV8String(mainIsolate, message);
+
         TryCatch tc(mainIsolate);
-        bool handled = Worker::EmitError(mainIsolate, worker.As<Object>(), message, source,
-                                         stackTrace, lineNumber);
+        Local<Value> error;
+        (void)Worker::EmitError(mainIsolate, worker.As<Object>(), message, source, stackTrace,
+                                lineNumber, errorName, errorMessage)
+            .ToLocal(&error);
         if (tc.HasCaught()) {
-          Local<Value> error = tc.Exception();
-          Log(@"%s", tns::ToString(mainIsolate, error).c_str());
-          mainIsolate->ThrowException(error);
+          Local<Value> thrown = tc.Exception();
+          Log(@"%s", tns::ToString(mainIsolate, thrown).c_str());
+          mainIsolate->ThrowException(thrown);
           return;
         }
-        if (handled) {
+        if (!error.IsEmpty() && error->IsUndefined()) {
+          // A handler took ownership of it.
           return;
         }
         // HTML: an error the Worker object leaves unhandled is reported to the
-        // parent's global scope. Only primitives crossed the isolate boundary,
-        // so the error object is rebuilt from them here.
-        Local<Context> context = Caches::Get(mainIsolate)->GetContext();
-        Local<Value> error = v8::Exception::Error(tns::ToV8String(mainIsolate, message));
-        if (error->IsObject() && !stackTrace.empty()) {
-          (void)error.As<Object>()->Set(context, tns::ToV8String(mainIsolate, "stack"),
-                                        tns::ToV8String(mainIsolate, stackTrace));
-        }
-        if (!ErrorEvents::DispatchError(mainIsolate, error, message, stackTrace)) {
+        // parent's global scope.
+        if (error.IsEmpty() ||
+            !ErrorEvents::DispatchError(mainIsolate, error, message, stackTrace)) {
           Log(@"Unhandled error in worker %s:%d: %s\n%s", source.c_str(), lineNumber,
               message.c_str(), stackTrace.c_str());
         }
