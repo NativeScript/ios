@@ -140,4 +140,20 @@ describe("JS block outliving its worker", function () {
         };
         worker.postMessage(0);
     });
+
+    // The worker's teardown itself drops the block's last reference, while it
+    // still has the function left to dispose.
+    it("is released by the teardown that later disposes its function", function (done) {
+        var worker = new Worker("./blockTeardownReleaseWorker.js");
+        worker.onmessage = function (msg) {
+            expect(msg.data).toBe("held");
+            worker.terminate();
+            setTimeout(done, 600);
+        };
+        worker.onerror = function (e) {
+            expect(String(e && e.message ? e.message : e)).toBe("<no worker error>");
+            done();
+        };
+        worker.postMessage(0);
+    });
 });
