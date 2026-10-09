@@ -314,31 +314,45 @@ class StructTypeWrapper : public BaseDataWrapper {
   const struct StructInfo* structInfo_;
 };
 
+// A root is the only struct object with a finalizer. A view aliases a field of
+// its root's buffer; the root owns the view's wrapper, and the view's JS object
+// keeps its parent's JS object alive through kParentField. Every view is cached
+// in its parent's view slots, which is how disposing a root finds the view
+// objects to detach: a finalizer that refuses disposal can revive a view after
+// its root was disposed.
 class StructWrapper : public StructTypeWrapper {
  public:
+  // Internal fields of a struct object after the wrapper (field 0). The parent
+  // field holds whatever keeps the buffer alive: a view's parent struct object,
+  // or the Pointer object a pointer-backed root was built over. From
+  // kFirstViewField on, one slot per struct-typed field caches its view.
+  static constexpr int kParentField = 1;
+  static constexpr int kFirstViewField = 2;
+
   StructWrapper(const struct StructInfo& structInfo, void* data,
-                std::shared_ptr<v8::Persistent<v8::Value>> parent)
+                StructWrapper* root = nullptr, bool ownsData = true)
       : StructTypeWrapper(structInfo),
         data_(data),
-        childCount_(0),
-        parent_(parent) {}
+        root_(root),
+        ownsData_(ownsData) {}
 
   const WrapperType Type() { return WrapperType::Struct; }
 
   void* Data() const { return this->data_; }
 
-  std::shared_ptr<v8::Persistent<v8::Value>> Parent() { return this->parent_; }
+  bool IsRoot() const { return this->root_ == nullptr; }
 
-  void IncrementChildren() { this->childCount_++; }
+  bool OwnsData() const { return this->ownsData_; }
 
-  void DecrementChildren() { this->childCount_--; }
+  StructWrapper* Root() { return this->root_ == nullptr ? this : this->root_; }
 
-  int ChildCount() { return this->childCount_; }
+  void AdoptView(StructWrapper* view) { this->views_.emplace_back(view); }
 
  private:
   void* data_;
-  int childCount_;
-  std::shared_ptr<v8::Persistent<v8::Value>> parent_;
+  StructWrapper* root_;
+  bool ownsData_;
+  std::vector<std::unique_ptr<StructWrapper>> views_;
 };
 
 class ObjCAllocDataWrapper : public BaseDataWrapper {

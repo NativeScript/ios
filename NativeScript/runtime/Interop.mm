@@ -786,42 +786,33 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
 }
 
 Local<Value> Interop::StructToValue(Local<Context> context, void* result,
-                                    const StructInfo& structInfo,
-                                    std::shared_ptr<Persistent<Value>> parentStruct) {
+                                    const StructInfo& structInfo, Local<Object> parentStruct) {
   Isolate* isolate = v8::Isolate::GetCurrent();
-  StructWrapper* wrapper = nullptr;
-  if (parentStruct == nullptr) {
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  tns::Assert(cache != nullptr && cache->StructInstanceFactory != nullptr, isolate);
+
+  StructWrapper* parentWrapper = nullptr;
+  if (!parentStruct.IsEmpty()) {
+    BaseDataWrapper* baseWrapper = tns::GetValue(isolate, parentStruct);
+    tns::Assert(baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Struct, isolate);
+    parentWrapper = static_cast<StructWrapper*>(baseWrapper);
+  }
+
+  if (parentWrapper == nullptr) {
     ffi_type* ffiType = structInfo.FFIType();
     void* dest = malloc(ffiType->size);
     memcpy(dest, result, ffiType->size);
 
-    wrapper = new StructWrapper(structInfo, dest, nullptr);
-  } else {
-    Local<Value> parent = parentStruct->Get(isolate);
-    BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parent);
-    if (parentWrapper != nullptr && parentWrapper->Type() == WrapperType::Struct) {
-      StructWrapper* parentStructWrapper = static_cast<StructWrapper*>(parentWrapper);
-      parentStructWrapper->IncrementChildren();
-    }
-    wrapper = new StructWrapper(structInfo, result, parentStruct);
+    StructWrapper* wrapper = new StructWrapper(structInfo, dest);
+    Local<Object> res = cache->StructInstanceFactory(context, wrapper, Local<Object>());
+    ObjectManager::Register(context, res);
+    return res;
   }
 
-  std::shared_ptr<Caches> cache = Caches::Get(isolate);
-  std::pair<void*, const StructInfo*> key = std::make_pair(wrapper->Data(), &structInfo);
-  auto it = cache->StructInstances.find(key);
-  if (it != cache->StructInstances.end()) {
-    return it->second->Get(isolate);
-  }
-
-  // The root's registration handle is the one StructInstances and child views'
-  // Parent() hold; child views are registered by ConvertArgument.
-  bool isRoot = parentStruct == nullptr;
-  Local<Value> res = ArgConverter::ConvertArgument(context, wrapper, isRoot);
-  if (isRoot) {
-    std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(context, res);
-    cache->StructInstances.emplace(key, poResult);
-  }
-  return res;
+  StructWrapper* root = parentWrapper->Root();
+  StructWrapper* wrapper = new StructWrapper(structInfo, result, root);
+  root->AdoptView(wrapper);
+  return cache->StructInstanceFactory(context, wrapper, parentStruct);
 }
 
 void Interop::InitializeStruct(Local<Context> context, void* destBuffer,
@@ -940,8 +931,7 @@ void Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t pos
 }
 
 Local<Value> Interop::GetResultByType(Local<Context> context, BaseDataWrapper* typeWrapper,
-                                      BaseCall* call,
-                                      std::shared_ptr<Persistent<Value>> parentStruct) {
+                                      BaseCall* call, Local<Object> parentStruct) {
   Isolate* isolate = v8::Isolate::GetCurrent();
 
   if (typeWrapper->Type() == WrapperType::StructType) {
@@ -957,8 +947,7 @@ Local<Value> Interop::GetResultByType(Local<Context> context, BaseDataWrapper* t
 }
 
 Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding,
-                                BaseCall* call, bool marshalToPrimitive,
-                                std::shared_ptr<Persistent<Value>> parentStruct,
+                                BaseCall* call, bool marshalToPrimitive, Local<Object> parentStruct,
                                 bool isStructMember, bool ownsReturnedObject, bool returnsUnmanaged,
                                 bool isInitializer) {
   Isolate* isolate = v8::Isolate::GetCurrent();
@@ -1143,7 +1132,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
               ffi_call(parametrizedCall->Cif, FFI_FN(block->invoke), call.ResultBuffer(),
                        call.ArgsArray());
 
-              Local<Value> result = Interop::GetResult(context, enc, &call, true, nullptr);
+              Local<Value> result = Interop::GetResult(context, enc, &call, true);
 
               info.GetReturnValue().Set(result);
             },
@@ -1477,18 +1466,41 @@ void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrap
 
   const TypeEncoding* fieldEncoding = field.Encoding();
   switch (fieldEncoding->type) {
-    case BinaryTypeEncodingType::StructDeclarationReference: {
-      BaseDataWrapper* sourceWrapper =
-          tns::GetValueOrReport(isolate, value, "struct field assignment");
-      if (sourceWrapper == nullptr) {
+    case BinaryTypeEncodingType::StructDeclarationReference:
+    case BinaryTypeEncodingType::AnonymousStructEncoding: {
+      bool isNativeObject = value->IsObject() && value.As<Object>()->InternalFieldCount() > 0;
+      if (isNativeObject) {
+        BaseDataWrapper* sourceWrapper =
+            tns::GetValueOrReport(isolate, value, "struct field assignment");
+        if (sourceWrapper == nullptr) {
+          return;
+        }
+        if (sourceWrapper->Type() == WrapperType::Struct) {
+          // The source can be a view of this very field.
+          memmove(destBuffer, static_cast<StructWrapper*>(sourceWrapper)->Data(),
+                  field.FFIType()->size);
+          break;
+        }
+      }
+      if (isNativeObject || !value->IsObject()) {
+        isolate->ThrowException(Exception::TypeError(tns::ToV8String(
+            isolate, "A struct field accepts a struct of its type or a plain object")));
         return;
       }
-      tns::Assert(sourceWrapper->Type() == WrapperType::Struct, isolate);
-      StructWrapper* targetStruct = static_cast<StructWrapper*>(sourceWrapper);
 
-      void* sourceBuffer = targetStruct->Data();
-      size_t fieldSize = field.FFIType()->size;
-      memcpy(destBuffer, sourceBuffer, fieldSize);
+      if (fieldEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
+        const Meta* meta =
+            ArgConverter::GetMeta(fieldEncoding->details.declarationReference.name.valuePtr());
+        tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
+        const StructInfo& nestedInfo = FFICall::GetStructInfo(static_cast<const StructMeta*>(meta));
+        Interop::InitializeStruct(context, destBuffer, nestedInfo.Fields(), value);
+      } else {
+        const StructInfo& nestedInfo =
+            FFICall::GetStructInfo(fieldEncoding->details.anonymousRecord.fieldsCount,
+                                   fieldEncoding->details.anonymousRecord.getFieldsEncodings(),
+                                   fieldEncoding->details.anonymousRecord.getFieldNames());
+        Interop::InitializeStruct(context, destBuffer, nestedInfo.Fields(), value);
+      }
       break;
     }
     case BinaryTypeEncodingType::ConstantArrayEncoding: {
@@ -1557,8 +1569,7 @@ void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrap
       break;
     }
     default: {
-      // TODO: Handle all possible cases
-      tns::Assert(false, isolate);
+      Interop::WriteValue(context, fieldEncoding, destBuffer, value);
     }
   }
 }
@@ -1797,9 +1808,10 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     }
   }
 
-  Local<Value> result = Interop::GetResult(
-      methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive, nullptr, false,
-      methodCall.ownsReturnedObject_, methodCall.returnsUnmanaged_, methodCall.isInitializer_);
+  Local<Value> result =
+      Interop::GetResult(methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive,
+                         Local<Object>(), false, methodCall.ownsReturnedObject_,
+                         methodCall.returnsUnmanaged_, methodCall.isInitializer_);
 
   return result;
 }

@@ -15,15 +15,11 @@ using namespace std;
 
 namespace tns {
 
-void ArgConverter::Init(Local<Context> context, NamedPropertyGetterCallback structPropertyGetter,
-                        NamedPropertySetterCallbackV2 structPropertySetter) {
+void ArgConverter::Init(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   auto cache = Caches::Get(isolate);
   cache->EmptyObjCtorFunc = std::make_unique<Persistent<v8::Function>>(
       isolate, ArgConverter::CreateEmptyInstanceFunction(context));
-  cache->EmptyStructCtorFunc = std::make_unique<Persistent<v8::Function>>(
-      isolate, ArgConverter::CreateEmptyInstanceFunction(context, structPropertyGetter,
-                                                         structPropertySetter));
 }
 
 Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Object> receiver,
@@ -840,34 +836,9 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
     return Null(isolate);
   }
 
-  if (wrapper->Type() == WrapperType::Struct) {
-    if (receiver.IsEmpty()) {
-      Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyStructCtorFunc.get();
-      tns::Assert(ctorFunc != nullptr, isolate);
-      receiver = NewEmptyInstance(context, ctorFunc);
-      // A struct object must carry exactly one finalizer registration; callers
-      // passing skipGCRegistration keep the handle and register it themselves.
-      if (!skipGCRegistration) {
-        ObjectManager::Register(context, receiver);
-      }
-    }
-
-    StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
-    const StructInfo& structInfo = structWrapper->StructInfo();
-    auto cache = Caches::Get(isolate);
-    Local<Object> proto;
-    if (cache->StructPrototypeInitializer) {
-      proto = cache->StructPrototypeInitializer(context, structInfo);
-    }
-    if (!proto.IsEmpty()) {
-      bool success = receiver->SetPrototype(context, proto).FromMaybe(false);
-      tns::Assert(success, isolate);
-    }
-
-    tns::SetValue(isolate, receiver, structWrapper);
-
-    return receiver;
-  }
+  // Struct objects come from Interop::StructToValue or a struct constructor,
+  // never from here: their shape and lifetime are per struct type.
+  tns::Assert(wrapper->Type() != WrapperType::Struct, isolate);
 
   if (wrapper->Type() == WrapperType::ObjCAllocObject) {
     ObjCAllocDataWrapper* allocDataWrapper = static_cast<ObjCAllocDataWrapper*>(wrapper);
@@ -1116,18 +1087,11 @@ std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(
   return poValue;
 }
 
-Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(
-    Local<Context> context, NamedPropertyGetterCallback propertyGetter,
-    NamedPropertySetterCallbackV2 propertySetter) {
+Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   Local<FunctionTemplate> emptyInstanceCtorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
   Local<ObjectTemplate> instanceTemplate = emptyInstanceCtorFuncTemplate->InstanceTemplate();
   instanceTemplate->SetInternalFieldCount(2);
-
-  if (propertyGetter != nullptr || propertySetter != nullptr) {
-    NamedPropertyHandlerConfiguration config(propertyGetter, propertySetter);
-    instanceTemplate->SetHandler(config);
-  }
 
   instanceTemplate->SetHandler(IndexedPropertyHandlerConfiguration(IndexedPropertyGetterCallback,
                                                                    IndexedPropertySetterCallback));

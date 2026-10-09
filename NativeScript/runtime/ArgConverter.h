@@ -34,17 +34,14 @@ struct MethodCallbackWrapper {
 
 class ArgConverter {
  public:
-  static void Init(v8::Local<v8::Context> context,
-                   v8::NamedPropertyGetterCallback structPropertyGetter,
-                   v8::NamedPropertySetterCallbackV2 structPropertySetter);
+  static void Init(v8::Local<v8::Context> context);
   static v8::Local<v8::Value> Invoke(v8::Local<v8::Context> context,
                                      Class klass,
                                      v8::Local<v8::Object> receiver,
                                      V8Args& args, const MethodMeta* meta,
                                      bool isMethodCallback);
   // skipGCRegistration: for ObjC wrappers the object gets a strong handle and
-  // no finalizer; for Struct wrappers the caller must call
-  // ObjectManager::Register itself, exactly once.
+  // no finalizer.
   static v8::Local<v8::Value> ConvertArgument(
       v8::Local<v8::Context> context, BaseDataWrapper* wrapper,
       bool skipGCRegistration = false,
@@ -99,9 +96,7 @@ class ArgConverter {
 
  private:
   static v8::Local<v8::Function> CreateEmptyInstanceFunction(
-      v8::Local<v8::Context> context,
-      v8::NamedPropertyGetterCallback propertyGetter = nullptr,
-      v8::NamedPropertySetterCallbackV2 propertySetter = nullptr);
+      v8::Local<v8::Context> context);
   static v8::Local<v8::Object> NewEmptyInstance(
       v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc);
   static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyInstance(

@@ -81,6 +81,120 @@ describe(module.id, function () {
         expect(size.height).toBe(40);
     });
 
+    it("copies a struct returned from native", function () {
+        var rect = getRectStruct();
+        rect.size.width = 1;
+        expect(getRectStruct().size.width).toBe(30);
+    });
+
+    it("returns the same view for repeated nested reads", function () {
+        var rect = getRectStruct();
+        expect(rect.size).toBe(rect.size);
+        expect(rect.origin).toBe(rect.origin);
+        expect(rect.size).not.toBe(getRectStruct().size);
+    });
+
+    it("writes through a held view in both directions", function () {
+        var rect = getRectStruct();
+        var size = rect.size;
+        size.width = 5;
+        expect(rect.size.width).toBe(5);
+
+        rect.size = new CGSize({ width: 7, height: 8 });
+        expect(size.width).toBe(7);
+        expect(size.height).toBe(8);
+        expect(CGRect.equals(rect, { origin: { x: 10, y: 20 }, size: { width: 7, height: 8 } })).toBe(true);
+    });
+
+    it("writes through views nested more than one level deep", function () {
+        var record = TNSTestNativeCallbacks.recordsNestedAnonymousStruct({ x1: 1, y1: { x2: 2, y2: { x3: 3 } } });
+        var inner = record.y1.y2;
+        inner.x3 = 30;
+        expect(record.y1.y2).toBe(inner);
+        expect(record.y1.y2.x3).toBe(30);
+    });
+
+    it("keeps a deep view's root alive after the root and middle view are dropped", function () {
+        var inner = null;
+        (() => {
+            var record = TNSTestNativeCallbacks.recordsNestedAnonymousStruct({ x1: 1, y1: { x2: 2, y2: { x3: 3 } } });
+            inner = record.y1.y2;
+        })();
+        gc();
+        gc();
+
+        expect(inner.x3).toBe(3);
+    });
+
+    it("collects roots together with their cached views", function () {
+        for (var i = 0; i < 1000; i++) {
+            var rect = getRectStruct();
+            rect.origin.x = i;
+            rect.size.width = i;
+        }
+        gc();
+        gc();
+        expect(getRectStruct().size.width).toBe(30);
+    });
+
+    it("exposes fields as own enumerable properties", function () {
+        var point = new CGPoint({ x: 1, y: 2 });
+        expect(Object.keys(point)).toEqual(["x", "y"]);
+        expect(JSON.stringify(point)).toBe('{"x":1,"y":2}');
+        expect(Object.keys(getRectStruct())).toEqual(["origin", "size"]);
+        expect(delete point.x).toBe(false);
+        expect(point.x).toBe(1);
+    });
+
+    it("gives a struct from native its complete constructor", function () {
+        var record = getStructWith3Doubles();
+        expect(typeof record.constructor.equals).toBe("function");
+        expect(interop.sizeof(record.constructor)).toBe(24);
+    });
+
+    it("assigns struct fields from structs and plain objects", function () {
+        var target = TNSTestNativeCallbacks.recordsNestedAnonymousStruct({ x1: 1, y1: { x2: 2, y2: { x3: 3 } } });
+        var source = TNSTestNativeCallbacks.recordsNestedAnonymousStruct({ x1: 4, y1: { x2: 5, y2: { x3: 6 } } });
+        var inner = target.y1;
+        Object.assign(target, source);
+        expect(target.x1).toBe(4);
+        expect(inner.x2).toBe(5);
+        expect(inner.y2.x3).toBe(6);
+
+        var rect = getRectStruct();
+        rect.size = { width: 1, height: 2 };
+        expect(rect.size.width).toBe(1);
+        expect(rect.size.height).toBe(2);
+        expect(function () { rect.size = 5; }).toThrowError(TypeError);
+    });
+
+    it("leaves the memory of a pointer-backed struct to the pointer", function () {
+        var pointer = interop.alloc(interop.sizeof(CGSize));
+        (() => {
+            var size = CGSize(pointer);
+            size.width = 3;
+        })();
+        gc();
+        gc();
+        var again = CGSize(pointer);
+        again.height = 4;
+        expect(again.width).toBe(3);
+        expect(again.height).toBe(4);
+    });
+
+    it("reaches methods on the struct prototype", function () {
+        CGSize.prototype.area = function () {
+            return this.width * this.height;
+        };
+        try {
+            expect(getRectStruct().size.area()).toBe(1200);
+            expect(new CGSize({ width: 2, height: 3 }).area()).toBe(6);
+        } finally {
+            delete CGSize.prototype.area;
+        }
+        expect(typeof getRectStruct().hasOwnProperty).toBe("function");
+    });
+
     it("RecordConstructorPointer", function () {
         (function () {
             var size = interop.sizeof(TNSNestedStruct);
