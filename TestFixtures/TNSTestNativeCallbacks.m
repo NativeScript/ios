@@ -371,6 +371,54 @@
   return result;
 }
 
++ (void)keepBlock:(void (^)(void))block releaseMode:(int)mode {
+  static dispatch_queue_t serialQueue;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    serialQueue =
+        dispatch_queue_create("org.nativescript.TestFixtures.blockRelease", DISPATCH_QUEUE_SERIAL);
+  });
+
+  __block void (^kept)(void) = block;
+  if (mode == 2) {
+    [[NSOperationQueue mainQueue] addOperationWithBlock:kept];
+  }
+  dispatch_queue_t queue =
+      mode == 1 ? serialQueue : dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0);
+  int64_t delay = (int64_t)arc4random_uniform(2 * NSEC_PER_MSEC + 1);
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, delay), queue, ^{
+    kept = nil;
+  });
+}
+
++ (void)keepBlock:(void (^)(void))block forMilliseconds:(int)ms {
+  __block void (^kept)(void) = block;
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)ms * NSEC_PER_MSEC),
+                 dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+                   kept = nil;
+                 });
+}
+
++ (void)sleepMilliseconds:(int)ms {
+  usleep((useconds_t)ms * 1000);
+}
+
++ (void)repeat:(int)count pausingAfter:(void (^)(int))step {
+  for (int i = 0; i < count; i++) {
+    @autoreleasepool {
+      step(i);
+    }
+    usleep(arc4random_uniform(3001));
+  }
+}
+
++ (void)runOnBackgroundQueue:(void (^)(void))work completion:(void (^)(void))completion {
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+    work();
+    dispatch_async(dispatch_get_main_queue(), completion);
+  });
+}
+
 - (void (^)())getBlock {
   return nil;
 }

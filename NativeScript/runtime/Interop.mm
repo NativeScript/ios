@@ -54,12 +54,10 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
                 HandleScope handle_scope(isolate);
                 Local<Value> callback = wrapper->callback_->Get(isolate);
                 if (!callback.IsEmpty() && callback->IsObject()) {
-                  // The callback's slot is the cache's owner, so only a wrapper
-                  // still sitting in it is ours to free.
+                  // The slot may hold another wrapper by now; only our own is
+                  // cleared from it.
                   if (tns::GetValue(isolate, callback) == blockWrapper) {
                     tns::DeleteValue(isolate, callback);
-                  } else {
-                    blockWrapper = nullptr;
                   }
                 }
                 // Unconditional: an already-detached callback still owns its
@@ -76,6 +74,32 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
             block->~JSBlock();
           }
         }};
+
+// libclosure's flags layout (Block_private.h): bit 0 is set once the last
+// release has started disposing the block, bits 1-15 hold the refcount, and a
+// saturated refcount latches the block alive.
+static constexpr int32_t kBlockDeallocating = 0x0001;
+static constexpr int32_t kBlockRefcountMask = 0xfffe;
+
+// libclosure's increment ignores the deallocating bit, so Block_copy would hand
+// out a block whose dispose is already waiting for the isolate's Locker and
+// which libclosure frees right after. This CASes the same word libclosure does.
+bool Interop::TryRetainJSBlock(JSBlock* block) {
+  volatile int32_t* flags = &block->flags;
+  int32_t old = __atomic_load_n(flags, __ATOMIC_RELAXED);
+  while (true) {
+    if ((old & kBlockDeallocating) || (old & kBlockRefcountMask) == 0) {
+      return false;
+    }
+    if ((old & kBlockRefcountMask) == kBlockRefcountMask) {
+      return true;
+    }
+    if (__atomic_compare_exchange_n(flags, &old, old + 2, true, __ATOMIC_ACQ_REL,
+                                    __ATOMIC_RELAXED)) {
+      return true;
+    }
+  }
+}
 
 std::pair<IMP, ffi_closure*> Interop::CreateMethodInternal(const uint8_t initialParamIndex,
                                                            const uint8_t argsCount,
@@ -538,11 +562,20 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::Block) {
       BlockWrapper* wrapper = static_cast<BlockWrapper*>(baseWrapper);
       // The callee takes the block at +0 and copies it if it needs to keep it,
-      // so the copy that keeps it alive across the call must be balanced: the
-      // JSBlock dispose helper owns the ffi closure and the callback wrapper
+      // so the reference that keeps it alive across the call must be balanced:
+      // the JSBlock dispose helper owns the ffi closure and the callback wrapper
       // and only runs once the last reference goes away.
-      blockPtr = CFAutorelease(Block_copy(wrapper->Block()));
-    } else {
+      if (wrapper->OwnsBlock()) {
+        // A native block; the wrapper's own Block_copy keeps it alive.
+        blockPtr = CFAutorelease(Block_copy(wrapper->Block()));
+      } else if (TryRetainJSBlock(static_cast<JSBlock*>(wrapper->Block()))) {
+        // Reading the block is safe even when its last release raced ahead:
+        // while the isolate is valid, dispose clears this slot under the
+        // Locker this thread holds, before libclosure frees the block.
+        blockPtr = CFAutorelease(wrapper->Block());
+      }
+    }
+    if (blockPtr == nullptr) {
       std::shared_ptr<Persistent<Value>> poCallback =
           std::make_shared<Persistent<Value>>(isolate, arg);
       MethodCallbackWrapper* userData =
