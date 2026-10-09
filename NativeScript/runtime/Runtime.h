@@ -51,6 +51,7 @@ class Runtime {
   inline bool IsRuntimeWorker() { return workerId_ > 0; }
 
   inline bool IsOnRuntimeThread() const { return pthread_equal(runtimeThread_, pthread_self()) != 0; }
+  inline pthread_t RuntimeThread() const { return runtimeThread_; }
 
   /*
    * Scheduler bound to this runtime's runloop. Producers on any thread post;
