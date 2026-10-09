@@ -193,15 +193,18 @@ bool isErrorDisplayShowing = false;
 // CFNotificationCenterRemoveObserver(CFNotificationCenterGetLocalCenter(), this,
 // kCFTimeZoneSystemTimeZoneDidChangeNotification, NULL);
 
-void DisposeIsolateWhenPossible(Isolate* isolate) {
-  // Disposal is deferred only while the isolate is still entered, which happens
+void DisposeIsolateWhenPossible(Isolate* isolate, int gateId) {
+  // Disposal is deferred while the isolate is still entered, which happens
   // when the runtime is deleted by code running inside its own isolate: an
-  // embedder calling shutdownRuntime from a JS callback. exit() never deletes a
-  // runtime, so a process that is dying leaves its isolates to the OS.
-  if (isolate->IsInUse()) {
+  // embedder calling shutdownRuntime from a JS callback. It is also deferred
+  // while another thread holds a pin to wait for or use the isolate's Locker.
+  // Never block here instead: the pin holder may be waiting for a Locker this
+  // thread still holds further up the stack. exit() never deletes a runtime,
+  // so a process that is dying leaves its isolates to the OS.
+  if (isolate->IsInUse() || !IsolateGates::RetireIfUnpinned(gateId)) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_MSEC)),
                    dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
-                     DisposeIsolateWhenPossible(isolate);
+                     DisposeIsolateWhenPossible(isolate, gateId);
                    });
   } else {
     isolate->Dispose();
@@ -234,10 +237,11 @@ Runtime::~Runtime() {
   NativeScriptException::OnIsolateTeardown(isolate_);
 
   auto currentIsolate = this->isolate_;
+  int gateId = Caches::Get(this->isolate_)->getGateId();
   {
-    // make sure we remove the isolate from the list of active isolates first
-    // this will make sure isAlive(isolate) will return false and prevent locking of the v8 isolate
-    // after it terminates execution
+    // First, so IsAlive turns false: native callbacks arriving from here on
+    // bail before taking the Locker. A block's dispose still pins and locks
+    // until the gate closes below.
     SpinLock lock(isolatesMutex_);
     Runtime::isolates_.erase(
         std::remove(Runtime::isolates_.begin(), Runtime::isolates_.end(), this->isolate_),
@@ -299,9 +303,14 @@ Runtime::~Runtime() {
     Caches::Remove(this->isolate_);
 
     this->isolate_->SetData(Constants::RUNTIME_SLOT, nullptr);
+
+    // Last, and under the Locker: from here on nothing reads a wrapper through
+    // a JS object, so threads that never pinned may free theirs without the
+    // lock, and threads already pinned see the gate closed once they get it.
+    IsolateGates::Close(gateId);
   }
 
-  DisposeIsolateWhenPossible(this->isolate_);
+  DisposeIsolateWhenPossible(this->isolate_, gateId);
 
   // Matched erase: only removes the registry entry while it still maps to
   // this runtime's loop, so a worker isolate that reuses this pointer after
@@ -384,6 +393,8 @@ Isolate* Runtime::CreateIsolate(const IsolateLimits& limits) {
 void Runtime::Init(Isolate* isolate, bool isWorker) {
   std::shared_ptr<Caches> cache =
       Caches::Init(isolate, nextIsolateId.fetch_add(1, std::memory_order_relaxed));
+  // Before anything can build an IsolateWrapper for this isolate.
+  IsolateGates::Open(cache->getGateId());
   cache->isWorker = isWorker;
   cache->ObjectCtorInitializer = MetadataBuilder::GetOrCreateConstructorFunctionTemplate;
   cache->StructPrototypeInitializer = MetadataBuilder::GetOrCreateStructPrototype;
