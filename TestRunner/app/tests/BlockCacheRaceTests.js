@@ -67,3 +67,77 @@ describe("JS block cache under cross-thread release", function () {
         });
     });
 });
+
+describe("JS block whose dispose is waiting for the isolate", function () {
+    // Drops the last native reference to fn's cached block on a background
+    // queue while this thread keeps the isolate locked, so the block's dispose
+    // stays parked on the Locker for the rest of the turn.
+    function strandDispose(fn) {
+        TNSTestNativeCallbacks.repeatPausingAfter(1, function () {
+            TNSTestNativeCallbacks.keepBlockForMilliseconds(fn, 1);
+        });
+        TNSTestNativeCallbacks.sleepMilliseconds(30);
+    }
+
+    it("is reported by interop.handleof while native code holds it", function () {
+        var fn = function () {};
+        TNSTestNativeCallbacks.keepBlockForMilliseconds(fn, 1000);
+        expect(interop.handleof(fn) instanceof interop.Pointer).toBe(true);
+    });
+
+    it("is not handed out by interop.handleof", function () {
+        var fn = function () {};
+        strandDispose(fn);
+        expect(function () {
+            interop.handleof(fn);
+        }).toThrow();
+    });
+
+    it("is replaced by a fresh block when the function is marshalled again", function (done) {
+        var ran = 0;
+        var fn = function () {
+            ran++;
+        };
+        strandDispose(fn);
+        NSOperationQueue.mainQueue.addOperationWithBlock(fn);
+
+        var attempts = 100;
+        (function poll() {
+            if (ran === 1 || --attempts === 0) {
+                expect(ran).toBe(1);
+                done();
+                return;
+            }
+            setTimeout(poll, 10);
+        })();
+    });
+});
+
+describe("JS block outliving its worker", function () {
+    var originalTimeout;
+    beforeEach(function () {
+        originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 10000;
+    });
+    afterEach(function () {
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+    });
+
+    // The function is also registered through interop.FunctionReference, so
+    // the worker's teardown disposes it while native code still holds the
+    // block built from it; the block's own dispose runs after the isolate is
+    // gone.
+    it("is released after a teardown that disposed its function", function (done) {
+        var worker = new Worker("./blockFunctionReferenceWorker.js");
+        worker.onmessage = function (msg) {
+            expect(msg.data).toBe("kept");
+            worker.terminate();
+            setTimeout(done, 600);
+        };
+        worker.onerror = function (e) {
+            expect(String(e && e.message ? e.message : e)).toBe("<no worker error>");
+            done();
+        };
+        worker.postMessage(0);
+    });
+});

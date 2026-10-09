@@ -391,6 +391,18 @@
   });
 }
 
++ (void)keepBlock:(void (^)(void))block forMilliseconds:(int)ms {
+  __block void (^kept)(void) = block;
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)ms * NSEC_PER_MSEC),
+                 dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+                   kept = nil;
+                 });
+}
+
++ (void)sleepMilliseconds:(int)ms {
+  usleep((useconds_t)ms * 1000);
+}
+
 + (void)repeat:(int)count pausingAfter:(void (^)(int))step {
   for (int i = 0; i < count; i++) {
     @autoreleasepool {

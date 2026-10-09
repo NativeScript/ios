@@ -73,6 +73,12 @@
 // the block is also enqueued on the main operation queue first.
 + (void)keepBlock:(void (^)(void))block releaseMode:(int)mode;
 
+// Keeps `block` and drops that reference from a global queue after `ms`.
++ (void)keepBlock:(void (^)(void))block forMilliseconds:(int)ms;
+
+// Blocks the calling thread, and with it the current JS turn, for `ms`.
++ (void)sleepMilliseconds:(int)ms;
+
 // Calls `step` `count` times on the calling thread, each call inside its own
 // autorelease pool, so the runtime's autoreleased copy of a block marshalled
 // by `step` is gone before the next call. Sleeps 0-3 ms after each call
