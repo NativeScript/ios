@@ -39,15 +39,21 @@ using namespace v8;
 
 - (NSUInteger)count {
   auto isolate = wrapper_->Isolate();
-  if (!wrapper_->IsValid()) {
-    return 0;
-  }
   NSUInteger result = 0;
   // Scopes-before-@throw: a branded escape from the JS boundary is @thrown only
   // after the inner block's V8 scopes destruct.
   NSException* __strong pendingThrow = nil;
   {
+    // Any thread may read the array, so the isolate can be torn down while
+    // this one waits for the Locker; validity is checked again once it is held.
+    IsolatePin pin = wrapper_->Pin();
+    if (!pin || !wrapper_->IsValid()) {
+      return 0;
+    }
     v8::Locker locker(isolate);
+    if (!wrapper_->IsValid()) {
+      return 0;
+    }
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
@@ -76,10 +82,6 @@ using namespace v8;
 
 - (id)objectAtIndex:(NSUInteger)index {
   auto isolate = wrapper_->Isolate();
-  if (!wrapper_->IsValid()) {
-    return nil;
-  }
-
   if (!(index < [self count])) {
     // Out of bounds: return the adapter default rather than aborting.
     return nil;
@@ -88,7 +90,14 @@ using namespace v8;
   id result = nil;
   NSException* __strong pendingThrow = nil;
   {
+    IsolatePin pin = wrapper_->Pin();
+    if (!pin || !wrapper_->IsValid()) {
+      return nil;
+    }
     v8::Locker locker(isolate);
+    if (!wrapper_->IsValid()) {
+      return nil;
+    }
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
@@ -112,32 +121,36 @@ using namespace v8;
 }
 
 - (void)dealloc {
-  if (wrapper_->IsValid()) {
-    auto isolate = wrapper_->Isolate();
-    v8::Locker locker(isolate);
-    Isolate::Scope isolate_scope(isolate);
-    HandleScope handle_scope(isolate);
-    wrapper_->GetCache()->Instances.erase(self);
-    // Detach and free only a wrapper that is still the one we attached: a
-    // finalizer or __releaseNativeCounterpart can have retired it already, and
-    // whatever else sits in the field belongs to another owner. Once the
-    // isolate is gone the field can no longer be read, so the claim is dropped
-    // rather than freed blind.
-    if (dataWrapper_ != nullptr) {
-      Local<Value> value = self->object_->Get(isolate);
-      if (tns::GetValue(isolate, value) == dataWrapper_) {
-        tns::DeleteValue(isolate, value);
-        delete dataWrapper_;
+  {
+    IsolatePin pin = wrapper_->Pin();
+    if (pin) {
+      auto isolate = wrapper_->Isolate();
+      v8::Locker locker(isolate);
+      // Validity is not the test: until the teardown closes the gate it can
+      // still reach the claim through the JS object, so it is detached under
+      // the Locker even once the isolate is invalidated.
+      if (!wrapper_->IsTornDown()) {
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+        wrapper_->GetCache()->Instances.erase(self);
+        // Detach and free only a wrapper that is still the one we attached: a
+        // finalizer or __releaseNativeCounterpart can have retired it already,
+        // and whatever else sits in the field belongs to another owner.
+        if (dataWrapper_ != nullptr) {
+          Local<Value> value = self->object_->Get(isolate);
+          if (tns::GetValue(isolate, value) == dataWrapper_) {
+            tns::DeleteValue(isolate, value);
+            delete dataWrapper_;
+          }
+          dataWrapper_ = nullptr;
+        }
+        self->object_->Reset();
       }
-      dataWrapper_ = nullptr;
     }
-    self->object_->Reset();
-  } else if (dataWrapper_ != nullptr) {
-    // The isolate is gone, and with it the JS object and every reader of the
-    // claim; no other path deletes one (__releaseNativeCounterpart leaves
-    // adapter claims attached), so the owner frees it here — adapters
-    // released after a worker isolate's teardown otherwise leak one wrapper
-    // each.
+  }
+  if (dataWrapper_ != nullptr) {
+    // The gate is closed: the JS object and every reader of the claim are
+    // gone, and no other path deletes an adapter claim.
     delete dataWrapper_;
     dataWrapper_ = nullptr;
   }
