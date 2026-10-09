@@ -90,6 +90,11 @@
 // queue.
 + (void)runOnBackgroundQueue:(void (^)(void))work completion:(void (^)(void))completion;
 
+// Reads `collection` (an NSArray or NSDictionary) in a tight loop from
+// `threads` global-queue threads until `ms` have passed. Those loops hold the
+// last references to it, so its final release lands on one of them.
++ (void)query:(id)collection fromThreads:(int)threads forMilliseconds:(int)ms;
+
 - (void (^)())getBlock;
 - (void (^)())getBlockFromNative;
 

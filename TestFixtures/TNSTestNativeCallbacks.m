@@ -412,6 +412,30 @@
   }
 }
 
++ (void)query:(id)collection fromThreads:(int)threads forMilliseconds:(int)ms {
+  uint64_t deadline = clock_gettime_nsec_np(CLOCK_UPTIME_RAW) + (uint64_t)ms * NSEC_PER_MSEC;
+  for (int i = 0; i < threads; i++) {
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+      while (clock_gettime_nsec_np(CLOCK_UPTIME_RAW) < deadline) {
+        @autoreleasepool {
+          if ([collection isKindOfClass:[NSArray class]]) {
+            NSArray* array = collection;
+            if (array.count > 0) {
+              UNUSED([array objectAtIndex:0]);
+            }
+          } else if ([collection isKindOfClass:[NSDictionary class]]) {
+            NSDictionary* dictionary = collection;
+            UNUSED(dictionary.count);
+            for (id key in dictionary) {
+              UNUSED([dictionary objectForKey:key]);
+            }
+          }
+        }
+      }
+    });
+  }
+}
+
 + (void)runOnBackgroundQueue:(void (^)(void))work completion:(void (^)(void))completion {
   dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
     work();
