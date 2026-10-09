@@ -117,9 +117,12 @@ v8::Intercepted MetadataBuilder::GlobalPropertyGetter(Local<v8::Name> property,
     const FunctionMeta* funcMeta = static_cast<const FunctionMeta*>(meta);
     void* functionPointer =
         SymbolLoader::instance().loadFunctionSymbol(meta->topLevelModule(), meta->name());
+    // Metadata can list functions the running OS or linked binary doesn't export
+    // (newer SDK, weak-linked or stripped symbol); expose those as undefined so
+    // `typeof fn === "undefined"` works as feature detection.
     if (functionPointer == nullptr) {
       Log(@"Unable to load \"%s\" function", meta->name());
-      tns::Assert(false, isolate);
+      return v8::Intercepted::kNo;
     }
 
     CacheItem<FunctionMeta>* item =
