@@ -200,6 +200,9 @@ require("./ExtendedClassNamingTests");
 // Worker wrapper reachability across GC (strong while running, collectable after)
 require("./WorkerLifetimeTests");
 
+// terminate() landing inside a worker's entry script
+require("./WorkerTerminateTests");
+
 // Tests common for all runtimes (git submodule of NativeScript/common-runtime-tests-app).
 require("../shared/index").runAllTests();
 

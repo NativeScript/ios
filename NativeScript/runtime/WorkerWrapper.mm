@@ -69,7 +69,14 @@ const bool WorkerWrapper::IsRunning() { return this->isRunning_; }
 
 const bool WorkerWrapper::IsClosing() { return this->isClosing_; }
 
+const bool WorkerWrapper::IsTerminating() { return this->isTerminating_; }
+
 const int WorkerWrapper::WorkerId() { return this->workerId_; }
+
+void WorkerWrapper::PublishIsolate(Isolate* isolate) {
+  std::lock_guard<std::mutex> lock(this->workerIsolateMutex_);
+  this->workerIsolate_ = isolate;
+}
 
 void WorkerWrapper::PostMessage(std::shared_ptr<worker::Message> message) {
   if (!this->isTerminating_ && !this->isClosing_) {
@@ -77,8 +84,8 @@ void WorkerWrapper::PostMessage(std::shared_ptr<worker::Message> message) {
   }
 }
 
-void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker,
-                          std::function<Isolate*()> func, std::optional<int> qualityOfService) {
+void WorkerWrapper::Start(std::shared_ptr<Persistent<Value>> poWorker, std::function<void()> func,
+                          std::optional<int> qualityOfService) {
   this->poWorker_ = poWorker;
   // Set before the operation is queued: a worker that terminates inside its
   // entry script clears this flag from its own thread, and a store made after
@@ -147,12 +154,14 @@ void WorkerWrapper::EndWrapperLifetime() {
 
 void WorkerWrapper::DrainPendingTasks() {
   // The drain source is armed (and can be signaled by a main-thread
-  // PostMessage) BEFORE `workerIsolate_` is assigned in BackgroundLooper, and
-  // worker creation spins this runloop inside that window: the entry's module
-  // graph load pumps it while waiting on fetches, which fires this source with
-  // a null isolate (crash in v8::Locker::Initialize). Bail until the isolate
-  // exists — the messages stay queued and the explicit DrainPendingTasks()
-  // call right after isolate creation delivers them.
+  // PostMessage) before the worker's runtime exists, and the entry's module
+  // graph load pumps this runloop while waiting on fetches. A fire that
+  // arrives before the isolate is published has nothing to lock (a null
+  // isolate crashes v8::Locker::Initialize); one that arrives during the entry
+  // locks and then leaves at the messagesEnabled_ gate below, since the queue
+  // is only enabled once the entry has finished evaluating. Either way the
+  // messages stay queued for the explicit DrainPendingTasks() call after the
+  // startup function returns.
   if (this->workerIsolate_ == nullptr) {
     return;
   }
@@ -232,7 +241,7 @@ static void PostThreadEndedNotification(Isolate* mainIsolate, std::weak_ptr<Even
       true);
 }
 
-void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
+void WorkerWrapper::BackgroundLooper(std::function<void()> func) {
   if (!this->isTerminating_) {
     CFRunLoopRef runLoop = CFRunLoopGetCurrent();
     this->queue_.Initialize(
@@ -243,15 +252,13 @@ void WorkerWrapper::BackgroundLooper(std::function<Isolate*()> func) {
         },
         this);
 
-    Isolate* workerIsolate = func();
-    {
-      std::lock_guard<std::mutex> lock(this->workerIsolateMutex_);
-      this->workerIsolate_ = workerIsolate;
-    }
+    // Publishes the isolate itself, before it runs the entry script.
+    func();
 
     this->DrainPendingTasks();
 
-    // check again as it could terminate before this
+    // A terminate() that interrupted the entry, or the entry's own close(),
+    // ends the worker here without a loop turn.
     if (!this->isTerminating_) {
       CFRunLoopRun();
     }
@@ -350,12 +357,6 @@ void WorkerWrapper::Terminate() {
         // Flagged before the request so a pump that is between iterations sees
         // it on its next check, rather than only once V8 has some JS to
         // interrupt — which a parked graph never provides.
-        //
-        // NOTE: `workerIsolate_` is assigned only after the worker's ENTRY has
-        // finished evaluating, so a worker still parked in its entry is not
-        // reachable from here at all and terminate() does nothing for it. That
-        // is a pre-existing worker-lifecycle gap, not something this flag can
-        // close — see the follow-up filed for it.
         if (Runtime* workerRuntime = Runtime::GetRuntime(this->workerIsolate_)) {
           workerRuntime->RequestTermination();
         }
@@ -409,10 +410,11 @@ size_t WorkerWrapper::OnNearHeapLimit(void* data, size_t current_heap_limit,
   worker->PassUncaughtExceptionFromWorkerToMain(worker->heapLimitMessage_, worker->heapLimitSource_,
                                                 "", 0, true);
 
-  // Terminate() only reaches an isolate BackgroundLooper has already published,
-  // which happens after the entry script finished evaluating — and a worker
-  // that exhausts its heap usually does so inside that entry. Ask the isolate
-  // this callback belongs to directly.
+  // Terminate() only reaches a published isolate, and this callback is armed
+  // before publication: a cap small enough can be hit while Runtime::Init is
+  // still evaluating builtins. Ask the isolate this callback belongs to
+  // directly, so the GC that is running finishes and whatever JS is on the
+  // stack unwinds either way.
   if (Runtime* runtime = Runtime::GetRuntime(worker->heapLimitIsolate_)) {
     runtime->RequestTermination();
   }
@@ -470,7 +472,9 @@ void WorkerWrapper::DestroyInspector() {
 }
 
 void WorkerWrapper::CallOnErrorHandlers(Isolate* isolate, TryCatch& tc) {
-  if (this->isTerminating_) {
+  // A termination is not an error: a dying worker reports nothing, and a
+  // TryCatch that caught one holds no exception value to hand a handler.
+  if (this->isTerminating_ || tc.HasTerminated()) {
     return;
   }
   Local<Context> context = Caches::Get(isolate)->GetContext();
@@ -552,6 +556,12 @@ void WorkerWrapper::ReportEntryEvaluationRejection(Isolate* isolate, Local<Conte
 
 void WorkerWrapper::PassUncaughtExceptionFromWorkerToMain(Local<Context> context, TryCatch& tc,
                                                           bool async) {
+  // Same rule as CallOnErrorHandlers. The string overload stays open: the
+  // paths that report a failure and then terminate the worker themselves (a
+  // missing entry, the heap cap) go through it before they set the flag.
+  if (this->isTerminating_ || tc.HasTerminated()) {
+    return;
+  }
   Isolate* workerIsolate = v8::Isolate::GetCurrent();
   int lineNumber = 0;
   std::string message = "";

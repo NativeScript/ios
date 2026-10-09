@@ -258,7 +258,10 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
       moduleNamespace =
           ModuleInternal::LoadESModule(isolate, path, BootEntryEvaluationOptions(isHttpModule));
     } catch (const NativeScriptException& ex) {
-      if (RuntimeConfig.IsDebug) {
+      Runtime* runtime = Runtime::GetRuntime(isolate);
+      bool terminating = isolate->IsExecutionTerminating() ||
+                         (runtime != nullptr && runtime->IsTerminationRequested());
+      if (RuntimeConfig.IsDebug && !terminating) {
         Log(@"***** JavaScript exception occurred *****");
         Log(@"Error loading ES module: %s", path.c_str());
         Log(@"Exception: %s", ex.getMessage().c_str());
@@ -293,6 +296,15 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
   success = requireFunc->Call(context, globalObject, 1, args).ToLocal(&result);
 
   if (!success || tc.HasCaught()) {
+    // A termination is caught like an exception but carries no error value;
+    // naming it as the failure keeps it from being reported as one. All three
+    // signals, as in the settle pump: a native frame between here and the
+    // interrupted JS may have swallowed the sentinel on its way out.
+    Runtime* runtime = Runtime::GetRuntime(isolate);
+    if (tc.HasTerminated() || isolate->IsExecutionTerminating() ||
+        (runtime != nullptr && runtime->IsTerminationRequested())) {
+      throw NativeScriptException("Module evaluation interrupted by isolate termination: " + path);
+    }
     if (RuntimeConfig.IsDebug) {
       Log(@"***** JavaScript exception occurred *****");
       Log(@"Error in require() call:");
@@ -882,6 +894,12 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const std::string& mo
         moduleFunc->Call(context, thiz, sizeof(requireArgs) / sizeof(Local<Value>), requireArgs)
             .ToLocal(&result);
     if (!success || tc.HasCaught()) {
+      Runtime* runtime = Runtime::GetRuntime(isolate);
+      if (tc.HasTerminated() || isolate->IsExecutionTerminating() ||
+          (runtime != nullptr && runtime->IsTerminationRequested())) {
+        throw NativeScriptException("Module evaluation interrupted by isolate termination: " +
+                                    modulePath);
+      }
       throw NativeScriptException(isolate, tc, "Error calling module function");
     }
   }
@@ -1277,6 +1295,15 @@ MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context
   Local<Value> result;
   if (!module->Evaluate(context).ToLocal(&result)) {
     RemoveModuleFromRegistry(isolate, canonicalPath);
+    // Same rule as the pump below: a termination outranks any failure detail,
+    // and reading the TryCatch as an error would run JS on the dying isolate.
+    Runtime* runtime = Runtime::GetRuntime(isolate);
+    if (tcEval.HasTerminated() || isolate->IsExecutionTerminating() ||
+        (runtime != nullptr && runtime->IsTerminationRequested())) {
+      LogEsmPhase(canonicalPath, "evaluate", "terminated");
+      throw NativeScriptException("Module evaluation interrupted by isolate termination: " +
+                                  canonicalPath);
+    }
     const char* classification = "unknown";
     if (tcEval.HasCaught()) {
       Local<Message> msg = tcEval.Message();
@@ -1364,32 +1391,38 @@ MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context
   NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:options.deadlineSeconds];
   bool settled = false;
 
+  // Termination outranks a settled result and a timeout alike. Handing back a
+  // namespace would send the caller on to run more JS — enabling a queue,
+  // draining messages — on an isolate V8 has already been told to stop, and
+  // reporting a timeout would name a reason that is not the real one.
+  //
+  // Three signals are consulted: V8 only reports a termination it has already
+  // materialized, which needs JS to run, and a graph parked on a promise
+  // nothing settles never gives it any; one that materialized inside a
+  // checkpoint lands in promiseTc. Message-only exception: building a V8
+  // error on a terminating isolate is not allowed.
+  auto throwIfTerminating = [&]() {
+    if (!promiseTc.HasTerminated() && !isolate->IsExecutionTerminating() &&
+        (runtime == nullptr || !runtime->IsTerminationRequested())) {
+      return;
+    }
+    LogEsmPhase(canonicalPath, "evaluate", "terminated");
+    // Probed, not consumed: only a still-pending promise leaves a
+    // half-evaluated module in the registry. One that already settled is
+    // complete, and evicting it would throw away a good entry for no reason
+    // — the result simply goes unused.
+    if (promise->State() == Promise::kPending) {
+      RemoveModuleFromRegistry(isolate, canonicalPath);
+    }
+    throw NativeScriptException("Module evaluation interrupted by isolate termination: " +
+                                canonicalPath);
+  };
+
   // State is checked before the first pump: a synchronous graph's
   // evaluation promise is already settled when Evaluate() returns, so it
   // exits here without paying for a runloop slice.
   while (!promiseTc.HasCaught()) {
-    // Termination outranks a settled result. Handing back a namespace here
-    // would send the caller on to run more JS — enabling a queue, draining
-    // messages — on an isolate V8 has already been told to stop, so a
-    // termination seen at the loop head always throws, settled or not.
-    //
-    // Both signals are consulted: V8 only reports a termination it has already
-    // materialized, which needs JS to run, and a graph parked on a promise
-    // nothing settles never gives it any. Message-only exception: building a
-    // V8 error on a terminating isolate is not allowed.
-    if (isolate->IsExecutionTerminating() ||
-        (runtime != nullptr && runtime->IsTerminationRequested())) {
-      LogEsmPhase(canonicalPath, "evaluate", "terminated");
-      // Probed, not consumed: only a still-pending promise leaves a
-      // half-evaluated module in the registry. One that already settled is
-      // complete, and evicting it would throw away a good entry for no reason
-      // — the result simply goes unused.
-      if (promise->State() == Promise::kPending) {
-        RemoveModuleFromRegistry(isolate, canonicalPath);
-      }
-      throw NativeScriptException("Module evaluation interrupted by isolate termination: " +
-                                  canonicalPath);
-    }
+    throwIfTerminating();
 
     Promise::PromiseState state = promise->State();
     if (state != Promise::kPending) {
@@ -1410,6 +1443,11 @@ MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context
       usleep(1000);  // 1ms delay for non-HTTP top-level await polling
     }
   }
+
+  // The loop leaves through its condition when a pump materializes the
+  // termination, and through the deadline when the request arrived during the
+  // final slice.
+  throwIfTerminating();
 
   if (!settled && promise->State() == Promise::kPending) {
     LogEsmPhase(canonicalPath, "evaluate", "promise-timeout");
@@ -1432,6 +1470,21 @@ MaybeLocal<Promise> EvaluateModuleGraph(Isolate* isolate, Local<Context> context
   }
 
   return MaybeLocal<Promise>();
+}
+
+// A pumped graph walk bails on a termination request but reports nothing;
+// what follows it would compile, fetch synchronously or evaluate on an
+// isolate that must not run anything more.
+static void ThrowIfLoadInterruptedByTermination(Isolate* isolate,
+                                                const std::string& canonicalPath) {
+  Runtime* runtime = Runtime::GetRuntime(isolate);
+  if (!isolate->IsExecutionTerminating() &&
+      (runtime == nullptr || !runtime->IsTerminationRequested())) {
+    return;
+  }
+  LogEsmPhase(canonicalPath, "load", "terminated");
+  throw NativeScriptException("Module evaluation interrupted by isolate termination: " +
+                              canonicalPath);
 }
 
 Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path,
@@ -1513,6 +1566,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     // registry hit and instantiation resolves as pure lookup. On timeout or
     // partial coverage the legacy synchronous path still owns correctness.
     RunModuleGraphLoadPumped(isolate, context, requestPath, kModuleEvaluateDeadlineSeconds);
+    ThrowIfLoadInterruptedByTermination(isolate, canonicalPath);
     MaybeLocal<Module> maybeMod = LoadHttpModuleForUrl(isolate, context, requestPath);
     if (!maybeMod.ToLocal(&module)) {
       logPhase("compile", "fail", "http-loader");
@@ -1536,6 +1590,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
     // async fetch, so it legitimately waits here and then evaluates
     // synchronously.
     RunModuleGraphLoadPumped(isolate, context, canonicalPath, kModuleEvaluateDeadlineSeconds);
+    ThrowIfLoadInterruptedByTermination(isolate, canonicalPath);
     auto walkedIt = registry.find(canonicalPath);
     if (walkedIt != registry.end()) {
       Local<Module> walked = walkedIt->second.Get(isolate);
@@ -1597,6 +1652,13 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
 
     if (!linked) {
       RemoveModuleFromRegistry(isolate, canonicalPath);
+      Runtime* runtime = Runtime::GetRuntime(isolate);
+      if (tcLink.HasTerminated() || isolate->IsExecutionTerminating() ||
+          (runtime != nullptr && runtime->IsTerminationRequested())) {
+        logPhase("instantiate", "terminated");
+        throw NativeScriptException("Module evaluation interrupted by isolate termination: " +
+                                    canonicalPath);
+      }
       const char* classification = "unknown";
       if (tcLink.HasCaught()) {
         Local<Message> msg = tcLink.Message();

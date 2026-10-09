@@ -433,7 +433,7 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
     // vocabulary updates).
     tns::LoaderVocabulary inheritedVocabulary = tns::CaptureLoaderVocabulary(isolate);
 
-    std::function<Isolate*()> func([worker, workerPath, inheritedVocabulary, resourceLimits]() {
+    std::function<void()> func([worker, workerPath, inheritedVocabulary, resourceLimits]() {
       // Name the looper thread after its entry script so a crash report
       // identifies which worker died instead of an anonymous NSOperationQueue
       // thread. Darwin caps thread names at 63 bytes; keep the basename only.
@@ -477,6 +477,14 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       // the worker's scripts are visible to the debugger from the start.
       worker->CreateInspector(isolate, resolvedPath);
 
+      // From here terminate() interrupts this isolate. A terminate() that
+      // landed before now had nothing to interrupt, so it is honored here,
+      // before any app code runs: the thread goes straight to teardown.
+      worker->PublishIsolate(isolate);
+      if (worker->IsTerminating()) {
+        return;
+      }
+
       TryCatch tc(isolate);
 
       // If the script can be determined missing up-front, report it through
@@ -491,7 +499,7 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
           worker->PassUncaughtExceptionFromWorkerToMain(
               "Worker script does not exist: " + resolvedPath, resolvedPath, "", 1, true);
           worker->Terminate();
-          return isolate;
+          return;
         }
       }
 
@@ -500,16 +508,22 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
       } catch (NativeScriptException& ex) {
         // Re-arm the failure as the pending V8 exception (the original JS
         // error when one was captured) so the tc.HasCaught() path below
-        // routes it to worker.onerror with full detail.
-        Isolate::Scope isolate_scope(isolate);
-        HandleScope handle_scope(isolate);
-        ex.ReThrowToV8(isolate);
+        // routes it to worker.onerror with full detail. Not on an isolate
+        // that is terminating: the failure then is the termination itself,
+        // and throwing on such an isolate is not allowed.
+        if (!worker->IsTerminating()) {
+          Isolate::Scope isolate_scope(isolate);
+          HandleScope handle_scope(isolate);
+          ex.ReThrowToV8(isolate);
+        }
       }
 
-      // The near-heap-limit callback has already reported to the parent and
-      // asked V8 to terminate this isolate; everything below would run JS on it.
-      if (worker->HeapLimitExceeded()) {
-        return isolate;
+      // The entry was cut short — by terminate(), or by the near-heap-limit
+      // callback, which has already reported to the parent and asked V8 to
+      // terminate this isolate. Everything below would run JS on it, and a
+      // terminated worker reports no error.
+      if (worker->IsTerminating()) {
+        return;
       }
 
       // WHATWG parity: enable the implicit port's message queue once the
@@ -590,8 +604,6 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
         worker->PassUncaughtExceptionFromWorkerToMain(context, tc, true);
         worker->Terminate();
       }
-
-      return isolate;
     });
 
     // The registry entry has to exist before the worker can run: the worker

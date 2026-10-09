@@ -49,12 +49,12 @@ means deliberately unsupported.
 | `markAsUncloneable(obj)` | real | Brands `obj` so serializing it at all is a `DataCloneError`, in `structuredClone` and every `postMessage` alike. |
 | `setEnvironmentData(key, value)` | real, deviates | Clones and stores process-wide. No per-thread snapshot — see below. Passing `undefined` (or omitting the value) deletes the key. |
 | `getEnvironmentData(key)` | real, deviates | Deserializes a fresh copy per read, on any isolate. |
-| `resourceLimits` | shim | Always `{}`; the runtime imposes no per-worker limits and reports none. |
+| `resourceLimits` | shim | Always `{}`, on the main isolate and inside a worker alike. The constructor *option* of that name is real — see [Worker options](#worker-options) — but a worker cannot read its own caps back through this export. |
 | `SHARE_ENV` | shim | Exported so the spelling resolves, but inert — see below. |
 | `threadName` | shim | Always `undefined`. |
 | `workerData` | shim | Always `null` — see below. |
 | `parentPort` | shim | `null` on the main isolate. Inside a worker, a `MessagePort`-shaped `EventTarget` over the worker's existing parent channel: `postMessage` forwards to the global `postMessage`, `message`/`messageerror` are re-dispatched from the worker global scope, `start()` and `close()` are no-ops. It is **not** a real port: not transferable, no queue of its own. |
-| `Worker` | shim | A class over the runtime's global `Worker` with a small Node-style emitter (`on`/`once`/`off`/`removeListener`) for `message`, `messageerror`, `error`, `online` and `exit`. `postMessage(value, transfer)` and `terminate()` forward. `online` is emitted off a microtask after construction, not from the thread. `exit` (always code `0`) fires exactly once, when the thread has ended, whether the worker was terminated or ended by its own `close()`; `terminate()` resolves at the same point. Unsupported options throw a `TypeError` naming the option: `workerData`, `env`, `eval`, `transferList`, and `stdin`/`stdout`/`stderr` when explicitly truthy. |
+| `Worker` | shim | A class over the runtime's global `Worker` with a small Node-style emitter (`on`/`once`/`off`/`removeListener`) for `message`, `messageerror`, `error`, `online` and `exit`. `postMessage(value, transfer)` and `terminate()` forward. `online` is emitted off a microtask after construction, not from the thread. `exit` (always code `0`) fires exactly once, when the thread has ended, whether the worker was terminated or ended by its own `close()`; `terminate()` resolves at the same point. Unsupported options throw a `TypeError` naming the option: `workerData`, `env`, `eval`, `transferList`, and `stdin`/`stdout`/`stderr` when explicitly truthy. The runtime's own options, `ios` and `resourceLimits`, pass through unchanged — see [Worker options](#worker-options). |
 | `postMessageToThread` | throws | `Error: postMessageToThread is not supported in this runtime`. |
 | `moveMessagePortToContext` | throws | `Error: moveMessagePortToContext is not supported in this runtime`. |
 | `locks` | absent | Web Locks are not implemented; the property does not exist. |
@@ -269,6 +269,55 @@ code relies on. Transfer is not part of that leniency — a port in a worker
 transfer list is validated exactly as it is everywhere else, since degrading a
 transfer would strand the port's sibling.
 
+## Worker options
+
+The runtime's `Worker` constructor takes two options of its own, and the
+`node:worker_threads` shim passes both through unchanged. Unknown keys inside
+either object are ignored, so a later runtime can add more without breaking an
+older one.
+
+### `ios.priority`
+
+The quality of service of the worker's thread: `"userInteractive"`,
+`"userInitiated"`, `"default"`, `"utility"` or `"background"`. Omitting it
+leaves the operation queue's own default. A non-object `ios`, a non-string
+priority or an unrecognized name throws a `TypeError`; `ios: null` is the same
+as no `ios` at all. The older top-level `iosPriority` is still accepted, with a
+one-time deprecation warning, and `ios.priority` wins when both are given.
+
+### `resourceLimits`
+
+Node's option, at the top level of the options object:
+
+```js
+new Worker("./w.js", {
+  resourceLimits: {
+    maxOldGenerationSizeMb: 64,
+    maxYoungGenerationSizeMb: 8,
+    jsDispatchTableSizeMb: 64,
+  },
+});
+```
+
+| key | effect |
+|---|---|
+| `maxOldGenerationSizeMb` | Caps the worker isolate's old generation. |
+| `maxYoungGenerationSizeMb` | Caps its young generation. |
+| `jsDispatchTableSizeMb` | A NativeScript extension: the isolate's JS dispatch table reservation, a whole number of megabytes from 1 to 256. Worker isolates reserve 64 MB by default instead of V8's 256 MB; the main isolate keeps V8's default. |
+
+Node's `stackSizeMb` and `codeRangeSizeMb` are ignored like any other unknown
+key. A `resourceLimits` that is not an object, or a key that is not a number,
+throws a `TypeError`; a non-finite value, one worth less than a byte, or one
+too large to hold in bytes throws a `RangeError`, as does a fractional or
+out-of-range `jsDispatchTableSizeMb`.
+`resourceLimits: null` is the same as omitting it.
+
+Exhausting a worker's heap does not take the process down. Every worker
+isolate, capped or not, watches its heap limit: a worker that reaches it is
+terminated, and the parent's `Worker` receives an `error` event whose message
+is `Worker JS heap out of memory`, followed by the cap in parentheses when
+`maxOldGenerationSizeMb` was set — `(maxOldGenerationSizeMb: 32)`.
+
 ## Worker lifetime
 
 **A `Worker` is held strongly by the runtime from the moment its thread starts
@@ -293,6 +342,21 @@ The root is released when the worker ends — `terminate()`, or the worker's own
 `close()`. From then on the object is collectable like any other, and the
 runtime drops the native side with it. Nothing about a *finished* worker is
 kept alive.
+
+### `terminate()` reaches the entry script
+
+`terminate()` stops the worker wherever it is, as in Node and on the web. A
+worker still evaluating its entry script — spinning in a synchronous loop,
+parked in a top-level `await`, or waiting on a remote module fetch — is
+interrupted there, exactly like one idling in its event loop: the thread winds
+down, `nsworkerended` fires, and a `node:worker_threads` `terminate()`
+resolves. A termination is not an error, so a worker cut short in its entry
+produces neither a worker-scope `onerror` call nor an `error` event on the
+parent's `Worker`. A `terminate()` that lands before the worker's runtime even
+exists is honored at the first opportunity, before any app code runs.
+
+The worker's own `close()` is different: it lets the script that called it run
+to completion and ends the worker once that returns, as on the web.
 
 ### `nsworkerended`
 
