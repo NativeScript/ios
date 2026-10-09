@@ -129,6 +129,7 @@ require("./MetadataTests");
 //
 require("./ApiTests");
 require("./NsRuntimeTests");
+require("./NsWorkerThreadsTests");
 require("./GCFinalizerTests");
 require("./BlockCacheRaceTests");
 require("./WorkerConcurrentStartupTests");

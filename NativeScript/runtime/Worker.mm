@@ -30,6 +30,13 @@ struct WorkerEventsState {
   Global<v8::Function> emitEnded;
 };
 
+// The constructor template Init put on the global template. A template's
+// function is cached per context, so instantiating it again yields the very
+// function the global was created with.
+struct WorkerConstructorState {
+  Global<FunctionTemplate> constructor;
+};
+
 }  // namespace
 
 std::vector<std::string> Worker::GlobalFunctions = {"postMessage", "close"};
@@ -275,6 +282,19 @@ void Worker::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate, bool i
   prototype->Set(ToV8String(isolate, "terminate"), terminateWorkerFuncTemplate);
 
   globalTemplate->Set(workerFuncName, workerFuncTemplate);
+
+  if (WorkerConstructorState* state = Caches::StateFor<WorkerConstructorState>(isolate)) {
+    state->constructor.Reset(isolate, workerFuncTemplate);
+  }
+}
+
+MaybeLocal<v8::Function> Worker::Constructor(Local<Context> context) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  WorkerConstructorState* state = Caches::StateFor<WorkerConstructorState>(isolate);
+  if (state == nullptr || state->constructor.IsEmpty()) {
+    return MaybeLocal<v8::Function>();
+  }
+  return state->constructor.Get(isolate)->GetFunction(context);
 }
 
 void Worker::InitEvents(Local<Context> context) {

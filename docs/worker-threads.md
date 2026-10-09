@@ -274,7 +274,9 @@ transfer would strand the port's sibling.
 The runtime's `Worker` constructor takes two options of its own, and the
 `node:worker_threads` shim passes both through unchanged. Unknown keys inside
 either object are ignored, so a later runtime can add more without breaking an
-older one.
+older one. The constructor is also exported by the
+[`ns:worker_threads`](ns-builtin-modules.md#nsworker_threads) builtin, whose type declarations
+describe both options and merge them into the global `WorkerOptions`.
 
 ### `ios.priority`
 

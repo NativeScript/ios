@@ -14,6 +14,13 @@ class Worker {
   static void Init(v8::Isolate* isolate,
                    v8::Local<v8::ObjectTemplate> globalTemplate);
 
+  // The Worker constructor of `context`: the function Init's template
+  // produces for it, which is the object the global of that name was created
+  // with, whatever `globalThis.Worker` names by now. Empty before Init has
+  // run for the isolate.
+  static v8::MaybeLocal<v8::Function> Constructor(
+      v8::Local<v8::Context> context);
+
   // Turns Worker and the worker global scope into EventTargets and caches the
   // builtin's delivery callout for this isolate. Runs during Runtime::Init,
   // after Events::Init has installed the event primitives it builds on.
