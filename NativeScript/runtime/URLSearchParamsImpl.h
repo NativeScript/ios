@@ -22,6 +22,10 @@ class URLSearchParamsImpl : public IsolateTracked {
   static void Init(v8::Isolate* isolate,
                    v8::Local<v8::ObjectTemplate> globalTemplate);
 
+  // The URLSearchParams constructor of `context`, as URLImpl::Constructor.
+  static v8::MaybeLocal<v8::Function> Constructor(
+      v8::Local<v8::Context> context);
+
   static void Ctor(const v8::FunctionCallbackInfo<v8::Value>& args);
 
   static void Append(const v8::FunctionCallbackInfo<v8::Value>& args);

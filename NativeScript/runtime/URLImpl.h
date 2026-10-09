@@ -21,6 +21,13 @@ class URLImpl : public IsolateTracked {
   static void Init(v8::Isolate* isolate,
                    v8::Local<v8::ObjectTemplate> globalTemplate);
 
+  // The URL constructor of `context`: the function Init's template produces
+  // for it, which is the object the global of that name was created with,
+  // whatever `globalThis.URL` names by now. Empty before Init has run for the
+  // isolate.
+  static v8::MaybeLocal<v8::Function> Constructor(
+      v8::Local<v8::Context> context);
+
   static URLImpl* GetPointer(v8::Local<v8::Object> object);
 
   static v8::Local<v8::FunctionTemplate> GetCtor(v8::Isolate* isolate);

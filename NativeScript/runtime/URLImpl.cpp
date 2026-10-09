@@ -4,11 +4,23 @@
 
 #include "URLImpl.h"
 
+#include "Caches.h"
 #include "Helpers.h"
 #include "ModuleBinding.hpp"
 
 using namespace tns;
 using namespace ada;
+
+namespace {
+
+// The constructor template Init put on the global template. A template's
+// function is cached per context, so instantiating it again yields the very
+// function the global was created with.
+struct URLConstructorState {
+  v8::Global<v8::FunctionTemplate> constructor;
+};
+
+}  // namespace
 
 URLImpl::URLImpl(url_aggregator url) : url_(url) {}
 
@@ -18,6 +30,20 @@ void URLImpl::Init(v8::Isolate* isolate,
 
   v8::Local<v8::String> urlPropertyName = ToV8String(isolate, "URL");
   globalTemplate->Set(urlPropertyName, URLTemplate);
+
+  if (auto* state = Caches::StateFor<URLConstructorState>(isolate)) {
+    state->constructor.Reset(isolate, URLTemplate);
+  }
+}
+
+v8::MaybeLocal<v8::Function> URLImpl::Constructor(
+    v8::Local<v8::Context> context) {
+  v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  auto* state = Caches::StateFor<URLConstructorState>(isolate);
+  if (state == nullptr || state->constructor.IsEmpty()) {
+    return v8::MaybeLocal<v8::Function>();
+  }
+  return state->constructor.Get(isolate)->GetFunction(context);
 }
 
 URLImpl* URLImpl::GetPointer(v8::Local<v8::Object> object) {
@@ -65,6 +91,10 @@ v8::Local<v8::FunctionTemplate> URLImpl::GetCtor(v8::Isolate* isolate) {
                               SetUserName);
 
   tmpl->Set(ToV8String(isolate, "toString"),
+            v8::FunctionTemplate::New(isolate, &ToString));
+
+  // WHATWG defines toJSON as the href serialization, the same as toString.
+  tmpl->Set(ToV8String(isolate, "toJSON"),
             v8::FunctionTemplate::New(isolate, &ToString));
 
   ctorTmpl->Set(ToV8String(isolate, "canParse"),

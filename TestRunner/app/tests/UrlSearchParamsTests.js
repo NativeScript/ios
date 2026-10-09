@@ -146,4 +146,18 @@ describe("URL.searchParams caching", function () {
       expect(key).not.toBe("_searchParamsSource");
     }
   });
+
+  it("deletes only the matching pair when given a value", function () {
+    const url = new URL("https://x.test/?a=1&a=2");
+    url.searchParams.delete("a", "1");
+    expect(url.search).toBe("?a=2");
+    expect(url.searchParams.getAll("a")).toEqual(["2"]);
+  });
+
+  it("deletes every pair of the name when given no value", function () {
+    const url = new URL("https://x.test/?a=1&a=2");
+    url.searchParams.delete("a");
+    expect(url.search).toBe("");
+    expect(url.searchParams.getAll("a")).toEqual([]);
+  });
 });
