@@ -81,12 +81,11 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
 static constexpr int32_t kBlockDeallocating = 0x0001;
 static constexpr int32_t kBlockRefcountMask = 0xfffe;
 
-// Block_copy cannot be used on a cached JSBlock: its increment ignores the
-// deallocating bit, so it would hand out a block whose dispose is already
-// waiting for the isolate's Locker and which libclosure frees right after.
-// This takes a reference only while the block is still live, CASing the same
-// word libclosure does.
-static bool TryRetainBlock(volatile int32_t* flags) {
+// libclosure's increment ignores the deallocating bit, so Block_copy would hand
+// out a block whose dispose is already waiting for the isolate's Locker and
+// which libclosure frees right after. This CASes the same word libclosure does.
+bool Interop::TryRetainJSBlock(JSBlock* block) {
+  volatile int32_t* flags = &block->flags;
   int32_t old = __atomic_load_n(flags, __ATOMIC_RELAXED);
   while (true) {
     if ((old & kBlockDeallocating) || (old & kBlockRefcountMask) == 0) {
@@ -569,7 +568,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       if (wrapper->OwnsBlock()) {
         // A native block; the wrapper's own Block_copy keeps it alive.
         blockPtr = CFAutorelease(Block_copy(wrapper->Block()));
-      } else if (TryRetainBlock(&static_cast<JSBlock*>(wrapper->Block())->flags)) {
+      } else if (TryRetainJSBlock(static_cast<JSBlock*>(wrapper->Block()))) {
         // Reading the block is safe even when its last release raced ahead:
         // while the isolate is valid, dispose clears this slot under the
         // Locker this thread holds, before libclosure frees the block.

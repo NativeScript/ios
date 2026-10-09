@@ -246,18 +246,19 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
     }
     case WrapperType::Block: {
       BlockWrapper* blockWrapper = static_cast<BlockWrapper*>(wrapper);
-      if (blockWrapper->OwnsBlock()) {
-        // Balance the Block_copy taken when a native block was wrapped for JS
-        // (see Interop::GetResult). Block_release is the correct counterpart to
-        // Block_copy and runs the block's dispose helper once we drop the last
-        // reference. (Using CFRelease here over-released stack blocks that were
-        // never promoted to the heap, crashing in objc_release during GC.)
-        Block_release(blockWrapper->Block());
+      if (!blockWrapper->OwnsBlock()) {
+        // A block created from a JS callback is owned by the native code it
+        // was handed to (e.g. NSNotificationCenter), and it owns this wrapper
+        // (see Interop::JSBlock): its dispose helper frees both once the last
+        // native reference goes, possibly after this isolate is gone.
+        return true;
       }
-      // Blocks created from JS callbacks (OwnsBlock() == false) are owned by
-      // the native code they were handed to (e.g. NSNotificationCenter);
-      // freeing them here would leave that code with a dangling pointer. The
-      // JSBlock dispose helper cleans up once the last native reference goes.
+      // Balance the Block_copy taken when a native block was wrapped for JS
+      // (see Interop::GetResult). Block_release is the correct counterpart to
+      // Block_copy and runs the block's dispose helper once we drop the last
+      // reference. (Using CFRelease here over-released stack blocks that were
+      // never promoted to the heap, crashing in objc_release during GC.)
+      Block_release(blockWrapper->Block());
       break;
     }
     case WrapperType::Reference: {

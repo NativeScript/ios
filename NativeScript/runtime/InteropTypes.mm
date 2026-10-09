@@ -693,7 +693,18 @@ Local<Value> Interop::HandleOf(Local<Context> context, Local<Value> value) {
           }
           case WrapperType::Block: {
             BlockWrapper* blockWrapper = static_cast<BlockWrapper*>(wrapper);
-            return Pointer::NewInstance(context, blockWrapper->Block());
+            if (blockWrapper->OwnsBlock()) {
+              return Pointer::NewInstance(context, blockWrapper->Block());
+            }
+            // A JS function does not keep its block alive: only native
+            // references do. A live block is kept for the rest of the turn,
+            // like one passed to a native call; a dying one is no handle.
+            JSBlock* block = static_cast<JSBlock*>(blockWrapper->Block());
+            if (TryRetainJSBlock(block)) {
+              CFAutorelease(block);
+              return Pointer::NewInstance(context, block);
+            }
+            break;
           }
           default:
             break;
