@@ -24,14 +24,10 @@ class MetadataBuilder {
           std::vector<std::string>());
   static v8::Local<v8::Function> GetOrCreateStructCtorFunction(
       v8::Local<v8::Context> context, const StructInfo& structInfo);
-  static v8::Local<v8::Object> GetOrCreateStructPrototype(
-      v8::Local<v8::Context> context, const StructInfo& structInfo);
-  static v8::Intercepted StructPropertyGetterCallback(
-      v8::Local<v8::Name> property,
-      const v8::PropertyCallbackInfo<v8::Value>& info);
-  static v8::Intercepted StructPropertySetterCallback(
-      v8::Local<v8::Name> property, v8::Local<v8::Value> value,
-      const v8::PropertyCallbackInfo<v8::Boolean>& info);
+  // See Caches::StructInstanceFactory.
+  static v8::Local<v8::Object> NewStructInstance(v8::Local<v8::Context> context,
+                                                 StructWrapper* wrapper,
+                                                 v8::Local<v8::Object> parent);
 
  private:
   static v8::Local<v8::FunctionTemplate>
@@ -63,6 +59,16 @@ class MetadataBuilder {
       const v8::FunctionCallbackInfo<v8::Value>& info);
   static void StructEqualsCallback(
       const v8::FunctionCallbackInfo<v8::Value>& info);
+  static void StructFieldGetterCallback(
+      v8::Local<v8::Name> property,
+      const v8::PropertyCallbackInfo<v8::Value>& info);
+  static void StructFieldSetterCallback(
+      v8::Local<v8::Name> property, v8::Local<v8::Value> value,
+      const v8::PropertyCallbackInfo<v8::Boolean>& info);
+  static v8::Local<v8::FunctionTemplate> CreateStructCtorTemplate(
+      v8::Isolate* isolate, StructTypeWrapper* typeWrapper);
+  static v8::Local<v8::FunctionTemplate> GetOrCreateStructCtorTemplate(
+      v8::Local<v8::Context> context, const StructInfo& structInfo);
   static void ToStringFunctionCallback(
       const v8::FunctionCallbackInfo<v8::Value>& info);
   static std::pair<ffi_type*, void*> GetStructData(

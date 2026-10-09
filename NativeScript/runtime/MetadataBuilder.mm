@@ -21,17 +21,27 @@ namespace tns {
 
 namespace {
 struct StructTypeEntry {
+  StructTypeWrapper* typeWrapper = nullptr;
+  std::unique_ptr<Persistent<FunctionTemplate>> ctorTemplate;
   std::unique_ptr<Persistent<v8::Function>> ctor;
-  std::unique_ptr<Persistent<Object>> prototype;
 };
 
-// Per-isolate struct constructor functions and their prototypes, keyed by the
+// Per-isolate struct constructor templates and functions, keyed by the
 // process-wide StructInfo (see FFICall.h), whose address is stable for the
-// lifetime of the process. The prototype is cached because the constructor's
-// `prototype` property is made read-only, so it cannot be swapped from JS.
+// lifetime of the process.
 struct StructTypeState {
   robin_hood::unordered_map<const StructInfo*, StructTypeEntry> types;
 };
+
+// Internal field layout: see StructWrapper. The parent<->view cycle is plain
+// JS, so the collector can reclaim it.
+constexpr int kStructParentField = StructWrapper::kParentField;
+constexpr int kStructFirstViewField = StructWrapper::kFirstViewField;
+
+// Accessor data: the field index in the low 16 bits, the view slot (0 for a
+// field that is not a struct) above them.
+constexpr int kStructViewSlotShift = 16;
+constexpr int32_t kStructFieldIndexMask = (1 << kStructViewSlotShift) - 1;
 }  // namespace
 
 void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate,
@@ -189,19 +199,20 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Local<Context
   StructTypeState* state = Caches::StateFor<StructTypeState>(isolate);
   if (state != nullptr) {
     auto it = state->types.find(&structInfo);
-    if (it != state->types.end()) {
+    if (it != state->types.end() && it->second.ctor != nullptr) {
       return it->second.ctor->Get(isolate);
     }
   }
 
-  StructTypeWrapper* wrapper = new StructTypeWrapper(structInfo);
-  Local<External> ext = External::New(isolate, wrapper, v8::kExternalPointerTypeTagDefault);
+  Local<FunctionTemplate> ctorTemplate =
+      MetadataBuilder::GetOrCreateStructCtorTemplate(context, structInfo);
   Local<v8::Function> structCtorFunc;
-  bool success =
-      v8::Function::New(context, StructConstructorCallback, ext).ToLocal(&structCtorFunc);
+  bool success = ctorTemplate->GetFunction(context).ToLocal(&structCtorFunc);
   tns::Assert(success, isolate);
 
-  tns::SetValue(isolate, structCtorFunc, wrapper);
+  StructTypeWrapper* typeWrapper =
+      state != nullptr ? state->types[&structInfo].typeWrapper : new StructTypeWrapper(structInfo);
+  tns::SetValue(isolate, structCtorFunc, typeWrapper);
 
   Local<v8::Function> equalsFunc;
   success = v8::Function::New(context, StructEqualsCallback).ToLocal(&equalsFunc);
@@ -211,56 +222,108 @@ Local<v8::Function> MetadataBuilder::GetOrCreateStructCtorFunction(Local<Context
       structCtorFunc->Set(context, tns::ToV8String(isolate, "equals"), equalsFunc).FromMaybe(false);
   tns::Assert(success, isolate);
 
-  // Like interface constructors (built from templates with a read-only
-  // prototype), a struct constructor's prototype can be extended but not
-  // replaced.
-  Local<v8::String> prototypeKey = tns::ToV8String(isolate, "prototype");
-  Local<Value> proto;
-  success = structCtorFunc->Get(context, prototypeKey).ToLocal(&proto);
-  tns::Assert(success && proto->IsObject(), isolate);
-  const PropertyAttribute readOnlyFlags = static_cast<PropertyAttribute>(
-      PropertyAttribute::DontEnum | PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
-  success = structCtorFunc->DefineOwnProperty(context, prototypeKey, proto, readOnlyFlags)
-                .FromMaybe(false);
-  tns::Assert(success, isolate);
-
   if (state != nullptr) {
-    StructTypeEntry entry;
-    entry.ctor = std::make_unique<Persistent<v8::Function>>(isolate, structCtorFunc);
-    entry.prototype = std::make_unique<Persistent<Object>>(isolate, proto.As<Object>());
-    state->types.emplace(&structInfo, std::move(entry));
+    state->types[&structInfo].ctor =
+        std::make_unique<Persistent<v8::Function>>(isolate, structCtorFunc);
   }
 
   return structCtorFunc;
 }
 
-Local<Object> MetadataBuilder::GetOrCreateStructPrototype(Local<Context> context,
-                                                          const StructInfo& structInfo) {
+Local<FunctionTemplate> MetadataBuilder::GetOrCreateStructCtorTemplate(
+    Local<Context> context, const StructInfo& structInfo) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  StructTypeState* state = Caches::StateFor<StructTypeState>(isolate);
+  if (state == nullptr) {
+    // Teardown has begun: build without caching. Instances created in this
+    // window do not share a prototype with earlier ones; only finalizer-driven
+    // conversions can reach it.
+    return MetadataBuilder::CreateStructCtorTemplate(isolate, new StructTypeWrapper(structInfo));
+  }
+
+  auto it = state->types.find(&structInfo);
+  if (it != state->types.end() && it->second.ctorTemplate != nullptr) {
+    return it->second.ctorTemplate->Get(isolate);
+  }
+
+  // Building the template allocates, and a GC finalizer can re-enter JS and
+  // insert into `types`, so no reference into it is held across the build.
+  StructTypeWrapper* typeWrapper = new StructTypeWrapper(structInfo);
+  Local<FunctionTemplate> ctorTemplate =
+      MetadataBuilder::CreateStructCtorTemplate(isolate, typeWrapper);
+  StructTypeEntry& entry = state->types[&structInfo];
+  if (entry.ctorTemplate != nullptr) {
+    delete typeWrapper;
+    return entry.ctorTemplate->Get(isolate);
+  }
+  entry.typeWrapper = typeWrapper;
+  entry.ctorTemplate = std::make_unique<Persistent<FunctionTemplate>>(isolate, ctorTemplate);
+  return ctorTemplate;
+}
+
+Local<FunctionTemplate> MetadataBuilder::CreateStructCtorTemplate(Isolate* isolate,
+                                                                  StructTypeWrapper* typeWrapper) {
+  const StructInfo& structInfo = typeWrapper->StructInfo();
+  Local<External> ext = External::New(isolate, typeWrapper, v8::kExternalPointerTypeTagDefault);
+  Local<FunctionTemplate> ctorTemplate =
+      FunctionTemplate::New(isolate, StructConstructorCallback, ext);
+  // Like interface constructors, a struct constructor's prototype can be
+  // extended but not replaced.
+  ctorTemplate->ReadOnlyPrototype();
+
+  Local<ObjectTemplate> instanceTemplate = ctorTemplate->InstanceTemplate();
+  const std::vector<StructField>& fields = structInfo.Fields();
+  tns::Assert(fields.size() <= kStructFieldIndexMask, isolate);
+  int viewSlots = 0;
+  // V8 instantiates template native-data properties in reverse definition
+  // order; define them back to front so enumeration follows the C layout.
+  for (size_t i = fields.size(); i-- > 0;) {
+    const StructField& field = fields[i];
+    BinaryTypeEncodingType type = field.Encoding()->type;
+    int viewSlot = 0;
+    if (type == BinaryTypeEncodingType::StructDeclarationReference ||
+        type == BinaryTypeEncodingType::AnonymousStructEncoding) {
+      viewSlot = kStructFirstViewField + viewSlots++;
+    }
+    Local<v8::String> name;
+    bool success = v8::String::NewFromUtf8(isolate, field.Name().c_str(),
+                                           NewStringType::kInternalized, (int)field.Name().size())
+                       .ToLocal(&name);
+    tns::Assert(success, isolate);
+    int32_t data = static_cast<int32_t>(i) | (viewSlot << kStructViewSlotShift);
+    instanceTemplate->SetNativeDataProperty(name, StructFieldGetterCallback,
+                                            StructFieldSetterCallback,
+                                            v8::Int32::New(isolate, data), DontDelete);
+  }
+  instanceTemplate->SetInternalFieldCount(kStructFirstViewField + viewSlots);
+
+  return ctorTemplate;
+}
+
+Local<Object> MetadataBuilder::NewStructInstance(Local<Context> context, StructWrapper* wrapper,
+                                                 Local<Object> parent) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  const StructInfo& structInfo = wrapper->StructInfo();
   StructTypeState* state = Caches::StateFor<StructTypeState>(isolate);
   if (state != nullptr) {
     auto it = state->types.find(&structInfo);
-    if (it == state->types.end()) {
+    if (it == state->types.end() || it->second.ctor == nullptr) {
+      // `instance.constructor` must be the complete constructor (`equals`,
+      // type metadata) even before JS has named the struct type.
       MetadataBuilder::GetOrCreateStructCtorFunction(context, structInfo);
-      it = state->types.find(&structInfo);
-    }
-    if (it != state->types.end()) {
-      return it->second.prototype->Get(isolate);
     }
   }
+  Local<FunctionTemplate> ctorTemplate =
+      MetadataBuilder::GetOrCreateStructCtorTemplate(context, structInfo);
+  Local<Object> instance;
+  bool success = ctorTemplate->InstanceTemplate()->NewInstance(context).ToLocal(&instance);
+  tns::Assert(success, isolate);
 
-  // No per-isolate state (teardown has begun): resolve without caching. Each
-  // call here builds a fresh constructor, so instances created in this window
-  // do not share a prototype with earlier ones; only finalizer-driven
-  // conversions can reach it.
-  Local<v8::Function> structCtorFunc =
-      MetadataBuilder::GetOrCreateStructCtorFunction(context, structInfo);
-  Local<Value> proto;
-  if (!structCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&proto) ||
-      !proto->IsObject()) {
-    return Local<Object>();
+  tns::SetValue(isolate, instance, wrapper);
+  if (!parent.IsEmpty()) {
+    instance->SetInternalField(kStructParentField, parent);
   }
-  return proto.As<Object>();
+  return instance;
 }
 
 void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value>& info) {
@@ -272,13 +335,15 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
 
     const StructInfo& structInfo = typeWrapper->StructInfo();
 
-    void* dest = nullptr;
-
+    Local<Object> result;
     if (info.IsConstructCall()) {
       // A new structure is allocated
       Local<Value> initializer = info.Length() > 0 ? info[0] : Local<Value>();
-      dest = malloc(structInfo.FFIType()->size);
+      void* dest = malloc(structInfo.FFIType()->size);
       Interop::InitializeStruct(context, dest, structInfo.Fields(), initializer);
+      // `this` was built from the struct type's instance template.
+      result = info.This();
+      tns::SetValue(isolate, result, new StructWrapper(structInfo, dest));
     } else {
       // The structure is not used as constructor and in this case we assume a pointer is passed to
       // the function This pointer will be used as backing memory for the structure
@@ -289,20 +354,15 @@ void MetadataBuilder::StructConstructorCallback(const FunctionCallbackInfo<Value
             "A pointer instance must be passed to the structure initializer");
       }
 
+      // The memory stays the pointer's: the struct object does not free it,
+      // and holds the pointer object so the memory outlives it.
       PointerWrapper* pw = static_cast<PointerWrapper*>(wrapper);
-      dest = pw->Data();
+      result = MetadataBuilder::NewStructInstance(
+          context, new StructWrapper(structInfo, pw->Data(), nullptr, false), Local<Object>());
+      result->SetInternalField(kStructParentField, info[0]);
     }
 
-    StructWrapper* wrapper = new StructWrapper(structInfo, dest, nullptr);
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Value> result = ArgConverter::ConvertArgument(context, wrapper, true);
-
-    std::shared_ptr<Caches> cache = Caches::Get(isolate);
-    std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(context, result);
-    std::pair<void*, const StructInfo*> key = std::make_pair(wrapper->Data(), &structInfo);
-    cache->StructInstances.emplace(key, poResult);
-    tns::DeleteWrapperIfUnused(isolate, result, wrapper);
-
+    ObjectManager::Register(context, result);
     info.GetReturnValue().Set(result);
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
@@ -935,90 +995,57 @@ void MetadataBuilder::PropertyNameSetterCallback(const FunctionCallbackInfo<Valu
                                 item->ResolveClass(), false);
 }
 
-Intercepted MetadataBuilder::StructPropertyGetterCallback(Local<v8::Name> property,
-                                                          const PropertyCallbackInfo<Value>& info) {
+void MetadataBuilder::StructFieldGetterCallback(Local<v8::Name> property,
+                                                const PropertyCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Object> thiz = info.Holder();
+  int32_t data = info.Data().As<v8::Int32>()->Value();
+  int viewSlot = data >> kStructViewSlotShift;
 
-  std::string propertyName = tns::ToString(isolate, property);
-
-  if (propertyName == "") {
-    info.GetReturnValue().Set(thiz);
-    return Intercepted::kYes;
+  if (viewSlot != 0) {
+    Local<Data> cached = thiz->GetInternalField(viewSlot);
+    if (cached->IsValue() && cached.As<Value>()->IsObject()) {
+      info.GetReturnValue().Set(cached.As<Value>());
+      return;
+    }
   }
 
   BaseDataWrapper* baseWrapper = tns::GetValueOrReport(isolate, thiz, "struct property get");
   if (baseWrapper == nullptr) {
     info.GetReturnValue().SetUndefined();
-    return Intercepted::kYes;
+    return;
   }
   tns::Assert(baseWrapper->Type() == WrapperType::Struct, isolate);
   StructWrapper* wrapper = static_cast<StructWrapper*>(baseWrapper);
 
-  const StructInfo& structInfo = wrapper->StructInfo();
-
-  std::shared_ptr<Caches> cache = Caches::Get(isolate);
-  std::pair<void*, const StructInfo*> key = std::make_pair(wrapper->Data(), &structInfo);
-  std::shared_ptr<Persistent<Value>> parentStruct = nullptr;
-  auto x = cache->StructInstances.find(key);
-  if (x != cache->StructInstances.end()) {
-    parentStruct = x->second;
-  }
-
-  const std::vector<StructField>& fields = structInfo.Fields();
-  auto it = std::find_if(fields.begin(), fields.end(), [&propertyName](const StructField& f) {
-    return f.Name() == propertyName;
-  });
-  if (it == fields.end()) {
-    info.GetReturnValue().SetUndefined();
-    return Intercepted::kYes;
-  }
-
-  const StructField& field = *it;
-  const TypeEncoding* fieldEncoding = field.Encoding();
-  ptrdiff_t offset = field.Offset();
-  void* buffer = wrapper->Data();
-  BaseCall call((uint8_t*)buffer, offset);
+  const StructField& field = wrapper->StructInfo().Fields()[data & kStructFieldIndexMask];
+  BaseCall call((uint8_t*)wrapper->Data(), field.Offset());
 
   Local<Context> context = isolate->GetCurrentContext();
-  Local<Value> result =
-      Interop::GetResult(context, fieldEncoding, &call, false, parentStruct, true);
+  Local<Value> result = Interop::GetResult(context, field.Encoding(), &call, false,
+                                           viewSlot != 0 ? thiz : Local<Object>(), true);
+  if (viewSlot != 0) {
+    thiz->SetInternalField(viewSlot, result);
+  }
 
   info.GetReturnValue().Set(result);
-  return Intercepted::kYes;
 }
 
-Intercepted MetadataBuilder::StructPropertySetterCallback(
-    Local<v8::Name> property, Local<Value> value, const PropertyCallbackInfo<v8::Boolean>& info) {
+void MetadataBuilder::StructFieldSetterCallback(Local<v8::Name> property, Local<Value> value,
+                                                const PropertyCallbackInfo<v8::Boolean>& info) {
   Isolate* isolate = info.GetIsolate();
-  Local<Context> context = isolate->GetCurrentContext();
   Local<Object> thiz = info.Holder();
-
-  std::string propertyName = tns::ToString(isolate, property);
-
-  if (propertyName == "") {
-    return Intercepted::kYes;
-  }
+  int32_t data = info.Data().As<v8::Int32>()->Value();
 
   BaseDataWrapper* baseWrapper = tns::GetValueOrReport(isolate, thiz, "struct property set");
   if (baseWrapper == nullptr) {
-    return Intercepted::kYes;
+    return;
   }
   tns::Assert(baseWrapper->Type() == WrapperType::Struct, isolate);
   StructWrapper* wrapper = static_cast<StructWrapper*>(baseWrapper);
 
-  const StructInfo& structInfo = wrapper->StructInfo();
-  const std::vector<StructField>& fields = structInfo.Fields();
-
-  auto it = std::find_if(fields.begin(), fields.end(), [&propertyName](const StructField& f) {
-    return f.Name() == propertyName;
-  });
-  if (it == fields.end()) {
-    return Intercepted::kNo;
-  }
-
-  Interop::SetStructPropertyValue(context, wrapper, *it, value);
-  return Intercepted::kYes;
+  const StructField& field = wrapper->StructInfo().Fields()[data & kStructFieldIndexMask];
+  Interop::SetStructPropertyValue(isolate->GetCurrentContext(), wrapper, field, value);
 }
 
 void MetadataBuilder::DefineFunctionLengthProperty(Local<Context> context,

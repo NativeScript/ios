@@ -83,6 +83,23 @@ void DisposeHandleMap(v8::Isolate* isolate, Map& map) {
   }
 }
 
+// Detaches the views cached below a struct object (whose wrappers its root
+// owns), then drops the object's own parent and view links.
+void DetachStructObjectLinks(v8::Isolate* isolate, Local<Object> obj) {
+  int fieldCount = obj->InternalFieldCount();
+  for (int i = StructWrapper::kFirstViewField; i < fieldCount; i++) {
+    Local<Data> slot = obj->GetInternalField(i);
+    if (slot->IsValue() && slot.As<Value>()->IsObject()) {
+      Local<Object> view = slot.As<Value>().As<Object>();
+      DetachStructObjectLinks(isolate, view);
+      tns::DeleteValue(isolate, view);
+    }
+  }
+  for (int i = StructWrapper::kParentField; i < fieldCount; i++) {
+    obj->SetInternalField(i, v8::Undefined(isolate));
+  }
+}
+
 void DisposeHandle(v8::Isolate* isolate,
                    const std::unique_ptr<v8::Persistent<v8::Function>>& handle) {
   if (handle == nullptr || handle->IsEmpty()) {
@@ -204,25 +221,16 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
   switch (wrapper->Type()) {
     case WrapperType::Struct: {
       StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
-      void* data = structWrapper->Data();
-
-      std::shared_ptr<Persistent<Value>> poParentStruct = structWrapper->Parent();
-      if (poParentStruct != nullptr) {
-        Local<Value> parentStruct = poParentStruct->Get(isolate);
-        BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parentStruct);
-        if (parentWrapper != nullptr && parentWrapper->Type() == WrapperType::Struct) {
-          StructWrapper* parentStructWrapper = static_cast<StructWrapper*>(parentWrapper);
-          parentStructWrapper->DecrementChildren();
-        }
-      } else {
-        if (structWrapper->ChildCount() == 0) {
-          std::pair<void*, const StructInfo*> key =
-              std::make_pair(data, &structWrapper->StructInfo());
-          cache->StructInstances.erase(key);
-          std::free(data);
-        } else {
-          return false;
-        }
+      if (!structWrapper->IsRoot()) {
+        // Owned by its root, whose finalizer deletes it.
+        return true;
+      }
+      // A view revived after this (another finalizer refusing disposal can
+      // keep it reachable) reports as released instead of reaching a deleted
+      // wrapper.
+      DetachStructObjectLinks(isolate, obj);
+      if (structWrapper->OwnsData()) {
+        std::free(structWrapper->Data());
       }
       break;
     }

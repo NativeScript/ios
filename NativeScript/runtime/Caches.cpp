@@ -28,7 +28,6 @@ Caches::~Caches() {
   this->CFunctions.clear();
 
   this->Instances.clear();
-  this->StructInstances.clear();
   this->PointerInstances.clear();
   this->cacheBoundObjects_.clear();
 }

@@ -89,11 +89,13 @@ class Interop {
   static v8::Local<v8::Value> GetResultByType(
       v8::Local<v8::Context> context, BaseDataWrapper* typeWrapper,
       BaseCall* call,
-      std::shared_ptr<v8::Persistent<v8::Value>> parentStruct = nullptr);
+      v8::Local<v8::Object> parentStruct = v8::Local<v8::Object>());
+  // A non-empty `parentStruct` makes a struct-typed result a view into the
+  // parent's buffer (`call` points at the field) instead of a copy.
   static v8::Local<v8::Value> GetResult(
       v8::Local<v8::Context> context, const TypeEncoding* typeEncoding,
       BaseCall* call, bool marshalToPrimitive,
-      std::shared_ptr<v8::Persistent<v8::Value>> parentStruct = nullptr,
+      v8::Local<v8::Object> parentStruct = v8::Local<v8::Object>(),
       bool isStructMember = false, bool ownsReturnedObject = false,
       bool returnsUnmanaged = false, bool isInitializer = false);
   static void SetStructPropertyValue(v8::Local<v8::Context> context,
@@ -160,10 +162,10 @@ class Interop {
   static bool isRefTypeEqual(const TypeEncoding* typeEncoding,
                              const char* clazz);
   static v8::Local<v8::Array> ToArray(v8::Local<v8::Object> object);
-  static v8::Local<v8::Value> StructToValue(
-      v8::Local<v8::Context> context, void* result,
-      const StructInfo& structInfo,
-      std::shared_ptr<v8::Persistent<v8::Value>> parentStruct);
+  static v8::Local<v8::Value> StructToValue(v8::Local<v8::Context> context,
+                                            void* result,
+                                            const StructInfo& structInfo,
+                                            v8::Local<v8::Object> parentStruct);
   static const TypeEncoding* CreateEncoding(BinaryTypeEncodingType type);
   static v8::Local<v8::Value> HandleOf(v8::Local<v8::Context> context,
                                        v8::Local<v8::Value> value);
