@@ -253,11 +253,9 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
         // native reference goes, possibly after this isolate is gone.
         return true;
       }
-      // Balance the Block_copy taken when a native block was wrapped for JS
-      // (see Interop::GetResult). Block_release is the correct counterpart to
-      // Block_copy and runs the block's dispose helper once we drop the last
-      // reference. (Using CFRelease here over-released stack blocks that were
-      // never promoted to the heap, crashing in objc_release during GC.)
+      // Balances the Block_copy taken when a native block was wrapped for JS
+      // (see Interop::GetResult). Block_release, not CFRelease: the block may
+      // have been a stack block promoted by Block_copy.
       Block_release(blockWrapper->Block());
       break;
     }
