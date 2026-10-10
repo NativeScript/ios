@@ -8,6 +8,7 @@
 #include "Constants.h"
 #include "ErrorEvents.h"
 #include "Events.h"
+#include "ExternalMemory.h"
 #include "Helpers.h"
 #include "InlineFunctions.h"
 #include "Interop.h"
@@ -215,6 +216,7 @@ void Runtime::Initialize() {
   // Before anything worth tracing runs, so NS_DEBUG covers boot itself.
   tns::InitializeLogCategoriesFromEnvironment();
   MetaFile::setInstance(RuntimeConfig.MetadataPtr);
+  ExternalMemory::StartMemoryPressureMonitoring();
 }
 
 Runtime::Runtime() {
@@ -785,6 +787,25 @@ bool Runtime::IsAlive(const Isolate* isolate) {
   SpinLock lock(isolatesMutex_);
   return std::find(Runtime::isolates_.begin(), Runtime::isolates_.end(), isolate) !=
          Runtime::isolates_.end();
+}
+
+void Runtime::NotifyMemoryPressure(MemoryPressureLevel level) {
+  std::vector<std::pair<Isolate*, int>> targets;
+  {
+    SpinLock lock(isolatesMutex_);
+    targets.reserve(Runtime::isolates_.size());
+    for (Isolate* isolate : Runtime::isolates_) {
+      targets.emplace_back(isolate, Caches::Get(isolate)->getGateId());
+    }
+  }
+  // Notified outside the registry lock: off its own thread V8 posts a task to
+  // the isolate's runner. The pin keeps the isolate from being disposed.
+  for (auto& [isolate, gateId] : targets) {
+    if (IsolateGates::TryPin(gateId)) {
+      isolate->MemoryPressureNotification(level);
+      IsolateGates::Unpin(gateId);
+    }
+  }
 }
 
 napi_env Runtime::GetNapiEnvIfAlive(const Runtime* runtime) {

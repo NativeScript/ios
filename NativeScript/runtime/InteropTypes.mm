@@ -2,6 +2,7 @@
 #include "ArgConverter.h"
 #include "Caches.h"
 #include "Constants.h"
+#include "ExternalMemory.h"
 #include "FunctionReference.h"
 #include "Helpers.h"
 #include "Interop.h"
@@ -31,6 +32,7 @@ void Interop::RegisterInteropTypes(Local<Context> context) {
   RegisterAllocFunction(context, interop);
   RegisterFreeFunction(context, interop);
   RegisterAdoptFunction(context, interop);
+  RegisterExternalSizeFunctions(context, interop);
   RegisterSizeOfFunction(context, interop);
   RegisterEscapeExceptionFunction(context, interop);
 
@@ -324,6 +326,7 @@ void Interop::RegisterAllocFunction(Local<Context> context, Local<Object> intero
                        pointerInstance.As<Object>()->GetInternalField(0).As<External>()->Value(
                            v8::kExternalPointerTypeTagDefault));
                    wrapper->SetAdopted(true);
+                   ExternalMemory::SetSize(isolate, wrapper, size);
                    info.GetReturnValue().Set(pointerInstance);
                  }).ToLocal(&func);
 
@@ -331,6 +334,82 @@ void Interop::RegisterAllocFunction(Local<Context> context, Local<Object> intero
   tns::Assert(success, isolate);
 
   success = interop->Set(context, tns::ToV8String(isolate, "alloc"), func).FromMaybe(false);
+  tns::Assert(success, isolate);
+}
+
+// Wrappers that die with their JS object. Class, protocol and type wrappers
+// live as long as the isolate, so a charge on them could never be returned.
+static BaseDataWrapper* GetChargeableWrapper(Isolate* isolate, Local<Value> value) {
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+  if (wrapper == nullptr) {
+    return nullptr;
+  }
+  switch (wrapper->Type()) {
+    case WrapperType::ObjCObject:
+    case WrapperType::Pointer:
+    case WrapperType::Reference:
+    case WrapperType::Struct:
+    case WrapperType::Block:
+    case WrapperType::FunctionReference:
+    case WrapperType::ExtVector:
+      return wrapper;
+    default:
+      return nullptr;
+  }
+}
+
+void Interop::RegisterExternalSizeFunctions(Local<Context> context, Local<Object> interop) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+
+  Local<v8::Function> setFunc;
+  bool success =
+      v8::Function::New(
+          context,
+          [](const FunctionCallbackInfo<Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            BaseDataWrapper* wrapper = GetChargeableWrapper(isolate, info[0]);
+            if (wrapper == nullptr) {
+              isolate->ThrowException(Exception::TypeError(tns::ToV8String(
+                  isolate, "interop.setExternalSize expects a native object, pointer, "
+                           "reference, struct or block instance")));
+              return;
+            }
+            // Below V8's sanity limit on a single adjustment, which aborts the
+            // process rather than throwing.
+            constexpr double kMaxBytes = static_cast<double>(1ull << 34);
+            double bytes = info[1]->IsNumber() ? info[1].As<Number>()->Value() : -1;
+            if (!(bytes >= 0 && bytes <= kMaxBytes)) {
+              isolate->ThrowException(Exception::RangeError(tns::ToV8String(
+                  isolate, "interop.setExternalSize expects a byte count between 0 and 2^34")));
+              return;
+            }
+            ExternalMemory::SetSize(isolate, wrapper, static_cast<size_t>(bytes));
+          },
+          Local<Value>(), 2)
+          .ToLocal(&setFunc);
+  tns::Assert(success, isolate);
+  success =
+      interop->Set(context, tns::ToV8String(isolate, "setExternalSize"), setFunc).FromMaybe(false);
+  tns::Assert(success, isolate);
+
+  Local<v8::Function> getFunc;
+  success = v8::Function::New(
+                context,
+                [](const FunctionCallbackInfo<Value>& info) {
+                  Isolate* isolate = info.GetIsolate();
+                  BaseDataWrapper* wrapper = tns::GetValue(isolate, info[0]);
+                  ExternalMemoryCharge* charge =
+                      wrapper != nullptr ? wrapper->ExternalCharge() : nullptr;
+                  double bytes = charge != nullptr && charge->Isolate() == isolate
+                                     ? static_cast<double>(charge->Bytes())
+                                     : 0;
+                  info.GetReturnValue().Set(bytes);
+                },
+                Local<Value>(), 1)
+                .ToLocal(&getFunc);
+  tns::Assert(success, isolate);
+  success =
+      interop->Set(context, tns::ToV8String(isolate, "getExternalSize"), getFunc).FromMaybe(false);
   tns::Assert(success, isolate);
 }
 

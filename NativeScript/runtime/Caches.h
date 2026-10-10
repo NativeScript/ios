@@ -178,6 +178,8 @@ class Caches {
   robin_hood::unordered_map<const void*,
                             std::shared_ptr<v8::Persistent<v8::Object>>>
       PointerInstances;
+  // ExternalMemory's size estimator per class, resolved on first sight.
+  robin_hood::unordered_map<Class, uint8_t> ExternalSizeEstimators;
 
   // Live IsolateTracked instances (URL, URLSearchParams, URLPattern). Their
   // weak-callback finalizers never fire at isolate disposal, so teardown
