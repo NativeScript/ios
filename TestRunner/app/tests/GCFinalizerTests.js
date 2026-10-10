@@ -142,6 +142,86 @@ describe("GC finalizer callbacks", function () {
         }, 0);
     });
 
+    // The same hazard with an ObjC object in the property: the kept parent
+    // comes back holding a husk of a native object only JS owned. Calls on it
+    // follow releasedObjectPolicy like the struct touches above, and the
+    // debug-build drain names what was released and through which property.
+    it("names the property an ObjC object was released through when its natively retained owner was kept", function (done) {
+        var OwnerOfChild = (function (_super) {
+            __extends(OwnerOfChild, _super);
+            function OwnerOfChild() {
+                return (_super !== null && _super.apply(this, arguments)) || this;
+            }
+            return OwnerOfChild;
+        })(NSObject);
+
+        var N = 16;
+        var holder = NSMutableArray.alloc().init();
+
+        (function create() {
+            for (var i = 0; i < N; i++) {
+                var owner = OwnerOfChild.alloc().init();
+                owner.child = NSMutableArray.alloc().init(); // owned only by JS
+                owner.__mine = true;
+                holder.addObject(owner); // native-only retain → GcProtect
+            }
+        })();
+
+        (function scrub(n) {
+            return n > 0 ? scrub(n - 1) + n : 0;
+        })(300);
+        __collect();
+        __collect();
+
+        var runtime = require("ns:runtime");
+        runtime.setConfig("releasedObjectPolicy", "throw");
+        var husks = [];
+        var thrown = [];
+        for (var i = 0; i < N; i++) {
+            var kept = holder.objectAtIndex(i);
+            if (kept.__mine !== true) {
+                continue;
+            }
+            try {
+                kept.child.count;
+            } catch (e) {
+                husks.push(kept.child);
+                thrown.push(e);
+            }
+        }
+        runtime.setConfig("releasedObjectPolicy", "report");
+
+        // Zero husks is a legal (if unlucky) outcome, as in the struct spec.
+        TNSLog("objc husk spec: " + husks.length + "/" + N + " husks formed");
+        if (husks.length === 0) {
+            done();
+            return;
+        }
+
+        expect(thrown[0] instanceof ReferenceError).toBe(true);
+        expect(thrown[0].message).toMatch(/The native \S+ object has been released \(method 'count'/);
+        expect(thrown[0].message).toMatch(/while still referenced from '\S+\.child'/);
+
+        var events = [];
+        var onReleased = function (e) {
+            events.push(e);
+        };
+        global.addEventListener("releasednativeaccess", onReleased);
+
+        // Report policy: the call is skipped.
+        expect(husks[0].count).toBeUndefined();
+        expect(husks[0].addObject(NSObject.new())).toBeUndefined();
+
+        setTimeout(function () {
+            global.removeEventListener("releasednativeaccess", onReleased);
+            // Deduplicated per object: the second call does not report.
+            expect(events.length).toBe(1);
+            expect(events[0].operation).toMatch(/^method 'count'/);
+            expect(String(events[0].error)).toMatch(/\.child'/);
+            done();
+        }, 0);
+    });
+
     // Overwrites the stack region that held the creation locals so
     // conservative stack scanning cannot keep dead wrappers alive.
     function scrubStack() {

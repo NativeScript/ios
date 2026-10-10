@@ -37,21 +37,15 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
     BaseDataWrapper* wrapper = tns::GetValue(isolate, receiver);
 
     if (wrapper == nullptr) {
-      // During fast view churn like HMR in development, JS objects can outlive their
-      // native wrappers briefly. In Debug, throw a catchable JS error instead of crashing.
-      // In Release, assert so crash reporting can capture unexpected cases.
-      if (RuntimeConfig.IsDebug) {
-        const char* selectorStr = meta ? meta->selectorAsString() : "<unknown>";
-        const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
-        const char* classNameStr = klass ? class_getName(klass) : "<unknown>";
-        std::string errMsg = std::string("Cannot call method '") + jsNameStr +
-                             "' on a disposed native object (class: " + classNameStr +
-                             ", selector: " + selectorStr +
-                             "). This can happen during HMR or fast view churn.";
-        throw NativeScriptException(isolate, errMsg);
-      } else {
-        tns::Assert(false, isolate);
-      }
+      // A JS object can outlive its native half: a husk the finalizer drain
+      // left behind (docs/knowledge/v8-resurrecting-finalizers.md, "Known
+      // hazard"), or one briefly orphaned by fast view churn like HMR. Like
+      // every other touch of a released object, the call follows
+      // releasedObjectPolicy: it is skipped and reported, or it throws.
+      std::string operation = std::string("method '") + (meta ? meta->jsName() : "<unknown>") +
+                              "' (" + (meta ? meta->selectorAsString() : "<unknown>") + ")";
+      tns::GetValueOrReport(isolate, receiver, operation.c_str());
+      return Local<Value>();
     }
 
     if (wrapper->Type() == WrapperType::ObjCAllocObject) {

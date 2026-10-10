@@ -148,15 +148,21 @@ already been released (a state a resurrected object can expose — see the iOS
 runtime's `docs/knowledge/v8-resurrecting-finalizers.md`):
 
 - `"report"` (default): the operation no-ops — reads produce `undefined`,
-  writes are skipped, `toString` yields a `<Pointer: released>`-style
-  placeholder — and a cancelable `releasednativeaccess` event fires on
-  `globalThis` (`event.error` carries a `ReferenceError` whose stack names the
-  touch site; `event.operation` names the API surface, e.g.
-  `"struct field assignment"`). Reports are deduplicated per released object.
+  writes and ObjC method calls are skipped (a call returns `undefined`),
+  `toString` yields a `<Pointer: released>`-style placeholder — and a
+  cancelable `releasednativeaccess` event fires on `globalThis` (`event.error`
+  carries a `ReferenceError` whose stack names the touch site;
+  `event.operation` names the API surface, e.g. `"struct field assignment"` or
+  `"method 'count' (count)"`). Reports are deduplicated per released object.
   In debug builds the event's default action is a `console.warn`; a listener
   that handles the report suppresses it with `preventDefault()`.
 - `"throw"`: the touch throws a catchable `ReferenceError` synchronously, and
   no event fires.
+
+In debug builds the error message also names the released object's native
+class and, when the collector released it through a property of a natively
+retained object it kept alive, that property (e.g. `'MyDelegate.provider'`),
+and the release itself logs a warning when it happens.
 
 ```js
 const { setConfig } = require("ns:runtime");

@@ -192,8 +192,17 @@ neutered field goes through it — `Pointer.cpp`'s methods, `ExtVector.cpp` toSt
 `Interop::SetStructPropertyValue` (both struct cases), `MetadataBuilder::GetStructData` and
 both struct property interceptors, the two `InteropTypes.mm` argument readers, and the
 `Reference.cpp` accessors (`SetValueCallback`, `GetWrappedPointer`, `GetDataPair` → indexed
-get/set, toString). Regression spec: *"throws instead of crashing when touching a released
-object through a resurrected parent"* in `GCFinalizerTests.js`.
+get/set, toString), and ObjC method and property calls on a husk receiver
+(`ArgConverter::Invoke`). Regression specs: *"reports or throws (never crashes) when touching a
+released object through a resurrected parent"* and *"names the property an ObjC object was
+released through when its natively retained owner was kept"* in `GCFinalizerTests.js`.
+
+In debug builds the drain also names the hazard when it creates one: `FinalizerCallback` tags
+each ObjC husk with its class, and when it keeps a protected object it records that object's
+own enumerable data properties, one level deep. Whichever of the pair finalizes second matches
+the other (`Caches::ReleasedThisGC` / `Caches::KeptObjectProperties`, cleared by a GC
+prologue), tags the husk with `Owner.property` and logs a warning; `GetValueOrReport` puts both
+tags in its message.
 
 Two facts worth knowing when reasoning about which objects can husk:
 

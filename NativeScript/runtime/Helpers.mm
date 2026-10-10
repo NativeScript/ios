@@ -471,9 +471,39 @@ tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>
     return wrapper;
   }
 
+  std::string releasedClass;
+  std::string releasedThrough;
+  if (val->IsObject()) {
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> obj = val.As<Object>();
+    Local<Value> tag;
+    if (obj->GetPrivate(context,
+                        Private::ForApi(isolate, tns::ToV8String(isolate, kReleasedClassKey)))
+            .ToLocal(&tag) &&
+        tag->IsString()) {
+      releasedClass = tns::ToString(isolate, tag);
+    }
+    if (obj->GetPrivate(context,
+                        Private::ForApi(isolate, tns::ToV8String(isolate, kReleasedThroughKey)))
+            .ToLocal(&tag) &&
+        tag->IsString()) {
+      releasedThrough = tns::ToString(isolate, tag);
+    }
+  }
+
   std::string message =
-      std::string("The native object has been released or is not a valid native object (") +
-      operation + ")";
+      releasedClass.empty()
+          ? std::string("The native object has been released or is not a valid native object (") +
+                operation + ")"
+          : std::string("The native ") + releasedClass + " object has been released (" + operation +
+                ")";
+  if (!releasedThrough.empty()) {
+    message += ". It was released by the garbage collector while still referenced from '" +
+               releasedThrough + "': '" + releasedThrough.substr(0, releasedThrough.rfind('.')) +
+               "' is kept alive only because native code retains it, which does not keep the "
+               "objects its JS properties reference alive. Keep the owner or the property's "
+               "value reachable from a JS root";
+  }
 
   if (GetReleasedObjectPolicy() == ReleasedObjectPolicy::kThrow) {
     isolate->ThrowException(v8::Exception::ReferenceError(tns::ToV8String(isolate, message)));

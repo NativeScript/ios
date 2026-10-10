@@ -143,6 +143,15 @@ class Caches {
   // wrappers.
   ObjectWeakCallbackState* ObjectManagedValues = nullptr;
 
+  // Debug builds only, for naming what a finalizer drain released through a
+  // natively retained object it kept (see ObjectManager::FinalizerCallback).
+  // The drain can run the child's finalizer before or after the parent's, so
+  // each side records what the other needs. A GC prologue clears both, so they
+  // only ever describe the collection in progress.
+  std::vector<v8::Global<v8::Object>> ReleasedThisGC;
+  std::vector<std::pair<v8::Global<v8::Object>, std::string>>
+      KeptObjectProperties;
+
   robin_hood::unordered_map<const Meta*,
                             std::unique_ptr<v8::Persistent<v8::Value>>>
       Prototypes;
