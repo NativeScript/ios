@@ -205,6 +205,9 @@ require("./WorkerLifetimeTests");
 // terminate() landing inside a worker's entry script
 require("./WorkerTerminateTests");
 
+// interop.setExternalSize and the runtime's own external memory charges
+require("./ExternalMemoryTests");
+
 // Tests common for all runtimes (git submodule of NativeScript/common-runtime-tests-app).
 require("../shared/index").runAllTests();
 

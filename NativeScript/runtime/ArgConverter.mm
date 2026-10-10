@@ -2,6 +2,7 @@
 #include <Foundation/Foundation.h>
 #include <sstream>
 #include "DictionaryAdapter.h"
+#include "ExternalMemory.h"
 #include "Helpers.h"
 #include "Interop.h"
 #include "NSExceptionSupport.h"
@@ -638,6 +639,7 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
     if (!resultIsOwned) {
       [result retain];
     }
+    ExternalMemory::ChargeEstimatedSize(isolate, thiz);
   }
 }
 

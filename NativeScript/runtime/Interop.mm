@@ -7,6 +7,7 @@
 #include "Constants.h"
 #include "DictionaryAdapter.h"
 #include "ExtVector.h"
+#include "ExternalMemory.h"
 #include "Helpers.h"
 #include "NSDataAdapter.h"
 #include "NativeScriptException.h"
@@ -1840,6 +1841,15 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
   Local<Value> result = Interop::GetResult(
       methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive, nullptr, false,
       methodCall.ownsReturnedObject_, methodCall.returnsUnmanaged_, methodCall.isInitializer_);
+
+  // Owned returns, initializers and class factory methods hand out objects JS
+  // most likely holds the last reference to. Instance getters do not: their
+  // results usually stay retained by the receiver.
+  bool returnsFreshObject = methodCall.ownsReturnedObject_ || methodCall.isInitializer_ ||
+                            (!methodCall.isPrimitiveFunction_ && !isInstanceMethod);
+  if (returnsFreshObject && !result.IsEmpty() && result->IsObject()) {
+    ExternalMemory::ChargeEstimatedSize(v8::Isolate::GetCurrent(), result);
+  }
 
   return result;
 }

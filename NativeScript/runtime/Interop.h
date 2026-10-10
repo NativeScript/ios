@@ -149,6 +149,8 @@ class Interop {
                                    v8::Local<v8::Object> interop);
   static void RegisterAdoptFunction(v8::Local<v8::Context> context,
                                     v8::Local<v8::Object> interop);
+  static void RegisterExternalSizeFunctions(v8::Local<v8::Context> context,
+                                            v8::Local<v8::Object> interop);
   static void RegisterSizeOfFunction(v8::Local<v8::Context> context,
                                      v8::Local<v8::Object> interop);
   static void RegisterEscapeExceptionFunction(v8::Local<v8::Context> context,

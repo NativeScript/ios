@@ -10,6 +10,7 @@
 
 #include "Common.h"
 #include "ConcurrentQueue.h"
+#include "ExternalMemory.h"
 #include "Metadata.h"
 #include "libffi.h"
 
@@ -163,8 +164,15 @@ class BaseDataWrapper {
 
   void GcUnprotect() { this->gcProtected_ = false; }
 
+  ExternalMemoryCharge* ExternalCharge() { return this->externalCharge_.get(); }
+
+  void SetExternalCharge(std::unique_ptr<ExternalMemoryCharge> charge) {
+    this->externalCharge_ = std::move(charge);
+  }
+
  private:
   bool gcProtected_;
+  std::unique_ptr<ExternalMemoryCharge> externalCharge_;
 };
 
 class EnumDataWrapper : public BaseDataWrapper {
