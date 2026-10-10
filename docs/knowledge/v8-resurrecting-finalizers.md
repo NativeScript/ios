@@ -195,6 +195,15 @@ both struct property interceptors, the two `InteropTypes.mm` argument readers, a
 get/set, toString). Regression spec: *"throws instead of crashing when touching a released
 object through a resurrected parent"* in `GCFinalizerTests.js`.
 
+An instance can opt out of the hazard with `interop.keepAliveWhileRetained(obj)`: while it is
+`GcProtected` its registered handle is made strong (`ObjectManager::SyncKeepAliveRoot`, the weak
+callback's parameter parked on the `ObjCDataWrapper`) instead of relying on the refused
+finalizer, so it is never queued and its closure is traced like any other root. That is exactly
+the conversion the previous paragraphs rule out as a default, so it is per instance and the
+caller accepts the cost: a cycle from the native retain back to the instance through JS leaks.
+It suits delegates and providers that a native framework retains and nothing they reference
+retains back. Only `__extends` instances accept it, since only they observe native retains.
+
 Two facts worth knowing when reasoning about which objects can husk:
 
 - `Pointer`/`interop.alloc` objects never husk at runtime — `Caches::PointerInstances`

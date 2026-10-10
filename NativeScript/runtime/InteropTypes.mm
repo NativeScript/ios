@@ -28,6 +28,7 @@ void Interop::RegisterInteropTypes(Local<Context> context) {
   RegisterBufferFromDataFunction(context, interop);
   RegisterStringFromCString(context, interop);
   RegisterHandleOfFunction(context, interop);
+  RegisterKeepAliveWhileRetainedFunction(context, interop);
   RegisterAllocFunction(context, interop);
   RegisterFreeFunction(context, interop);
   RegisterAdoptFunction(context, interop);
@@ -300,6 +301,69 @@ void Interop::RegisterHandleOfFunction(Local<Context> context, Local<Object> int
   tns::Assert(success, isolate);
 
   success = interop->Set(context, tns::ToV8String(isolate, "handleof"), func).FromMaybe(false);
+  tns::Assert(success, isolate);
+}
+
+// interop.keepAliveWhileRetained(obj): while native code retains `obj` (an
+// instance of a class built by __extends), its JS object is held strongly
+// instead of only being refused finalization, so everything it references
+// stays alive too. The cost is the one that refusal exists to avoid: a cycle
+// running back from that native retain to `obj` through JS is never collected.
+void Interop::RegisterKeepAliveWhileRetainedFunction(Local<Context> context,
+                                                     Local<Object> interop) {
+  Local<v8::Function> func;
+  bool success =
+      v8::Function::New(context, [](const FunctionCallbackInfo<Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        auto throwTypeError = [isolate](const char* message) {
+          isolate->ThrowException(Exception::TypeError(tns::ToV8String(isolate, message)));
+        };
+
+        if (info.Length() < 1 || !info[0]->IsObject()) {
+          throwTypeError("interop.keepAliveWhileRetained expects a native object.");
+          return;
+        }
+        Local<Object> arg = info[0].As<Object>();
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
+        if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject) {
+          throwTypeError("interop.keepAliveWhileRetained expects a native object.");
+          return;
+        }
+        ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+        id target = objcWrapper->Data();
+        if (target == nil) {
+          throwTypeError("interop.keepAliveWhileRetained expects a native object.");
+          return;
+        }
+
+        auto cache = Caches::Get(isolate);
+        bool tracked = false;
+        for (Class klass = object_getClass(target); klass != nil;
+             klass = class_getSuperclass(klass)) {
+          if (cache->RetainTrackedClasses.contains(klass)) {
+            tracked = true;
+            break;
+          }
+        }
+        if (!tracked) {
+          throwTypeError("interop.keepAliveWhileRetained expects an instance of a class built by "
+                         "__extends: only those observe native retains.");
+          return;
+        }
+
+        objcWrapper->KeepAliveWhileRetained();
+        auto it = cache->Instances.find(target);
+        if (it != cache->Instances.end() && it->second != nullptr && !it->second->IsEmpty() &&
+            it->second->Get(isolate) == arg) {
+          ObjectManager::SyncKeepAliveRoot(it->second, objcWrapper);
+        }
+      }).ToLocal(&func);
+
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  tns::Assert(success, isolate);
+
+  success = interop->Set(context, tns::ToV8String(isolate, "keepAliveWhileRetained"), func)
+                .FromMaybe(false);
   tns::Assert(success, isolate);
 }
 

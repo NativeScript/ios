@@ -400,8 +400,22 @@ class ObjCDataWrapper : public BaseDataWrapper {
   // anything keyed on the raw pointer needs this to detect a recycled slot.
   Class Klass() { return this->klass_; }
 
+  // Set by interop.keepAliveWhileRetained. While such an instance is
+  // GcProtected its registered handle is strong rather than a refused
+  // finalizer, so V8 traces what it references;
+  // ObjectManager::SyncKeepAliveRoot parks the weak callback's parameter here
+  // until the handle is weak again.
+  bool KeepsAliveWhileRetained() { return this->keepAliveWhileRetained_; }
+  void KeepAliveWhileRetained() { this->keepAliveWhileRetained_ = true; }
+  ObjectWeakCallbackState* RootedState() { return this->rootedState_; }
+  void SetRootedState(ObjectWeakCallbackState* state) {
+    this->rootedState_ = state;
+  }
+
  private:
   bool adapterClaim_ = false;
+  bool keepAliveWhileRetained_ = false;
+  ObjectWeakCallbackState* rootedState_ = nullptr;
   id data_;
   const tns::TypeEncoding* typeEncoding_;
   Class klass_;

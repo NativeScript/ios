@@ -332,7 +332,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
                 BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
                 if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
                   ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                  objcWrapper->GcProtect();
+                  ObjectManager::SetGcProtected(it->second, objcWrapper, true);
                 }
               }
             };
@@ -371,7 +371,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
                   BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
                   if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
                     ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                    objcWrapper->GcUnprotect();
+                    ObjectManager::SetGcProtected(it->second, objcWrapper, false);
                   }
                 }
               }
@@ -394,7 +394,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
                   BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
                   if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
                     ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                    objcWrapper->GcUnprotect();
+                    ObjectManager::SetGcProtected(it->second, objcWrapper, false);
                   }
                 }
               }
@@ -404,6 +404,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
           release(self, @selector(release));
         });
         class_addMethod(extendedClass, @selector(release), newRelease, "v@:");
+        cache->RetainTrackedClasses.insert(extendedClass);
 
         info.GetReturnValue().SetUndefined();
       }).ToLocalChecked();

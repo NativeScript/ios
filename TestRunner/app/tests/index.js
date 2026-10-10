@@ -132,6 +132,7 @@ require("./NsRuntimeTests");
 require("./NsWorkerThreadsTests");
 require("./NsUrlTests");
 require("./GCFinalizerTests");
+require("./KeepAliveWhileRetainedTests");
 require("./BlockCacheRaceTests");
 require("./WorkerConcurrentStartupTests");
 require("./WorkerOptionsTests");
