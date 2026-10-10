@@ -285,8 +285,14 @@ void SetReleasedObjectPolicy(ReleasedObjectPolicy policy);
 BaseDataWrapper* GetValueOrReport(v8::Isolate* isolate, const v8::Local<v8::Value>& val,
                                   const char* operation);
 
-// Private keys a debug-build finalizer drain sets on a husk so the
-// GetValueOrReport message can say what was released and through what:
+// The message for a touch of a released object: names the native class and,
+// when a debug-build drain recorded it, the "Owner.property" it was released
+// through (see the keys below).
+std::string ReleasedObjectMessage(v8::Isolate* isolate, const v8::Local<v8::Value>& val,
+                                  const char* operation);
+
+// Private keys a debug-build finalizer drain sets on a husk so
+// ReleasedObjectMessage can say what was released and through what:
 // the native class name, and "Owner.property" when the drain released it
 // through a natively retained object it kept (ObjectManager::FinalizerCallback).
 constexpr const char* kReleasedClassKey = "ns:releasedClass";

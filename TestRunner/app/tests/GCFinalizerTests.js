@@ -143,9 +143,10 @@ describe("GC finalizer callbacks", function () {
     });
 
     // The same hazard with an ObjC object in the property: the kept parent
-    // comes back holding a husk of a native object only JS owned. Calls on it
-    // follow releasedObjectPolicy like the struct touches above, and the
-    // debug-build drain names what was released and through which property.
+    // comes back holding a husk of a native object only JS owned. Unlike the
+    // struct touches above, calls on it throw under either releasedObjectPolicy
+    // (a skipped call would break its caller's contract), and the debug-build
+    // drain names what was released and through which property.
     it("names the property an ObjC object was released through when its natively retained owner was kept", function (done) {
         var OwnerOfChild = (function (_super) {
             __extends(OwnerOfChild, _super);
@@ -173,8 +174,6 @@ describe("GC finalizer callbacks", function () {
         __collect();
         __collect();
 
-        var runtime = require("ns:runtime");
-        runtime.setConfig("releasedObjectPolicy", "throw");
         var husks = [];
         var thrown = [];
         for (var i = 0; i < N; i++) {
@@ -189,7 +188,6 @@ describe("GC finalizer callbacks", function () {
                 thrown.push(e);
             }
         }
-        runtime.setConfig("releasedObjectPolicy", "report");
 
         // Zero husks is a legal (if unlucky) outcome, as in the struct spec.
         TNSLog("objc husk spec: " + husks.length + "/" + N + " husks formed");
@@ -198,6 +196,8 @@ describe("GC finalizer callbacks", function () {
             return;
         }
 
+        // Under the default "report" policy too.
+        expect(require("ns:runtime").getConfig("releasedObjectPolicy")).toBe("report");
         expect(thrown[0] instanceof ReferenceError).toBe(true);
         expect(thrown[0].message).toMatch(/The native \S+ object has been released \(method 'count'/);
         expect(thrown[0].message).toMatch(/while still referenced from '\S+\.child'/);
@@ -208,16 +208,14 @@ describe("GC finalizer callbacks", function () {
         };
         global.addEventListener("releasednativeaccess", onReleased);
 
-        // Report policy: the call is skipped.
-        expect(husks[0].count).toBeUndefined();
-        expect(husks[0].addObject(NSObject.new())).toBeUndefined();
+        expect(function () {
+            husks[0].addObject(NSObject.new());
+        }).toThrowError(ReferenceError, /method 'addObject'/);
 
         setTimeout(function () {
             global.removeEventListener("releasednativeaccess", onReleased);
-            // Deduplicated per object: the second call does not report.
-            expect(events.length).toBe(1);
-            expect(events[0].operation).toMatch(/^method 'count'/);
-            expect(String(events[0].error)).toMatch(/\.child'/);
+            // A call throws instead of reporting.
+            expect(events.length).toBe(0);
             done();
         }, 0);
     });

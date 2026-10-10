@@ -39,13 +39,18 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
     if (wrapper == nullptr) {
       // A JS object can outlive its native half: a husk the finalizer drain
       // left behind (docs/knowledge/v8-resurrecting-finalizers.md, "Known
-      // hazard"), or one briefly orphaned by fast view churn like HMR. Like
-      // every other touch of a released object, the call follows
-      // releasedObjectPolicy: it is skipped and reported, or it throws.
-      std::string operation = std::string("method '") + (meta ? meta->jsName() : "<unknown>") +
-                              "' (" + (meta ? meta->selectorAsString() : "<unknown>") + ")";
-      tns::GetValueOrReport(isolate, receiver, operation.c_str());
-      return Local<Value>();
+      // hazard"), or one briefly orphaned by fast view churn like HMR. Unlike
+      // the other released-object touches this always throws, whatever
+      // releasedObjectPolicy says: a skipped call breaks its caller's
+      // contract (a completion that never fires), and an exception reaches
+      // the app's error handlers in every build.
+      std::string message = tns::ReleasedObjectMessage(
+          isolate, receiver,
+          (std::string("method '") + (meta ? meta->jsName() : "<unknown>") + "' (" +
+           (meta ? meta->selectorAsString() : "<unknown>") + ")")
+              .c_str());
+      throw NativeScriptException(
+          isolate, v8::Exception::ReferenceError(tns::ToV8String(isolate, message)), message);
     }
 
     if (wrapper->Type() == WrapperType::ObjCAllocObject) {

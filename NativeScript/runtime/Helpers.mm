@@ -464,13 +464,8 @@ void tns::EmitDebugLog(LogCategory category, const char* format, ...) {
   va_end(ap);
 }
 
-tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>& val,
-                                            const char* operation) {
-  BaseDataWrapper* wrapper = tns::GetValue(isolate, val);
-  if (wrapper != nullptr) {
-    return wrapper;
-  }
-
+std::string tns::ReleasedObjectMessage(Isolate* isolate, const Local<Value>& val,
+                                       const char* operation) {
   std::string releasedClass;
   std::string releasedThrough;
   if (val->IsObject()) {
@@ -504,6 +499,18 @@ tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>
                "objects its JS properties reference alive. Keep the owner or the property's "
                "value reachable from a JS root";
   }
+
+  return message;
+}
+
+tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>& val,
+                                            const char* operation) {
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, val);
+  if (wrapper != nullptr) {
+    return wrapper;
+  }
+
+  std::string message = tns::ReleasedObjectMessage(isolate, val, operation);
 
   if (GetReleasedObjectPolicy() == ReleasedObjectPolicy::kThrow) {
     isolate->ThrowException(v8::Exception::ReferenceError(tns::ToV8String(isolate, message)));

@@ -23,7 +23,6 @@ void ResetReleaseTracking(Isolate* isolate, GCType type, GCCallbackFlags flags) 
   if (cache == nullptr) {
     return;
   }
-  cache->ReleasedThisGC.clear();
   cache->KeptObjectProperties.clear();
 }
 
@@ -72,16 +71,16 @@ void MarkReleasedThrough(Isolate* isolate, Local<Object> released, const std::st
       path.c_str(), path.substr(0, path.rfind('.')).c_str());
 }
 
+// Child finalized after its kept owner: the owner's walk recorded it.
 void TrackReleased(Isolate* isolate, Local<Object> released, const std::string& className) {
-  SetTag(isolate, released, tns::kReleasedClassKey, className);
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   for (auto& entry : cache->KeptObjectProperties) {
     if (entry.first.Get(isolate) == released) {
+      SetTag(isolate, released, tns::kReleasedClassKey, className);
       MarkReleasedThrough(isolate, released, entry.second);
       return;
     }
   }
-  cache->ReleasedThisGC.emplace_back(isolate, released);
 }
 
 // A natively retained object this finalizer kept: its own data properties are
@@ -120,19 +119,41 @@ void TrackKept(Isolate* isolate, Local<Object> kept) {
     Local<Object> child = value.As<Object>();
     std::string path = owner + "." + tns::ToString(isolate, name);
 
-    bool releasedAlready = false;
-    for (auto& released : cache->ReleasedThisGC) {
-      if (released.Get(isolate) == child) {
-        releasedAlready = true;
-        break;
+    // Child finalized before its kept owner: it is already a husk, a wrapper
+    // object whose internal field disposal neutered. A husk labelled by an
+    // earlier collection is not reported again.
+    if (child->InternalFieldCount() > 0 && tns::GetValue(isolate, child) == nullptr) {
+      Local<Private> throughKey =
+          Private::ForApi(isolate, tns::ToV8String(isolate, tns::kReleasedThroughKey));
+      if (!child->HasPrivate(context, throughKey).FromMaybe(true)) {
+        SetTag(isolate, child, tns::kReleasedClassKey,
+               tns::ToString(isolate, child->GetConstructorName()));
+        MarkReleasedThrough(isolate, child, path);
       }
-    }
-    if (releasedAlready) {
-      MarkReleasedThrough(isolate, child, path);
     } else if (!ReleasableClassName(isolate, child).empty()) {
       cache->KeptObjectProperties.emplace_back(v8::Global<Object>(isolate, child), path);
     }
   }
+}
+
+// DisposeValue plus the debug-only naming of the "Known hazard" in
+// docs/knowledge/v8-resurrecting-finalizers.md: a kept, natively retained
+// object can come back holding a property whose native object this drain
+// released, and the husk then explains itself (ReleasedObjectMessage).
+bool DisposeAndTrackRelease(Isolate* isolate, Local<Value> value) {
+  std::string releasedClass;
+  if (!Caches::Get(isolate)->KeptObjectProperties.empty()) {
+    releasedClass = ReleasableClassName(isolate, value);
+  }
+  bool disposed = ObjectManager::DisposeValue(isolate, value);
+  if (!value.IsEmpty() && value->IsObject()) {
+    if (disposed && !releasedClass.empty()) {
+      TrackReleased(isolate, value.As<Object>(), releasedClass);
+    } else if (!disposed) {
+      TrackKept(isolate, value.As<Object>());
+    }
+  }
+  return disposed;
 }
 
 }  // namespace
@@ -223,7 +244,6 @@ void ObjectManager::DisposeAllRegistered(Isolate* isolate) {
 
   // Globals reset in their destructor, and the Caches holding them can outlive
   // the isolate; let them go while it is still alive.
-  cache->ReleasedThisGC.clear();
   cache->KeptObjectProperties.clear();
 
   // Detach the whole list first so disposal can't walk into freed entries, and
@@ -277,24 +297,9 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
 
   state->disposing_ = true;
   Local<Value> value = state->target_->Get(isolate);
-  std::string releasedClass;
-  if (RuntimeConfig.IsDebug) {
-    releasedClass = ReleasableClassName(isolate, value);
-  }
-  bool disposed = ObjectManager::DisposeValue(isolate, value);
+  bool disposed = RuntimeConfig.IsDebug ? DisposeAndTrackRelease(isolate, value)
+                                        : ObjectManager::DisposeValue(isolate, value);
   state->disposing_ = false;
-
-  // Debug-only naming of the "Known hazard" in
-  // docs/knowledge/v8-resurrecting-finalizers.md: a kept, natively retained
-  // object can come back holding a property whose native object this drain
-  // released. The husk then explains itself (GetValueOrReport).
-  if (RuntimeConfig.IsDebug && !value.IsEmpty() && value->IsObject()) {
-    if (disposed && !releasedClass.empty()) {
-      TrackReleased(isolate, value.As<Object>(), releasedClass);
-    } else if (!disposed) {
-      TrackKept(isolate, value.As<Object>());
-    }
-  }
 
   // Disposal releases the native counterpart, and a -dealloc reached that way
   // can reset this very handle (the collection adapters reset the persistent
