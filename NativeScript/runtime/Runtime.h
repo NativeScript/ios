@@ -122,6 +122,10 @@ class Runtime {
 
   static bool IsAlive(const v8::Isolate* isolate);
 
+  // Forwards a system memory pressure level to every live isolate. Safe from
+  // any thread.
+  static void NotifyMemoryPressure(v8::MemoryPressureLevel level);
+
   // Resolves the env while holding the registry lock, so a possibly-stale
   // pointer (e.g. a thread-local left behind when a Runtime was destroyed on
   // another thread) is never dereferenced outside it. The returned env's
