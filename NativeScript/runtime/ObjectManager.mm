@@ -339,6 +339,49 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
   return true;
 }
 
+void ObjectManager::SetGcProtected(const std::shared_ptr<Persistent<Value>>& handle,
+                                   ObjCDataWrapper* wrapper, bool isProtected) {
+  if (isProtected) {
+    wrapper->GcProtect();
+  } else {
+    wrapper->GcUnprotect();
+  }
+  SyncKeepAliveRoot(handle, wrapper);
+}
+
+void ObjectManager::SyncKeepAliveRoot(const std::shared_ptr<Persistent<Value>>& handle,
+                                      ObjCDataWrapper* wrapper) {
+  bool wantsRoot = wrapper->KeepsAliveWhileRetained() && wrapper->IsGcProtected();
+  bool isRooted = wrapper->RootedState() != nullptr;
+  if (wantsRoot == isRooted || handle == nullptr || handle->IsEmpty()) {
+    return;
+  }
+
+  if (wantsRoot) {
+    // A handle that is not weak was never registered with a finalizer, so
+    // there is no weakness to suspend.
+    if (!handle->IsWeak()) {
+      return;
+    }
+    ObjectWeakCallbackState* state = handle->ClearWeak<ObjectWeakCallbackState>();
+    if (state == nullptr) {
+      return;
+    }
+    if (state->disposing_) {
+      // Reached from inside this handle's own finalizer frame, which owns the
+      // state: leave the weakness in place for it.
+      handle->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
+      return;
+    }
+    wrapper->SetRootedState(state);
+    return;
+  }
+
+  ObjectWeakCallbackState* state = wrapper->RootedState();
+  wrapper->SetRootedState(nullptr);
+  handle->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
+}
+
 void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
 
@@ -377,8 +420,17 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
     auto it = cache->Instances.find(data);
     if (it != cache->Instances.end()) {
       std::shared_ptr<Persistent<Value>> handle = it->second;
-      ObjectWeakCallbackState* state =
-          handle->IsWeak() ? handle->ClearWeak<ObjectWeakCallbackState>() : nullptr;
+      // A handle kept alive while retained is strong, its state parked on the
+      // wrapper; retiring it without taking that state back would leave the
+      // handle rooted forever.
+      ObjectWeakCallbackState* state = nullptr;
+      ObjectWeakCallbackState* rooted = objcWrapper->RootedState();
+      if (rooted != nullptr && rooted->target_ == handle) {
+        objcWrapper->SetRootedState(nullptr);
+        state = rooted;
+      } else if (handle->IsWeak()) {
+        state = handle->ClearWeak<ObjectWeakCallbackState>();
+      }
       if (state != nullptr && state->disposing_) {
         // Reached from a -dealloc running inside this handle's own finalizer:
         // that frame already released the native counterpart and owns the

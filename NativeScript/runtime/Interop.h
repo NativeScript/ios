@@ -143,6 +143,8 @@ class Interop {
                                         v8::Local<v8::Object> interop);
   static void RegisterHandleOfFunction(v8::Local<v8::Context> context,
                                        v8::Local<v8::Object> interop);
+  static void RegisterKeepAliveWhileRetainedFunction(
+      v8::Local<v8::Context> context, v8::Local<v8::Object> interop);
   static void RegisterAllocFunction(v8::Local<v8::Context> context,
                                     v8::Local<v8::Object> interop);
   static void RegisterFreeFunction(v8::Local<v8::Context> context,

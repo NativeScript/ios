@@ -169,6 +169,9 @@ class Caches {
 
   robin_hood::unordered_map<id, std::shared_ptr<v8::Persistent<v8::Value>>>
       Instances;
+  // Classes built by __extends, whose swizzled retain/release drive
+  // GcProtect. Only their instances can be kept alive while retained.
+  robin_hood::unordered_set<Class> RetainTrackedClasses;
   // Root struct objects by (backing buffer, struct type). Child views created
   // for nested-struct fields are never entered here.
   robin_hood::unordered_map<std::pair<void*, const StructInfo*>,

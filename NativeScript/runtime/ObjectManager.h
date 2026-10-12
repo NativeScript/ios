@@ -6,6 +6,7 @@
 namespace tns {
 
 class ObjectManager;
+class ObjCDataWrapper;
 
 // Parameter of the kFinalizer weak callback armed on target_.
 //
@@ -50,6 +51,17 @@ class ObjectManager {
       const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
   static bool DisposeValue(v8::Isolate* isolate, v8::Local<v8::Value> value,
                            bool isFinalDisposal = false);
+  // The only way a wrapper's GcProtect flag may change: it also keeps an
+  // interop.keepAliveWhileRetained handle strong exactly while protected.
+  static void SetGcProtected(
+      const std::shared_ptr<v8::Persistent<v8::Value>>& handle,
+      ObjCDataWrapper* wrapper, bool isProtected);
+  // Makes `handle` strong when `wrapper` keeps alive while retained and is
+  // protected, and weak again otherwise. `handle` must be the wrapper's entry
+  // in Caches::Instances.
+  static void SyncKeepAliveRoot(
+      const std::shared_ptr<v8::Persistent<v8::Value>>& handle,
+      ObjCDataWrapper* wrapper);
   // Disposes every handle from Register() that is still alive. Replaces the
   // old Isolate::VisitHandlesWithClassIds walk, which V8 removed.
   static void DisposeAllRegistered(v8::Isolate* isolate);
