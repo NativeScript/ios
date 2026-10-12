@@ -81,6 +81,245 @@ describe(module.id, function () {
         expect(size.height).toBe(40);
     });
 
+    it("copies a struct returned from native", function () {
+        var rect = getRectStruct();
+        rect.size.width = 1;
+        expect(getRectStruct().size.width).toBe(30);
+    });
+
+    it("returns the same view for repeated nested reads", function () {
+        var rect = getRectStruct();
+        expect(rect.size).toBe(rect.size);
+        expect(rect.origin).toBe(rect.origin);
+        expect(rect.size).not.toBe(getRectStruct().size);
+    });
+
+    it("writes through a held view in both directions", function () {
+        var rect = getRectStruct();
+        var size = rect.size;
+        size.width = 5;
+        expect(rect.size.width).toBe(5);
+
+        rect.size = new CGSize({ width: 7, height: 8 });
+        expect(size.width).toBe(7);
+        expect(size.height).toBe(8);
+        expect(CGRect.equals(rect, { origin: { x: 10, y: 20 }, size: { width: 7, height: 8 } })).toBe(true);
+    });
+
+    it("writes through views nested more than one level deep", function () {
+        var record = TNSTestNativeCallbacks.recordsNestedAnonymousStruct({ x1: 1, y1: { x2: 2, y2: { x3: 3 } } });
+        var inner = record.y1.y2;
+        inner.x3 = 30;
+        expect(record.y1.y2).toBe(inner);
+        expect(record.y1.y2.x3).toBe(30);
+    });
+
+    it("keeps a deep view's root alive after the root and middle view are dropped", function () {
+        var inner = null;
+        (() => {
+            var record = TNSTestNativeCallbacks.recordsNestedAnonymousStruct({ x1: 1, y1: { x2: 2, y2: { x3: 3 } } });
+            inner = record.y1.y2;
+        })();
+        gc();
+        gc();
+
+        expect(inner.x3).toBe(3);
+    });
+
+    it("keeps struct storage alive as long as a struct object reaches it", function () {
+        var size = getRectStruct().size;
+        var pointer = interop.alloc(interop.sizeof(CGSize));
+        var aliased = CGSize(pointer);
+        aliased.width = 9;
+        for (var i = 0; i < 20000; i++) {
+            sink = getRectStruct().size.width + new CGPoint({ x: i, y: i }).x;
+        }
+        gc();
+        gc();
+
+        expect(size.width).toBe(30);
+        expect(size.height).toBe(40);
+        expect(aliased.width).toBe(9);
+        expect(CGSize(pointer).width).toBe(9);
+    });
+    var sink = 0;
+
+    it("zero-fills a struct constructed without an initializer", function () {
+        var record = new TNSStructWithArray();
+        expect(record.x).toBe(0);
+        expect([record.arr[0], record.arr[1], record.arr[2], record.arr[3]]).toEqual([0, 0, 0, 0]);
+    });
+
+    it("collects roots together with their cached views", function () {
+        for (var i = 0; i < 1000; i++) {
+            var rect = getRectStruct();
+            rect.origin.x = i;
+            rect.size.width = i;
+        }
+        gc();
+        gc();
+        expect(getRectStruct().size.width).toBe(30);
+    });
+
+    it("exposes fields as own enumerable properties", function () {
+        var point = new CGPoint({ x: 1, y: 2 });
+        expect(Object.keys(point)).toEqual(["x", "y"]);
+        expect(JSON.stringify(point)).toBe('{"x":1,"y":2}');
+        expect(Object.keys(getRectStruct())).toEqual(["origin", "size"]);
+        expect(delete point.x).toBe(false);
+        expect(point.x).toBe(1);
+    });
+
+    it("gives a struct from native its complete constructor", function () {
+        var record = getStructWith3Doubles();
+        expect(typeof record.constructor.equals).toBe("function");
+        expect(interop.sizeof(record.constructor)).toBe(24);
+    });
+
+    it("assigns struct fields from structs and plain objects", function () {
+        var target = TNSTestNativeCallbacks.recordsNestedAnonymousStruct({ x1: 1, y1: { x2: 2, y2: { x3: 3 } } });
+        var source = TNSTestNativeCallbacks.recordsNestedAnonymousStruct({ x1: 4, y1: { x2: 5, y2: { x3: 6 } } });
+        var inner = target.y1;
+        Object.assign(target, source);
+        expect(target.x1).toBe(4);
+        expect(inner.x2).toBe(5);
+        expect(inner.y2.x3).toBe(6);
+
+        var rect = getRectStruct();
+        rect.size = { width: 1, height: 2 };
+        expect(rect.size.width).toBe(1);
+        expect(rect.size.height).toBe(2);
+        expect(function () { rect.size = 5; }).toThrowError(TypeError);
+    });
+
+    it("leaves the memory of a pointer-backed struct to the pointer", function () {
+        var pointer = interop.alloc(interop.sizeof(CGSize));
+        (() => {
+            var size = CGSize(pointer);
+            size.width = 3;
+        })();
+        gc();
+        gc();
+        var again = CGSize(pointer);
+        again.height = 4;
+        expect(again.width).toBe(3);
+        expect(again.height).toBe(4);
+    });
+
+    it("assigns pointer fields from pointers, references, structs and null", function () {
+        var memory = interop.alloc(4);
+        var simple = new TNSSimpleStruct({ x: 1, y: 2 });
+        var next = new TNSStructWithPointers();
+        var source = new TNSStructWithPointers();
+        source.x = memory;
+        source.y = simple;
+        source.z = next;
+
+        var target = new TNSStructWithPointers();
+        Object.assign(target, source);
+        expect(interop.handleof(target.x).toNumber()).toBe(memory.toNumber());
+        expect(interop.handleof(target.y).toNumber()).toBe(interop.handleof(simple).toNumber());
+        expect(target.y.value.x).toBe(1);
+        expect(interop.handleof(target.z).toNumber()).toBe(interop.handleof(next).toNumber());
+        expect(interop.handleof(source.x).toNumber()).toBe(memory.toNumber());
+
+        var unbound = new interop.Reference(interop.types.int32, 5);
+        target.x = unbound;
+        expect(target.x.value).toBe(5);
+
+        target.x = null;
+        expect(target.x).toBe(null);
+    });
+
+    it("rejects values a pointer field cannot hold", function () {
+        var record = new TNSStructWithPointers();
+        var memory = interop.alloc(4);
+        record.x = memory;
+
+        expect(function () { record.x = "abc"; }).toThrowError(TypeError);
+        expect(function () { record.x = 5; }).toThrowError(TypeError);
+        expect(function () { record.x = {}; }).toThrowError(TypeError);
+        expect(function () { Object.assign(record, { x: "abc" }); }).toThrowError(TypeError);
+        expect(interop.handleof(record.x).toNumber()).toBe(memory.toNumber());
+
+        var buffer = new ArrayBuffer(4);
+        record.x = buffer;
+        expect(record.x).not.toBe(null);
+
+        record.y = { x: 7, y: 8 };
+        expect(record.y.value.x).toBe(7);
+
+        var rect = getRectStruct();
+        expect(function () { rect.size = new ArrayBuffer(16); }).toThrowError(TypeError);
+    });
+
+    it("rejects a struct of another type assigned to a struct field", function () {
+        var rect = getRectStruct();
+        expect(function () { rect.size = new CGPoint({ x: 1, y: 2 }); }).toThrowError(TypeError);
+        expect(function () { rect.size = getRectStruct(); }).toThrowError(TypeError);
+        expect(rect.size.width).toBe(30);
+        expect(rect.size.height).toBe(40);
+
+        rect.size = new CGSize({ width: 5, height: 6 });
+        expect(rect.size.width).toBe(5);
+    });
+
+    function nativeCopy(rect) {
+        return NSValue.valueWithCGRect(rect).CGRectValue;
+    }
+
+    [
+        ["without traps", {}],
+        ["with Reflect traps", {
+            get: function (t, k, r) { return Reflect.get(t, k, r); },
+            set: function (t, k, v, r) { return Reflect.set(t, k, v, r); }
+        }]
+    ].forEach(function (testCase) {
+        it("reads and writes struct fields through a Proxy " + testCase[0], function () {
+            var rect = getRectStruct();
+            var proxy = new Proxy(rect, testCase[1]);
+            expect(proxy.origin.x).toBe(10);
+            expect(proxy.size.height).toBe(40);
+
+            proxy.origin.x = 1;
+            proxy.size = { width: 2, height: 3 };
+            var origin = new Proxy(rect.origin, testCase[1]);
+            origin.y = 4;
+            var direct = new Proxy(rect.size, testCase[1]);
+            direct.height = 5;
+
+            expect(rect.origin.x).toBe(1);
+            expect(rect.origin.y).toBe(4);
+            expect(rect.size.width).toBe(2);
+            expect(rect.size.height).toBe(5);
+            var copy = nativeCopy(rect);
+            expect(copy.origin.x).toBe(1);
+            expect(copy.origin.y).toBe(4);
+            expect(copy.size.width).toBe(2);
+            expect(copy.size.height).toBe(5);
+
+            // The fields stay bound to the buffer after a write through a Proxy.
+            proxy.size.width = 7;
+            rect.size.height = 8;
+            expect(nativeCopy(rect).size.width).toBe(7);
+            expect(nativeCopy(rect).size.height).toBe(8);
+            expect(Object.getOwnPropertyDescriptor(rect.size, "height").configurable).toBe(false);
+        });
+    });
+
+    it("reaches methods on the struct prototype", function () {
+        CGSize.prototype.area = function () {
+            return this.width * this.height;
+        };
+        try {
+            expect(getRectStruct().size.area()).toBe(1200);
+            expect(new CGSize({ width: 2, height: 3 }).area()).toBe(6);
+        } finally {
+            delete CGSize.prototype.area;
+        }
+        expect(typeof getRectStruct().hasOwnProperty).toBe("function");
+    });
+
     it("RecordConstructorPointer", function () {
         (function () {
             var size = interop.sizeof(TNSNestedStruct);

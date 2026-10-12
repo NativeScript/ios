@@ -397,7 +397,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   IsolateGates::Open(cache->getGateId());
   cache->isWorker = isWorker;
   cache->ObjectCtorInitializer = MetadataBuilder::GetOrCreateConstructorFunctionTemplate;
-  cache->StructPrototypeInitializer = MetadataBuilder::GetOrCreateStructPrototype;
+  cache->StructInstanceFactory = MetadataBuilder::NewStructInstance;
 
   Isolate::Scope isolate_scope(isolate);
   HandleScope handle_scope(isolate);
@@ -481,8 +481,7 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
 
   this->moduleInternal_ = std::make_unique<ModuleInternal>(context);
 
-  ArgConverter::Init(context, MetadataBuilder::StructPropertyGetterCallback,
-                     MetadataBuilder::StructPropertySetterCallback);
+  ArgConverter::Init(context);
   Interop::RegisterInteropTypes(context);
 
   ClassBuilder::RegisterBaseTypeScriptExtendsFunction(

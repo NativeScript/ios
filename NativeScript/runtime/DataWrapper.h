@@ -314,31 +314,39 @@ class StructTypeWrapper : public BaseDataWrapper {
   const struct StructInfo* structInfo_;
 };
 
+enum class StructStorage {
+  // The struct object owns a copy of the bytes.
+  kCopy,
+  // The struct object aliases bytes owned by whatever its parent field holds.
+  kAlias,
+};
+
+// Constructed in place at the start of the ArrayBuffer backing store held in
+// kStorageField (followed by the bytes, for kCopy) and destroyed by the store's
+// deleter, so struct objects need no finalizer. V8 may run that deleter on a
+// background thread, and never runs it at process exit: the destructor must
+// not touch V8 or the isolate, and nothing may depend on it running. That
+// ArrayBuffer must never reach JS (copy the bytes instead): a detach or
+// transfer would pull the wrapper out from under the struct object.
 class StructWrapper : public StructTypeWrapper {
  public:
-  StructWrapper(const struct StructInfo& structInfo, void* data,
-                std::shared_ptr<v8::Persistent<v8::Value>> parent)
-      : StructTypeWrapper(structInfo),
-        data_(data),
-        childCount_(0),
-        parent_(parent) {}
+  // Internal fields of a struct object after the wrapper (field 0). The parent
+  // field holds whatever keeps aliased bytes alive: a view's parent struct
+  // object, or the Pointer object a pointer-backed struct was built over. From
+  // kFirstViewField on, one slot per struct-typed field caches its view.
+  static constexpr int kParentField = 1;
+  static constexpr int kStorageField = 2;
+  static constexpr int kFirstViewField = 3;
+
+  StructWrapper(const struct StructInfo& structInfo, void* data)
+      : StructTypeWrapper(structInfo), data_(data) {}
 
   const WrapperType Type() { return WrapperType::Struct; }
 
   void* Data() const { return this->data_; }
 
-  std::shared_ptr<v8::Persistent<v8::Value>> Parent() { return this->parent_; }
-
-  void IncrementChildren() { this->childCount_++; }
-
-  void DecrementChildren() { this->childCount_--; }
-
-  int ChildCount() { return this->childCount_; }
-
  private:
   void* data_;
-  int childCount_;
-  std::shared_ptr<v8::Persistent<v8::Value>> parent_;
 };
 
 class ObjCAllocDataWrapper : public BaseDataWrapper {

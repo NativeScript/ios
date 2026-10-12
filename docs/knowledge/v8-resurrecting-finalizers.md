@@ -190,7 +190,7 @@ missing wrapper — default `"report"` no-ops the operation and fires the
 catchable JS `ReferenceError` — and every internal-field read that could otherwise see a
 neutered field goes through it — `Pointer.cpp`'s methods, `ExtVector.cpp` toString,
 `Interop::SetStructPropertyValue` (both struct cases), `MetadataBuilder::GetStructData` and
-both struct property interceptors, the two `InteropTypes.mm` argument readers, and the
+both struct field accessors, the two `InteropTypes.mm` argument readers, and the
 `Reference.cpp` accessors (`SetValueCallback`, `GetWrappedPointer`, `GetDataPair` → indexed
 get/set, toString). Regression spec: *"throws instead of crashing when touching a released
 object through a resurrected parent"* in `GCFinalizerTests.js`.
@@ -199,7 +199,9 @@ Two facts worth knowing when reasoning about which objects can husk:
 
 - `Pointer`/`interop.alloc` objects never husk at runtime — `Caches::PointerInstances`
   holds them behind strong persistents, so their finalizers cannot fire. Struct instances
-  and `Reference`s are held only by their own weak finalizer handle and do husk.
+  never husk either: their wrapper and bytes live in an ArrayBuffer backing store held by
+  the struct object, so the GC frees them only once nothing (resurrected or not) reaches
+  it. `Reference`s are held only by their own weak finalizer handle and do husk.
 - Only the TypeScript `__extends` path installs the retain/release swizzles that drive
   `GcProtect()`; a class from plain `.extend()` is never protected, so its instances are
   disposed rather than resurrected when natively retained.

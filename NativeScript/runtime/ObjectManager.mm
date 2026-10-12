@@ -202,30 +202,9 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
 
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   switch (wrapper->Type()) {
-    case WrapperType::Struct: {
-      StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
-      void* data = structWrapper->Data();
-
-      std::shared_ptr<Persistent<Value>> poParentStruct = structWrapper->Parent();
-      if (poParentStruct != nullptr) {
-        Local<Value> parentStruct = poParentStruct->Get(isolate);
-        BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parentStruct);
-        if (parentWrapper != nullptr && parentWrapper->Type() == WrapperType::Struct) {
-          StructWrapper* parentStructWrapper = static_cast<StructWrapper*>(parentWrapper);
-          parentStructWrapper->DecrementChildren();
-        }
-      } else {
-        if (structWrapper->ChildCount() == 0) {
-          std::pair<void*, const StructInfo*> key =
-              std::make_pair(data, &structWrapper->StructInfo());
-          cache->StructInstances.erase(key);
-          std::free(data);
-        } else {
-          return false;
-        }
-      }
-      break;
-    }
+    case WrapperType::Struct:
+      // Lives in the struct object's ArrayBuffer storage, which the GC frees.
+      return true;
     case WrapperType::ObjCObject: {
       ObjCDataWrapper* objCObjectWrapper = static_cast<ObjCDataWrapper*>(wrapper);
       id target = objCObjectWrapper->Data();
