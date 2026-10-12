@@ -72,8 +72,9 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
                 }
               }
             }
-            // Outside the gate: once the teardown is done the cache slot is
-            // unreachable and nothing else can free the wrapper.
+            // Outside the gate: the JSBlock is the wrapper's only owner
+            // (ObjectManager::DisposeValue leaves it alone), whether or not
+            // the isolate is alive.
             delete blockWrapper;
             delete wrapper;
             ffi_closure_free(block->ffiClosure);

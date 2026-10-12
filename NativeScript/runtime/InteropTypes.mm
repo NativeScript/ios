@@ -697,8 +697,9 @@ Local<Value> Interop::HandleOf(Local<Context> context, Local<Value> value) {
               return Pointer::NewInstance(context, blockWrapper->Block());
             }
             // A JS function does not keep its block alive: only native
-            // references do. A live block is kept for the rest of the turn,
-            // like one passed to a native call; a dying one is no handle.
+            // references do. A live block is kept until the current
+            // autorelease pool drains, like one passed to a native call; a
+            // dying one is no handle.
             JSBlock* block = static_cast<JSBlock*>(blockWrapper->Block());
             if (TryRetainJSBlock(block)) {
               CFAutorelease(block);
