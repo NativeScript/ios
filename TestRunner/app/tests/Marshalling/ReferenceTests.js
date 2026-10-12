@@ -337,6 +337,37 @@ describe(module.id, function () {
         interop.free(ptr);
     });
 
+    it("reuses one marshalled buffer for repeated ASCII CString arguments", function () {
+        // Built at runtime so the string is a plain sequential string rather
+        // than an internalized literal, which V8 may refuse to externalize.
+        // V8 also refuses to externalize young-generation strings, so promote
+        // it to old space first - mirroring the real-world shape of a
+        // long-lived string marshalled repeatedly.
+        var str = Array(65).join("a");
+        __collect();
+        __collect();
+
+        // functionWithCharPtr echoes its argument pointer, exposing the
+        // address of the marshalled buffer: after the first call externalizes
+        // the string, later calls must reuse the same buffer instead of
+        // copying again.
+        var first = functionWithCharPtr(str);
+        var second = functionWithCharPtr(str);
+        expect(interop.handleof(first).toNumber()).toBe(interop.handleof(second).toNumber());
+        expect(NSString.stringWithUTF8String(first).toString()).toBe(str);
+    });
+
+    it("marshals non-ASCII CString arguments as UTF-8 on every call", function () {
+        // Non-ASCII strings cannot be externalized as one-byte (Latin-1), so
+        // each marshal takes the copying path; the content must round-trip as
+        // UTF-8 both times.
+        var str = ["héllo", "wörld", "🙂"].join(" ");
+        var first = functionWithCharPtr(str);
+        expect(NSString.stringWithUTF8String(first).toString()).toBe(str);
+        var second = functionWithCharPtr(str);
+        expect(NSString.stringWithUTF8String(second).toString()).toBe(str);
+    });
+
     it("interops string from CString", function () {
         const str = "test";
         const ptr = interop.alloc((str.length + 1) * interop.sizeof(interop.types.uint8));
