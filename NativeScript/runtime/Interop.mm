@@ -887,42 +887,17 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
 }
 
 Local<Value> Interop::StructToValue(Local<Context> context, void* result,
-                                    const StructInfo& structInfo,
-                                    std::shared_ptr<Persistent<Value>> parentStruct) {
+                                    const StructInfo& structInfo, Local<Object> parentStruct) {
   Isolate* isolate = v8::Isolate::GetCurrent();
-  StructWrapper* wrapper = nullptr;
-  if (parentStruct == nullptr) {
-    ffi_type* ffiType = structInfo.FFIType();
-    void* dest = malloc(ffiType->size);
-    memcpy(dest, result, ffiType->size);
-
-    wrapper = new StructWrapper(structInfo, dest, nullptr);
-  } else {
-    Local<Value> parent = parentStruct->Get(isolate);
-    BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parent);
-    if (parentWrapper != nullptr && parentWrapper->Type() == WrapperType::Struct) {
-      StructWrapper* parentStructWrapper = static_cast<StructWrapper*>(parentWrapper);
-      parentStructWrapper->IncrementChildren();
-    }
-    wrapper = new StructWrapper(structInfo, result, parentStruct);
-  }
-
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
-  std::pair<void*, const StructInfo*> key = std::make_pair(wrapper->Data(), &structInfo);
-  auto it = cache->StructInstances.find(key);
-  if (it != cache->StructInstances.end()) {
-    return it->second->Get(isolate);
-  }
+  tns::Assert(cache != nullptr && cache->StructInstanceFactory != nullptr, isolate);
 
-  // The root's registration handle is the one StructInstances and child views'
-  // Parent() hold; child views are registered by ConvertArgument.
-  bool isRoot = parentStruct == nullptr;
-  Local<Value> res = ArgConverter::ConvertArgument(context, wrapper, isRoot);
-  if (isRoot) {
-    std::shared_ptr<Persistent<Value>> poResult = ObjectManager::Register(context, res);
-    cache->StructInstances.emplace(key, poResult);
+  if (parentStruct.IsEmpty()) {
+    return cache->StructInstanceFactory(context, structInfo, result, StructStorage::kCopy,
+                                        Local<Object>());
   }
-  return res;
+  return cache->StructInstanceFactory(context, structInfo, result, StructStorage::kAlias,
+                                      parentStruct);
 }
 
 void Interop::InitializeStruct(Local<Context> context, void* destBuffer,
@@ -1044,8 +1019,7 @@ void Interop::SetStructValue(Local<Value> value, void* destBuffer, ptrdiff_t pos
 }
 
 Local<Value> Interop::GetResultByType(Local<Context> context, BaseDataWrapper* typeWrapper,
-                                      BaseCall* call,
-                                      std::shared_ptr<Persistent<Value>> parentStruct) {
+                                      BaseCall* call, Local<Object> parentStruct) {
   Isolate* isolate = v8::Isolate::GetCurrent();
 
   if (typeWrapper->Type() == WrapperType::StructType) {
@@ -1061,8 +1035,7 @@ Local<Value> Interop::GetResultByType(Local<Context> context, BaseDataWrapper* t
 }
 
 Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding,
-                                BaseCall* call, bool marshalToPrimitive,
-                                std::shared_ptr<Persistent<Value>> parentStruct,
+                                BaseCall* call, bool marshalToPrimitive, Local<Object> parentStruct,
                                 bool isStructMember, bool ownsReturnedObject, bool returnsUnmanaged,
                                 bool isInitializer) {
   Isolate* isolate = v8::Isolate::GetCurrent();
@@ -1247,7 +1220,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
               ffi_call(parametrizedCall->Cif, FFI_FN(block->invoke), call.ResultBuffer(),
                        call.ArgsArray());
 
-              Local<Value> result = Interop::GetResult(context, enc, &call, true, nullptr);
+              Local<Value> result = Interop::GetResult(context, enc, &call, true);
 
               info.GetReturnValue().Set(result);
             },
@@ -1569,6 +1542,39 @@ bool Interop::IsNumbericType(BinaryTypeEncodingType type) {
          type == BinaryTypeEncodingType::DoubleEncoding;
 }
 
+namespace {
+
+// StructInfos are cached per resolved name, so one C type can have several;
+// compare layout and field names rather than identity. Names keep same-shaped
+// but different types (CGPoint vs CGSize) apart.
+// ArrayBuffers and their views carry V8 embedder fields, so InternalFieldCount
+// alone cannot tell them from native wrapper objects.
+bool IsArrayBufferLike(Local<Value> value) {
+  return value->IsArrayBuffer() || value->IsArrayBufferView() || value->IsSharedArrayBuffer();
+}
+
+bool HasSameStructLayout(const StructInfo& a, const StructInfo& b) {
+  if (&a == &b) {
+    return true;
+  }
+  const std::vector<StructField>& aFields = a.Fields();
+  const std::vector<StructField>& bFields = b.Fields();
+  if (a.FFIType()->size != b.FFIType()->size || aFields.size() != bFields.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < aFields.size(); i++) {
+    if (aFields[i].Offset() != bFields[i].Offset() ||
+        aFields[i].FFIType()->size != bFields[i].FFIType()->size ||
+        aFields[i].Encoding()->type != bFields[i].Encoding()->type ||
+        aFields[i].Name() != bFields[i].Name()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+}  // namespace
+
 void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrapper,
                                      const StructField& field, Local<Value> value) {
   if (value.IsEmpty()) {
@@ -1581,18 +1587,46 @@ void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrap
 
   const TypeEncoding* fieldEncoding = field.Encoding();
   switch (fieldEncoding->type) {
-    case BinaryTypeEncodingType::StructDeclarationReference: {
-      BaseDataWrapper* sourceWrapper =
-          tns::GetValueOrReport(isolate, value, "struct field assignment");
-      if (sourceWrapper == nullptr) {
+    case BinaryTypeEncodingType::StructDeclarationReference:
+    case BinaryTypeEncodingType::AnonymousStructEncoding: {
+      const StructInfo* nestedInfo = nullptr;
+      if (fieldEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
+        const Meta* meta =
+            ArgConverter::GetMeta(fieldEncoding->details.declarationReference.name.valuePtr());
+        tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
+        nestedInfo = &FFICall::GetStructInfo(static_cast<const StructMeta*>(meta));
+      } else {
+        nestedInfo =
+            &FFICall::GetStructInfo(fieldEncoding->details.anonymousRecord.fieldsCount,
+                                    fieldEncoding->details.anonymousRecord.getFieldsEncodings(),
+                                    fieldEncoding->details.anonymousRecord.getFieldNames());
+      }
+
+      bool isArrayBufferLike = IsArrayBufferLike(value);
+      bool isNativeObject =
+          !isArrayBufferLike && value->IsObject() && value.As<Object>()->InternalFieldCount() > 0;
+      if (isNativeObject) {
+        BaseDataWrapper* sourceWrapper =
+            tns::GetValueOrReport(isolate, value, "struct field assignment");
+        if (sourceWrapper == nullptr) {
+          return;
+        }
+        if (sourceWrapper->Type() == WrapperType::Struct) {
+          StructWrapper* source = static_cast<StructWrapper*>(sourceWrapper);
+          if (HasSameStructLayout(source->StructInfo(), *nestedInfo)) {
+            // The source can be a view of this very field.
+            memmove(destBuffer, source->Data(), nestedInfo->FFIType()->size);
+            break;
+          }
+        }
+      }
+      if (isNativeObject || isArrayBufferLike || !value->IsObject()) {
+        isolate->ThrowException(Exception::TypeError(tns::ToV8String(
+            isolate, "A struct field accepts a struct of its type or a plain object")));
         return;
       }
-      tns::Assert(sourceWrapper->Type() == WrapperType::Struct, isolate);
-      StructWrapper* targetStruct = static_cast<StructWrapper*>(sourceWrapper);
 
-      void* sourceBuffer = targetStruct->Data();
-      size_t fieldSize = field.FFIType()->size;
-      memcpy(destBuffer, sourceBuffer, fieldSize);
+      Interop::InitializeStruct(context, destBuffer, nestedInfo->Fields(), value);
       break;
     }
     case BinaryTypeEncodingType::ConstantArrayEncoding: {
@@ -1600,14 +1634,39 @@ void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrap
       break;
     }
     case BinaryTypeEncodingType::PointerEncoding: {
-      BaseDataWrapper* wrapper = tns::GetValueOrReport(isolate, value, "struct field assignment");
-      if (wrapper == nullptr) {
+      Local<Value> target = tns::UnwrapProxy(value);
+      // A revoked Proxy (empty target) goes to WriteValue, which throws for it.
+      if (target.IsEmpty() || target->IsNullOrUndefined() || IsArrayBufferLike(target)) {
+        Interop::WriteValue(context, fieldEncoding, destBuffer, value);
+        break;
+      }
+
+      BaseDataWrapper* wrapper = tns::GetValue(isolate, target);
+      if (wrapper == nullptr && target->IsObject() &&
+          target.As<Object>()->InternalFieldCount() > 0) {
+        // A native object whose wrapper was released: report it, write nothing.
+        tns::GetValueOrReport(isolate, target, "struct field assignment");
         return;
       }
-      tns::Assert(wrapper->Type() == WrapperType::Struct, isolate);
-      StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
-      void* data = structWrapper->Data();
-      Interop::SetValue(destBuffer, data);
+
+      if (wrapper != nullptr && wrapper->Type() == WrapperType::Struct) {
+        Interop::SetValue(destBuffer, static_cast<StructWrapper*>(wrapper)->Data());
+      } else if (wrapper != nullptr && wrapper->Type() == WrapperType::Reference) {
+        // WriteValue would treat a Reference as an out-parameter and re-point it
+        // at fresh memory; a field stores the address it already wraps.
+        Interop::SetValue(destBuffer, Reference::GetWrappedPointer(context, target, fieldEncoding));
+      } else if ((wrapper != nullptr && wrapper->Type() == WrapperType::Pointer) ||
+                 (wrapper == nullptr && target->IsObject() &&
+                  fieldEncoding->details.pointer.getInnerType()->type ==
+                      BinaryTypeEncodingType::StructDeclarationReference)) {
+        // WriteValue snapshots a plain object into a new struct for a struct pointer.
+        Interop::WriteValue(context, fieldEncoding, destBuffer, value);
+      } else {
+        isolate->ThrowException(Exception::TypeError(tns::ToV8String(
+            isolate,
+            "A pointer field accepts a Pointer, a Reference, a struct, an ArrayBuffer or null")));
+        return;
+      }
       break;
     }
     case BinaryTypeEncodingType::UShortEncoding: {
@@ -1661,8 +1720,7 @@ void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrap
       break;
     }
     default: {
-      // TODO: Handle all possible cases
-      tns::Assert(false, isolate);
+      Interop::WriteValue(context, fieldEncoding, destBuffer, value);
     }
   }
 }
@@ -1877,9 +1935,10 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     }
   }
 
-  Local<Value> result = Interop::GetResult(
-      methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive, nullptr, false,
-      methodCall.ownsReturnedObject_, methodCall.returnsUnmanaged_, methodCall.isInitializer_);
+  Local<Value> result =
+      Interop::GetResult(methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive,
+                         Local<Object>(), false, methodCall.ownsReturnedObject_,
+                         methodCall.returnsUnmanaged_, methodCall.isInitializer_);
 
   return result;
 }

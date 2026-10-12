@@ -63,7 +63,9 @@ describe("GC finalizer callbacks", function () {
         (function create() {
             for (var i = 0; i < N; i++) {
                 var t = HuskParent.alloc().init();
-                t.buddy = CGPointMake(3, 4);
+                // Structs keep their storage while reachable and never husk;
+                // a Reference still has a finalizer of its own.
+                t.buddy = new interop.Reference(interop.types.int32, 3);
                 t.__mine = true;
                 holder.addObject(t); // native-only retain → GcProtect
             }
@@ -117,7 +119,7 @@ describe("GC finalizer callbacks", function () {
         // Default policy: report — the operations no-op.
         rect.origin = husk;
         expect(rect.origin.x).toBe(0);
-        expect(husk.x).toBeUndefined();
+        expect(husk[0]).toBeUndefined();
 
         // Throw policy: same touches become catchable ReferenceErrors.
         var runtime = require("ns:runtime");
@@ -126,7 +128,7 @@ describe("GC finalizer callbacks", function () {
             rect.origin = husk;
         }).toThrowError(/released/);
         expect(function () {
-            return husk.x;
+            return husk[0];
         }).toThrowError(/released/);
         runtime.setConfig("releasedObjectPolicy", "report");
 
@@ -140,6 +142,44 @@ describe("GC finalizer callbacks", function () {
             expect(String(events[0].error)).toMatch(/released/);
             done();
         }, 0);
+    });
+
+    it("keeps a struct view reachable only through a resurrected parent intact", function () {
+        var StructParent = (function (_super) {
+            __extends(StructParent, _super);
+            function StructParent() {
+                return (_super !== null && _super.apply(this, arguments)) || this;
+            }
+            return StructParent;
+        })(NSObject);
+
+        var N = 16;
+        var holder = NSMutableArray.alloc().init();
+        (function create() {
+            for (var i = 0; i < N; i++) {
+                var t = StructParent.alloc().init();
+                // Only the view is held; its root is reachable through it alone.
+                t.size = CGRectMake(1, 2, 3, 4).size;
+                t.__mine = true;
+                holder.addObject(t);
+            }
+        })();
+
+        scrubStack();
+        __collect();
+        __collect();
+
+        for (var i = 0; i < N; i++) {
+            var t2 = holder.objectAtIndex(i);
+            if (t2.__mine !== true) {
+                continue;
+            }
+            expect(t2.size.width).toBe(3);
+            expect(t2.size.height).toBe(4);
+            t2.size.width = 5;
+            expect(t2.size.width).toBe(5);
+        }
+        holder.removeAllObjects();
     });
 
     // Overwrites the stack region that held the creation locals so

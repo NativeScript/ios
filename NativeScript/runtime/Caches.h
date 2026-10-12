@@ -14,6 +14,8 @@
 namespace tns {
 
 struct StructInfo;
+class StructWrapper;
+enum class StructStorage;
 struct ObjectWeakCallbackState;
 class PromiseRejectionTracker;
 class IsolateTracked;
@@ -32,13 +34,6 @@ struct TransparentStringEqual {
   using is_transparent = void;
   bool operator()(std::string_view lhs, std::string_view rhs) const {
     return lhs == rhs;
-  }
-};
-
-struct pair_hash {
-  template <class T1, class T2>
-  std::size_t operator()(const std::pair<T1, T2>& pair) const {
-    return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
   }
 };
 
@@ -169,12 +164,6 @@ class Caches {
 
   robin_hood::unordered_map<id, std::shared_ptr<v8::Persistent<v8::Value>>>
       Instances;
-  // Root struct objects by (backing buffer, struct type). Child views created
-  // for nested-struct fields are never entered here.
-  robin_hood::unordered_map<std::pair<void*, const StructInfo*>,
-                            std::shared_ptr<v8::Persistent<v8::Value>>,
-                            pair_hash>
-      StructInstances;
   robin_hood::unordered_map<const void*,
                             std::shared_ptr<v8::Persistent<v8::Object>>>
       PointerInstances;
@@ -188,19 +177,18 @@ class Caches {
       v8::Local<v8::Context>, const BaseClassMeta*, KnownUnknownClassPair,
       const std::vector<std::string>&)>
       ObjectCtorInitializer;
-  // Resolves the prototype a struct instance of the given type must carry.
-  // Indirected through std::function so this header stays free of
-  // MetadataBuilder.
-  std::function<v8::Local<v8::Object>(v8::Local<v8::Context>,
-                                      const StructInfo&)>
-      StructPrototypeInitializer;
+  // Builds a struct object over `data`: a copy of it (kCopy; zero-filled when
+  // `data` is null) or an alias kept alive by `parent` (kAlias). Indirected
+  // through std::function so this header stays free of MetadataBuilder.
+  std::function<v8::Local<v8::Object>(v8::Local<v8::Context>, const StructInfo&,
+                                      void* data, StructStorage storage,
+                                      v8::Local<v8::Object> parent)>
+      StructInstanceFactory;
   robin_hood::unordered_map<const InterfaceMeta*,
                             std::vector<const MethodMeta*>>
       Initializers;
 
   std::unique_ptr<v8::Persistent<v8::Function>> EmptyObjCtorFunc =
-      std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
-  std::unique_ptr<v8::Persistent<v8::Function>> EmptyStructCtorFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
   std::unique_ptr<v8::Persistent<v8::Function>> SliceFunc =
       std::unique_ptr<v8::Persistent<v8::Function>>(nullptr);
