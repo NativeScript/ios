@@ -275,6 +275,14 @@ inline v8::Local<v8::Value> UnwrapProxy(v8::Local<v8::Value> value) {
 // NativeScriptException carrying a TypeError.
 v8::Local<v8::Value> UnwrapProxyOrThrow(v8::Isolate* isolate, v8::Local<v8::Value> value);
 
+// The value native code should read properties and elements from, given the
+// original value and its unwrapped target. A Proxy over an ordinary object or
+// Array is read through its traps, so native code sees what JS sees. Any other
+// target is read directly: native wrappers keep their state on the target, and
+// objects with internal slots (Map, Set, buffers, Date, RegExp, boxed
+// primitives, functions) reject a Proxy receiver in their own methods.
+v8::Local<v8::Value> ProxyReadSource(v8::Local<v8::Value> original, v8::Local<v8::Value> target);
+
 // The object's creation context, or the isolate's current (else main) context
 // for objects that have none, such as proxies.
 v8::Local<v8::Context> GetCreationContextOrCurrent(v8::Isolate* isolate,

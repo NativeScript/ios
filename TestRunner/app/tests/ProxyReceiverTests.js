@@ -193,4 +193,101 @@ describe(module.id, function () {
         expect(proxy.length).toBe(3);
         expect(accessed).toContain("length");
     });
+
+    it("reads a proxied array through its get and has traps", function () {
+        var proxy = new Proxy([], {
+            get: function (target, key, receiver) {
+                if (key === "length") {
+                    return 3;
+                }
+                if (key === "0" || key === "1" || key === "2") {
+                    return Number(key) * 10;
+                }
+                return Reflect.get(target, key, receiver);
+            },
+            has: function (target, key) {
+                return key === "0" || key === "1" || key === "2" || Reflect.has(target, key);
+            }
+        });
+
+        var array = NSArray.arrayWithArray(proxy);
+
+        expect(array.count).toBe(3);
+        expect(array.objectAtIndex(0)).toBe(0);
+        expect(array.objectAtIndex(1)).toBe(10);
+        expect(array.objectAtIndex(2)).toBe(20);
+    });
+
+    it("enumerates a proxied object through its ownKeys trap", function () {
+        var proxy = new Proxy({ a: 1, b: 2 }, {
+            ownKeys: function () {
+                return ["a"];
+            },
+            getOwnPropertyDescriptor: function (target, key) {
+                return key === "a" ? Reflect.getOwnPropertyDescriptor(target, key) : undefined;
+            }
+        });
+
+        var dictionary = NSDictionary.dictionaryWithDictionary(proxy);
+
+        expect(dictionary.count).toBe(1);
+        expect(dictionary.objectForKey("a")).toBe(1);
+        expect(dictionary.objectForKey("b")).toBe(null);
+    });
+
+    it("reads values a get trap unwraps, like Vue's reactive refs", function () {
+        var ref = { __v_isRef: true, value: 1 };
+        var proxy = new Proxy({ a: ref }, {
+            get: function (target, key, receiver) {
+                var value = Reflect.get(target, key, receiver);
+                return value && value.__v_isRef ? value.value : value;
+            }
+        });
+
+        var dictionary = NSDictionary.dictionaryWithDictionary(proxy);
+
+        expect(dictionary.count).toBe(1);
+        expect(dictionary.objectForKey("a")).toBe(1);
+    });
+
+    it("throws the error of a throwing get trap on a proxied array argument", function () {
+        var proxy = new Proxy([1, 2], {
+            get: function (target, key, receiver) {
+                if (key === "1") {
+                    throw new Error("boom");
+                }
+                return Reflect.get(target, key, receiver);
+            }
+        });
+
+        expect(function () {
+            NSArray.arrayWithArray(proxy);
+        }).toThrowError(/boom/);
+    });
+
+    it("passes a proxied Map as an NSDictionary of its entries", function () {
+        var map = new Map();
+        map.set("k", "v");
+
+        var dictionary = NSDictionary.dictionaryWithDictionary(new Proxy(map, {}));
+
+        expect(dictionary.count).toBe(1);
+        expect(dictionary.objectForKey("k")).toBe("v");
+    });
+
+    it("initializes a struct through the get trap of a proxied object", function () {
+        var proxy = new Proxy({}, {
+            get: function (target, key) {
+                return key === "location" ? 5 : key === "length" ? 6 : undefined;
+            },
+            has: function () {
+                return true;
+            }
+        });
+
+        var value = NSValue.valueWithRange(proxy);
+
+        expect(value.rangeValue.location).toBe(5);
+        expect(value.rangeValue.length).toBe(6);
+    });
 });

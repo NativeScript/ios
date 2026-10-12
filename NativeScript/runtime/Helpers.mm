@@ -211,6 +211,24 @@ Local<Value> tns::UnwrapProxyOrThrow(Isolate* isolate, Local<Value> value) {
   return target;
 }
 
+Local<Value> tns::ProxyReadSource(Local<Value> original, Local<Value> target) {
+  if (original.IsEmpty() || !original->IsProxy() || target.IsEmpty() || !target->IsObject()) {
+    return target;
+  }
+  if (target->IsArray()) {
+    return original;
+  }
+  if (target->IsFunction() || target->IsMap() || target->IsSet() || target->IsWeakMap() ||
+      target->IsWeakSet() || target->IsArrayBuffer() || target->IsArrayBufferView() ||
+      target->IsSharedArrayBuffer() || target->IsDate() || target->IsRegExp() ||
+      target->IsStringObject() || target->IsNumberObject() || target->IsBooleanObject() ||
+      target->IsBigIntObject() || target->IsSymbolObject() || target->IsPromise() ||
+      target.As<Object>()->InternalFieldCount() > 0) {
+    return target;
+  }
+  return original;
+}
+
 Local<Context> tns::GetCreationContextOrCurrent(Isolate* isolate, const Local<Object>& obj) {
   Local<Context> context;
   if (obj->GetCreationContext(isolate).ToLocal(&context)) {
