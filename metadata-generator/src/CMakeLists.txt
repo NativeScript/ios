@@ -33,6 +33,7 @@ set(GENERATOR_HEADERS
     Utils/stream.h
     Utils/StringHasher.h
     Utils/StringUtils.h
+    Json/JsonSerializer.h
     Yaml/MetaYamlTraits.h
     Yaml/YamlSerializer.h
 )

@@ -1,0 +1,13 @@
+{
+  "methods": [
+    {"class": "UIScreen", "selector": "scale"},
+    {"class": "UIView", "selector": "frame"},
+    {"class": "UIView", "selector": "setNeedsLayout"},
+    {"class": "UIView", "selector": "addSubview:"},
+    {"class": "UIView", "selector": "convertPoint:toView:"},
+    {"class": "UILabel", "selector": "description"},
+    {"class": "NSDictionary", "selector": "objectForKey:"},
+    {"class": "UIColor", "selector": "colorWithRed:green:blue:alpha:", "static": true},
+    {"class": "NSIndexPath", "selector": "indexPathForItem:inSection:", "static": true}
+  ]
+}

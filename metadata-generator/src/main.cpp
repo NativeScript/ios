@@ -1,5 +1,15 @@
+#include <clang/Frontend/CompilerInstance.h>
+#include <clang/Tooling/Tooling.h>
+#include <llvm/Support/Debug.h>
+#include <llvm/Support/Path.h>
+#include <pwd.h>
+
+#include <fstream>
+#include <sstream>
+
 #include "Binary/binarySerializer.h"
 #include "HeadersParser/Parser.h"
+#include "Json/JsonSerializer.h"
 #include "Meta/DeclarationConverterVisitor.h"
 #include "Meta/Filters/HandleExceptionalMetasFilter.h"
 #include "Meta/Filters/HandleMethodsAndPropertiesWithSameNameFilter.h"
@@ -10,13 +20,6 @@
 #include "TypeScript/DefinitionWriter.h"
 #include "TypeScript/DocSetManager.h"
 #include "Yaml/YamlSerializer.h"
-#include <clang/Frontend/CompilerInstance.h>
-#include <clang/Tooling/Tooling.h>
-#include <fstream>
-#include <llvm/Support/Debug.h>
-#include <llvm/Support/Path.h>
-#include <pwd.h>
-#include <sstream>
 
 // Command line parameters
 llvm::cl::opt<bool>   cla_verbose("verbose", llvm::cl::desc("Set verbose output mode"), llvm::cl::value_desc("bool"));
@@ -24,6 +27,9 @@ llvm::cl::opt<bool>   cla_strictIncludes("strict-includes", llvm::cl::desc("Set 
 llvm::cl::opt<string> cla_outputUmbrellaHeaderFile("output-umbrella", llvm::cl::desc("Specify the output umbrella header file"), llvm::cl::value_desc("file_path"));
 llvm::cl::opt<string> cla_inputUmbrellaHeaderFile("input-umbrella", llvm::cl::desc("Specify the input umbrella header file"), llvm::cl::value_desc("file_path"));
 llvm::cl::opt<string> cla_outputYamlFolder("output-yaml", llvm::cl::desc("Specify the output yaml folder"), llvm::cl::value_desc("<dir_path>"));
+llvm::cl::opt<string> cla_outputJsonFolder(
+    "output-json", llvm::cl::desc("Specify the output json folder"),
+    llvm::cl::value_desc("<dir_path>"));
 llvm::cl::opt<string> cla_outputModuleMapsFolder("output-modulemaps", llvm::cl::desc("Specify the fodler where modulemap files of all parsed modules will be dumped"), llvm::cl::value_desc("<dir_path>"));
 llvm::cl::opt<string> cla_outputBinFile("output-bin", llvm::cl::desc("Specify the output binary metadata file"), llvm::cl::value_desc("<file_path>"));
 llvm::cl::opt<string> cla_outputDtsFolder("output-typescript", llvm::cl::desc("Specify the output .d.ts folder"), llvm::cl::value_desc("<dir_path>"));
@@ -92,6 +98,18 @@ public:
                 DEBUG_WITH_TYPE("yaml", llvm::dbgs() << "Generating: " << yamlFileName << "\n");
                 Yaml::YamlSerializer::serialize<std::pair<clang::Module*, std::vector<Meta::Meta*> > >(cla_outputYamlFolder + "/" + yamlFileName, modulePair);
             }
+        }
+
+        // Serialize Meta objects to JSON
+        if (!cla_outputJsonFolder.empty()) {
+          llvm::sys::fs::create_directories(cla_outputJsonFolder);
+          for (std::pair<clang::Module*, std::vector<Meta::Meta*> >&
+                   modulePair : metasByModules) {
+            std::string jsonFileName =
+                modulePair.first->getFullModuleName() + ".json";
+            Json::JsonSerializer::serialize(
+                cla_outputJsonFolder + "/" + jsonFileName, modulePair);
+          }
         }
 
         // Serialize Meta objects to binary metadata

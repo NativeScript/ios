@@ -120,6 +120,7 @@ require("./Inheritance/ProtocolImplementationTests");
 require("./Inheritance/TypeScriptTests");
 //
 require("./MethodCallsTests");
+require("./AOTDirectCallsTests");
 require("./StaleWrapperCacheTests");
 //import "./FunctionsTests";
 require("./VersionDiffTests");
