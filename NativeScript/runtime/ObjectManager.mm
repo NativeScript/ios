@@ -7,6 +7,7 @@
 #include "DataWrapper.h"
 #include "FFICall.h"
 #include "Helpers.h"
+#include "RuntimeConfig.h"
 
 using namespace v8;
 using namespace std;
@@ -15,10 +16,147 @@ namespace tns {
 
 static Class NSTimerClass = objc_getClass("NSTimer");
 
+namespace {
+
+void ResetReleaseTracking(Isolate* isolate, GCType type, GCCallbackFlags flags) {
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  if (cache == nullptr) {
+    return;
+  }
+  cache->KeptObjectProperties.clear();
+}
+
+}  // namespace
+
 void ObjectManager::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
   globalTemplate->Set(tns::ToV8String(isolate, "__releaseNativeCounterpart"),
                       FunctionTemplate::New(isolate, ReleaseNativeCounterpartCallback));
+  if (RuntimeConfig.IsDebug) {
+    isolate->AddGCPrologueCallback(ResetReleaseTracking);
+  }
 }
+
+namespace {
+
+// Names the class of an ObjC object this finalizer is about to release, or
+// returns an empty string when disposal will not release one (protected,
+// already detached, or not an ObjC wrapper). Read before disposal: it deletes
+// the wrapper.
+std::string ReleasableClassName(Isolate* isolate, Local<Value> value) {
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+  if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject ||
+      wrapper->IsGcProtected()) {
+    return std::string();
+  }
+  id target = static_cast<ObjCDataWrapper*>(wrapper)->Data();
+  return target != nil ? std::string(object_getClassName(target)) : std::string();
+}
+
+void SetTag(Isolate* isolate, Local<Object> obj, const char* key, const std::string& value) {
+  Local<Context> context;
+  if (!obj->GetCreationContext(isolate).ToLocal(&context)) {
+    return;
+  }
+  obj->SetPrivate(context, Private::ForApi(isolate, tns::ToV8String(isolate, key)),
+                  tns::ToV8String(isolate, value))
+      .FromMaybe(false);
+}
+
+void MarkReleasedThrough(Isolate* isolate, Local<Object> released, const std::string& path) {
+  SetTag(isolate, released, tns::kReleasedThroughKey, path);
+  Log(@"Warning: the native object referenced by '%s' was released by the garbage collector. "
+      @"'%s' is kept alive only because native code retains it, which does not keep the objects "
+      @"its JS properties reference alive. Keep the owner or the property's value reachable "
+      @"from a JS root.",
+      path.c_str(), path.substr(0, path.rfind('.')).c_str());
+}
+
+// Child finalized after its kept owner: the owner's walk recorded it.
+void TrackReleased(Isolate* isolate, Local<Object> released, const std::string& className) {
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  for (auto& entry : cache->KeptObjectProperties) {
+    if (entry.first.Get(isolate) == released) {
+      SetTag(isolate, released, tns::kReleasedClassKey, className);
+      MarkReleasedThrough(isolate, released, entry.second);
+      return;
+    }
+  }
+}
+
+// A natively retained object this finalizer kept: its own data properties are
+// the objects the same drain may release through it. One level deep, which is
+// the delegate-holds-a-native-object shape.
+void TrackKept(Isolate* isolate, Local<Object> kept) {
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, kept);
+  if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject ||
+      !wrapper->IsGcProtected()) {
+    return;
+  }
+  id target = static_cast<ObjCDataWrapper*>(wrapper)->Data();
+  Local<Context> context;
+  Local<v8::Array> names;
+  if (target == nil || !kept->GetCreationContext(isolate).ToLocal(&context) ||
+      !kept->GetOwnPropertyNames(context, PropertyFilter::ONLY_ENUMERABLE).ToLocal(&names)) {
+    return;
+  }
+
+  std::string owner = object_getClassName(target);
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  for (uint32_t i = 0; i < names->Length(); i++) {
+    Local<Value> name;
+    if (!names->Get(context, i).ToLocal(&name) || !name->IsString()) {
+      continue;
+    }
+    // Accessors would run JS from inside the drain.
+    if (kept->HasRealNamedCallbackProperty(context, name.As<v8::String>()).FromMaybe(true)) {
+      continue;
+    }
+    Local<Value> value;
+    if (!kept->GetRealNamedProperty(context, name.As<v8::String>()).ToLocal(&value) ||
+        !value->IsObject()) {
+      continue;
+    }
+    Local<Object> child = value.As<Object>();
+    std::string path = owner + "." + tns::ToString(isolate, name);
+
+    // Child finalized before its kept owner: it is already a husk, a wrapper
+    // object whose internal field disposal neutered. A husk labelled by an
+    // earlier collection is not reported again.
+    if (child->InternalFieldCount() > 0 && tns::GetValue(isolate, child) == nullptr) {
+      Local<Private> throughKey =
+          Private::ForApi(isolate, tns::ToV8String(isolate, tns::kReleasedThroughKey));
+      if (!child->HasPrivate(context, throughKey).FromMaybe(true)) {
+        SetTag(isolate, child, tns::kReleasedClassKey,
+               tns::ToString(isolate, child->GetConstructorName()));
+        MarkReleasedThrough(isolate, child, path);
+      }
+    } else if (!ReleasableClassName(isolate, child).empty()) {
+      cache->KeptObjectProperties.emplace_back(v8::Global<Object>(isolate, child), path);
+    }
+  }
+}
+
+// DisposeValue plus the debug-only naming of the "Known hazard" in
+// docs/knowledge/v8-resurrecting-finalizers.md: a kept, natively retained
+// object can come back holding a property whose native object this drain
+// released, and the husk then explains itself (ReleasedObjectMessage).
+bool DisposeAndTrackRelease(Isolate* isolate, Local<Value> value) {
+  std::string releasedClass;
+  if (!Caches::Get(isolate)->KeptObjectProperties.empty()) {
+    releasedClass = ReleasableClassName(isolate, value);
+  }
+  bool disposed = ObjectManager::DisposeValue(isolate, value);
+  if (!value.IsEmpty() && value->IsObject()) {
+    if (disposed && !releasedClass.empty()) {
+      TrackReleased(isolate, value.As<Object>(), releasedClass);
+    } else if (!disposed) {
+      TrackKept(isolate, value.As<Object>());
+    }
+  }
+  return disposed;
+}
+
+}  // namespace
 
 namespace {
 
@@ -104,6 +242,10 @@ void ObjectManager::DisposeAllRegistered(Isolate* isolate) {
   Isolate::Scope isolateScope(isolate);
   HandleScope scope(isolate);
 
+  // Globals reset in their destructor, and the Caches holding them can outlive
+  // the isolate; let them go while it is still alive.
+  cache->KeptObjectProperties.clear();
+
   // Detach the whole list first so disposal can't walk into freed entries, and
   // claim every state up front: disposing one entry can re-enter JS from
   // -dealloc and reach __releaseNativeCounterpart for any other entry this
@@ -155,7 +297,8 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
 
   state->disposing_ = true;
   Local<Value> value = state->target_->Get(isolate);
-  bool disposed = ObjectManager::DisposeValue(isolate, value);
+  bool disposed = RuntimeConfig.IsDebug ? DisposeAndTrackRelease(isolate, value)
+                                        : ObjectManager::DisposeValue(isolate, value);
   state->disposing_ = false;
 
   // Disposal releases the native counterpart, and a -dealloc reached that way

@@ -158,6 +158,16 @@ runtime's `docs/knowledge/v8-resurrecting-finalizers.md`):
 - `"throw"`: the touch throws a catchable `ReferenceError` synchronously, and
   no event fires.
 
+ObjC method and property calls on a released object are the exception: they
+always throw a `ReferenceError`, whatever the policy says. Skipping a call would
+break its caller's contract (a completion handler that never runs), and an
+exception reaches the app's error handlers in every build.
+
+In debug builds the error message also names the released object's native
+class and, when the collector released it through a property of a natively
+retained object it kept alive, that property (e.g. `'MyDelegate.provider'`),
+and the release itself logs a warning when it happens.
+
 ```js
 const { setConfig } = require("ns:runtime");
 

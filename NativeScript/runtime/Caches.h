@@ -143,6 +143,13 @@ class Caches {
   // wrappers.
   ObjectWeakCallbackState* ObjectManagedValues = nullptr;
 
+  // Debug builds only: the ObjC objects a finalizer drain may release
+  // through a natively retained object it kept, as "Owner.property", so their
+  // own finalizer can name the husk (ObjectManager::FinalizerCallback). A GC
+  // prologue clears it, so it only describes the collection in progress.
+  std::vector<std::pair<v8::Global<v8::Object>, std::string>>
+      KeptObjectProperties;
+
   robin_hood::unordered_map<const Meta*,
                             std::unique_ptr<v8::Persistent<v8::Value>>>
       Prototypes;

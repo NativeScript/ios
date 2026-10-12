@@ -38,21 +38,20 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
     BaseDataWrapper* wrapper = tns::GetValue(isolate, receiver);
 
     if (wrapper == nullptr) {
-      // During fast view churn like HMR in development, JS objects can outlive their
-      // native wrappers briefly. In Debug, throw a catchable JS error instead of crashing.
-      // In Release, assert so crash reporting can capture unexpected cases.
-      if (RuntimeConfig.IsDebug) {
-        const char* selectorStr = meta ? meta->selectorAsString() : "<unknown>";
-        const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
-        const char* classNameStr = klass ? class_getName(klass) : "<unknown>";
-        std::string errMsg = std::string("Cannot call method '") + jsNameStr +
-                             "' on a disposed native object (class: " + classNameStr +
-                             ", selector: " + selectorStr +
-                             "). This can happen during HMR or fast view churn.";
-        throw NativeScriptException(isolate, errMsg);
-      } else {
-        tns::Assert(false, isolate);
-      }
+      // A JS object can outlive its native half: a husk the finalizer drain
+      // left behind (docs/knowledge/v8-resurrecting-finalizers.md, "Known
+      // hazard"), or one briefly orphaned by fast view churn like HMR. Unlike
+      // the other released-object touches this always throws, whatever
+      // releasedObjectPolicy says: a skipped call breaks its caller's
+      // contract (a completion that never fires), and an exception reaches
+      // the app's error handlers in every build.
+      std::string message = tns::ReleasedObjectMessage(
+          isolate, receiver,
+          (std::string("method '") + (meta ? meta->jsName() : "<unknown>") + "' (" +
+           (meta ? meta->selectorAsString() : "<unknown>") + ")")
+              .c_str());
+      throw NativeScriptException(
+          isolate, v8::Exception::ReferenceError(tns::ToV8String(isolate, message)), message);
     }
 
     if (wrapper->Type() == WrapperType::ObjCAllocObject) {
