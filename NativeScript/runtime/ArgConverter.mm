@@ -1,5 +1,6 @@
 #include "ArgConverter.h"
 #include <Foundation/Foundation.h>
+#include <algorithm>
 #include <sstream>
 #include "DictionaryAdapter.h"
 #include "Helpers.h"
@@ -438,7 +439,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
       if (!success) {
         memset(retValue, 0, cif->rtype->size);
       } else {
-        ArgConverter::SetValue(context, retValue, result, data->typeEncoding_);
+        ArgConverter::SetValue(context, retValue, cif->rtype->size, result, data->typeEncoding_);
       }
     } else {
       memset(retValue, 0, cif->rtype->size);
@@ -450,15 +451,19 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
   }
 }
 
-void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value> value,
-                            const TypeEncoding* typeEncoding) {
+void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t returnSize,
+                            Local<Value> value, const TypeEncoding* typeEncoding) {
   if (typeEncoding->type == BinaryTypeEncodingType::VoidEncoding) {
     return;
   }
 
+  // Runs inside an ffi closure, where a C++ throw cannot propagate; a revoked
+  // proxy returns nil. libffi sizes the return slot to at least ffi_arg even
+  // for narrower types, and the full slot must be written.
+  Local<Value> original = value;
+  value = tns::UnwrapProxy(value);
   if (value.IsEmpty() || value->IsNullOrUndefined()) {
-    void* nullPtr = nullptr;
-    *(ffi_arg*)retValue = (unsigned long)nullPtr;
+    memset(retValue, 0, std::max(returnSize, sizeof(ffi_arg)));
     return;
   }
 
@@ -540,8 +545,9 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, Local<Value>
         *static_cast<id __strong*>(retValue) = data;
         return;
       } else {
-        id adapter = [[DictionaryAdapter alloc] initWithJSObject:value.As<Object>()
-                                                         isolate:isolate];
+        id adapter = [[DictionaryAdapter alloc]
+            initWithJSObject:tns::ProxyReadSource(original, value).As<Object>()
+                     isolate:isolate];
         memset(retValue, 0, sizeof(id));
         *static_cast<id __strong*>(retValue) = adapter;
         // CFAutorelease(adapter);
@@ -651,7 +657,9 @@ const MethodMeta* ArgConverter::FindInitializer(Local<Context> context, Class kl
   std::vector<Local<Value>> initializerArgs;
   std::string constructorTokens;
   if (info.Length() == 1 && info[0]->IsObject() && tns::GetValue(isolate, info[0]) == nullptr) {
-    initializerArgs = GetInitializerArgs(info[0].As<Object>(), constructorTokens);
+    Local<Value> initializer = tns::UnwrapProxyOrThrow(isolate, info[0]);
+    initializerArgs = GetInitializerArgs(tns::ProxyReadSource(info[0], initializer).As<Object>(),
+                                         constructorTokens);
   }
 
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
@@ -733,6 +741,8 @@ bool ArgConverter::CanInvoke(Local<Context> context, const MethodMeta* candidate
 
 bool ArgConverter::CanInvoke(Local<Context> context, const TypeEncoding* typeEncoding,
                              Local<Value> arg) {
+  // A revoked proxy matches anything so marshalling reports it as such.
+  arg = tns::UnwrapProxy(arg);
   if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
     return true;
   }
@@ -811,26 +821,27 @@ std::vector<Local<Value>> ArgConverter::GetInitializerArgs(Local<Object> obj,
                                                            std::string& constructorTokens) {
   std::vector<Local<Value>> args;
   constructorTokens = "";
-  Local<Context> context;
-  bool success = obj->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
-  tns::Assert(success);
   Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Context> context = tns::GetCreationContextOrCurrent(isolate, obj);
   Local<v8::Array> properties;
-  if (obj->GetOwnPropertyNames(context).ToLocal(&properties)) {
-    std::stringstream ss;
-    for (uint32_t i = 0; i < properties->Length(); i++) {
-      Local<Value> propertyName;
-      if (properties->Get(context, i).ToLocal(&propertyName)) {
-        std::string name = tns::ToString(isolate, propertyName);
-        ss << name << ":";
-        Local<Value> propertyValue;
-        bool ok = obj->Get(context, propertyName).ToLocal(&propertyValue);
-        tns::Assert(ok, isolate);
-        args.push_back(propertyValue);
-      }
-    }
-    constructorTokens = ss.str();
+  TryCatch tc(isolate);
+  if (!obj->GetOwnPropertyNames(context).ToLocal(&properties)) {
+    throw NativeScriptException(isolate, tc, "Cannot read initializer object");
   }
+  std::stringstream ss;
+  for (uint32_t i = 0; i < properties->Length(); i++) {
+    Local<Value> propertyName;
+    if (properties->Get(context, i).ToLocal(&propertyName)) {
+      std::string name = tns::ToString(isolate, propertyName);
+      ss << name << ":";
+      Local<Value> propertyValue;
+      if (!obj->Get(context, propertyName).ToLocal(&propertyValue)) {
+        throw NativeScriptException(isolate, tc, "Cannot read initializer object");
+      }
+      args.push_back(propertyValue);
+    }
+  }
+  constructorTokens = ss.str();
 
   return args;
 }

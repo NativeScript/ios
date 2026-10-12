@@ -226,6 +226,9 @@ using namespace tns;
   // both isolate states; the field compare below guards the isolate-alive
   // path against a slot someone else overwrote.
   ObjCDataWrapper* dataWrapper_;
+  // The Proxy target holding dataWrapper_ when object_ is a Proxy: a Proxy
+  // revoked later no longer leads to it, and the claim must still be found.
+  Persistent<Value>* claimTarget_;
 }
 
 - (instancetype)initWithJSObject:(Local<Object>)jsObject isolate:(Isolate*)isolate {
@@ -240,6 +243,12 @@ using namespace tns;
       self->dataWrapper_ = new ObjCDataWrapper(self);
       self->dataWrapper_->MarkAdapterClaim();
       tns::SetValue(isolate, jsObject, self->dataWrapper_);
+      if (jsObject->IsProxy()) {
+        Local<Value> target = tns::UnwrapProxy(jsObject);
+        if (!target.IsEmpty()) {
+          self->claimTarget_ = new Persistent<Value>(isolate, target);
+        }
+      }
     }
   }
 
@@ -368,7 +377,8 @@ using namespace tns;
     // isolate is gone the field can no longer be read, so the claim is dropped
     // rather than freed blind.
     if (dataWrapper_ != nullptr) {
-      Local<Value> value = self->object_->Get(isolate);
+      Local<Value> value =
+          claimTarget_ != nullptr ? claimTarget_->Get(isolate) : self->object_->Get(isolate);
       if (tns::GetValue(isolate, value) == dataWrapper_) {
         tns::DeleteValue(isolate, value);
         delete dataWrapper_;
@@ -379,6 +389,9 @@ using namespace tns;
     // vended by -keyEnumerator hold this adapter alive, so nothing can be
     // reading the handle by the time this runs.
     self->object_->Reset();
+    if (claimTarget_ != nullptr) {
+      claimTarget_->Reset();
+    }
   } else if (dataWrapper_ != nullptr) {
     // The isolate is gone, and with it the JS object and every reader of the
     // claim; no other path deletes one (__releaseNativeCounterpart leaves
@@ -389,6 +402,8 @@ using namespace tns;
     dataWrapper_ = nullptr;
   }
   self->object_ = nullptr;
+  delete claimTarget_;
+  claimTarget_ = nullptr;
   delete self->wrapper_;
 
   [super dealloc];

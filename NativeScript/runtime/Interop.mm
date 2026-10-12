@@ -246,9 +246,49 @@ class ValueCache {
   IsOfType _isObject = UNDEFINED;
 };
 
+// Array.prototype.slice over `object`, so a Proxy's length and element reads
+// go through its traps. False when a read throws (the exception is left
+// pending) or the result is not an Array.
+static bool SnapshotArrayLike(Isolate* isolate, Local<Object> object, Local<v8::Array>& result) {
+  Local<v8::Function> sliceFunc;
+  auto cache = Caches::Get(isolate);
+  Persistent<v8::Function>* poSliceFunc = cache->SliceFunc.get();
+
+  if (poSliceFunc != nullptr) {
+    sliceFunc = poSliceFunc->Get(isolate);
+  } else {
+    std::string source = "Array.prototype.slice";
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Script> script;
+    if (!Script::Compile(context, tns::ToV8String(isolate, source)).ToLocal(&script)) {
+      tns::Assert(false, isolate);
+    }
+    tns::Assert(!script.IsEmpty(), isolate);
+
+    Local<Value> tempSliceFunc;
+    if (!script->Run(context).ToLocal(&tempSliceFunc)) {
+      tns::Assert(false, isolate);
+    }
+
+    tns::Assert(tempSliceFunc->IsFunction(), isolate);
+    sliceFunc = tempSliceFunc.As<v8::Function>();
+    cache->SliceFunc = std::make_unique<Persistent<v8::Function>>(isolate, sliceFunc);
+  }
+
+  Local<Context> context = tns::GetCreationContextOrCurrent(isolate, object);
+  Local<Value> value;
+  if (!sliceFunc->Call(context, object, 0, nullptr).ToLocal(&value) || !value->IsArray()) {
+    return false;
+  }
+  result = value.As<v8::Array>();
+  return true;
+}
+
 void Interop::WriteTypeValue(Local<Context> context, BaseDataWrapper* typeWrapper, void* dest,
                              Local<Value> arg) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Value> original = arg;
+  arg = tns::UnwrapProxyOrThrow(isolate, arg);
   ValueCache argHelper(arg);
   bool isEmptyOrUndefined = arg.IsEmpty() || arg->IsNullOrUndefined();
   bool success = false;
@@ -274,7 +314,8 @@ void Interop::WriteTypeValue(Local<Context> context, BaseDataWrapper* typeWrappe
         // Create the structure using the struct initializer syntax
         StructTypeWrapper* structTypeWrapper = static_cast<StructTypeWrapper*>(typeWrapper);
         const StructInfo& structInfo = structTypeWrapper->StructInfo();
-        Interop::InitializeStruct(context, dest, structInfo.Fields(), arg.As<Object>());
+        Interop::InitializeStruct(context, dest, structInfo.Fields(),
+                                  tns::ProxyReadSource(original, arg));
         success = true;
       }
     }
@@ -288,6 +329,11 @@ void Interop::WriteTypeValue(Local<Context> context, BaseDataWrapper* typeWrappe
 void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncoding, void* dest,
                          Local<Value> arg) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  // Classification and native-wrapper lookups use the Proxy target, whose type
+  // and internal fields a Proxy hides; JS-backed reads go through `source`.
+  Local<Value> original = arg;
+  arg = tns::UnwrapProxyOrThrow(isolate, arg);
+  Local<Value> source = tns::ProxyReadSource(original, arg);
   ExecuteWriteValueDebugValidationsIfInDebug(context, typeEncoding, dest, arg);
   ValueCache argHelper(arg);
   if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
@@ -473,7 +519,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
         // wrapper should be treated as a nullptr, except when deating with
         // StructDeclarationReference
         data = malloc(structInfo.FFIType()->size);
-        Interop::InitializeStruct(context, data, structInfo.Fields(), arg);
+        Interop::InitializeStruct(context, data, structInfo.Fields(), source);
       } else {
         if (wrapper == nullptr) {
           bool isArrayBuffer = false;
@@ -598,7 +644,6 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     Interop::SetValue(dest, blockPtr);
   } else if (argHelper.isObject() &&
              typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
-    Local<Object> obj = arg.As<Object>();
     BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
     if (wrapper != nullptr) {
       if (wrapper->Type() == WrapperType::Struct) {
@@ -623,11 +668,10 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
       const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
       const StructInfo& structInfo = FFICall::GetStructInfo(structMeta);
-      Interop::InitializeStruct(context, dest, structInfo.Fields(), obj);
+      Interop::InitializeStruct(context, dest, structInfo.Fields(), source);
     }
   } else if (argHelper.isObject() &&
              typeEncoding->type == BinaryTypeEncodingType::AnonymousStructEncoding) {
-    Local<Object> obj = arg.As<Object>();
     BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
     if (wrapper != nullptr && wrapper->Type() == WrapperType::Struct) {
       size_t fieldsCount = typeEncoding->details.anonymousRecord.fieldsCount;
@@ -648,7 +692,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
           typeEncoding->details.anonymousRecord.getFieldsEncodings();
       const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
       const StructInfo& structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
-      Interop::InitializeStruct(context, dest, structInfo.Fields(), obj);
+      Interop::InitializeStruct(context, dest, structInfo.Fields(), source);
     }
   } else if (arg->IsFunction() && typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
     Local<Object> obj = arg.As<Object>();
@@ -678,7 +722,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     Interop::SetValue(dest, data);
   } else if (typeEncoding->type == BinaryTypeEncodingType::ConstantArrayEncoding) {
     if (arg->IsArray()) {
-      Local<v8::Array> array = arg.As<v8::Array>();
+      Local<v8::Array> array = Interop::ToArray(source.As<Object>());
       Local<Context> context = isolate->GetCurrentContext();
       const TypeEncoding* innerType = typeEncoding->details.constantArray.getInnerType();
       ffi_type* ffiType = FFICall::GetArgumentType(innerType);
@@ -753,12 +797,13 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       Interop::SetValue(dest, CFBridgingRelease(adapter));
       // CFAutorelease(adapter);
     } else if (tns::IsArrayOrArrayLike(isolate, obj)) {
-      Local<v8::Array> array = Interop::ToArray(obj);
+      Local<v8::Array> array = Interop::ToArray(source.As<Object>());
       ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
       Interop::SetValue(dest, CFBridgingRelease(adapter));
       // CFAutorelease(adapter);
     } else {
-      DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
+      DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:source.As<Object>()
+                                                                       isolate:isolate];
       Interop::SetValue(dest, CFBridgingRelease(adapter));
       // CFAutorelease(adapter);
     }
@@ -769,6 +814,11 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
 
 id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  // Runs inside adapter callbacks invoked by native code, where a C++ throw
+  // cannot propagate; a revoked proxy reads as nil.
+  Local<Value> original = arg;
+  arg = tns::UnwrapProxy(arg);
+  Local<Value> source = tns::ProxyReadSource(original, arg);
   if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
     return nil;
   } else if (tns::IsString(arg)) {
@@ -786,8 +836,19 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
     bool value = tns::ToBool(arg);
     return @(value);
   } else if (arg->IsArray()) {
-    Local<Object> obj = arg.As<Object>();
-    ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:obj isolate:isolate];
+    Local<v8::Array> array = arg.As<v8::Array>();
+    if (source->IsProxy()) {
+      // Reported like the adapters' other read failures: a C++ throw or an
+      // @throw under the caller's V8 scopes cannot leave this frame.
+      TryCatch tc(isolate);
+      if (!SnapshotArrayLike(isolate, source.As<Object>(), array)) {
+        if (tc.HasCaught()) {
+          ArgConverter::HandleBoundaryException(context, tc);
+        }
+        return nil;
+      }
+    }
+    ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
     return adapter;
   } else if (arg->IsObject()) {
     if (BaseDataWrapper* wrapper = tns::GetValue(isolate, arg)) {
@@ -813,8 +874,8 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
           break;
       }
     } else {
-      Local<Object> obj = arg.As<Object>();
-      DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:obj isolate:isolate];
+      DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:source.As<Object>()
+                                                                       isolate:isolate];
       // CFAutorelease(adapter);
       return adapter;
     }
@@ -879,10 +940,12 @@ void Interop::InitializeStruct(Local<Context> context, void* destBuffer,
 
     Local<Value> value;
     if (!inititalizer.IsEmpty() && !inititalizer->IsNullOrUndefined() && inititalizer->IsObject()) {
-      bool success = inititalizer.As<Object>()
-                         ->Get(context, tns::ToV8String(isolate, field.Name()))
-                         .ToLocal(&value);
-      tns::Assert(success, isolate);
+      TryCatch tc(isolate);
+      if (!inititalizer.As<Object>()
+               ->Get(context, tns::ToV8String(isolate, field.Name()))
+               .ToLocal(&value)) {
+        throw NativeScriptException(isolate, tc, "Cannot read struct initializer field");
+      }
     }
 
     BinaryTypeEncodingType type = field.Encoding()->type;
@@ -912,10 +975,11 @@ void Interop::InitializeStruct(Local<Context> context, void* destBuffer,
       uint32_t length = field.Encoding()->details.constantArray.size;
       ptrdiff_t offset = position + field.Offset();
 
+      Local<Value> valueTarget = tns::UnwrapProxy(value);
       if (value.IsEmpty()) {
         position += length;
-      } else if (value->IsArray()) {
-        Local<v8::Array> array = value.As<v8::Array>();
+      } else if (!valueTarget.IsEmpty() && valueTarget->IsArray()) {
+        Local<v8::Array> array = Interop::ToArray(value.As<Object>());
         uint32_t min = std::min(length, array->Length());
         for (uint32_t index = 0; index < min; index++) {
           Local<Value> element;
@@ -1604,47 +1668,23 @@ void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrap
 }
 
 Local<v8::Array> Interop::ToArray(Local<Object> object) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
   if (object->IsArray()) {
     return object.As<v8::Array>();
   }
+  tns::UnwrapProxyOrThrow(isolate, object);
 
-  Local<Context> context;
-  bool success = object->GetCreationContext(v8::Isolate::GetCurrent()).ToLocal(&context);
-  tns::Assert(success);
-  Isolate* isolate = v8::Isolate::GetCurrent();
-
-  Local<v8::Function> sliceFunc;
-  auto cache = Caches::Get(isolate);
-  Persistent<v8::Function>* poSliceFunc = cache->SliceFunc.get();
-
-  if (poSliceFunc != nullptr) {
-    sliceFunc = poSliceFunc->Get(isolate);
-  } else {
-    std::string source = "Array.prototype.slice";
-    Local<Context> context = isolate->GetCurrentContext();
-    Local<Script> script;
-    if (!Script::Compile(context, tns::ToV8String(isolate, source)).ToLocal(&script)) {
-      tns::Assert(false, isolate);
+  TryCatch tc(isolate);
+  Local<v8::Array> result;
+  if (!SnapshotArrayLike(isolate, object, result)) {
+    if (tc.HasCaught()) {
+      throw NativeScriptException(isolate, tc, "Cannot convert value to an array");
     }
-    tns::Assert(!script.IsEmpty(), isolate);
-
-    Local<Value> tempSliceFunc;
-    if (!script->Run(context).ToLocal(&tempSliceFunc)) {
-      tns::Assert(false, isolate);
-    }
-
-    tns::Assert(tempSliceFunc->IsFunction(), isolate);
-    sliceFunc = tempSliceFunc.As<v8::Function>();
-    cache->SliceFunc = std::make_unique<Persistent<v8::Function>>(isolate, sliceFunc);
+    std::string message = "Cannot convert value to an array";
+    throw NativeScriptException(
+        isolate, v8::Exception::TypeError(tns::ToV8String(isolate, message)), message);
   }
-
-  Local<Value> sliceArgs[1]{object};
-
-  Local<Value> result;
-  success = sliceFunc->Call(context, object, 1, sliceArgs).ToLocal(&result);
-  tns::Assert(success, isolate);
-
-  return result.As<v8::Array>();
+  return result;
 }
 
 SEL Interop::GetSwizzledMethodSelector(SEL selector) {
