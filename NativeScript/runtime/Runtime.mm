@@ -393,8 +393,14 @@ Isolate* Runtime::CreateIsolate(const IsolateLimits& limits) {
 }
 
 void Runtime::Init(Isolate* isolate, bool isWorker) {
-  std::shared_ptr<Caches> cache =
-      Caches::Init(isolate, nextIsolateId.fetch_add(1, std::memory_order_relaxed));
+  std::shared_ptr<Caches> cache;
+  {
+    // CreateIsolate has already registered the isolate, so NotifyMemoryPressure
+    // can read its Caches slot from another thread. It reads under the registry
+    // lock, so the slot is published under it too.
+    SpinLock lock(isolatesMutex_);
+    cache = Caches::Init(isolate, nextIsolateId.fetch_add(1, std::memory_order_relaxed));
+  }
   // Before anything can build an IsolateWrapper for this isolate.
   IsolateGates::Open(cache->getGateId());
   cache->isWorker = isWorker;
