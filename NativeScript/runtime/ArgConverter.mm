@@ -686,7 +686,7 @@ bool ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
     if (type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
         type == BinaryTypeEncodingType::InstanceTypeEncoding ||
         type == BinaryTypeEncodingType::IdEncoding) {
-      BaseDataWrapper* baseWrapper = tns::GetValue(isolate, value);
+      BaseDataWrapper* baseWrapper = tns::GetValueForMarshalling(isolate, value);
       if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::ObjCObject) {
         ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(baseWrapper);
         WrapperLifetime::Escape(wrapper);

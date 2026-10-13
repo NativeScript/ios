@@ -517,6 +517,9 @@ ObjCDataWrapper::~ObjCDataWrapper() {
   if (this->lifetimeState_ != nullptr) {
     this->lifetimeState_->lifetimeWrapper_ = nullptr;
   }
+  if (this->adapterClaim_) {
+    objc_storeWeak(&this->data_, nil);
+  }
 }
 
 }  // namespace tns
