@@ -219,13 +219,78 @@ void Runtime::Initialize() {
   ExternalMemory::StartMemoryPressureMonitoring();
 }
 
-Runtime::Runtime() {
+Runtime::Runtime(const RuntimeOptions& options) : workerId_(options.workerId) {
   currentRuntime_ = this;
-  workerId_ = -1;
   workerCache_ = Caches::Workers;
+  const IsolateLimits& limits = options.limits;
+
+  if (!v8Initialized_) {
+    // Runtime::platform_ = RuntimeConfig.IsDebug
+    //     ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
+    //     : platform::NewDefaultPlatform();
+
+    // Flags must be set before V8::Initialize(), which freezes them; changing a
+    // flag afterwards aborts the process. Don't pass --jitless either:
+    // v8_enable_lite_mode already implies it and makes the flag read-only,
+    // which is likewise fatal to set.
+    std::string flags = RuntimeConfig.IsDebug ? "--expose_gc" : "--expose_gc --no-lazy";
+    V8::SetFlagsFromString(flags.c_str(), flags.size());
+
+    // wrap the default platform so foreground tasks ride each runtime
+    // thread's CFRunLoop instead of sitting in never-pumped libplatform queues
+    Runtime::platform_ = new NativeScriptPlatform(platform::NewDefaultPlatform());
+
+    V8::InitializePlatform(Runtime::platform_);
+    V8::Initialize();
+    v8Initialized_ = true;
+  }
+
+  timeOriginMonotonic_ = platform_->MonotonicallyIncreasingTime();
+  timeOriginRealtimeMs_ = platform_->CurrentClockTimeMillis();
+
+  // auto version = v8::V8::GetVersion();
+
+  Isolate::CreateParams create_params;
+  create_params.array_buffer_allocator = &allocator_;
+  if (limits.maxOldGenerationSizeBytes.has_value()) {
+    create_params.constraints.set_max_old_generation_size_in_bytes(
+        *limits.maxOldGenerationSizeBytes);
+  }
+  if (limits.maxYoungGenerationSizeBytes.has_value()) {
+    create_params.constraints.set_max_young_generation_size_in_bytes(
+        *limits.maxYoungGenerationSizeBytes);
+  }
+#ifdef V8_HAS_JS_DISPATCH_TABLE_RESERVATION_PARAM
+  if (limits.jsDispatchTableReservationBytes.has_value()) {
+    create_params.js_dispatch_table_reservation_size = *limits.jsDispatchTableReservationBytes;
+  }
+#endif
+  Isolate* isolate = Isolate::New(create_params);
+  runtimeLoop_ = CFRunLoopGetCurrent();
+  // v8 already asked for this isolate's task runner during Isolate::New, so
+  // the registry may hold an unbound loop - or a stopped one, when a worker
+  // isolate reuses a disposed isolate's address. Refresh, then attach to this
+  // thread; foreground tasks buffered so far start flowing from here on.
+  // (In the reused-address case, tasks v8 posted DURING Isolate::New landed
+  // in the stale stopped loop and were dropped - refreshing any earlier is
+  // impossible (the address isn't known) and refreshing on runner lookup
+  // would defeat the matched-erase teardown protection.)
+  eventLoop_ = NativeScriptPlatform::Instance()->RefreshEventLoop(isolate);
+  eventLoop_->BindToCurrentThread();
+  isolate->SetData(Constants::RUNTIME_SLOT, this);
+  isolate_ = isolate;
 }
 
 Runtime::~Runtime() {
+  if (!initialized_) {
+    // Never published: no other thread can know this isolate, and it holds no
+    // caches, gate or wrappers.
+    isolate_->Dispose();
+    NativeScriptPlatform::Instance()->IsolateDisposed(isolate_, eventLoop_);
+    currentRuntime_ = nullptr;
+    return;
+  }
+
   // Tear the rejection observer down before any isolate teardown: it references
   // the isolate and reads Caches, both of which are invalidated below.
   if (rejectionObserver_ != nullptr) {
@@ -328,73 +393,16 @@ Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
   return static_cast<Runtime*>(isolate->GetData(Constants::RUNTIME_SLOT));
 }
 
-Isolate* Runtime::CreateIsolate(const IsolateLimits& limits) {
-  if (!v8Initialized_) {
-    // Runtime::platform_ = RuntimeConfig.IsDebug
-    //     ? v8_inspector::V8InspectorPlatform::CreateDefaultPlatform()
-    //     : platform::NewDefaultPlatform();
-
-    // Flags must be set before V8::Initialize(), which freezes them; changing a
-    // flag afterwards aborts the process. Don't pass --jitless either:
-    // v8_enable_lite_mode already implies it and makes the flag read-only,
-    // which is likewise fatal to set.
-    std::string flags = RuntimeConfig.IsDebug ? "--expose_gc" : "--expose_gc --no-lazy";
-    V8::SetFlagsFromString(flags.c_str(), flags.size());
-
-    // wrap the default platform so foreground tasks ride each runtime
-    // thread's CFRunLoop instead of sitting in never-pumped libplatform queues
-    Runtime::platform_ = new NativeScriptPlatform(platform::NewDefaultPlatform());
-
-    V8::InitializePlatform(Runtime::platform_);
-    V8::Initialize();
-    v8Initialized_ = true;
-  }
-
-  timeOriginMonotonic_ = platform_->MonotonicallyIncreasingTime();
-  timeOriginRealtimeMs_ = platform_->CurrentClockTimeMillis();
-
-  // auto version = v8::V8::GetVersion();
-
-  Isolate::CreateParams create_params;
-  create_params.array_buffer_allocator = &allocator_;
-  if (limits.maxOldGenerationSizeBytes.has_value()) {
-    create_params.constraints.set_max_old_generation_size_in_bytes(
-        *limits.maxOldGenerationSizeBytes);
-  }
-  if (limits.maxYoungGenerationSizeBytes.has_value()) {
-    create_params.constraints.set_max_young_generation_size_in_bytes(
-        *limits.maxYoungGenerationSizeBytes);
-  }
-#ifdef V8_HAS_JS_DISPATCH_TABLE_RESERVATION_PARAM
-  if (limits.jsDispatchTableReservationBytes.has_value()) {
-    create_params.js_dispatch_table_reservation_size = *limits.jsDispatchTableReservationBytes;
-  }
-#endif
-  Isolate* isolate = Isolate::New(create_params);
-  runtimeLoop_ = CFRunLoopGetCurrent();
-  // v8 already asked for this isolate's task runner during Isolate::New, so
-  // the registry may hold an unbound loop - or a stopped one, when a worker
-  // isolate reuses a disposed isolate's address. Refresh, then attach to this
-  // thread; foreground tasks buffered so far start flowing from here on.
-  // (In the reused-address case, tasks v8 posted DURING Isolate::New landed
-  // in the stale stopped loop and were dropped - refreshing any earlier is
-  // impossible (the address isn't known) and refreshing on runner lookup
-  // would defeat the matched-erase teardown protection.)
-  eventLoop_ = NativeScriptPlatform::Instance()->RefreshEventLoop(isolate);
-  eventLoop_->BindToCurrentThread();
-  isolate->SetData(Constants::RUNTIME_SLOT, this);
-
+void Runtime::Init() {
+  Isolate* isolate = isolate_;
+  bool isWorker = IsRuntimeWorker();
+  std::shared_ptr<Caches> cache =
+      Caches::Init(isolate, nextIsolateId.fetch_add(1, std::memory_order_relaxed));
   {
     SpinLock lock(isolatesMutex_);
     Runtime::isolates_.emplace_back(isolate);
   }
-
-  return isolate;
-}
-
-void Runtime::Init(Isolate* isolate, bool isWorker) {
-  std::shared_ptr<Caches> cache =
-      Caches::Init(isolate, nextIsolateId.fetch_add(1, std::memory_order_relaxed));
+  initialized_ = true;
   // Before anything can build an IsolateWrapper for this isolate.
   IsolateGates::Open(cache->getGateId());
   cache->isWorker = isWorker;
@@ -497,8 +505,6 @@ void Runtime::Init(Isolate* isolate, bool isWorker) {
   cache->SetContext(context);
 
   this->napiEnv_ = NapiEnv::Create(context);
-
-  this->isolate_ = isolate;
 }
 
 void Runtime::RunMainScript() {
@@ -581,8 +587,6 @@ void Runtime::RunScript(const std::string script) {
 Isolate* Runtime::GetIsolate() { return this->isolate_; }
 
 const int Runtime::WorkerId() { return this->workerId_; }
-
-void Runtime::SetWorkerId(int workerId) { this->workerId_ = workerId; }
 
 id Runtime::GetAppConfigValue(std::string key) {
   if (AppPackageJson == nil) {

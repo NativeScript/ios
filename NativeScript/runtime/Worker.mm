@@ -479,17 +479,16 @@ void Worker::ConstructorCallback(const FunctionCallbackInfo<Value>& info) {
         resolvedPath = RuntimeConfig.ApplicationPath + "/" + tail;
       }
 
-      tns::Runtime* runtime = new tns::Runtime();
-      Isolate* isolate = runtime->CreateIsolate(resourceLimits);
+      int workerId = worker->WorkerId();
+      tns::Runtime* runtime = new tns::Runtime({.limits = resourceLimits, .workerId = workerId});
+      Isolate* isolate = runtime->GetIsolate();
       v8::Locker locker(isolate);
       // Armed for every worker isolate, capped or not: without it V8 aborts the
       // whole process when a worker exhausts its heap.
       worker->WatchHeapLimit(isolate, resolvedPath, resourceLimits.maxOldGenerationSizeBytes);
-      runtime->Init(isolate, true);
+      runtime->Init();
       // Before any module load runs in this isolate.
       tns::InstallLoaderVocabulary(isolate, inheritedVocabulary);
-      runtime->SetWorkerId(worker->WorkerId());
-      int workerId = worker->WorkerId();
       Worker::SetWorkerId(isolate, workerId);
 
       // Expose this worker to an attached Chrome DevTools frontend as a
