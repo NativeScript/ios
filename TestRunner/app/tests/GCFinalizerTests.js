@@ -497,4 +497,141 @@ describe("GC finalizer callbacks", function () {
             done();
         }, 0);
     });
+
+    it("leaves borrowed adapter claims owned by their native containers", function () {
+        var value = { answer: 42 };
+        var holder = NSMutableArray.alloc().init();
+        holder.addObject(value);
+        __releaseNativeCounterpart(value);
+        __releaseNativeCounterpart(value);
+        expect(TNSTestNativeCallbacks.dictionaryValueForKeyKey(value, "answer")).toBe(42);
+        holder.removeAllObjects();
+    });
+
+    describe("cross-isolate finalizer release", function () {
+        var worker, timer, observer, originalTimeout;
+        beforeEach(function () {
+            originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+            jasmine.DEFAULT_TIMEOUT_INTERVAL = 15000;
+        });
+        afterEach(function () {
+            clearTimeout(timer);
+            if (observer) {
+                NSNotificationCenter.defaultCenter.removeObserver(observer);
+                observer = null;
+            }
+            if (worker) {
+                worker.terminate();
+                worker = null;
+            }
+            jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+        });
+
+        it("reads adapters and enumerators while their worker shuts down", function (done) {
+            var values = [];
+            var center = NSNotificationCenter.defaultCenter;
+            observer = center.addObserverForNameObjectQueueUsingBlock(
+                "adapter-teardown-read", null, null, function (notification) {
+                    values.push(notification.object);
+                });
+            worker = new Worker("./adapterTeardownReadWorker.js");
+            worker.onmessage = function () {
+                center.removeObserver(observer);
+                expect(values.length).toBe(4);
+                var keys = [values[0].keyEnumerator(), values[1].keyEnumerator()];
+                worker.terminate();
+                TNSTestNativeCallbacks.repeatPausingAfter(100, function () {
+                    values[0].count;
+                    values[1].objectForKey("answer");
+                    values[2].objectAtIndex(0);
+                    keys[0].nextObject();
+                    keys[1].allObjects;
+                });
+                var attempts = 100;
+                (function poll() {
+                    if (values[0].count !== 0 && --attempts > 0) {
+                        timer = setTimeout(poll, 10);
+                        return;
+                    }
+                    expect(values[0].count).toBe(0);
+                    expect(values[1].count).toBe(0);
+                    expect(values[2].count).toBe(0);
+                    expect(keys[0].nextObject()).toBeNull();
+                    expect(keys[1].nextObject()).toBeNull();
+                    expect(values[3].length).toBe(2);
+                    done();
+                })();
+            };
+            worker.onerror = function (e) {
+                center.removeObserver(observer);
+                expect(String(e && e.message ? e.message : e)).toBe("<no worker error>");
+                done();
+            };
+        });
+
+        // The main thread posts under its Locker, then waits for the worker's
+        // observer. The worker collects notifications under its own Locker,
+        // dropping native objects whose teardown needs the main isolate.
+        ["adapters", "blocks"].forEach(function (kind) {
+            it("releases another isolate's " + kind + " from a worker finalizer", function (done) {
+                worker = new Worker("./adapterCrossIsolateReleaseWorker.js");
+                var remaining = 400;
+                var sent = 0;
+                var identityMisses = 0;
+                var shared = [{ posted: 0 }, new Proxy({ value: 1 }, {}), [1, 2], new Uint8Array([3, 4])];
+                var sharedCallback = function () {};
+                var center = NSNotificationCenter.defaultCenter;
+
+                function post(value) {
+                    center.postNotificationNameObjectUserInfo("adapter-cross-isolate-release", value, null);
+                    sent++;
+                }
+                function postBlock(callback) {
+                    var operation = NSBlockOperation.blockOperationWithBlock(callback);
+                    post(operation);
+                    __releaseNativeCounterpart(operation);
+                }
+                function tick() {
+                    if (kind === "adapters") {
+                        post({ remaining: remaining });
+                        shared[0].posted++;
+                        shared.forEach(post);
+                        // Native code holding a shared object's adapter gets
+                        // that adapter back for the object, also while the one
+                        // the worker dropped still waits here for its teardown.
+                        var holder = NSMutableArray.alloc().init();
+                        shared.forEach(function (value, index) {
+                            holder.addObject(value);
+                            if (holder.indexOfObjectIdenticalTo(value) !== index) {
+                                identityMisses++;
+                            }
+                        });
+                        holder.removeAllObjects();
+                    } else {
+                        postBlock(function () {});
+                        postBlock(sharedCallback);
+                    }
+                    if (--remaining === 0) {
+                        worker.postMessage("stop");
+                    } else {
+                        timer = setTimeout(tick, 1);
+                    }
+                }
+                worker.onmessage = function (msg) {
+                    if (msg.data === "observing") {
+                        tick();
+                        return;
+                    }
+                    expect(msg.data.received).toBe(sent);
+                    expect(remaining).toBe(0);
+                    expect(identityMisses).toBe(0);
+                    done();
+                };
+                worker.onerror = function (e) {
+                    expect(String(e && e.message ? e.message : e)).toBe("<no worker error>");
+                    done();
+                };
+            });
+        });
+    });
 });

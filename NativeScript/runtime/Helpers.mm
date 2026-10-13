@@ -337,6 +337,19 @@ tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
       metadataProp.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 }
 
+tns::BaseDataWrapper* tns::GetValueForMarshalling(Isolate* isolate, const Local<Value>& val) {
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, val);
+  if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject &&
+      static_cast<ObjCDataWrapper*>(wrapper)->IsAdapterClaim() &&
+      static_cast<ObjCDataWrapper*>(wrapper)->Data() == nil) {
+    // Detached but not freed: the dying adapter owns its claim. With the slot
+    // empty, the replacement attaches its own and is found by later marshals.
+    tns::DeleteValue(isolate, val);
+    return nullptr;
+  }
+  return wrapper;
+}
+
 namespace {
 
 std::atomic<int> releasedObjectPolicy_{static_cast<int>(tns::ReleasedObjectPolicy::kReport)};

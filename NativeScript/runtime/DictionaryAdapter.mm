@@ -389,6 +389,11 @@ using namespace tns;
 }
 
 - (void)dealloc {
+  // Reached from a thread inside another isolate, the teardown below runs on
+  // this adapter's own isolate instead; the object stays allocated until then.
+  if (wrapper_->HandOffTeardown([self]() { [self dealloc]; })) {
+    return;
+  }
   {
     IsolatePin pin = wrapper_->Pin();
     if (pin) {
@@ -401,17 +406,15 @@ using namespace tns;
         Isolate::Scope isolate_scope(isolate);
         HandleScope handle_scope(isolate);
         wrapper_->GetCache()->Instances.erase(self);
-        // Detach and free only a wrapper that is still the one we attached: a
-        // finalizer or __releaseNativeCounterpart can have retired it already,
-        // and whatever else sits in the field belongs to another owner.
+        // Detach only a claim that is still the one we attached: marshalling
+        // the object once this adapter's last release has started detaches
+        // it, and whatever else sits in the field belongs to another owner.
         if (dataWrapper_ != nullptr) {
           Local<Value> value =
               claimTarget_ != nullptr ? claimTarget_->Get(isolate) : self->object_->Get(isolate);
           if (tns::GetValue(isolate, value) == dataWrapper_) {
             tns::DeleteValue(isolate, value);
-            delete dataWrapper_;
           }
-          dataWrapper_ = nullptr;
         }
         // Persistent<Value> does not reset in its destructor; the enumerators
         // vended by -keyEnumerator hold this adapter alive, so nothing can be
@@ -423,12 +426,9 @@ using namespace tns;
       }
     }
   }
-  if (dataWrapper_ != nullptr) {
-    // The gate is closed: the JS object and every reader of the claim are
-    // gone, and no other path deletes an adapter claim.
-    delete dataWrapper_;
-    dataWrapper_ = nullptr;
-  }
+  // No other path frees an adapter claim, attached or not.
+  delete dataWrapper_;
+  dataWrapper_ = nullptr;
   self->object_ = nullptr;
   delete claimTarget_;
   claimTarget_ = nullptr;

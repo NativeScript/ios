@@ -292,6 +292,10 @@ v8::Local<v8::Context> GetCreationContextOrCurrent(v8::Isolate* isolate,
 // the Proxy target, so a proxied wrapper yields its target's wrapper.
 void SetValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, BaseDataWrapper* value);
 BaseDataWrapper* GetValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
+// Acquires an autoreleased reference for an adapter claim. A claim whose
+// adapter's last release has started is detached and reads as null, so the
+// value gets a fresh adapter that attaches its own claim.
+BaseDataWrapper* GetValueForMarshalling(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
 
 // What happens when JS touches a wrapper whose native counterpart has already
 // been released (its internal field was neutered by DisposeValue) — a state a

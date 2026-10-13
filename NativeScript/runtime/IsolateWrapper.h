@@ -9,6 +9,7 @@
 #ifndef IsolateWrapper_h
 #define IsolateWrapper_h
 
+#include <functional>
 #include <type_traits>
 
 #include "Caches.h"
@@ -82,6 +83,18 @@ public:
     // True once the teardown has finished with every wrapper reachable from
     // JS. Read it while pinned.
     inline bool IsTornDown() const { return IsolateGates::IsClosed(gateId_); }
+    // For a teardown that needs this isolate's Locker and can be reached from
+    // any thread. A thread that is inside another isolate must not wait for
+    // this one's Locker: it may hold the other isolate's, and a thread inside
+    // this isolate may be waiting for that one. From such a thread `teardown`
+    // is posted to this isolate's loop and true is returned; the caller must
+    // then return without touching anything `teardown` frees, this wrapper
+    // included. `teardown` runs once: from the loop, or when the loop drops
+    // the entry while shutting down. If the loop refuses the post, a native
+    // queue runs it without holding any isolate lock. False means the caller
+    // runs the teardown itself. The teardown must pin and check IsTornDown()
+    // under the Locker before touching handles.
+    bool HandOffTeardown(std::function<void()> teardown) const;
 
    private:
     v8::Isolate* isolate_;
