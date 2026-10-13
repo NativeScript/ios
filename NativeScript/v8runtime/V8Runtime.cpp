@@ -9,6 +9,7 @@
 
 #include "runtime/Helpers.h"
 #include "runtime/Runtime.h"
+#include "v8-external-memory-accounter.h"
 #include "v8.h"
 
 // #include <glog/logging.h>
@@ -29,6 +30,68 @@ namespace rnv8 {
 namespace {
 
 const char kHostFunctionProxyProp[] = "__hostFunctionProxy";
+
+struct NativeStateHolder {
+  std::shared_ptr<jsi::NativeState> state;
+  v8::Global<v8::Object> weakObject;
+
+  NativeStateHolder(v8::Isolate* isolate, v8::Local<v8::Object> object,
+                    std::shared_ptr<jsi::NativeState>&& nativeState)
+      : state(std::move(nativeState)), weakObject(isolate, object) {
+    weakObject.SetWeak(this, &NativeStateHolder::Finalizer,
+                       v8::WeakCallbackType::kParameter);
+  }
+
+  static void Finalizer(const v8::WeakCallbackInfo<NativeStateHolder>& data) {
+    auto* holder = data.GetParameter();
+    holder->weakObject.Reset();
+    delete holder;
+  }
+};
+
+struct ExternalMemoryTracker {
+  v8::Isolate* isolate;
+  v8::Global<v8::Object> weakObject;
+  v8::ExternalMemoryAccounter accounter;
+  size_t amount = 0;
+
+  ExternalMemoryTracker(v8::Isolate* iso, v8::Local<v8::Object> obj,
+                        size_t initialAmount)
+      : isolate(iso), weakObject(iso, obj), amount(initialAmount) {
+    if (amount > 0) {
+      accounter.Increase(isolate, amount);
+    }
+    weakObject.SetWeak(this, &ExternalMemoryTracker::Finalizer,
+                       v8::WeakCallbackType::kParameter);
+  }
+
+  void Update(size_t newAmount) {
+    if (newAmount == amount) {
+      return;
+    }
+    int64_t delta =
+        static_cast<int64_t>(newAmount) - static_cast<int64_t>(amount);
+    accounter.Update(isolate, delta);
+    amount = newAmount;
+  }
+
+  void RebindObject(v8::Local<v8::Object> newObj) {
+    weakObject.Reset(isolate, newObj);
+    weakObject.SetWeak(this, &ExternalMemoryTracker::Finalizer,
+                       v8::WeakCallbackType::kParameter);
+  }
+
+  static void Finalizer(
+      const v8::WeakCallbackInfo<ExternalMemoryTracker>& data) {
+    auto* tracker = data.GetParameter();
+    if (tracker->amount > 0) {
+      tracker->accounter.Decrease(tracker->isolate, tracker->amount);
+      tracker->amount = 0;
+    }
+    tracker->weakObject.Reset();
+    delete tracker;
+  }
+};
 
 }  // namespace
 
@@ -407,7 +470,9 @@ V8Runtime::InternalFieldType V8Runtime::GetInternalFieldType(
     return V8Runtime::InternalFieldType::kInvalid;
   }
   v8::Local<v8::Value> typeValue = object->GetInternalField(0).As<v8::Value>();
-  assert(typeValue->IsUint32());
+  if (!typeValue->IsUint32()) {
+    return V8Runtime::InternalFieldType::kInvalid;
+  }
   return static_cast<V8Runtime::InternalFieldType>(
       v8::Local<v8::Uint32>::Cast(typeValue)->Value());
 }
@@ -882,6 +947,36 @@ jsi::HostFunctionType& V8Runtime::getHostFunction(
   return hostFunctionProxy->GetHostFunction();
 }
 
+jsi::Object V8Runtime::createObjectWithPrototype(const jsi::Value& prototype) {
+  v8::Locker locker(isolate_);
+  v8::Isolate::Scope scopedIsolate(isolate_);
+  v8::HandleScope scopedHandle(isolate_);
+  v8::Local<v8::Context> context = context_.Get(isolate_);
+  v8::Context::Scope scopedContext(context);
+
+  v8::Local<v8::ObjectTemplate> objectTemplate =
+      v8::ObjectTemplate::New(isolate_);
+  objectTemplate->SetInternalFieldCount(2);
+  v8::Local<v8::Object> v8Object;
+  if (!objectTemplate->NewInstance(context).ToLocal(&v8Object)) {
+    throw jsi::JSError(*this,
+                       "Unable to create new Object with custom prototype");
+  }
+  v8Object->SetInternalField(
+      0, v8::Integer::NewFromUnsigned(isolate_, InternalFieldType::kInvalid));
+  v8Object->SetAlignedPointerInInternalField(
+      1, nullptr, v8::kEmbedderDataTypeTagDefault);
+
+  v8::Local<v8::Value> v8Prototype =
+      JSIV8ValueConverter::ToV8Value(*this, prototype);
+  if (!v8Object->SetPrototype(context, v8Prototype).FromMaybe(false)) {
+    throw jsi::JSError(*this,
+                       "Unable to set prototype on newly created Object");
+  }
+
+  return make<jsi::Object>(new V8PointerValue(isolate_, v8Object));
+}
+
 bool V8Runtime::hasNativeState(const jsi::Object& object) {
   v8::Locker locker(isolate_);
   v8::Isolate::Scope scopedIsolate(isolate_);
@@ -890,7 +985,13 @@ bool V8Runtime::hasNativeState(const jsi::Object& object) {
 
   v8::Local<v8::Object> v8Object =
       JSIV8ValueConverter::ToV8Object(*this, object);
-  return GetInternalFieldType(v8Object) == InternalFieldType::kNativeState;
+  if (GetInternalFieldType(v8Object) != InternalFieldType::kNativeState) {
+    return false;
+  }
+  auto* holder = reinterpret_cast<NativeStateHolder*>(
+      v8Object->GetAlignedPointerFromInternalField(
+          1, v8::kEmbedderDataTypeTagDefault));
+  return holder != nullptr && holder->state != nullptr;
 }
 
 std::shared_ptr<jsi::NativeState> V8Runtime::getNativeState(
@@ -900,8 +1001,6 @@ std::shared_ptr<jsi::NativeState> V8Runtime::getNativeState(
   }
   assert(hasNativeState(object));
 
-  // We are guarenteed at this point to have hasNativeState(obj) == true
-  // so the internal data should be a NativeState
   v8::Locker locker(isolate_);
   v8::Isolate::Scope scopedIsolate(isolate_);
   v8::HandleScope scopedHandle(isolate_);
@@ -909,10 +1008,10 @@ std::shared_ptr<jsi::NativeState> V8Runtime::getNativeState(
 
   v8::Local<v8::Object> v8Object =
       JSIV8ValueConverter::ToV8Object(*this, object);
-  auto* nativeStatePtr = reinterpret_cast<std::shared_ptr<jsi::NativeState>*>(
+  auto* holder = reinterpret_cast<NativeStateHolder*>(
       v8Object->GetAlignedPointerFromInternalField(
           1, v8::kEmbedderDataTypeTagDefault));
-  return std::shared_ptr(*nativeStatePtr);
+  return holder ? holder->state : nullptr;
 }
 
 void V8Runtime::setNativeState(const jsi::Object& object,
@@ -924,17 +1023,44 @@ void V8Runtime::setNativeState(const jsi::Object& object,
   v8::Locker locker(isolate_);
   v8::Isolate::Scope scopedIsolate(isolate_);
   v8::HandleScope scopedHandle(isolate_);
-  v8::Context::Scope scopedContext(context_.Get(isolate_));
+  v8::Local<v8::Context> context = context_.Get(isolate_);
+  v8::Context::Scope scopedContext(context);
 
   v8::Local<v8::Object> v8ObjectOriginal =
       JSIV8ValueConverter::ToV8Object(*this, object);
+
+  if (GetInternalFieldType(v8ObjectOriginal) ==
+      InternalFieldType::kNativeState) {
+    auto* existingHolder = reinterpret_cast<NativeStateHolder*>(
+        v8ObjectOriginal->GetAlignedPointerFromInternalField(
+            1, v8::kEmbedderDataTypeTagDefault));
+    if (existingHolder) {
+      existingHolder->state = std::move(state);
+      return;
+    }
+  }
+
+  // Objects created via createObjectWithPrototype pre-allocate 2 internal
+  // fields with field 0 initialized to kInvalid so setNativeState can populate
+  // them in place without replacing the V8 object identity.
+  if (v8ObjectOriginal->InternalFieldCount() == 2 &&
+      v8ObjectOriginal->GetInternalField(0).As<v8::Value>()->IsUint32() &&
+      GetInternalFieldType(v8ObjectOriginal) == InternalFieldType::kInvalid) {
+    v8ObjectOriginal->SetInternalField(
+        0, v8::Integer::NewFromUnsigned(isolate_,
+                                        InternalFieldType::kNativeState));
+    auto* holder =
+        new NativeStateHolder(isolate_, v8ObjectOriginal, std::move(state));
+    v8ObjectOriginal->SetAlignedPointerInInternalField(
+        1, reinterpret_cast<void*>(holder), v8::kEmbedderDataTypeTagDefault);
+    return;
+  }
 
   v8::Local<v8::ObjectTemplate> objectTemplate =
       v8::ObjectTemplate::New(isolate_);
   objectTemplate->SetInternalFieldCount(2);
   v8::Local<v8::Object> v8Object;
-  if (!objectTemplate->NewInstance(isolate_->GetCurrentContext())
-           .ToLocal(&v8Object)) {
+  if (!objectTemplate->NewInstance(context).ToLocal(&v8Object)) {
     throw jsi::JSError(*this, "Unable to create new Object for setNativeState");
   }
   V8PointerValue* v8PointerValue = static_cast<V8PointerValue*>(
@@ -943,43 +1069,75 @@ void V8Runtime::setNativeState(const jsi::Object& object,
 
   v8Object->SetInternalField(0, v8::Integer::NewFromUnsigned(
                                     isolate_, InternalFieldType::kNativeState));
-  // Allocate a shared_ptr on the C++ heap and use it as context of NativeState.
-  auto* nativeStatePtr =
-      new std::shared_ptr<jsi::NativeState>(std::move(state));
+  auto* holder = new NativeStateHolder(isolate_, v8Object, std::move(state));
   v8Object->SetAlignedPointerInInternalField(
-      1, reinterpret_cast<void*>(nativeStatePtr),
-      v8::kEmbedderDataTypeTagDefault);
+      1, reinterpret_cast<void*>(holder), v8::kEmbedderDataTypeTagDefault);
 
-  // Clone properties to the new object created from object template with
-  // two internal fields.
-  v8::Local<v8::Object> global = context_.Get(isolate_)->Global();
+  v8::Local<v8::Value> prototype = v8ObjectOriginal->GetPrototype();
+  if (!prototype.IsEmpty()) {
+    v8Object->SetPrototype(context, prototype).Check();
+  }
+
+  v8::Local<v8::Object> global = context->Global();
   v8::Local<v8::Object> objectClass = v8::Local<v8::Object>::Cast(
       global
-          ->Get(isolate_->GetCurrentContext(),
-                v8::String::NewFromUtf8Literal(isolate_, "Object"))
+          ->Get(context, v8::String::NewFromUtf8Literal(isolate_, "Object"))
           .ToLocalChecked());
   v8::Local<v8::Function> objectAssignFunction = v8::Local<v8::Function>::Cast(
       objectClass
-          ->Get(isolate_->GetCurrentContext(),
-                v8::String::NewFromUtf8Literal(isolate_, "assign"))
+          ->Get(context, v8::String::NewFromUtf8Literal(isolate_, "assign"))
           .ToLocalChecked());
   v8::Local<v8::Value> args[] = {v8Object, v8ObjectOriginal};
-  objectAssignFunction
-      ->Call(isolate_->GetCurrentContext(), v8::Undefined(isolate_), 2, args)
+  objectAssignFunction->Call(context, v8::Undefined(isolate_), 2, args)
       .ToLocalChecked();
 
-  // Bind a global handle with weak callback to cleanup the shared_ptr
-  // on the C++ heap.
-  v8::Global<v8::Object> weakV8Object(isolate_, v8Object);
-  weakV8Object.SetWeak(
-      &weakV8Object,
-      [](const v8::WeakCallbackInfo<v8::Global<v8::Object>>& data) {
-        v8::Global<v8::Object>* weakV8ObjectPtr = data.GetParameter();
-        weakV8ObjectPtr->Reset();
-        delete reinterpret_cast<std::shared_ptr<jsi::NativeState>*>(
-            data.GetInternalField(1));
-      },
-      v8::WeakCallbackType::kInternalFields);
+  v8::Local<v8::Private> externalMemoryKey = v8::Private::ForApi(
+      isolate_,
+      v8::String::NewFromUtf8Literal(isolate_, "rnv8::ExternalMemoryPressure"));
+  if (v8ObjectOriginal->HasPrivate(context, externalMemoryKey)
+          .FromMaybe(false)) {
+    v8::Local<v8::Value> trackerVal;
+    if (v8ObjectOriginal->GetPrivate(context, externalMemoryKey)
+            .ToLocal(&trackerVal) &&
+        trackerVal->IsExternal()) {
+      auto* tracker = static_cast<ExternalMemoryTracker*>(
+          v8::Local<v8::External>::Cast(trackerVal)
+              ->Value(v8::kExternalPointerTypeTagDefault));
+      if (tracker) {
+        tracker->RebindObject(v8Object);
+        v8Object->SetPrivate(context, externalMemoryKey, trackerVal).Check();
+        v8ObjectOriginal->DeletePrivate(context, externalMemoryKey).Check();
+      }
+    }
+  }
+}
+
+void V8Runtime::setPrototypeOf(const jsi::Object& object,
+                               const jsi::Value& prototype) {
+  v8::Locker locker(isolate_);
+  v8::Isolate::Scope scopedIsolate(isolate_);
+  v8::HandleScope scopedHandle(isolate_);
+  v8::Local<v8::Context> context = context_.Get(isolate_);
+  v8::Context::Scope scopedContext(context);
+
+  v8::Local<v8::Object> v8Object =
+      JSIV8ValueConverter::ToV8Object(*this, object);
+  v8::Local<v8::Value> v8Prototype =
+      JSIV8ValueConverter::ToV8Value(*this, prototype);
+  if (!v8Object->SetPrototype(context, v8Prototype).FromMaybe(false)) {
+    throw jsi::JSError(*this, "Unable to set prototype of Object");
+  }
+}
+
+jsi::Value V8Runtime::getPrototypeOf(const jsi::Object& object) {
+  v8::Locker locker(isolate_);
+  v8::Isolate::Scope scopedIsolate(isolate_);
+  v8::HandleScope scopedHandle(isolate_);
+  v8::Context::Scope scopedContext(context_.Get(isolate_));
+
+  v8::Local<v8::Object> v8Object =
+      JSIV8ValueConverter::ToV8Object(*this, object);
+  return JSIV8ValueConverter::ToJSIValue(isolate_, v8Object->GetPrototype());
 }
 
 jsi::Value V8Runtime::getProperty(const jsi::Object& object,
@@ -1244,7 +1402,34 @@ jsi::Array V8Runtime::createArray(size_t length) {
 
 jsi::ArrayBuffer V8Runtime::createArrayBuffer(
     std::shared_ptr<jsi::MutableBuffer> buffer) {
-  throw std::logic_error("Not implemented");
+  v8::Locker locker(isolate_);
+  v8::Isolate::Scope scopedIsolate(isolate_);
+  v8::HandleScope scopedHandle(isolate_);
+  v8::Context::Scope scopedContext(context_.Get(isolate_));
+
+  if (!buffer) {
+    throw jsi::JSINativeException(
+        "V8Runtime::createArrayBuffer requires a non-null MutableBuffer");
+  }
+
+  uint8_t* data = buffer->data();
+  size_t byteLength = buffer->size();
+  auto* retainedBuffer =
+      new std::shared_ptr<jsi::MutableBuffer>(std::move(buffer));
+
+  std::unique_ptr<v8::BackingStore> backingStore =
+      v8::ArrayBuffer::NewBackingStore(
+          data, byteLength,
+          [](void* /*data*/, size_t /*length*/, void* deleterData) {
+            delete static_cast<std::shared_ptr<jsi::MutableBuffer>*>(
+                deleterData);
+          },
+          retainedBuffer);
+
+  v8::Local<v8::ArrayBuffer> v8ArrayBuffer =
+      v8::ArrayBuffer::New(isolate_, std::move(backingStore));
+  return make<jsi::Object>(new V8PointerValue(isolate_, v8ArrayBuffer))
+      .getArrayBuffer(*this);
 }
 
 size_t V8Runtime::size(const jsi::Array& array) {
@@ -1518,7 +1703,41 @@ bool V8Runtime::instanceOf(const jsi::Object& o, const jsi::Function& f) {
 }
 
 void V8Runtime::setExternalMemoryPressure(const jsi::Object& obj,
-                                          size_t amount) {}
+                                          size_t amount) {
+  v8::Locker locker(isolate_);
+  v8::Isolate::Scope scopedIsolate(isolate_);
+  v8::HandleScope scopedHandle(isolate_);
+  v8::Local<v8::Context> context = context_.Get(isolate_);
+  v8::Context::Scope scopedContext(context);
+
+  v8::Local<v8::Object> v8Object = JSIV8ValueConverter::ToV8Object(*this, obj);
+  v8::Local<v8::Private> privateKey = v8::Private::ForApi(
+      isolate_,
+      v8::String::NewFromUtf8Literal(isolate_, "rnv8::ExternalMemoryPressure"));
+
+  if (v8Object->HasPrivate(context, privateKey).FromMaybe(false)) {
+    v8::Local<v8::Value> existingVal;
+    if (v8Object->GetPrivate(context, privateKey).ToLocal(&existingVal) &&
+        existingVal->IsExternal()) {
+      auto* tracker = static_cast<ExternalMemoryTracker*>(
+          v8::Local<v8::External>::Cast(existingVal)
+              ->Value(v8::kExternalPointerTypeTagDefault));
+      if (tracker) {
+        tracker->Update(amount);
+        return;
+      }
+    }
+  }
+
+  if (amount == 0) {
+    return;
+  }
+
+  auto* tracker = new ExternalMemoryTracker(isolate_, v8Object, amount);
+  v8::Local<v8::External> wrappedTracker = v8::External::New(
+      isolate_, tracker, v8::kExternalPointerTypeTagDefault);
+  v8Object->SetPrivate(context, privateKey, wrappedTracker).Check();
+}
 
 //
 // JS function/object handler callbacks

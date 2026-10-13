@@ -124,12 +124,20 @@ class V8Runtime : public facebook::jsi::Runtime {
   facebook::jsi::HostFunctionType& getHostFunction(
       const facebook::jsi::Function&) override;
 
+  facebook::jsi::Object createObjectWithPrototype(
+      const facebook::jsi::Value& prototype) override;
+
   bool hasNativeState(const facebook::jsi::Object&) override;
   std::shared_ptr<facebook::jsi::NativeState> getNativeState(
       const facebook::jsi::Object&) override;
   void setNativeState(
       const facebook::jsi::Object&,
       std::shared_ptr<facebook::jsi::NativeState> state) override;
+
+  void setPrototypeOf(const facebook::jsi::Object& object,
+                      const facebook::jsi::Value& prototype) override;
+  facebook::jsi::Value getPrototypeOf(
+      const facebook::jsi::Object& object) override;
 
   facebook::jsi::Value getProperty(
       const facebook::jsi::Object&,
