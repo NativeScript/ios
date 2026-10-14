@@ -312,8 +312,8 @@ enum class ReleasedObjectPolicy {
 ReleasedObjectPolicy GetReleasedObjectPolicy();
 void SetReleasedObjectPolicy(ReleasedObjectPolicy policy);
 
-// Like GetValue, but applies ReleasedObjectPolicy when the object carries no
-// wrapper: throws (kThrow) or schedules a `releasednativeaccess` event
+// Like GetValueForMarshalling, but applies ReleasedObjectPolicy when the object
+// carries no wrapper: throws (kThrow) or schedules a `releasednativeaccess` event
 // (kReport, deduplicated per object), returning nullptr either way.
 // `operation` names the API surface for the event payload / error message.
 // Callers must no-op on nullptr; paths that would otherwise read the internal

@@ -534,7 +534,7 @@ void tns::EmitDebugLog(LogCategory category, const char* format, ...) {
 
 tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>& val,
                                             const char* operation) {
-  BaseDataWrapper* wrapper = tns::GetValue(isolate, val);
+  BaseDataWrapper* wrapper = tns::GetValueForMarshalling(isolate, val);
   if (wrapper != nullptr) {
     return wrapper;
   }

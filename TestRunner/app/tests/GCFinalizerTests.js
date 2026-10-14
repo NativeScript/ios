@@ -569,6 +569,44 @@ describe("GC finalizer callbacks", function () {
             };
         });
 
+        // While this isolate runs JS, teardowns the worker hands off wait, and
+        // the claims stay on their objects with their adapters released.
+        it("treats a claim whose adapter another isolate released as released", function (done) {
+            worker = new Worker("./adapterClaimReleaseWorker.js");
+            var object = { value: 1 };
+            var bytes = new Uint8Array([1, 2]);
+            worker.onmessage = function (msg) {
+                if (msg.data === "released") {
+                    done();
+                    return;
+                }
+                var center = NSNotificationCenter.defaultCenter;
+                center.postNotificationNameObjectUserInfo("adapter-claim-release", bytes, null);
+                center.postNotificationNameObjectUserInfo("adapter-claim-release", object, null);
+                // The notifications stay autoreleased until this turn ends.
+                timer = setTimeout(function () {
+                    worker.postMessage("release");
+                    // The worker releases the bytes' adapter first, so it is
+                    // released once the object's handle is gone.
+                    var handleReleased = false;
+                    var deadline = Date.now() + 5000;
+                    while (!handleReleased && Date.now() < deadline) {
+                        try {
+                            interop.handleof(object);
+                        } catch (e) {
+                            handleReleased = true;
+                        }
+                    }
+                    expect(handleReleased).toBe(true);
+                    expect(interop.bufferFromData(bytes)).toBeUndefined();
+                });
+            };
+            worker.onerror = function (e) {
+                expect(String(e && e.message ? e.message : e)).toBe("<no worker error>");
+                done();
+            };
+        });
+
         // The main thread posts under its Locker, then waits for the worker's
         // observer. The worker collects notifications under its own Locker,
         // dropping native objects whose teardown needs the main isolate.

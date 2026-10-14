@@ -730,6 +730,10 @@ Local<Value> Interop::HandleOf(Local<Context> context, Local<Value> value) {
             ObjCDataWrapper* w = static_cast<ObjCDataWrapper*>(wrapper);
             @autoreleasepool {
               id target = w->Data();
+              // A claim whose adapter's last release has started is no handle.
+              if (target == nil) {
+                break;
+              }
               CFTypeRef ref = CFBridgingRetain(target);
               void* handle = const_cast<void*>(ref);
               CFRelease(ref);
