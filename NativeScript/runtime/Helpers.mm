@@ -625,7 +625,7 @@ std::atomic<int> wrapperLifetimeWarnings_{-1};
 
 tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>& val,
                                             const char* operation) {
-  BaseDataWrapper* wrapper = tns::GetValue(isolate, val);
+  BaseDataWrapper* wrapper = tns::GetValueForMarshalling(isolate, val);
   if (wrapper != nullptr) {
     return wrapper;
   }
