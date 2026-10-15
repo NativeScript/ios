@@ -1,6 +1,7 @@
 #include <Foundation/Foundation.h>
 #include "ArgConverter.h"
 #include "Caches.h"
+#include "ClassBuilder.h"
 #include "Constants.h"
 #include "ExternalMemory.h"
 #include "FunctionReference.h"
@@ -35,6 +36,7 @@ void Interop::RegisterInteropTypes(Local<Context> context) {
   RegisterExternalSizeFunctions(context, interop);
   RegisterSizeOfFunction(context, interop);
   RegisterEscapeExceptionFunction(context, interop);
+  ClassBuilder::RegisterInitializerSymbols(context, interop);
 
   RegisterInteropType(
       context, types, "noop",

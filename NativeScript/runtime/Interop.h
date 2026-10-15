@@ -50,6 +50,10 @@ struct MethodCall {
   bool ownsReturnedObject_;
   bool returnsUnmanaged_;
   bool isInitializer_;
+  // The receiver was allocated for this call (`X.alloc().init…()`), so the +1
+  // an initializer returns is new rather than the receiver's own passing
+  // through.
+  bool receiverAllocatedForCall_ = false;
 };
 
 struct CMethodCall : MethodCall {
@@ -81,6 +85,9 @@ class Interop {
                           const uint8_t argsCount,
                           const TypeEncoding* typeEncoding,
                           FFIMethodCallback callback, void* userData);
+  // Throws the NSException `exception` as a NativeScriptException carrying a JS
+  // Error with its name, reason and the wrapped exception as `nativeException`.
+  [[noreturn]] static void ThrowAsJSError(id exception);
   static id CallInitializer(v8::Local<v8::Context> context,
                             const MethodMeta* methodMeta, id target,
                             Class clazz, V8Args& args);
@@ -97,7 +104,8 @@ class Interop {
       BaseCall* call, bool marshalToPrimitive,
       v8::Local<v8::Object> parentStruct = v8::Local<v8::Object>(),
       bool isStructMember = false, bool ownsReturnedObject = false,
-      bool returnsUnmanaged = false, bool isInitializer = false);
+      bool returnsUnmanaged = false, bool isInitializer = false,
+      bool receiverAllocatedForCall = false);
   static void SetStructPropertyValue(v8::Local<v8::Context> context,
                                      StructWrapper* wrapper,
                                      const StructField& field,

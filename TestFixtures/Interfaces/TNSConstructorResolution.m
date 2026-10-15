@@ -51,3 +51,34 @@
 }
 
 @end
+
+@interface TNSPrivateInitializerObject ()
+- (instancetype)initPrivately;
+@end
+
+@implementation TNSPrivateInitializerObject
+
++ (instancetype)createPrivately {
+  return [[self alloc] initPrivately];
+}
+
+- (instancetype)initPrivately {
+  self = [super init];
+  if (self) {
+    _initializedPrivately = YES;
+    TNSLog(@"initPrivately called");
+  }
+  return self;
+}
+
+@end
+
+@implementation TNSRaisingInitializerObject
+
+- (instancetype)initRaising {
+  @throw [NSException exceptionWithName:@"TNSInitializerException"
+                                 reason:@"initRaising raised"
+                               userInfo:nil];
+}
+
+@end

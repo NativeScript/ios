@@ -51,12 +51,9 @@ class ClassBuilder {
   // Base first so the Objective-C hierarchy mirrors the JS one. Returns the
   // registered class, or nil when ctorFunc is not part of a native inheritance
   // chain. Idempotent: subsequent calls return the cached class from the ctor's
-  // ObjCClassWrapper. Pass nativeAllocates when the caller is handing the class
-  // to Objective-C (or allocating through it), which is what makes the JS
-  // constructor unreachable and gates the debug diagnostic.
+  // ObjCClassWrapper.
   static Class EnsureExtendedClass(v8::Local<v8::Context> context,
-                                   v8::Local<v8::Function> ctorFunc,
-                                   bool nativeAllocates = false);
+                                   v8::Local<v8::Function> ctorFunc);
 
   // Resolves the Objective-C class that should be instantiated for a construct
   // call, honoring `new.target` so that plain ES subclasses of native classes
@@ -65,12 +62,36 @@ class ClassBuilder {
                                        v8::Local<v8::Value> newTarget,
                                        Class fallback);
 
-  // Throws unless a super(...) call from a plain ES subclass uses a form that
-  // names exactly one initializer. Call after ResolveConstructedClass, which
-  // is what marks new.target as ES-derived.
-  static void ValidateEsClassSuperArgs(
-      v8::Local<v8::Context> context,
-      const v8::FunctionCallbackInfo<v8::Value>& info);
+  // True when a construct call's new.target is a plain ES class registered by
+  // EnsureExtendedClass, whose super(...) follows the interop.initializer
+  // contract rather than the legacy constructor-argument matching.
+  static bool IsESDerivedConstructor(v8::Isolate* isolate,
+                                     v8::Local<v8::Value> newTarget);
+
+  // The native end of super(...) for an ES class. Binds info.This() to the
+  // object being initialized before the initializer runs, so overrides the
+  // initializer calls see the instance under construction:
+  // - inside an initializer hook (Objective-C started the construction), the
+  //   object already exists and the initializer the caller sent runs unless
+  //   the constructor names another in [interop.initializer.args];
+  // - when adopting an object first seen after an initializer that has no
+  //   hook, the object is bound as is and no initializer runs;
+  // - otherwise (`new X(...)`), klass is allocated and initialized with the
+  //   initializer [interop.initializer.args] names, or `init`.
+  static void ConstructESObject(v8::Local<v8::Context> context,
+                                const v8::FunctionCallbackInfo<v8::Value>& info,
+                                Class klass);
+
+  // Runs the ES constructor for an instance of an ES class that reaches JS
+  // without having been constructed, i.e. one initialized through an
+  // initializer the metadata does not list and so has no hook. Returns false
+  // when target is not such an instance.
+  static bool TryAdoptNativeInstance(v8::Local<v8::Context> context, id target,
+                                     v8::Local<v8::Value>& result);
+
+  // Defines interop.initializer.{args,native}.
+  static void RegisterInitializerSymbols(v8::Local<v8::Context> context,
+                                         v8::Local<v8::Object> interop);
 
   // The class a JS `super.method()` reaching a native method must dispatch
   // to: the superclass of the rootmost JS-defined class in klass's chain. A JS
@@ -89,9 +110,8 @@ class ClassBuilder {
       const v8::FunctionCallbackInfo<v8::Value>& info);
 
   static void SwizzleRetainRelease(v8::Isolate* isolate, Class extendedClass);
-  static void WarnIfConstructorIsUnreachable(
-      v8::Local<v8::Context> context,
-      const std::vector<v8::Local<v8::Function>>& chainCtors, Class extendedClass);
+  static void InstallInitializerHooks(v8::Isolate* isolate,
+                                      Class extendedClass);
   static void ExposeDynamicMethods(v8::Local<v8::Context> context,
                                    Class extendedClass,
                                    v8::Local<v8::Value> exposedMethods,

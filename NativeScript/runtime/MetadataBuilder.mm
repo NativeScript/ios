@@ -924,7 +924,6 @@ void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>
     // through super(); use new.target to lazily register (and construct) the
     // derived class.
     klass = ClassBuilder::ResolveConstructedClass(context, info.NewTarget(), klass);
-    ClassBuilder::ValidateEsClassSuperArgs(context, info);
 
     const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(item->meta_);
     ArgConverter::ConstructObject(context, info, klass, interfaceMeta);
@@ -950,7 +949,7 @@ void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
       // `JSClass.alloc()` where JSClass is a plain ES subclass of a native type
       // that has not been constructed yet - lazily register its derived class
       // first.
-      klass = ClassBuilder::EnsureExtendedClass(context, thiz.As<v8::Function>(), true);
+      klass = ClassBuilder::EnsureExtendedClass(context, thiz.As<v8::Function>());
     }
 
     if (klass == nil) {
@@ -995,7 +994,7 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
       // Static call through a plain ES subclass of a native type (inherited
       // static), e.g. `JSClass.new()` - lazily register the derived class so
       // the invocation dispatches to it.
-      Class ensured = ClassBuilder::EnsureExtendedClass(context, thiz.As<v8::Function>(), true);
+      Class ensured = ClassBuilder::EnsureExtendedClass(context, thiz.As<v8::Function>());
       if (ensured != nil) {
         klass = ensured;
       }

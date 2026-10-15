@@ -1,7 +1,9 @@
 #include "ArgConverter.h"
 #include <Foundation/Foundation.h>
 #include <algorithm>
+#include <set>
 #include <sstream>
+#include "ClassBuilder.h"
 #include "DictionaryAdapter.h"
 #include "ExternalMemory.h"
 #include "Helpers.h"
@@ -115,6 +117,7 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
   }
 
   ObjCMethodCall methodCall(context, meta, target, klass, args, callSuper);
+  methodCall.receiverAllocatedForCall_ = allocKlass != nil;
   return Interop::CallFunction(methodCall);
 }
 
@@ -579,6 +582,11 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
   Isolate* isolate = v8::Isolate::GetCurrent();
   tns::Assert(klass != nullptr, isolate);
 
+  if (ClassBuilder::IsESDerivedConstructor(isolate, info.NewTarget())) {
+    ClassBuilder::ConstructESObject(context, info, klass);
+    return;
+  }
+
   id result = nil;
   // A Caches::Instances entry owns exactly one reference to the object it maps
   // (ObjectManager::DisposeValue gives it back, and ClassBuilder's swizzled
@@ -904,6 +912,10 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
     if (it != cache->Instances.end()) {
       receiver = it->second->Get(isolate).As<Object>();
     } else {
+      Local<Value> adopted;
+      if (ClassBuilder::TryAdoptNativeInstance(context, target, adopted)) {
+        return adopted;
+      }
       std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context, skipGCRegistration);
       receiver = poValue->Get(isolate).As<Object>();
       tns::SetValue(isolate, receiver, wrapper);
@@ -1283,6 +1295,133 @@ std::vector<const MethodMeta*> ArgConverter::GetInitializers(Caches* cache, Clas
   cache->Initializers.emplace(interfaceMeta, initializers);
 
   return initializers;
+}
+
+std::vector<std::string> ArgConverter::ConstructorTokens(const MethodMeta* meta) {
+  std::vector<std::string> tokens;
+  std::string token;
+  for (const char* c = meta->constructorTokens(); *c != '\0'; c++) {
+    if (*c == ':') {
+      tokens.push_back(token);
+      token.clear();
+    } else {
+      token += *c;
+    }
+  }
+  return tokens;
+}
+
+static std::string FormatTokens(const std::vector<std::string>& tokens) {
+  if (tokens.empty()) {
+    return "{}";
+  }
+  std::string result = "{ ";
+  for (size_t i = 0; i < tokens.size(); i++) {
+    result += (i > 0 ? ", " : "") + tokens[i];
+  }
+  return result + " }";
+}
+
+const MethodMeta* ArgConverter::FindInitializerByTokens(Local<Context> context, Class klass,
+                                                        Local<Object> tokens,
+                                                        std::vector<Local<Value>>& args,
+                                                        bool throwIfMissing) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<v8::Array> names;
+  {
+    TryCatch tc(isolate);
+    if (!tokens->GetOwnPropertyNames(context).ToLocal(&names)) {
+      throw NativeScriptException(isolate, tc, "Cannot read initializer tokens");
+    }
+  }
+  std::vector<std::string> keys;
+  for (uint32_t i = 0; i < names->Length(); i++) {
+    Local<Value> name;
+    if (names->Get(context, i).ToLocal(&name)) {
+      keys.push_back(tns::ToString(isolate, name));
+    }
+  }
+  std::vector<std::string> sortedKeys = keys;
+  std::sort(sortedKeys.begin(), sortedKeys.end());
+
+  std::vector<const MethodMeta*> matches;
+  const MethodMeta* sameOrder = nullptr;
+  std::vector<std::string> available;
+  const Meta* meta = FindMeta(klass);
+  if (meta != nullptr && meta->type() == MetaType::Interface) {
+    auto cache = Caches::Get(isolate);
+    std::set<SEL> seen;
+    for (const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
+         interfaceMeta != nullptr; interfaceMeta = interfaceMeta->baseMeta()) {
+      for (const MethodMeta* candidate :
+           GetInitializers(cache.get(), objc_getClass(interfaceMeta->name()), interfaceMeta)) {
+        SEL selector = candidate->selector();
+        if (candidate->isVariadic() || !seen.insert(selector).second ||
+            ![klass instancesRespondToSelector:selector]) {
+          continue;
+        }
+        std::vector<std::string> candidateTokens = ConstructorTokens(candidate);
+        available.push_back(FormatTokens(candidateTokens));
+        std::vector<std::string> sortedTokens = candidateTokens;
+        std::sort(sortedTokens.begin(), sortedTokens.end());
+        if (sortedTokens != sortedKeys) {
+          continue;
+        }
+        matches.push_back(candidate);
+        if (candidateTokens == keys && sameOrder == nullptr) {
+          sameOrder = candidate;
+        }
+      }
+    }
+  }
+
+  const MethodMeta* match = nullptr;
+  if (matches.size() == 1) {
+    match = matches[0];
+  } else if (matches.size() > 1 && sameOrder != nullptr) {
+    match = sameOrder;
+  }
+
+  if (match == nullptr) {
+    if (!throwIfMissing) {
+      return nullptr;
+    }
+    std::stringstream ss;
+    if (matches.size() > 1) {
+      ss << "More than one initializer of " << class_getName(klass) << " takes "
+         << FormatTokens(keys) << ":";
+      for (const MethodMeta* candidate : matches) {
+        ss << " " << candidate->selectorAsString();
+      }
+      ss << ". List the keys in the order of the one to run.";
+    } else {
+      ss << "No initializer of " << class_getName(klass) << " takes " << FormatTokens(keys)
+         << ". Available:";
+      for (size_t i = 0; i < available.size(); i++) {
+        ss << (i > 0 ? ", " : " ") << available[i];
+      }
+    }
+    throw NativeScriptException(ss.str());
+  }
+
+  args.clear();
+  // A parameterless initializer still has a token (initWithEmpty -> { empty }), so the values
+  // passed are bounded by the parameters, not the tokens.
+  size_t paramsCount = match->encodings()->count - 1 - (match->hasErrorOutParameter() ? 1 : 0);
+  std::vector<std::string> matchTokens = ConstructorTokens(match);
+  TryCatch tc(isolate);
+  for (size_t i = 0; i < matchTokens.size() && i < paramsCount; i++) {
+    Local<Value> value;
+    if (!tokens->Get(context, tns::ToV8String(isolate, matchTokens[i])).ToLocal(&value)) {
+      throw NativeScriptException(isolate, tc, "Cannot read initializer tokens");
+    }
+    args.push_back(value);
+  }
+  if (match->hasErrorOutParameter()) {
+    // The NSError** an error-out initializer takes: never exposed as a token.
+    args.push_back(v8::Null(isolate));
+  }
+  return match;
 }
 
 }  // namespace tns

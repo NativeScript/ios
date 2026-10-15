@@ -95,6 +95,19 @@ class ArgConverter {
                               const v8::FunctionCallbackInfo<v8::Value>& info,
                               Class klass,
                               const InterfaceMeta* interfaceMeta = nullptr);
+  static std::vector<const MethodMeta*> GetInitializers(
+      Caches* cache, Class klass, const InterfaceMeta* interfaceMeta);
+  // An initializer's constructor tokens in selector order, e.g. { "int",
+  // "andInt" } for initWithInt:andInt:, empty for init.
+  static std::vector<std::string> ConstructorTokens(const MethodMeta* meta);
+  // The initializer klass implements whose constructor tokens are exactly the
+  // own keys of `tokens`, in any order; key order only breaks a tie between
+  // initializers taking the same set. Fills args in selector order. Returns
+  // nullptr when none matches, or throws listing the available token sets when
+  // throwIfMissing.
+  static const MethodMeta* FindInitializerByTokens(
+      v8::Local<v8::Context> context, Class klass, v8::Local<v8::Object> tokens,
+      std::vector<v8::Local<v8::Value>>& args, bool throwIfMissing);
 
  private:
   static v8::Local<v8::Function> CreateEmptyInstanceFunction(
@@ -126,8 +139,6 @@ class ArgConverter {
       uint32_t index, v8::Local<v8::Value> value,
       const v8::PropertyCallbackInfo<v8::Boolean>& args);
   static bool IsErrorOutParameter(const TypeEncoding* typeEncoding);
-  static std::vector<const MethodMeta*> GetInitializers(
-      Caches* cache, Class klass, const InterfaceMeta* interfaceMeta);
   static void MethodCallbackInternal(ffi_cif* cif, void* retValue,
                                      void** argValues, void* userData);
 };

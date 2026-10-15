@@ -161,6 +161,45 @@ CFTypeRef Interop::CreateBlock(const uint8_t initialParamIndex, const uint8_t ar
   return CFBridgingRelease(blockPointer);
 }
 
+void Interop::ThrowAsJSError(id exception) {
+  // Preserve the original NSException: build a JS Error carrying its name and
+  // reason, and attach the wrapped native object as `nativeException` (mirrors
+  // the NSError-out path). Throw it via NativeScriptException so the JS catch
+  // handler receives exactly this object.
+  NSException* e = (NSException*)exception;
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Context> context = isolate->GetCurrentContext();
+
+  NSString* nsName = [e name];
+  NSString* nsReason = [e reason];
+  Local<v8::String> messageV8 = tns::ToV8String(isolate, nsReason ?: (nsName ?: @"NSException"));
+  std::string message = tns::ToString(isolate, messageV8);
+
+  Local<Value> jsErrVal = Exception::Error(messageV8);
+  if (jsErrVal.IsEmpty() || !jsErrVal->IsObject()) {
+    // Fallback: keep the description-only behavior if Error creation fails.
+    throw NativeScriptException(tns::ToString(isolate, [e description]));
+  }
+
+  Local<Object> jsErrObj = jsErrVal.As<Object>();
+  if (nsName != nil) {
+    jsErrObj->Set(context, tns::ToV8String(isolate, "name"), tns::ToV8String(isolate, nsName))
+        .FromMaybe(false);
+  }
+  if (nsReason != nil) {
+    jsErrObj->Set(context, tns::ToV8String(isolate, "message"), tns::ToV8String(isolate, nsReason))
+        .FromMaybe(false);
+  }
+
+  ObjCDataWrapper* wrapper = new ObjCDataWrapper((id)e);
+  Local<Value> nativeWrapper =
+      ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true);
+  jsErrObj->Set(context, tns::ToV8String(isolate, "nativeException"), nativeWrapper)
+      .FromMaybe(false);
+
+  throw NativeScriptException(isolate, jsErrObj.As<Value>(), message);
+}
+
 Local<Value> Interop::CallFunction(CMethodCall& methodCall) {
   return Interop::CallFunctionInternal(methodCall);
 }
@@ -710,7 +749,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       // A plain ES subclass of a native type passed where a Class is expected
       // (e.g. `tableView.registerClassForCellReuseIdentifier(JSClass, ...)`) - lazily
       // register its derived class first.
-      Class ensured = ClassBuilder::EnsureExtendedClass(context, obj.As<v8::Function>(), true);
+      Class ensured = ClassBuilder::EnsureExtendedClass(context, obj.As<v8::Function>());
       if (ensured != nil) {
         wrapper = tns::GetValue(isolate, obj);
       }
@@ -888,7 +927,7 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
       if (arg->IsFunction()) {
         // A plain ES subclass of a native type passed where an `id` is expected - lazily
         // register its derived class and marshal the Objective-C Class object.
-        Class ensured = ClassBuilder::EnsureExtendedClass(context, arg.As<v8::Function>(), true);
+        Class ensured = ClassBuilder::EnsureExtendedClass(context, arg.As<v8::Function>());
         if (ensured != nil) {
           return ensured;
         }
@@ -1056,7 +1095,7 @@ Local<Value> Interop::GetResultByType(Local<Context> context, BaseDataWrapper* t
 Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding,
                                 BaseCall* call, bool marshalToPrimitive, Local<Object> parentStruct,
                                 bool isStructMember, bool ownsReturnedObject, bool returnsUnmanaged,
-                                bool isInitializer) {
+                                bool isInitializer, bool receiverAllocatedForCall) {
   Isolate* isolate = v8::Isolate::GetCurrent();
 
   if (returnsUnmanaged) {
@@ -1390,6 +1429,12 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     auto cache = Caches::Get(isolate);
     auto poInstance = ArgConverter::FindCachedInstance(isolate, cache, result);
     if (poInstance != nullptr) {
+      // The cached entry holds its own reference, so a new +1 handed back with the result is
+      // surplus. An initializer sent to an already wrapped receiver hands back that entry's own
+      // reference instead, which must stay.
+      if (ownsReturnedObject || (isInitializer && receiverAllocatedForCall)) {
+        [result release];
+      }
       return poInstance->Get(isolate);
     }
 
@@ -1862,44 +1907,8 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     ffi_call(parametrizedCall->Cif, FFI_FN(methodCall.functionPointer_), call.ResultBuffer(),
              call.ArgsArray());
   } @catch (NSException* e) {
-    // Preserve the original NSException: build a JS Error carrying its name and
-    // reason, and attach the wrapped native object as `nativeException` (mirrors
-    // the NSError-out path below). Throw it via NativeScriptException so the JS
-    // catch handler receives exactly this object.
     std::free(errorRef);
-
-    Isolate* isolate = v8::Isolate::GetCurrent();
-    Local<Context> context = isolate->GetCurrentContext();
-
-    NSString* nsName = [e name];
-    NSString* nsReason = [e reason];
-    Local<v8::String> messageV8 = tns::ToV8String(isolate, nsReason ?: (nsName ?: @"NSException"));
-    std::string message = tns::ToString(isolate, messageV8);
-
-    Local<Value> jsErrVal = Exception::Error(messageV8);
-    if (jsErrVal.IsEmpty() || !jsErrVal->IsObject()) {
-      // Fallback: keep the description-only behavior if Error creation fails.
-      throw NativeScriptException(tns::ToString(isolate, [e description]));
-    }
-
-    Local<Object> jsErrObj = jsErrVal.As<Object>();
-    if (nsName != nil) {
-      jsErrObj->Set(context, tns::ToV8String(isolate, "name"), tns::ToV8String(isolate, nsName))
-          .FromMaybe(false);
-    }
-    if (nsReason != nil) {
-      jsErrObj
-          ->Set(context, tns::ToV8String(isolate, "message"), tns::ToV8String(isolate, nsReason))
-          .FromMaybe(false);
-    }
-
-    ObjCDataWrapper* wrapper = new ObjCDataWrapper((id)e);
-    Local<Value> nativeWrapper =
-        ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true);
-    jsErrObj->Set(context, tns::ToV8String(isolate, "nativeException"), nativeWrapper)
-        .FromMaybe(false);
-
-    throw NativeScriptException(isolate, jsErrObj.As<Value>(), message);
+    Interop::ThrowAsJSError(e);
   }
 
   if (errorRef != nullptr) {
@@ -1954,10 +1963,10 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     }
   }
 
-  Local<Value> result =
-      Interop::GetResult(methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive,
-                         Local<Object>(), false, methodCall.ownsReturnedObject_,
-                         methodCall.returnsUnmanaged_, methodCall.isInitializer_);
+  Local<Value> result = Interop::GetResult(
+      methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive, Local<Object>(),
+      false, methodCall.ownsReturnedObject_, methodCall.returnsUnmanaged_,
+      methodCall.isInitializer_, methodCall.receiverAllocatedForCall_);
 
   // Owned returns, initializers and class factory methods hand out objects JS
   // most likely holds the last reference to. Instance getters do not: their

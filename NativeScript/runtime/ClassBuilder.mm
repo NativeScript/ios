@@ -1,17 +1,21 @@
 #include "ClassBuilder.h"
 #include <Foundation/Foundation.h>
+#include <objc/message.h>
+#include <algorithm>
 #include <numeric>
+#include <set>
 #include <sstream>
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
 #include "Caches.h"
+#include "ExternalMemory.h"
+#include "FFICall.h"
 #include "FastEnumerationAdapter.h"
 #include "Helpers.h"
 #include "Interop.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
-#include "RuntimeConfig.h"
 #include "TNSDerivedClass.h"
 
 using namespace v8;
@@ -31,84 +35,240 @@ void ScopeClassNameToIsolate(std::string& name, int isolateId) {
   }
 }
 
-// Both an explicit constructor and class fields are erased from the prototype,
-// and V8 exposes no API for either, so source text is the only signal. Only
-// ever gates a debug warning - a miss costs a log line, never behavior.
-bool DeclaresConstructorOrFields(const std::string& src) {
-  size_t i = src.find('{');
-  if (i == std::string::npos) {
+// API-registry symbols: shared by every context of an isolate, and unreachable through JS's
+// Symbol.for, so interop.initializer is the only way to obtain them.
+Local<Symbol> InitializerArgsSymbol(Isolate* isolate) {
+  return Symbol::ForApi(isolate, tns::ToV8String(isolate, "interop.initializer.args"));
+}
+
+Local<Symbol> InitializerNativeSymbol(Isolate* isolate) {
+  return Symbol::ForApi(isolate, tns::ToV8String(isolate, "interop.initializer.native"));
+}
+
+struct InitializerHook {
+  InitializerHook(Isolate* isolate, const MethodMeta* meta, Class hookClass)
+      : isolateWrapper(isolate), meta(meta), hookClass(hookClass) {}
+  IsolateWrapper isolateWrapper;
+  const MethodMeta* meta;
+  // The class the hook is installed on. Its subclasses inherit the hook, so this, not the
+  // receiver's class, is what the original implementation is looked up above.
+  Class hookClass;
+};
+
+// A construction Objective-C started, waiting for the constructor's super(...) to claim it.
+struct NativeConstruction {
+  id self;
+  Class klass;
+  // Null when adopting an object an initializer without a hook already initialized.
+  const InitializerHook* hook;
+  ffi_cif* cif;
+  void** argValues;
+  Local<Object> info;
+  Local<Value> prefill;
+  bool consumed = false;
+  bool initRan = false;
+  id result = nil;
+};
+
+// An initializer and the constructor it triggers run synchronously on one thread, so neither
+// list is ever read from another thread.
+thread_local std::vector<id> objectsUnderInit;
+thread_local std::vector<NativeConstruction*> nativeConstructions;
+
+bool IsUnderInit(id object) {
+  return std::find(objectsUnderInit.begin(), objectsUnderInit.end(), object) !=
+         objectsUnderInit.end();
+}
+
+class UnderInitScope {
+ public:
+  explicit UnderInitScope(id object) { objectsUnderInit.push_back(object); }
+  ~UnderInitScope() { objectsUnderInit.pop_back(); }
+};
+
+class NativeConstructionScope {
+ public:
+  explicit NativeConstructionScope(NativeConstruction* construction) {
+    nativeConstructions.push_back(construction);
+  }
+  ~NativeConstructionScope() { nativeConstructions.pop_back(); }
+};
+
+// The ES class object belongs to: its own class, or the one a runtime-created dynamic subclass
+// (KVO's NSKVONotifying_*) was made from. Nothing else can subclass a class the runtime
+// registered, so the first one found walking up is it.
+Class FindESClass(const std::shared_ptr<Caches>& cache, id object) {
+  for (Class klass = object_getClass(object); klass != nil; klass = class_getSuperclass(klass)) {
+    if (cache->ESClasses.count(klass) != 0) {
+      return klass;
+    }
+  }
+  return nil;
+}
+
+void CallSuperInitializer(ffi_cif* cif, void* retValue, void** argValues, Class hookClass) {
+  SEL selector = *static_cast<SEL*>(argValues[1]);
+  IMP imp = class_getMethodImplementation(class_getSuperclass(hookClass), selector);
+  ffi_call(cif, FFI_FN(imp), retValue, argValues);
+}
+
+// The initializer's arguments as JS values, without the trailing NSError** an error-out
+// initializer takes: neither constructor tokens nor JS callers ever see it.
+std::vector<Local<Value>> NativeInitializerArgs(Local<Context> context, const MethodMeta* meta,
+                                                void** argValues) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  int count = meta->encodings()->count - 1;
+  if (meta->hasErrorOutParameter()) {
+    count--;
+  }
+  std::vector<Local<Value>> args;
+  const TypeEncoding* typeEncoding = meta->encodings()->first();
+  for (int i = 0; i < count; i++) {
+    typeEncoding = typeEncoding->next();
+    BaseCall call(static_cast<uint8_t*>(argValues[i + 2]));
+    Local<Value> value = Interop::GetResult(context, typeEncoding, &call, true);
+    args.push_back(value.IsEmpty() ? Local<Value>(v8::Undefined(isolate)) : value);
+  }
+  return args;
+}
+
+Local<Object> NewInitializerInfo(Local<Context> context, SEL selector,
+                                 std::vector<Local<Value>> args) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Object> info = Object::New(isolate);
+  Local<Value> selectorValue = selector != nullptr
+                                   ? Local<Value>(tns::ToV8String(isolate, sel_getName(selector)))
+                                   : Local<Value>(v8::Null(isolate));
+  bool success =
+      info->Set(context, tns::ToV8String(isolate, "selector"), selectorValue).FromMaybe(false) &&
+      info->Set(context, tns::ToV8String(isolate, "args"),
+                v8::Array::New(isolate, args.data(), args.size()))
+          .FromMaybe(false) &&
+      info->SetIntegrityLevel(context, IntegrityLevel::kFrozen).FromMaybe(false);
+  tns::Assert(success, isolate);
+  return info;
+}
+
+Local<Object> NewTokensObject(Local<Context> context, const MethodMeta* meta,
+                              const std::vector<Local<Value>>& args) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  std::vector<std::string> tokens = ArgConverter::ConstructorTokens(meta);
+  Local<Object> tokensObject = Object::New(isolate);
+  // Every token is a key, even a parameterless initializer's (initWithEmpty -> { empty }), so a
+  // copy of this object names the same initializer.
+  for (size_t i = 0; i < tokens.size(); i++) {
+    Local<Value> value = i < args.size() ? args[i] : Local<Value>(v8::Undefined(isolate));
+    tns::Assert(
+        tokensObject->Set(context, tns::ToV8String(isolate, tokens[i]), value).FromMaybe(false),
+        isolate);
+  }
+  return tokensObject;
+}
+
+// An object literal or a spread of one; a class instance passed straight to super(...) is the
+// positional form this contract replaces.
+bool IsOptionsObject(Isolate* isolate, Local<Value> value) {
+  if (!value->IsObject() || value->IsFunction() || value->IsArray() ||
+      tns::GetValue(isolate, value) != nullptr) {
     return false;
   }
-
-  int depth = 0;
-  bool pendingStatic = false;
-  for (++i; i < src.size(); i++) {
-    char c = src[i];
-    if (c == '/' && i + 1 < src.size()) {
-      if (src[i + 1] == '/') {
-        i = src.find('\n', i);
-        if (i == std::string::npos) break;
-        continue;
-      }
-      if (src[i + 1] == '*') {
-        i = src.find("*/", i);
-        if (i == std::string::npos) break;
-        i++;
-        continue;
-      }
-    }
-    if (c == '"' || c == '\'' || c == '`') {
-      for (++i; i < src.size() && src[i] != c; i++) {
-        if (src[i] == '\\') i++;
-      }
-      continue;
-    }
-    if (c == '{' || c == '(' || c == '[') {
-      depth++;
-      continue;
-    }
-    if (c == '}' || c == ')' || c == ']') {
-      if (c == '}' && depth == 0) break;
-      depth--;
-      continue;
-    }
-    if (depth != 0) {
-      continue;
-    }
-
-    if (isalpha(c) || c == '_' || c == '$' || c == '#') {
-      size_t start = i;
-      while (i < src.size() && (isalnum(src[i]) || src[i] == '_' || src[i] == '$' || src[i] == '#'))
-        i++;
-      std::string word = src.substr(start, i - start);
-      size_t j = i;
-      while (j < src.size() && isspace(src[j])) j++;
-      if (j >= src.size()) break;
-
-      // Static fields initialize with the class itself, so they survive native
-      // allocation - only the instance members are at risk.
-      if (word == "static" && src[j] != '=' && src[j] != '(') {
-        pendingStatic = true;
-        i--;
-        continue;
-      }
-
-      if (word == "constructor" && src[j] == '(') {
-        return true;
-      }
-      // `name = value` at class-body top level is a field initializer;
-      // `==`/`=>` are not.
-      if (!pendingStatic && src[j] == '=' && j + 1 < src.size() && src[j + 1] != '=' &&
-          src[j + 1] != '>') {
-        return true;
-      }
-      pendingStatic = false;
-      i--;
-    }
-  }
-  return false;
+  return tns::ToString(isolate, value.As<Object>()->GetConstructorName()) == "Object";
 }
+
+void InitializerHookCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData) {
+  InitializerHook* hook = static_cast<InitializerHook*>(userData);
+  id self = *static_cast<const id*>(argValues[0]);
+  if (IsUnderInit(self)) {
+    CallSuperInitializer(cif, retValue, argValues, hook->hookClass);
+    return;
+  }
+
+  Isolate* isolate = hook->isolateWrapper.Isolate();
+  // Declared before all V8 scopes: an ObjC exception must never unwind through a live V8 scope.
+  NSException* __strong pendingThrow = nil;
+  id result = nil;
+  {
+    IsolatePin pin = hook->isolateWrapper.Pin();
+    if (!pin || !hook->isolateWrapper.IsValid()) {
+      CallSuperInitializer(cif, retValue, argValues, hook->hookClass);
+      return;
+    }
+    v8::Locker locker(isolate);
+    if (!hook->isolateWrapper.IsValid()) {
+      CallSuperInitializer(cif, retValue, argValues, hook->hookClass);
+      return;
+    }
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
+    std::shared_ptr<Caches> cache = Caches::Get(isolate);
+    Local<Context> context = cache->GetContext();
+    Context::Scope context_scope(context);
+
+    Class klass = FindESClass(cache, self);
+    auto ctorIt =
+        klass != nil ? cache->CtorFuncs.find(class_getName(klass)) : cache->CtorFuncs.end();
+    if (ctorIt == cache->CtorFuncs.end()) {
+      CallSuperInitializer(cif, retValue, argValues, hook->hookClass);
+      return;
+    }
+    Local<v8::Function> ctor = ctorIt->second->Get(isolate);
+
+    std::vector<Local<Value>> args = NativeInitializerArgs(context, hook->meta, argValues);
+    Local<Object> info = NewInitializerInfo(context, hook->meta->selector(), args);
+    // Frozen: super(...) forwards Objective-C's own arguments while this object is passed on
+    // unchanged, so an edit in place would be silently dropped. A replacement object is honored.
+    Local<Object> prefill = NewTokensObject(context, hook->meta, args);
+    tns::Assert(prefill->SetIntegrityLevel(context, IntegrityLevel::kFrozen).FromMaybe(false),
+                isolate);
+    Local<Object> options = Object::New(isolate);
+    tns::Assert(options->Set(context, InitializerNativeSymbol(isolate), info).FromMaybe(false) &&
+                    options->Set(context, InitializerArgsSymbol(isolate), prefill).FromMaybe(false),
+                isolate);
+
+    NativeConstruction construction{self, klass, hook, cif, argValues, info, prefill};
+    bool constructed = false;
+    {
+      TryCatch tc(isolate);
+      NativeConstructionScope scope(&construction);
+      Local<Value> optionsValue = options;
+      Local<Value> instance;
+      constructed = ctor->CallAsConstructor(context, 1, &optionsValue).ToLocal(&instance);
+      if (!constructed) {
+        pendingThrow = ArgConverter::HandleBoundaryException(context, tc);
+      } else if (!construction.consumed) {
+        Local<Value> error = Exception::Error(tns::ToV8String(
+            isolate, std::string("The constructor of ") + class_getName(klass) +
+                         " finished without calling super(...), so " +
+                         sel_getName(hook->meta->selector()) +
+                         " never ran and the instance Objective-C allocated was discarded."));
+        NativeScriptException::ReportToJsHandlersAndLog(isolate, error,
+                                                        Exception::CreateMessage(isolate, error));
+      }
+    }
+
+    if (constructed && construction.consumed && construction.result != nil) {
+      result = construction.result;
+    } else if (construction.initRan) {
+      // The caller's reference; a JS instance bound to the object holds its own.
+      [construction.result release];
+    } else {
+      // Never initialized: give back the caller's allocation, as a failing initializer does.
+      [self release];
+    }
+  }  // all V8 scopes destruct here
+
+  if (pendingThrow != nil) {
+    @throw pendingThrow;
+  }
+  *static_cast<id*>(retValue) = result;
+}
+
 }  // namespace
+
+static std::vector<const MethodMeta*> HookableInitializers(Isolate* isolate, Class nativeBase);
+static void ThrowIfOverridesInitializer(Local<Context> context, Class nativeBase,
+                                        Local<Object> implementationObject,
+                                        const std::string& className);
 
 Local<FunctionTemplate> ClassBuilder::GetExtendFunction(Isolate* isolate,
                                                         const InterfaceMeta* interfaceMeta) {
@@ -524,8 +684,7 @@ void ClassBuilder::RegisterNativeClassFunction(Local<Context> context) {
         }
 
         try {
-          Class klass =
-              ClassBuilder::EnsureExtendedClass(context, info[0].As<v8::Function>(), true);
+          Class klass = ClassBuilder::EnsureExtendedClass(context, info[0].As<v8::Function>());
           info.GetReturnValue().Set(klass != nil);
         } catch (NativeScriptException& ex) {
           ex.ReThrowToV8(isolate);
@@ -541,8 +700,7 @@ void ClassBuilder::RegisterNativeClassFunction(Local<Context> context) {
   tns::Assert(success, isolate);
 }
 
-Class ClassBuilder::EnsureExtendedClass(Local<Context> context,
-                                        Local<v8::Function> ctorFunc, bool nativeAllocates) {
+Class ClassBuilder::EnsureExtendedClass(Local<Context> context, Local<v8::Function> ctorFunc) {
   Isolate* isolate = v8::Isolate::GetCurrent();
 
   // Already registered (or a native/extended constructor that carries a class wrapper)
@@ -561,8 +719,7 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context,
 
   // The parent is native, legacy `.extend()`-created, already registered, or an
   // ES class that is registered here first so it can be this class's superclass.
-  Class baseClass =
-      ClassBuilder::EnsureExtendedClass(context, parentValue.As<v8::Function>(), nativeAllocates);
+  Class baseClass = ClassBuilder::EnsureExtendedClass(context, parentValue.As<v8::Function>());
   if (baseClass == nil) {
     return nil;
   }
@@ -571,6 +728,23 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context,
   auto isolateId = cache->getIsolateId();
 
   std::string baseClassName = class_getName(baseClass);
+
+  BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parentValue);
+  bool parentIsESClass = parentWrapper != nullptr &&
+                         parentWrapper->Type() == WrapperType::ObjCClass &&
+                         static_cast<ObjCClassWrapper*>(parentWrapper)->ESDerivedClass();
+
+  Local<Value> prototypeValue;
+  bool success =
+      ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
+  tns::Assert(success && !prototypeValue.IsEmpty() && prototypeValue->IsObject(), isolate);
+  Local<Object> implementationObject = prototypeValue.As<Object>();
+
+  Class nativeBase = class_conformsToProtocol(baseClass, @protocol(TNSDerivedClass))
+                         ? ClassBuilder::GetNativeSuperclass(baseClass)
+                         : baseClass;
+  ThrowIfOverridesInitializer(context, nativeBase, implementationObject,
+                              tns::ToString(isolate, ctorFunc->GetName()));
 
   // An explicit name survives minification, which mangles the inferred ctor
   // name and with it any name-based native lookup.
@@ -600,12 +774,6 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context,
   // Statics like ObjCProtocols/ObjCExposedMethods are read through the constructor, so they
   // inherit through the static chain like class statics do: a subclass overriding a method
   // declared there still finds its signature.
-  Local<Value> prototypeValue;
-  bool success =
-      ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
-  tns::Assert(success && !prototypeValue.IsEmpty() && prototypeValue->IsObject(), isolate);
-  Local<Object> implementationObject = prototypeValue.As<Object>();
-
   Local<Value> exposedMethods;
   success = ctorFunc->Get(context, tns::ToV8String(isolate, "ObjCExposedMethods"))
                 .ToLocal(&exposedMethods);
@@ -626,60 +794,20 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context,
   auto extendedPersistent = std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
   extendedPersistent->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
   cache->CtorFuncs.emplace(extendedClassName, std::move(extendedPersistent));
+  cache->ESClasses.insert(extendedClass);
 
   cache->ClassPrototypes.emplace(
       extendedClassName, std::make_unique<Persistent<Object>>(isolate, implementationObject));
 
   ClassBuilder::SwizzleRetainRelease(isolate, extendedClass);
 
-  if (nativeAllocates && RuntimeConfig.IsDebug) {
-    WarnIfConstructorIsUnreachable(context, {ctorFunc}, extendedClass);
+  // Installed once, on the first ES class above the native (or legacy) base; ES subclasses
+  // inherit the hooks and construct through them.
+  if (!parentIsESClass) {
+    ClassBuilder::InstallInitializerHooks(isolate, extendedClass);
   }
 
   return extendedClass;
-}
-
-// Objects Objective-C allocates itself (cell reuse, storyboards, NSCoding,
-// alloc/init) reach JS as a bare object with the class prototype grafted on -
-// they never run [[Construct]], so class fields and the constructor body are
-// absent and `#private` access throws. Overriding `init` is the only hook both
-// paths share.
-void ClassBuilder::WarnIfConstructorIsUnreachable(Local<Context> context,
-                                                  const std::vector<Local<v8::Function>>& chainCtors,
-                                                  Class extendedClass) {
-  Isolate* isolate = v8::Isolate::GetCurrent();
-  Local<v8::String> initKey = tns::ToV8String(isolate, "init");
-
-  for (Local<v8::Function> levelCtor : chainCtors) {
-    Local<Value> prototypeValue;
-    if (!levelCtor->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue) ||
-        !prototypeValue->IsObject()) {
-      continue;
-    }
-    bool hasInit = false;
-    if (prototypeValue.As<Object>()->HasOwnProperty(context, initKey).To(&hasInit) && hasInit) {
-      // The class opts into the construction path Objective-C also takes.
-      return;
-    }
-  }
-
-  for (Local<v8::Function> levelCtor : chainCtors) {
-    Local<Value> src;
-    if (!levelCtor->ToString(context).ToLocal(&src) || src.IsEmpty()) {
-      continue;
-    }
-    if (!DeclaresConstructorOrFields(tns::ToString(isolate, src))) {
-      continue;
-    }
-
-    Log(@"NativeScript warning: class %s declares a constructor or class fields, but it is now "
-        @"registered with the Objective-C runtime, so instances Objective-C creates itself "
-        @"(alloc/init, cell reuse, storyboards, NSCoding) never run them - those objects will be "
-        @"missing the fields, and reading a #private field on one throws. Override init() instead: "
-        @"init() { const self = super.init(); /* setup */ return self; }",
-        class_getName(extendedClass));
-    return;
-  }
 }
 
 Class ClassBuilder::ResolveConstructedClass(Local<Context> context, Local<Value> newTarget,
@@ -703,43 +831,320 @@ Class ClassBuilder::ResolveConstructedClass(Local<Context> context, Local<Value>
   return ensured != nil ? ensured : fallback;
 }
 
-void ClassBuilder::ValidateEsClassSuperArgs(Local<Context> context,
-                                            const FunctionCallbackInfo<Value>& info) {
-  if (info.Length() == 0) {
-    return;
-  }
-
-  Isolate* isolate = v8::Isolate::GetCurrent();
-  Local<Value> newTarget = info.NewTarget();
+bool ClassBuilder::IsESDerivedConstructor(Isolate* isolate, Local<Value> newTarget) {
   if (newTarget.IsEmpty() || !newTarget->IsFunction()) {
-    return;
+    return false;
+  }
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, newTarget);
+  return wrapper != nullptr && wrapper->Type() == WrapperType::ObjCClass &&
+         static_cast<ObjCClassWrapper*>(wrapper)->ESDerivedClass();
+}
+
+void ClassBuilder::ConstructESObject(Local<Context> context,
+                                     const FunctionCallbackInfo<Value>& info, Class klass) {
+  Isolate* isolate = info.GetIsolate();
+  auto cache = Caches::Get(isolate);
+
+  Local<Object> options;
+  if (info.Length() > 0 && !(info.Length() == 1 && info[0]->IsUndefined())) {
+    if (info.Length() > 1 || !IsOptionsObject(isolate, info[0])) {
+      throw NativeScriptException(
+          std::string("super(...) in ") + class_getName(klass) +
+          " takes no arguments or a single options object; choose the initializer with "
+          "super({ [interop.initializer.args]: { frame } }). Positional arguments are not "
+          "supported.");
+    }
+    options = info[0].As<Object>();
   }
 
-  BaseDataWrapper* wrapper = tns::GetValue(isolate, newTarget.As<v8::Function>());
-  if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCClass ||
-      !static_cast<ObjCClassWrapper*>(wrapper)->ESDerivedClass()) {
-    return;
+  Local<Value> selection;
+  Local<Value> nativeInfo;
+  if (!options.IsEmpty()) {
+    TryCatch tc(isolate);
+    if (!options->Get(context, InitializerArgsSymbol(isolate)).ToLocal(&selection) ||
+        !options->Get(context, InitializerNativeSymbol(isolate)).ToLocal(&nativeInfo)) {
+      throw NativeScriptException(isolate, tc, "Cannot read the super(...) options");
+    }
+  }
+  bool hasSelection = !selection.IsEmpty() && !selection->IsUndefined();
+  bool hasNativeInfo = !nativeInfo.IsEmpty() && !nativeInfo->IsUndefined();
+
+  NativeConstruction* construction = nullptr;
+  if (!nativeConstructions.empty()) {
+    NativeConstruction* top = nativeConstructions.back();
+    if (!top->consumed && top->klass == klass &&
+        (!hasNativeInfo || nativeInfo->StrictEquals(top->info))) {
+      construction = top;
+    }
+  }
+  if (construction == nullptr && hasNativeInfo) {
+    throw NativeScriptException(
+        "[interop.initializer.native] belongs to the construction Objective-C started; it "
+        "cannot be passed on to another one.");
   }
 
-  if (info.Length() == 1 && info[0]->IsObject()) {
-    BaseDataWrapper* argWrapper = tns::GetValue(isolate, info[0]);
-    // A token object carries no wrapper; a pointer is the adopt-an-existing-
-    // instance form. Both name exactly one initializer.
-    if (argWrapper == nullptr || argWrapper->Type() == WrapperType::Pointer) {
-      return;
+  if (construction == nullptr && !options.IsEmpty() && !hasSelection) {
+    std::vector<Local<Value>> unused;
+    const MethodMeta* lookalike =
+        ArgConverter::FindInitializerByTokens(context, klass, options, unused, false);
+    if (lookalike != nullptr && strlen(lookalike->constructorTokens()) > 0) {
+      throw NativeScriptException(
+          std::string("super({ ... }) does not choose an initializer by its keys. To run ") +
+          lookalike->selectorAsString() +
+          ", pass them as super({ [interop.initializer.args]: { ... } }).");
     }
   }
 
-  // Positional arguments pick an initializer by matching JS value shapes, so
-  // `initWithInt:` and `initWithDouble:` are indistinguishable and the winner
-  // depends on the call site. The token form names one selector outright, and
-  // is the only form the generated .d.ts can type.
-  throw NativeScriptException(
-      std::string("super(...) on a class extending \"") +
-      class_getName(static_cast<ObjCClassWrapper*>(wrapper)->Klass()) +
-      "\" must be called with no arguments or with a single initializer-token object, e.g. "
-      "super({ frame: rect }) for initWithFrame:. Positional arguments are ambiguous and are not "
-      "supported.");
+  id self = construction != nullptr ? construction->self : [klass alloc];
+  if (construction != nullptr) {
+    construction->consumed = true;
+  }
+  if (ArgConverter::FindCachedInstance(isolate, cache, self) != nullptr) {
+    if (construction == nullptr) {
+      [self release];
+    }
+    throw NativeScriptException(
+        std::string("This ") + class_getName(klass) +
+        " instance already has a JS object; it cannot be constructed twice.");
+  }
+
+  // Bound before any initializer runs: overrides it calls find `self` in Instances and so see
+  // the instance under construction.
+  Local<Object> thiz = info.This();
+  ObjCDataWrapper* wrapper = new ObjCDataWrapper(self);
+  tns::SetValue(isolate, thiz, wrapper);
+  std::shared_ptr<Persistent<Value>> poThiz = ObjectManager::Register(context, thiz);
+  cache->Instances.emplace(self, poThiz);
+  auto unbind = [&](id object) {
+    cache->Instances.erase(object);
+    tns::SetValue(isolate, thiz, nullptr);
+    delete wrapper;
+  };
+
+  id result = self;
+  bool adopting = construction != nullptr && construction->hook == nullptr;
+  if (!adopting) {
+    // Once an initializer raised, who owns `self` is unknowable; leaking it beats an
+    // over-release.
+    bool initRaised = false;
+    try {
+      UnderInitScope underInit(self);
+      @try {
+        if (construction != nullptr &&
+            (!hasSelection || selection->StrictEquals(construction->prefill))) {
+          // The initializer Objective-C sent, with its own arguments.
+          ffi_arg returned = 0;
+          ffi_call(construction->cif, FFI_FN(objc_msgSend), &returned, construction->argValues);
+          result = reinterpret_cast<id>(static_cast<uintptr_t>(returned));
+        } else if (!hasSelection) {
+          result = reinterpret_cast<id (*)(id, SEL)>(objc_msgSend)(self, @selector(init));
+        } else {
+          if (!selection->IsObject() || tns::GetValue(isolate, selection) != nullptr) {
+            throw NativeScriptException(
+                "[interop.initializer.args] must be an object of initializer tokens, e.g. "
+                "{ frame }.");
+          }
+          std::vector<Local<Value>> args;
+          const MethodMeta* initializer = ArgConverter::FindInitializerByTokens(
+              context, klass, selection.As<Object>(), args, true);
+          V8VectorArgs vectorArgs(args);
+          result = Interop::CallInitializer(context, initializer, self, klass, vectorArgs);
+        }
+      } @catch (NSException* e) {
+        initRaised = true;
+        Interop::ThrowAsJSError(e);
+      }
+    } catch (NativeScriptException&) {
+      unbind(self);
+      if (initRaised) {
+        if (construction != nullptr) {
+          construction->initRan = true;
+        }
+      } else if (construction == nullptr) {
+        // Never initialized. A hook gives back its caller's allocation itself.
+        [self release];
+      }
+      throw;
+    }
+    if (construction != nullptr) {
+      construction->initRan = true;
+    }
+  }
+
+  if (result == nil) {
+    unbind(self);
+    throw NativeScriptException(std::string("The initializer of ") + class_getName(klass) +
+                                " returned nil.");
+  }
+
+  if (result != self) {
+    cache->Instances.erase(self);
+    auto existing = ArgConverter::FindCachedInstance(isolate, cache, result);
+    if (existing != nullptr) {
+      // An initializer that answered with an already wrapped object (a singleton, a cached
+      // instance): that object is the result of super(...).
+      tns::SetValue(isolate, thiz, nullptr);
+      delete wrapper;
+      if (construction != nullptr) {
+        construction->result = result;
+      } else {
+        [result release];
+      }
+      info.GetReturnValue().Set(existing->Get(isolate));
+      return;
+    }
+    delete wrapper;
+    wrapper = new ObjCDataWrapper(result);
+    tns::SetValue(isolate, thiz, wrapper);
+    cache->Instances.emplace(result, poThiz);
+  }
+
+  if (construction != nullptr) {
+    // The Instances entry needs its own reference; the caller keeps the one the initializer
+    // returned (or, when adopting, the one it already held).
+    [result retain];
+    construction->result = result;
+  }
+
+  ExternalMemory::ChargeEstimatedSize(isolate, thiz);
+}
+
+bool ClassBuilder::TryAdoptNativeInstance(Local<Context> context, id target, Local<Value>& result) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  auto cache = Caches::Get(isolate);
+  // Runs for every object's first wrap; set lookups keep that path flat.
+  Class klass = FindESClass(cache, target);
+  if (klass == nil || IsUnderInit(target)) {
+    return false;
+  }
+  for (NativeConstruction* construction : nativeConstructions) {
+    if (construction->self == target) {
+      return false;
+    }
+  }
+
+  auto ctorIt = cache->CtorFuncs.find(class_getName(klass));
+  if (ctorIt == cache->CtorFuncs.end()) {
+    return false;
+  }
+  Local<v8::Function> ctor = ctorIt->second->Get(isolate);
+  if (!IsESDerivedConstructor(isolate, ctor)) {
+    return false;
+  }
+
+  Local<Object> info = NewInitializerInfo(context, nullptr, {});
+  Local<Object> options = Object::New(isolate);
+  tns::Assert(options->Set(context, InitializerNativeSymbol(isolate), info).FromMaybe(false),
+              isolate);
+
+  NativeConstruction construction{target, klass, nullptr, nullptr, nullptr, info, Local<Value>()};
+  {
+    // Runs wherever an object first crosses into JS, including inside callbacks from native
+    // code, where nothing could catch a rethrow: a failing constructor is reported instead.
+    TryCatch tc(isolate);
+    NativeConstructionScope scope(&construction);
+    Local<Value> optionsValue = options;
+    Local<Value> instance;
+    if (!ctor->CallAsConstructor(context, 1, &optionsValue).ToLocal(&instance) && tc.HasCaught()) {
+      NativeScriptException::ReportToJsHandlersAndLog(isolate, tc.Exception(), tc.Message());
+      tc.Reset();
+    }
+  }
+
+  if (!construction.consumed) {
+    Local<Value> error = Exception::Error(tns::ToV8String(
+        isolate, std::string("The constructor of ") + class_getName(klass) +
+                     " finished without calling super(...), so the instance Objective-C "
+                     "created reaches JS unconstructed."));
+    NativeScriptException::ReportToJsHandlersAndLog(isolate, error,
+                                                    Exception::CreateMessage(isolate, error));
+    return false;
+  }
+  auto cached = ArgConverter::FindCachedInstance(isolate, cache, target);
+  if (cached == nullptr) {
+    return false;
+  }
+  result = cached->Get(isolate);
+  return true;
+}
+
+void ClassBuilder::RegisterInitializerSymbols(Local<Context> context, Local<Object> interop) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Object> initializer = Object::New(isolate);
+  bool success =
+      initializer->Set(context, tns::ToV8String(isolate, "args"), InitializerArgsSymbol(isolate))
+          .FromMaybe(false) &&
+      initializer
+          ->Set(context, tns::ToV8String(isolate, "native"), InitializerNativeSymbol(isolate))
+          .FromMaybe(false) &&
+      initializer->SetIntegrityLevel(context, IntegrityLevel::kFrozen).FromMaybe(false) &&
+      interop->Set(context, tns::ToV8String(isolate, "initializer"), initializer).FromMaybe(false);
+  tns::Assert(success, isolate);
+}
+
+// Initializers the metadata lists for nativeBase's chain that nativeBase actually implements;
+// optional protocol initializers it does not implement must not start answering
+// respondsToSelector: on a subclass. Variadic ones cannot be forwarded by a fixed-signature
+// hook.
+static std::vector<const MethodMeta*> HookableInitializers(Isolate* isolate, Class nativeBase) {
+  std::vector<const MethodMeta*> result;
+  const Meta* meta = ArgConverter::FindMeta(nativeBase);
+  if (meta == nullptr || meta->type() != MetaType::Interface) {
+    return result;
+  }
+  auto cache = Caches::Get(isolate);
+  std::set<SEL> seen;
+  for (const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
+       interfaceMeta != nullptr; interfaceMeta = interfaceMeta->baseMeta()) {
+    for (const MethodMeta* initializer : ArgConverter::GetInitializers(
+             cache.get(), objc_getClass(interfaceMeta->name()), interfaceMeta)) {
+      SEL selector = initializer->selector();
+      if (initializer->isVariadic() || !seen.insert(selector).second ||
+          class_getInstanceMethod(nativeBase, selector) == nullptr) {
+        continue;
+      }
+      result.push_back(initializer);
+    }
+  }
+  return result;
+}
+
+void ClassBuilder::InstallInitializerHooks(Isolate* isolate, Class extendedClass) {
+  Class nativeBase = class_getSuperclass(extendedClass);
+  for (const MethodMeta* initializer : HookableInitializers(isolate, nativeBase)) {
+    SEL selector = initializer->selector();
+    InitializerHook* hook = new InitializerHook(isolate, initializer, extendedClass);
+    IMP imp =
+        Interop::CreateMethod(2, initializer->encodings()->count - 1,
+                              initializer->encodings()->first(), InitializerHookCallback, hook);
+    // The implemented method's own type string: exact for every signature, where one
+    // rebuilt from metadata cannot express all of them.
+    Method method = class_getInstanceMethod(nativeBase, selector);
+    class_addMethod(extendedClass, selector, imp, method_getTypeEncoding(method));
+  }
+}
+
+// The constructor runs for every initializer, so a JS method of the same name would replace the
+// hook that runs it.
+static void ThrowIfOverridesInitializer(Local<Context> context, Class nativeBase,
+                                        Local<Object> implementationObject,
+                                        const std::string& className) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  for (const MethodMeta* initializer : HookableInitializers(isolate, nativeBase)) {
+    bool own = false;
+    if (!implementationObject
+             ->HasOwnProperty(context, tns::ToV8String(isolate, initializer->jsName()))
+             .To(&own) ||
+        !own) {
+      continue;
+    }
+    throw NativeScriptException(
+        "Class " + className + " defines " + initializer->jsName() +
+        "(), which overrides the initializer " + initializer->selectorAsString() +
+        ". A class extending a native type runs its constructor for every initializer: move "
+        "this logic to the constructor, and choose the super initializer with "
+        "super({ [interop.initializer.args]: { ... } }).");
+  }
 }
 
 void ClassBuilder::ExposeDynamicMembers(v8::Local<v8::Context> context, Class extendedClass,

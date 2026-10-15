@@ -28,3 +28,15 @@ typedef struct TNSCStructure {
 @interface TNSTestObject : NSObject
 - (id)initWithURL:(NSURL*)x;
 @end
+
+// Instances come only from a factory that runs an initializer this header does not declare, so
+// the metadata never lists it (the shape of +[UIButton buttonWithType:]).
+@interface TNSPrivateInitializerObject : NSObject
++ (instancetype)createPrivately;
+@property(readonly) BOOL initializedPrivately;
+@end
+
+@interface TNSRaisingInitializerObject : NSObject
+// Raises an NSException named TNSInitializerException.
+- (instancetype)initRaising;
+@end

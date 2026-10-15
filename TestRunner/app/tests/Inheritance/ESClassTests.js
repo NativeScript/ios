@@ -57,67 +57,116 @@ describe(module.id, function () {
         expect(NSStringFromClass(object.class())).toBe('ESConstructorObject');
     });
 
-    it('ESClassSuperTokenObjectSelectsInitializer', function () {
+    it('ESClassInitializerArgsSelectInitializer', function () {
         class ESCtorArgsObject extends TNSCInterface {
-            constructor(name, x) {
-                // The token object names one selector outright. Arguments passed to `new` are
-                // only seen by the JS constructor.
-                super({ primitive: x });
-                this.name = name;
+            constructor(args) {
+                // The user's own keys never pick an initializer; only interop.initializer.args does.
+                super({ ...args, [interop.initializer.args]: { primitive: args.x } });
+                this.name = args.name;
             }
         }
 
-        var object = new ESCtorArgsObject('first', 7);
+        var object = new ESCtorArgsObject({ name: 'first', x: 7 });
         expect(object instanceof ESCtorArgsObject).toBe(true);
         expect(object.name).toBe('first');
         expect(TNSGetOutput()).toBe('initWithPrimitive:7 called');
         TNSClearOutput();
 
+        // Keys match as a set, in any order
         class ESCtorTwoArgsObject extends TNSCInterface {
-            constructor(a, b) {
-                super({ int: a, andInt: b });
+            constructor() {
+                super({ [interop.initializer.args]: { andInt: 10, int: 5 } });
             }
         }
 
-        var object2 = new ESCtorTwoArgsObject(5, 10);
+        var object2 = new ESCtorTwoArgsObject();
         expect(object2 instanceof ESCtorTwoArgsObject).toBe(true);
         expect(TNSGetOutput()).toBe('initWithInt:andInt: 5 10 called');
         TNSClearOutput();
 
-        // super() with no arguments falls back to plain [[Class alloc] init]
+        // No initializer named: plain [[Class alloc] init]
         class ESCtorNoArgsObject extends TNSCInterface {
+        }
+
+        var object3 = new ESCtorNoArgsObject({ unrelated: 1 });
+        expect(object3 instanceof ESCtorNoArgsObject).toBe(true);
+        expect(TNSGetOutput()).toBe('init called');
+        TNSClearOutput();
+
+        // An error-out initializer never exposes its NSError** as a token
+        class ESCtorErrorOutObject extends TNSCInterface {
             constructor() {
-                super();
+                super({ [interop.initializer.args]: { parameter1: 'a', parameter2: 'b' } });
             }
         }
 
-        var object3 = new ESCtorNoArgsObject();
-        expect(object3 instanceof ESCtorNoArgsObject).toBe(true);
-        expect(TNSGetOutput()).toBe('init called');
+        new ESCtorErrorOutObject();
+        expect(TNSGetOutput()).toBe('initWithParameter1:parameter2:error: a b called');
+        TNSClearOutput();
+
+        // A parameterless initializer is named by its token alone
+        class ESCtorEmptyObject extends TNSCInterface {
+            constructor() {
+                super({ [interop.initializer.args]: { empty: undefined } });
+            }
+        }
+
+        new ESCtorEmptyObject();
+        expect(TNSGetOutput()).toBe('initWithEmpty called');
     });
 
-    it('ESClassPositionalSuperArgsThrow', function () {
+    it('ESClassSuperArgumentErrors', function () {
         class ESPositionalSuperObject extends TNSCInterface {
             constructor() {
                 super(7);
             }
         }
 
-        // Positional args match on JS value shape, so initWithInt: and initWithPrimitive:
-        // are indistinguishable. The token form is the only supported spelling.
         expect(function () {
             new ESPositionalSuperObject();
-        }).toThrowError(/initializer-token object/);
+        }).toThrowError(/takes no arguments or a single options object/);
 
-        class ESPositionalSuperTwoObject extends TNSCInterface {
-            constructor() {
-                super(5, 10);
+        class ESClassInstanceSuperObject extends TNSCInterface {
+            constructor(owner) {
+                super(owner);
             }
         }
 
         expect(function () {
-            new ESPositionalSuperTwoObject();
-        }).toThrowError(/initializer-token object/);
+            new ESClassInstanceSuperObject(new (class Owner { })());
+        }).toThrowError(/takes no arguments or a single options object/);
+
+        // The pre-contract spelling would silently run init instead of initWithPrimitive:
+        class ESBareTokensSuperObject extends TNSCInterface {
+            constructor() {
+                super({ primitive: 7 });
+            }
+        }
+
+        expect(function () {
+            new ESBareTokensSuperObject();
+        }).toThrowError(/initWithPrimitive:.*interop\.initializer\.args/);
+
+        class ESUnknownTokensObject extends TNSCInterface {
+            constructor() {
+                super({ [interop.initializer.args]: { primitve: 7 } });
+            }
+        }
+
+        expect(function () {
+            new ESUnknownTokensObject();
+        }).toThrowError(/No initializer of ESUnknownTokensObject takes \{ primitve \}/);
+
+        class ESForgedNativeObject extends TNSCInterface {
+            constructor() {
+                super({ [interop.initializer.native]: { selector: 'init', args: [] } });
+            }
+        }
+
+        expect(function () {
+            new ESForgedNativeObject();
+        }).toThrowError(/belongs to the construction Objective-C started/);
+        expect(TNSGetOutput()).toBe('');
     });
 
     it('ESClassInstanceMethodsAndSuper', function () {
@@ -176,53 +225,259 @@ describe(module.id, function () {
         expect(NSStringFromClass(object.class())).toBe('ESAllocObject');
     });
 
-    it('ESClassAllocInitDoesNotRunJsConstructor', function () {
+    it('ESClassAllocInitRunsJsConstructor', function () {
         var constructorRuns = 0;
 
-        class ESAllocNoCtorObject extends NSObject {
+        class ESAllocCtorObject extends NSObject {
             field = 42;
+            #secret = 'private';
 
-            constructor() {
-                super();
+            constructor(args) {
+                super(args);
                 constructorRuns++;
                 this.initializedFromJs = true;
             }
-        }
 
-        // Objects Objective-C allocates - alloc/init here, but equally cell reuse,
-        // storyboards or NSCoding - are handed to JS as a bare object with the class
-        // prototype grafted on. They never run [[Construct]], so class fields and the
-        // constructor body are absent. Override init() (below) to run on both paths.
-        var allocated = ESAllocNoCtorObject.alloc().init();
-        expect(constructorRuns).toBe(0);
-        expect(allocated.field).toBe(undefined);
-        expect(allocated.initializedFromJs).toBe(undefined);
-        expect(allocated instanceof ESAllocNoCtorObject).toBe(true);
-        expect(NSStringFromClass(allocated.class())).toBe('ESAllocNoCtorObject');
-
-        var constructed = new ESAllocNoCtorObject();
-        expect(constructorRuns).toBe(1);
-        expect(constructed.field).toBe(42);
-        expect(constructed.initializedFromJs).toBe(true);
-    });
-
-    it('ESClassInitOverrideRunsOnNativeAllocation', function () {
-        class ESInitOverrideObject extends NSObject {
-            init() {
-                var self = super.init();
-                self.readyFromInit = true;
-                return self;
+            secret() {
+                return this.#secret;
             }
         }
 
-        // init() is the one construction hook both paths share
-        var allocated = ESInitOverrideObject.alloc().init();
-        expect(allocated.readyFromInit).toBe(true);
-        expect(allocated instanceof ESInitOverrideObject).toBe(true);
+        // alloc().init() is an initializer Objective-C sends, like cell reuse, storyboards or
+        // NSCoding: the constructor runs inside it, so fields and #private exist on both paths
+        var allocated = ESAllocCtorObject.alloc().init();
+        expect(constructorRuns).toBe(1);
+        expect(allocated.field).toBe(42);
+        expect(allocated.secret()).toBe('private');
+        expect(allocated.initializedFromJs).toBe(true);
+        expect(allocated instanceof ESAllocCtorObject).toBe(true);
+        expect(NSStringFromClass(allocated.class())).toBe('ESAllocCtorObject');
 
-        var constructed = new ESInitOverrideObject();
-        expect(constructed.readyFromInit).toBe(true);
-        expect(constructed instanceof ESInitOverrideObject).toBe(true);
+        var constructed = new ESAllocCtorObject();
+        expect(constructorRuns).toBe(2);
+        expect(constructed.field).toBe(42);
+        expect(constructed.secret()).toBe('private');
+    });
+
+    it('ESClassInitializerOverrideThrows', function () {
+        class ESInitOverrideObject extends NSObject {
+            init() {
+                return super.init();
+            }
+        }
+
+        // The constructor already runs for every initializer
+        expect(function () {
+            new ESInitOverrideObject();
+        }).toThrowError(/defines init\(\), which overrides the initializer init/);
+    });
+
+    it('InteropInitializerSymbols', function () {
+        expect(typeof interop.initializer.args).toBe('symbol');
+        expect(typeof interop.initializer.native).toBe('symbol');
+        expect(interop.initializer.args).not.toBe(Symbol.for('interop.initializer.args'));
+        expect(Object.isFrozen(interop.initializer)).toBe(true);
+    });
+
+    it('ESClassNativeInitializerReachesConstructor', function () {
+        var received = [];
+        class ESNativeInitObject extends TNSCInterface {
+            label = 'ready';
+            constructor(args) {
+                super(args);
+                received.push(args && args[interop.initializer.native]);
+            }
+        }
+
+        // The initializer Objective-C sent runs exactly once, with its own arguments
+        var object = ESNativeInitObject.alloc().initWithPrimitive(7);
+        expect(TNSGetOutput()).toBe('initWithPrimitive:7 called');
+        expect(object instanceof ESNativeInitObject).toBe(true);
+        expect(object.label).toBe('ready');
+        expect(received.length).toBe(1);
+        expect(received[0].selector).toBe('initWithPrimitive:');
+        expect(received[0].args).toEqual([7]);
+        expect(Object.isFrozen(received[0])).toBe(true);
+        TNSClearOutput();
+
+        new ESNativeInitObject();
+        expect(received[1]).toBeUndefined();
+        expect(TNSGetOutput()).toBe('init called');
+    });
+
+    it('ESClassNativeInitializerPrefillsTokens', function () {
+        var seen;
+        class ESPrefillObject extends TNSCInterface {
+            constructor(args) {
+                seen = args[interop.initializer.args];
+                super(args);
+            }
+        }
+
+        ESPrefillObject.alloc().initWithIntAndInt(1, 2);
+        expect(seen).toEqual({ int: 1, andInt: 2 });
+        // Frozen: super(...) forwards Objective-C's own arguments, so an edit in place would
+        // otherwise be silently dropped
+        expect(Object.isFrozen(seen)).toBe(true);
+        expect(TNSGetOutput()).toBe('initWithInt:andInt: 1 2 called');
+    });
+
+    it('ESClassAllocInitBalancesReferences', function () {
+        class ESRefCountObject extends NSObject {
+        }
+
+        // The JS instance holds exactly one reference; the one alloc/init returned is balanced
+        expect(ESRefCountObject.alloc().init().retainCount()).toBe(1);
+        expect(ESRefCountObject.new().retainCount()).toBe(1);
+        expect(new ESRefCountObject().retainCount()).toBe(1);
+    });
+
+    it('ESClassInitializerRaisingBecomesJsError', function () {
+        class ESRaisingObject extends TNSRaisingInitializerObject {
+            constructor() {
+                super({ [interop.initializer.args]: { raising: undefined } });
+            }
+        }
+
+        var error;
+        try {
+            new ESRaisingObject();
+        } catch (e) {
+            error = e;
+        }
+        expect(error).toBeDefined();
+        expect(error.name).toBe('TNSInitializerException');
+        expect(error.message).toBe('initRaising raised');
+    });
+
+    it('ESClassDefaultAndForcedInitializer', function () {
+        class ESDefaultInitObject extends TNSCInterface {
+            constructor(args = {}) {
+                super({ [interop.initializer.args]: { primitive: 1 }, ...args });
+            }
+        }
+
+        new ESDefaultInitObject();
+        expect(TNSGetOutput()).toBe('initWithPrimitive:1 called');
+        TNSClearOutput();
+
+        // Objective-C chose init; spread order lets its choice win over the class default
+        ESDefaultInitObject.alloc().init();
+        expect(TNSGetOutput()).toBe('init called');
+        TNSClearOutput();
+
+        class ESForcedInitObject extends TNSCInterface {
+            constructor(args = {}) {
+                super({ ...args, [interop.initializer.args]: { primitive: 2 } });
+            }
+        }
+
+        // Like -init { return [super initWithPrimitive:2]; }
+        var forced = ESForcedInitObject.alloc().init();
+        expect(forced instanceof ESForcedInitObject).toBe(true);
+        expect(TNSGetOutput()).toBe('initWithPrimitive:2 called');
+    });
+
+    it('ESClassMultiLevelConstruction', function () {
+        var order = [];
+        class ESConstructA extends TNSCInterface {
+            a = 'A';
+            constructor(args) {
+                super(args);
+                order.push('A');
+            }
+        }
+        class ESConstructB extends ESConstructA {
+            b = 'B';
+            constructor(args) {
+                super(args);
+                order.push('B');
+            }
+        }
+
+        var viaNew = new ESConstructB();
+        var viaNative = ESConstructB.alloc().initWithPrimitive(3);
+        expect(order).toEqual(['A', 'B', 'A', 'B']);
+        expect(viaNew.a + viaNew.b).toBe('AB');
+        expect(viaNative.a + viaNative.b).toBe('AB');
+        expect(TNSGetOutput()).toBe('init called' + 'initWithPrimitive:3 called');
+    });
+
+    it('ESClassConstructedByObjectiveC', function () {
+        var selectors = [];
+        class ESObjCConstructed extends TNSDerivedInterface {
+            constructor(args) {
+                super(args);
+                selectors.push(args[interop.initializer.native].selector);
+            }
+        }
+
+        // [[cls alloc] initBaseMethod] and the rest, sent from Objective-C, which asserts every
+        // result isKindOfClass: the class
+        TNSTestNativeCallbacks.inheritanceConstructorCalls(ESObjCConstructed);
+        expect(selectors).toContain('initBaseMethod');
+        expect(selectors).toContain('initBaseProtocolMethod1');
+    });
+
+    it('ESClassAdoptedWhenInitializerIsNotInMetadata', function () {
+        var constructorArgs;
+        class ESPrivatelyCreated extends TNSPrivateInitializerObject {
+            field = 'set';
+            constructor(args) {
+                super(args);
+                constructorArgs = args;
+            }
+        }
+
+        // createPrivately runs -initPrivately, which no hook sees: the constructor runs when the
+        // object first reaches JS, here as the factory's return value
+        var object = ESPrivatelyCreated.createPrivately();
+        expect(TNSGetOutput()).toBe('initPrivately called');
+        expect(object instanceof ESPrivatelyCreated).toBe(true);
+        expect(object.initializedPrivately).toBe(true);
+        expect(object.field).toBe('set');
+        expect(constructorArgs[interop.initializer.native].selector).toBeNull();
+        expect(constructorArgs[interop.initializer.args]).toBeUndefined();
+    });
+
+    it('ESClassConstructorThrowingOnNativePath', function () {
+        var previousHook = global.__onUncaughtError;
+        var uncaught = [];
+        global.__onUncaughtError = function (error) {
+            uncaught.push(error);
+        };
+        try {
+            class ESThrowingCtor extends NSObject {
+                constructor(args) {
+                    super(args);
+                    throw new Error('constructor failed');
+                }
+            }
+
+            // An initializer cannot throw into Objective-C: the error is reported and init
+            // answers nil
+            expect(ESThrowingCtor.alloc().init()).toBeNull();
+            expect(uncaught.length).toBe(1);
+            expect(String(uncaught[0] && uncaught[0].message)).toContain('constructor failed');
+
+            expect(function () {
+                new ESThrowingCtor();
+            }).toThrowError('constructor failed');
+        } finally {
+            global.__onUncaughtError = previousHook;
+        }
+    });
+
+    it('ESClassFromLegacyConstructsThroughInitializers', function () {
+        var LegacyCtorBase = TNSCInterface.extend({}, { name: 'ESLegacyCtorBase' });
+        class ESFromLegacyCtor extends LegacyCtorBase {
+            field = 1;
+        }
+
+        var object = ESFromLegacyCtor.alloc().initWithPrimitive(4);
+        expect(object instanceof ESFromLegacyCtor).toBe(true);
+        expect(object.field).toBe(1);
+        expect(TNSGetOutput()).toBe('initWithPrimitive:4 called');
     });
 
     it('ESClassNewBeforeConstruction', function () {
