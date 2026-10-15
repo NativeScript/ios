@@ -2,7 +2,6 @@
 #define ClassBuilder_h
 
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "Common.h"
@@ -48,10 +47,10 @@ class ClassBuilder {
   static void RegisterNativeClassFunction(v8::Local<v8::Context> context);
 
   // Lazily registers an Objective-C subclass for a plain ES
-  // `class X extends NativeBase {}` constructor function. Returns the
+  // `class X extends Base {}` constructor function, registering a JS-defined
+  // Base first so the Objective-C hierarchy mirrors the JS one. Returns the
   // registered class, or nil when ctorFunc is not part of a native inheritance
-  // chain; throws when the chain goes through a legacy `.extend()`-created
-  // class. Idempotent: subsequent calls return the cached class from the ctor's
+  // chain. Idempotent: subsequent calls return the cached class from the ctor's
   // ObjCClassWrapper. Pass nativeAllocates when the caller is handing the class
   // to Objective-C (or allocating through it), which is what makes the JS
   // constructor unreachable and gates the debug diagnostic.
@@ -73,6 +72,13 @@ class ClassBuilder {
       v8::Local<v8::Context> context,
       const v8::FunctionCallbackInfo<v8::Value>& info);
 
+  // The class a JS `super.method()` reaching a native method must dispatch
+  // to: the superclass of the rootmost JS-defined class in klass's chain. A JS
+  // super lookup only lands on a native method when no JS level above the
+  // caller defines it, so every JS-defined class in between must be skipped —
+  // their implementations call back into JS and would recurse.
+  static Class GetNativeSuperclass(Class klass);
+
  private:
   static std::atomic<unsigned long long> classNameCounter_;
 
@@ -86,12 +92,11 @@ class ClassBuilder {
   static void WarnIfConstructorIsUnreachable(
       v8::Local<v8::Context> context,
       const std::vector<v8::Local<v8::Function>>& chainCtors, Class extendedClass);
-  static void ExposeDynamicMethods(
-      v8::Local<v8::Context> context, Class extendedClass,
-      v8::Local<v8::Value> exposedMethods,
-      v8::Local<v8::Value> exposedProtocols,
-      v8::Local<v8::Object> implementationObject,
-      std::unordered_set<std::string>* visitedNames = nullptr);
+  static void ExposeDynamicMethods(v8::Local<v8::Context> context,
+                                   Class extendedClass,
+                                   v8::Local<v8::Value> exposedMethods,
+                                   v8::Local<v8::Value> exposedProtocols,
+                                   v8::Local<v8::Object> implementationObject);
   static void ExposeDynamicMembers(v8::Local<v8::Context> context,
                                    Class extendedClass,
                                    v8::Local<v8::Object> implementationObject,

@@ -361,6 +361,73 @@ describe(module.id, function () {
             'instance baseMethod called');
     });
 
+    it('ESClassMultiLevelMirrorsObjectiveCHierarchy', function () {
+        class ESMirrorA extends TNSDerivedInterface {
+            baseMethod() {
+                TNSLog('A baseMethod called');
+                super.baseMethod();
+            }
+            derivedMethod() {
+                TNSLog('A derivedMethod called');
+                super.derivedMethod();
+            }
+        }
+
+        class ESMirrorB extends ESMirrorA {
+            baseMethod() {
+                TNSLog('B baseMethod called');
+                super.baseMethod();
+            }
+        }
+
+        var b = new ESMirrorB();
+        expect(NSStringFromClass(b.class())).toBe('ESMirrorB');
+        expect(NSStringFromClass(ESMirrorB.superclass())).toBe('ESMirrorA');
+        expect(b.isKindOfClass(ESMirrorA)).toBe(true);
+        expect(b.isKindOfClass(TNSDerivedInterface)).toBe(true);
+
+        // Objective-C dispatch reaches each JS level, and every super call lands one level up
+        TNSTestNativeCallbacks.inheritanceMethodCalls(b);
+        var output = TNSGetOutput();
+        expect(output.indexOf('B baseMethod called' +
+            'A baseMethod called' +
+            'instance baseMethod called')).toBe(0);
+        expect(output).toContain('A derivedMethod called' +
+            'instance derivedMethod called');
+    });
+
+    it('ESClassThreeLevelSuperChain', function () {
+        class ESChainA extends TNSDerivedInterface {
+            baseMethod() {
+                TNSLog('A baseMethod called');
+                super.baseMethod();
+            }
+        }
+        class ESChainB extends ESChainA {
+        }
+        class ESChainC extends ESChainB {
+            baseMethod() {
+                TNSLog('C baseMethod called');
+                super.baseMethod();
+            }
+        }
+
+        var c = new ESChainC();
+        expect(c.isKindOfClass(ESChainB)).toBe(true);
+        expect(c.isKindOfClass(ESChainA)).toBe(true);
+
+        c.baseMethod();
+        expect(TNSGetOutput()).toBe('C baseMethod called' +
+            'A baseMethod called' +
+            'instance baseMethod called');
+        TNSClearOutput();
+
+        TNSTestNativeCallbacks.inheritanceMethodCalls(c);
+        expect(TNSGetOutput().indexOf('C baseMethod called' +
+            'A baseMethod called' +
+            'instance baseMethod called')).toBe(0);
+    });
+
     it('ESClassPlainJsSubclassUnaffected', function () {
         class PlainBase {
         }
@@ -373,24 +440,36 @@ describe(module.id, function () {
         expect(object instanceof PlainBase).toBe(true);
     });
 
-    it('ESClassExtendingLegacyExtendClassThrows', function () {
-        var LegacyBase = NSObject.extend({
-            legacyMethod: function () {
-                TNSLog('legacyMethod called');
+    it('ESClassExtendingLegacyExtendClass', function () {
+        var LegacyBase = TNSDerivedInterface.extend({
+            baseMethod: function () {
+                TNSLog('legacy baseMethod called');
+                this.super.baseMethod();
             }
         }, { name: 'ESLegacyBaseForChaining' });
 
         class ESFromLegacy extends LegacyBase {
-            legacyMethod() {
-                TNSLog('overridden');
+            baseMethod() {
+                TNSLog('es baseMethod called');
+                super.baseMethod();
             }
         }
 
-        // Falling back to the parent's class would register nothing and silently dispatch
-        // this class's overrides to the parent's implementations
-        expect(function () {
-            new ESFromLegacy();
-        }).toThrowError(/legacy \.extend\(\) API/);
+        var object = new ESFromLegacy();
+        expect(object instanceof LegacyBase).toBe(true);
+        expect(object.isKindOfClass(LegacyBase)).toBe(true);
+        expect(NSStringFromClass(ESFromLegacy.superclass())).toBe('ESLegacyBaseForChaining');
+
+        object.baseMethod();
+        expect(TNSGetOutput()).toBe('es baseMethod called' +
+            'legacy baseMethod called' +
+            'instance baseMethod called');
+        TNSClearOutput();
+
+        TNSTestNativeCallbacks.inheritanceMethodCalls(object);
+        expect(TNSGetOutput().indexOf('es baseMethod called' +
+            'legacy baseMethod called' +
+            'instance baseMethod called')).toBe(0);
     });
 
     it('NativeClassPlainCallForm', function () {

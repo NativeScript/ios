@@ -1828,7 +1828,7 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
 
       if (methodCall.callSuper_) {
         sup.receiver = methodCall.target_;
-        sup.super_class = class_getSuperclass(object_getClass(methodCall.target_));
+        sup.super_class = ClassBuilder::GetNativeSuperclass(object_getClass(methodCall.target_));
         Interop::SetValue(call.ArgumentBuffer(0), &sup);
       } else {
         Interop::SetValue(call.ArgumentBuffer(0), methodCall.target_);

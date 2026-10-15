@@ -554,55 +554,15 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context,
     return nil;
   }
 
-  // Walk the constructor prototype chain (mirrors the `class X extends Y` chain) and collect
-  // every plain (unregistered) ES constructor level until we reach a constructor holding an
-  // ObjCClassWrapper. ES-registered ancestors are flattened into this registration; legacy
-  // `.extend()`-created ancestors are not supported (mirrors the historic restriction) and
-  // make this function bail out so callers preserve their old behavior.
-  std::vector<Local<v8::Function>> chainCtors;
-  Local<v8::Function> current = ctorFunc;
-  Class baseClass = nil;
-  while (true) {
-    chainCtors.push_back(current);
-
-    Local<Value> parentValue = current->GetPrototype();
-    if (parentValue.IsEmpty() || !parentValue->IsObject() || !parentValue->IsFunction()) {
-      return nil;
-    }
-
-    Local<v8::Function> parent = parentValue.As<v8::Function>();
-    BaseDataWrapper* parentWrapper = tns::GetValue(isolate, parent);
-    if (parentWrapper == nullptr) {
-      current = parent;
-      continue;
-    }
-
-    if (parentWrapper->Type() != WrapperType::ObjCClass) {
-      return nil;
-    }
-
-    ObjCClassWrapper* parentClassWrapper = static_cast<ObjCClassWrapper*>(parentWrapper);
-    if (!parentClassWrapper->ExtendedClass()) {
-      baseClass = parentClassWrapper->Klass();
-      break;
-    }
-
-    if (parentClassWrapper->ESDerivedClass()) {
-      // Flatten: the parent's registered class sits directly under the pure native base, so
-      // keep walking (collecting the parent's prototype for scanning) until we reach it.
-      current = parent;
-      continue;
-    }
-
-    // Legacy `.extend()`-created base. Falling back to the parent's class would
-    // register nothing and silently dispatch this class's overrides to the
-    // parent's implementations, so refuse instead.
-    throw NativeScriptException(
-        std::string("Cannot extend \"") + class_getName(parentClassWrapper->Klass()) +
-        "\" with an ES class: it was created by the legacy .extend() API. Convert the base class "
-        "to an ES class, or declare this one with .extend() as well.");
+  Local<Value> parentValue = ctorFunc->GetPrototype();
+  if (parentValue.IsEmpty() || !parentValue->IsFunction()) {
+    return nil;
   }
 
+  // The parent is native, legacy `.extend()`-created, already registered, or an
+  // ES class that is registered here first so it can be this class's superclass.
+  Class baseClass =
+      ClassBuilder::EnsureExtendedClass(context, parentValue.As<v8::Function>(), nativeAllocates);
   if (baseClass == nil) {
     return nil;
   }
@@ -637,30 +597,27 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context,
   class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
   class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
 
-  // Expose members level by level, most-derived first, so JS shadowing semantics carry over to
-  // the installed Objective-C implementations. Statics like ObjCProtocols/ObjCExposedMethods are
-  // read through the constructor (inheriting through the static chain like class statics do).
-  std::unordered_set<std::string> visitedNames;
-  for (Local<v8::Function> levelCtor : chainCtors) {
-    Local<Value> prototypeValue;
-    bool success =
-        levelCtor->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
-    tns::Assert(success && !prototypeValue.IsEmpty() && prototypeValue->IsObject(), isolate);
-    Local<Object> implementationObject = prototypeValue.As<Object>();
+  // Statics like ObjCProtocols/ObjCExposedMethods are read through the constructor, so they
+  // inherit through the static chain like class statics do: a subclass overriding a method
+  // declared there still finds its signature.
+  Local<Value> prototypeValue;
+  bool success =
+      ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
+  tns::Assert(success && !prototypeValue.IsEmpty() && prototypeValue->IsObject(), isolate);
+  Local<Object> implementationObject = prototypeValue.As<Object>();
 
-    Local<Value> exposedMethods;
-    success = levelCtor->Get(context, tns::ToV8String(isolate, "ObjCExposedMethods"))
-                  .ToLocal(&exposedMethods);
-    tns::Assert(success, isolate);
+  Local<Value> exposedMethods;
+  success = ctorFunc->Get(context, tns::ToV8String(isolate, "ObjCExposedMethods"))
+                .ToLocal(&exposedMethods);
+  tns::Assert(success, isolate);
 
-    Local<Value> exposedProtocols;
-    success = levelCtor->Get(context, tns::ToV8String(isolate, "ObjCProtocols"))
-                  .ToLocal(&exposedProtocols);
-    tns::Assert(success, isolate);
+  Local<Value> exposedProtocols;
+  success =
+      ctorFunc->Get(context, tns::ToV8String(isolate, "ObjCProtocols")).ToLocal(&exposedProtocols);
+  tns::Assert(success, isolate);
 
-    ClassBuilder::ExposeDynamicMethods(context, extendedClass, exposedMethods, exposedProtocols,
-                                       implementationObject, &visitedNames);
-  }
+  ClassBuilder::ExposeDynamicMethods(context, extendedClass, exposedMethods, exposedProtocols,
+                                     implementationObject);
 
   tns::SetValue(isolate, ctorFunc, new ObjCClassWrapper(extendedClass, true, true));
 
@@ -670,17 +627,13 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context,
   extendedPersistent->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
   cache->CtorFuncs.emplace(extendedClassName, std::move(extendedPersistent));
 
-  Local<Value> ctorPrototypeValue;
-  bool success =
-      ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&ctorPrototypeValue);
-  tns::Assert(success && !ctorPrototypeValue.IsEmpty() && ctorPrototypeValue->IsObject(), isolate);
-  cache->ClassPrototypes.emplace(extendedClassName, std::make_unique<Persistent<Object>>(
-                                                        isolate, ctorPrototypeValue.As<Object>()));
+  cache->ClassPrototypes.emplace(
+      extendedClassName, std::make_unique<Persistent<Object>>(isolate, implementationObject));
 
   ClassBuilder::SwizzleRetainRelease(isolate, extendedClass);
 
   if (nativeAllocates && RuntimeConfig.IsDebug) {
-    WarnIfConstructorIsUnreachable(context, chainCtors, extendedClass);
+    WarnIfConstructorIsUnreachable(context, {ctorFunc}, extendedClass);
   }
 
   return extendedClass;
@@ -963,9 +916,16 @@ BinaryTypeEncodingType ClassBuilder::GetTypeEncodingType(Isolate* isolate, Local
 
 void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedClass,
                                         Local<Value> exposedMethods, Local<Value> exposedProtocols,
-                                        Local<Object> implementationObject,
-                                        std::unordered_set<std::string>* visitedNames) {
+                                        Local<Object> implementationObject) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  // A subclass of a JS-defined class inherits its parent's implementations through the
+  // Objective-C hierarchy; installing what it only inherits in JS would duplicate them.
+  bool inheritsJsClass =
+      class_conformsToProtocol(class_getSuperclass(extendedClass), @protocol(TNSDerivedClass));
+  auto isOwnMember = [&](Local<v8::Name> key) {
+    bool own = false;
+    return !inheritsJsClass || (implementationObject->HasOwnProperty(context, key).To(&own) && own);
+  };
   std::vector<const ProtocolMeta*> protocols;
   if (!exposedProtocols.IsEmpty() && exposedProtocols->IsArray()) {
     Local<v8::Array> protocolsArray = exposedProtocols.As<v8::Array>();
@@ -999,10 +959,7 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
       bool success = methodNames->Get(context, i).ToLocal(&methodName);
       tns::Assert(success, isolate);
 
-      // When flattening a multi-level ES class chain, skip names already exposed by a more
-      // derived level (JS shadowing semantics)
-      if (visitedNames != nullptr &&
-          !visitedNames->insert("exposed:" + tns::ToString(isolate, methodName)).second) {
+      if (!methodName->IsName() || !isOwnMember(methodName.As<v8::Name>())) {
         continue;
       }
 
@@ -1094,7 +1051,7 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
   tns::Assert(success, isolate);
 
   if (!symbolIterator.IsEmpty() && symbolIterator->IsFunction() &&
-      !class_conformsToProtocol(extendedClass, @protocol(NSFastEnumeration))) {
+      isOwnMember(Symbol::GetIterator(isolate))) {
     Local<v8::Function> symbolIteratorFunc = symbolIterator.As<v8::Function>();
 
     class_addProtocol(extendedClass, @protocol(NSFastEnumeration));
@@ -1136,12 +1093,6 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
     std::string methodName = tns::ToString(isolate, key);
 
     if (methodName == "constructor") {
-      continue;
-    }
-
-    // When flattening a multi-level ES class chain, skip names already handled by a more derived
-    // level (JS shadowing semantics)
-    if (visitedNames != nullptr && !visitedNames->insert(methodName).second) {
       continue;
     }
 
@@ -1403,17 +1354,33 @@ void ClassBuilder::SuperAccessorGetterCallback(const FunctionCallbackInfo<Value>
   Local<Context> context = isolate->GetCurrentContext();
   Local<Object> thiz = info.This();
 
+  // Resolved from the class that owns this accessor, not from the receiver: an ES subclass of a
+  // legacy class puts more prototypes between the instance and the implementation object.
+  CacheItem* item = static_cast<CacheItem*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+  auto cache = Caches::Get(isolate);
+  auto it = cache->ClassPrototypes.find(std::string_view(class_getName(item->data_)));
+  tns::Assert(it != cache->ClassPrototypes.end(), isolate);
+  Local<Object> implementationObject = it->second->Get(isolate)->GetPrototype().As<Object>();
+
   std::shared_ptr<Persistent<Value>> poValue = ArgConverter::CreateEmptyObject(context);
   Local<Object> superValue = poValue->Get(isolate).As<Object>();
 
-  superValue
-      ->SetPrototype(context,
-                     thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype())
-      .ToChecked();
+  superValue->SetPrototype(context, implementationObject->GetPrototype()).ToChecked();
   superValue->SetInternalField(0, thiz->GetInternalField(0));
   superValue->SetInternalField(1, tns::ToV8String(isolate, "super"));
 
   info.GetReturnValue().Set(superValue);
+}
+
+Class ClassBuilder::GetNativeSuperclass(Class klass) {
+  Class rootmostDerived = nil;
+  for (Class c = klass; c != nil; c = class_getSuperclass(c)) {
+    if (class_conformsToProtocol(c, @protocol(TNSDerivedClass))) {
+      rootmostDerived = c;
+    }
+  }
+  return class_getSuperclass(rootmostDerived != nil ? rootmostDerived : klass);
 }
 
 IMP ClassBuilder::FindNotOverridenMethod(Class klass, SEL method) {
