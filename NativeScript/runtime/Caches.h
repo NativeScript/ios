@@ -8,6 +8,7 @@
 
 #include "Common.h"
 #include "ConcurrentMap.h"
+#include "ExternalMemory.h"
 #include "Metadata.h"
 #include "robin_hood.h"
 
@@ -169,6 +170,7 @@ class Caches {
       PointerInstances;
   // ExternalMemory's size estimator per class, resolved on first sight.
   robin_hood::unordered_map<Class, uint8_t> ExternalSizeEstimators;
+  ExternalMemory::SoleOwnerCandidates SoleOwnerCandidates;
 
   // Live IsolateTracked instances (URL, URLSearchParams, URLPattern). Their
   // weak-callback finalizers never fire at isolate disposal, so teardown

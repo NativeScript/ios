@@ -201,16 +201,27 @@ void Interop::RegisterBufferFromDataFunction(Local<Context> context, Local<Objec
         // Take a +1 retain so the NSData outlives autorelease pool drains while
         // the ArrayBuffer is alive. The deleter below releases this retain when
         // V8 finalises the BackingStore (i.e. the ArrayBuffer is GC'd / detached).
+        // The wrapper counts it too, so the retain is not mistaken for a native
+        // owner (ExternalMemory::ChargeSoleOwners); the deleter drops the count
+        // before the retain, which can only make that check miss, never pass
+        // wrongly.
+        struct BufferRetain {
+          id obj;
+          std::shared_ptr<std::atomic<uint32_t>> count;
+        };
+        auto retain = new BufferRetain{obj, wrapper->BufferRetains()};
+        retain->count->fetch_add(1, std::memory_order_acq_rel);
         [obj retain];
 
         std::unique_ptr<v8::BackingStore> backingStore = ArrayBuffer::NewBackingStore(
             data, length,
             [](void* /*data*/, size_t /*length*/, void* deleter_data) {
-              if (deleter_data != nullptr) {
-                [(id)deleter_data release];
-              }
+              auto retain = static_cast<BufferRetain*>(deleter_data);
+              retain->count->fetch_sub(1, std::memory_order_acq_rel);
+              [retain->obj release];
+              delete retain;
             },
-            obj);
+            retain);
 
         Local<ArrayBuffer> result = ArrayBuffer::New(isolate, std::move(backingStore));
         info.GetReturnValue().Set(result);

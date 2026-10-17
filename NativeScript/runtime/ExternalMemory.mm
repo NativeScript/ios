@@ -7,8 +7,11 @@
 #include <objc/message.h>
 #include <objc/runtime.h>
 
+#include <algorithm>
+
 #include "Caches.h"
 #include "DataWrapper.h"
+#include "EventLoop.h"
 #include "Helpers.h"
 #include "IsolateWrapper.h"
 #include "NSDataAdapter.h"
@@ -140,6 +143,17 @@ size_t Estimate(Estimator estimator, id obj) {
   return 0;
 }
 
+Estimator EstimatorFor(Caches* cache, Class klass) {
+  auto& estimators = cache->ExternalSizeEstimators;
+  auto it = estimators.find(klass);
+  if (it != estimators.end()) {
+    return static_cast<Estimator>(it->second);
+  }
+  Estimator estimator = ResolveEstimator(klass);
+  estimators.emplace(klass, estimator);
+  return estimator;
+}
+
 }  // namespace
 
 void SetSize(Isolate* isolate, BaseDataWrapper* wrapper, size_t bytes) {
@@ -170,21 +184,137 @@ void ChargeEstimatedSize(Isolate* isolate, Local<Value> value) {
     return;
   }
 
-  auto& estimators = Caches::Get(isolate)->ExternalSizeEstimators;
-  Class klass = objcWrapper->Klass();
-  auto it = estimators.find(klass);
-  Estimator estimator;
-  if (it != estimators.end()) {
-    estimator = static_cast<Estimator>(it->second);
-  } else {
-    estimator = ResolveEstimator(klass);
-    estimators.emplace(klass, estimator);
-  }
+  Caches* cache = Caches::Get(isolate).get();
+  Estimator estimator = EstimatorFor(cache, objcWrapper->Klass());
   if (estimator == kNone) {
     return;
   }
 
+  // Wrapping the object just recorded it as a +0 candidate; drop that entry
+  // so owned objects do not use up the bounded list.
+  auto& candidates = cache->SoleOwnerCandidates.candidates_;
+  if (!candidates.empty() && candidates.back().object == obj) {
+    candidates.pop_back();
+  }
+
   SetSize(isolate, wrapper, Estimate(estimator, obj));
+}
+
+namespace {
+
+// Bounds the list between two checks. A burst beyond it goes uncharged.
+constexpr size_t kMaxSoleOwnerCandidates = 4096;
+
+// How long a candidate recorded off the home thread waits before its check.
+// Its native caller runs on that other thread and lets go on its own
+// schedule, after the callback returns or once that thread's pool drains, so
+// there is no point the home thread could observe; a frame is long enough for
+// both in practice.
+constexpr double kForeignSettleMs = 16;
+
+// How late a wake may fire for a candidate, so that callbacks arriving within
+// this window of each other share one wake.
+constexpr double kWakeCoalesceMs = 4;
+}  // namespace
+
+void RecordSoleOwnerCandidate(Isolate* isolate, Caches* cache, ObjCDataWrapper* wrapper,
+                              const std::shared_ptr<Persistent<Value>>& handle) {
+  Estimator estimator = EstimatorFor(cache, wrapper->Klass());
+  if (estimator == kNone) {
+    return;
+  }
+  SoleOwnerCandidates& candidates = cache->SoleOwnerCandidates;
+  if (candidates.candidates_.size() >= kMaxSoleOwnerCandidates) {
+    return;
+  }
+
+  bool onHomeThread = pthread_equal(pthread_self(), candidates.homeThread_);
+  double now = onHomeThread ? 0 : EventLoop::NowMs();
+  double dueMs = onHomeThread ? 0 : now + kForeignSettleMs;
+  candidates.candidates_.push_back({wrapper->Data(), wrapper->Klass(), estimator, handle, dueMs});
+  if (dueMs < candidates.NextDueMs()) {
+    candidates.nextDueMs_.store(dueMs, std::memory_order_release);
+  }
+  if (!onHomeThread) {
+    candidates.EnsureWake(isolate, dueMs, now);
+  }
+}
+
+void ChargeSoleOwners(Isolate* isolate, Caches* cache) {
+  SoleOwnerCandidates& candidates = cache->SoleOwnerCandidates;
+  if (candidates.candidates_.empty()) {
+    return;
+  }
+
+  double now = EventLoop::NowMs();
+  if (candidates.NextDueMs() > now) {
+    return;
+  }
+  // Charging below can collect, and finalizers can run code that records new
+  // candidates, so the due ones leave the list before any is charged.
+  auto firstWaiting =
+      std::partition(candidates.candidates_.begin(), candidates.candidates_.end(),
+                     [now](const SoleOwnerCandidates::Candidate& c) { return c.dueMs <= now; });
+  std::vector<SoleOwnerCandidates::Candidate> due(
+      std::make_move_iterator(candidates.candidates_.begin()),
+      std::make_move_iterator(firstWaiting));
+  candidates.candidates_.erase(candidates.candidates_.begin(), firstWaiting);
+  double nextDueMs = __builtin_inf();
+  for (const auto& c : candidates.candidates_) {
+    nextDueMs = std::min(nextDueMs, c.dueMs);
+  }
+  candidates.nextDueMs_.store(nextDueMs, std::memory_order_release);
+  if (nextDueMs != __builtin_inf()) {
+    candidates.EnsureWake(isolate, nextDueMs, now);
+  }
+
+  for (SoleOwnerCandidates::Candidate& c : due) {
+    if (isolate->IsExecutionTerminating()) {
+      return;
+    }
+    if (c.handle->IsEmpty()) {
+      continue;
+    }
+    // Keeps the object alive while charging: an increase can collect.
+    HandleScope handleScope(isolate);
+    Local<Value> value = c.handle->Get(isolate);
+    BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+    if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject ||
+        wrapper->ExternalCharge() != nullptr) {
+      continue;
+    }
+    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+    // A wrapper still attached to a live object owns its retain, so the object
+    // can be read from here on.
+    if (objcWrapper->Data() != c.object || objcWrapper->Klass() != c.klass) {
+      continue;
+    }
+    // JS's retains are the wrapper's own plus one per interop.bufferFromData
+    // buffer. Such a buffer's bytes are then weighed twice, by V8 and by this
+    // charge, until it dies; V8 counting the buffer alone never brings the
+    // collection that frees the wrapper. The buffer count is read before the
+    // retain count, and a deleter racing on another thread drops its count
+    // before its retain, so the race can only make the check miss. Immortal
+    // objects (constants, tagged pointers) report a count far above these.
+    uint32_t jsRetains = 1 + objcWrapper->BufferRetainCount();
+    if (static_cast<uint64_t>(CFGetRetainCount((CFTypeRef)c.object)) != jsRetains) {
+      continue;
+    }
+    SetSize(isolate, wrapper, Estimate(static_cast<Estimator>(c.estimator), c.object));
+  }
+}
+
+void SoleOwnerCandidates::EnsureWake(Isolate* isolate, double dueMs, double now) {
+  if (wakeAtMs_ >= dueMs && wakeAtMs_ <= dueMs + kWakeCoalesceMs) {
+    return;
+  }
+  Runtime* runtime = Runtime::GetRuntime(isolate);
+  std::shared_ptr<EventLoop> loop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
+  if (loop == nullptr) {
+    return;
+  }
+  wakeAtMs_ = dueMs + kWakeCoalesceMs;
+  loop->PostInternalDelayed([] {}, std::max(0.0, wakeAtMs_ - now));
 }
 
 void StartMemoryPressureMonitoring() {
