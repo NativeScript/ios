@@ -18,7 +18,9 @@ class InspectorServer {
   // process-unique connection id: onClientConnected hands out its sender,
   // and onClientDisconnected fires once with the same id when the
   // connection closes, after which that sender drops every message.
-  // Callbacks run on the connection's own serial queue.
+  // One client at a time: accepting a client closes the previous one. The
+  // previous client's onClientDisconnected may still be running on its own
+  // queue when the new onClientConnected starts.
   static in_port_t Init(
       std::function<void(uint64_t connectionId, Sender sender)>
           onClientConnected,

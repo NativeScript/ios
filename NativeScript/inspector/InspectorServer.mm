@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 
 namespace v8_inspector {
 
@@ -145,6 +146,12 @@ in_port_t InspectorServer::Init(
     assert(false);
   }
 
+  struct ActiveConnection {
+    std::mutex mutex;
+    std::weak_ptr<Connection> connection;
+  };
+  auto active = std::make_shared<ActiveConnection>();
+
   // Set up the dispatch source that will alert us to new incoming connections
   dispatch_queue_t q = dispatch_queue_create("server_queue", DISPATCH_QUEUE_CONCURRENT);
   dispatch_source_t acceptSource =
@@ -187,8 +194,19 @@ in_port_t InspectorServer::Init(
       }
 
       dispatch_async(connection->queue, ^{
-        onClientConnected(connection->id,
-                          [connection](const std::string& message) { Send(connection, message); });
+        {
+          // Held across both callbacks so two clients accepted back to back
+          // cannot hand out their senders in the opposite order.
+          std::lock_guard<std::mutex> lock(active->mutex);
+          std::shared_ptr<Connection> previous = active->connection.lock();
+          active->connection = connection;
+          if (previous != nullptr) {
+            CloseConnection(previous);
+          }
+          onClientConnected(connection->id, [connection](const std::string& message) {
+            Send(connection, message);
+          });
+        }
         ReadNextMessage(connection);
       });
     }

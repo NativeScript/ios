@@ -123,6 +123,10 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   static JsV8InspectorClient* instance_;
 
   std::mutex senderMutex_;
+  // Serializes onFrontendConnected/onFrontendDisconnected, which run on
+  // different connection queues. Taken before senderMutex_ and
+  // workerTargetsMutex_, never while holding either.
+  std::mutex frontendLifecycleMutex_;
 
   // Routes a frontend message carrying a sessionId to its worker session
   // (socket thread). msgId is -1 when the message has no id.
@@ -149,6 +153,7 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   // Pause loop only: resumes and defers the session swap to the next drain.
   void DeferSessionResetFromPauseLoop();
   void ResetMainSession();
+  void QueueSessionReset();
   void EnqueueMessage(const std::string& message);
   void ScheduleMessageDrain();
   std::string PumpMessage();

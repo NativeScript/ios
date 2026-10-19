@@ -212,6 +212,8 @@ void JsV8InspectorClient::enableInspector(int argc, char** argv) {
 
 void JsV8InspectorClient::onFrontendConnected(uint64_t connectionId,
                                               std::function<void(const std::string&)> sender) {
+  std::lock_guard<std::mutex> lifecycle(this->frontendLifecycleMutex_);
+
   if (this->isWaitingForDebugger_) {
     this->isWaitingForDebugger_ = NO;
     CFRunLoopRef runloop = CFRunLoopGetMain();
@@ -232,18 +234,20 @@ void JsV8InspectorClient::onFrontendConnected(uint64_t connectionId,
 
   // The frontend's Debugger.enable must land on a fresh session so it replays
   // Debugger.scriptParsed etc. Without a previous frontend the session is
-  // either untouched or its reset is already queued by the disconnect.
-  // Otherwise the reset is queued ahead of anything this connection sends,
-  // since its reads only start after this returns.
+  // either untouched or the disconnect (serialized with us by
+  // frontendLifecycleMutex_) already queued its reset. Either way the reset
+  // is ahead of anything this connection sends, since its reads only start
+  // after this returns.
   if (replacesFrontend) {
     this->ResetFrontendState();
-    this->EnqueueMessage(kResetSessionMessage);
-    this->ScheduleMessageDrain();
+    this->QueueSessionReset();
   }
   this->isConnected_ = true;
 }
 
 void JsV8InspectorClient::onFrontendDisconnected(uint64_t connectionId) {
+  std::lock_guard<std::mutex> lifecycle(this->frontendLifecycleMutex_);
+
   {
     std::lock_guard<std::mutex> lock(this->senderMutex_);
     // A newer connection already took over.
@@ -257,7 +261,18 @@ void JsV8InspectorClient::onFrontendDisconnected(uint64_t connectionId) {
   // Nobody is left to resume a pause or read what the session emits.
   this->isConnected_ = false;
   this->ResetFrontendState();
-  this->EnqueueMessage(kResetSessionMessage);
+  this->QueueSessionReset();
+}
+
+void JsV8InspectorClient::QueueSessionReset() {
+  // Everything still queued came from the departing frontend. Dropping it
+  // keeps its replies, whose ids may collide with the next frontend's, from
+  // reaching that frontend.
+  dispatch_sync(this->messagesQueue_, ^{
+    this->messages_ = {};
+    this->messages_.push(kResetSessionMessage);
+    dispatch_semaphore_signal(messageArrived_);
+  });
   this->ScheduleMessageDrain();
 }
 
