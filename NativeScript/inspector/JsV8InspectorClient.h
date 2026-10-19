@@ -2,7 +2,9 @@
 #define JsV8InspectorClient_h
 
 #include <dispatch/dispatch.h>
+#include <netinet/in.h>
 
+#include <atomic>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -23,7 +25,6 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   JsV8InspectorClient(tns::Runtime* runtime);
   void init();
   void connect(int argc, char** argv);
-  void disconnect();
   void dispatchMessage(const std::string& message);
 
   // The single instance debugging the main isolate (created when IsDebug);
@@ -64,7 +65,17 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
  private:
   static constexpr int contextGroupId = 1;
 
-  bool isConnected_;
+  // Queued behind the departing frontend's messages; replaces the main
+  // session when it reaches the front of the queue.
+  static constexpr const char* kResetSessionMessage =
+      "{\"__nsInternal\":\"resetSession\"}";
+
+  std::atomic<bool> isConnected_{false};
+  // Set when a reset arrives inside the pause loop (which may run on any
+  // thread holding the Locker), where the session may still be on the stack;
+  // the next drain after the loop exits performs it.
+  std::atomic<bool> pendingSessionReset_{false};
+  in_port_t listenPort_ = 0;  // main queue only
   std::unique_ptr<V8Inspector> inspector_;
   v8::Persistent<v8::Context> context_;
   std::unique_ptr<V8InspectorSession> session_;
@@ -77,6 +88,8 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   dispatch_queue_t messageLoopQueue_;
   dispatch_semaphore_t messageArrived_;
   std::function<void(const std::string&)> sender_;
+  uint64_t connectionId_ =
+      0;  // id of sender_'s connection, guarded by senderMutex_
   bool isWaitingForDebugger_;
   bool hasScheduledDebugBreak_;
 
@@ -126,8 +139,18 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   void createInspectorSession();
   void notify(std::unique_ptr<StringBuffer> message);
   void notify(const std::string& message);
-  void onFrontendConnected(std::function<void(const std::string&)> sender);
+  void onFrontendConnected(uint64_t connectionId,
+                           std::function<void(const std::string&)> sender);
+  void onFrontendDisconnected(uint64_t connectionId);
   void onFrontendMessageReceived(const std::string& message);
+  // Socket thread: drops the state owned by the departing frontend that does
+  // not need the main isolate (IO streams, tracing, worker sessions).
+  void ResetFrontendState();
+  // Pause loop only: resumes and defers the session swap to the next drain.
+  void DeferSessionResetFromPauseLoop();
+  void ResetMainSession();
+  void EnqueueMessage(const std::string& message);
+  void ScheduleMessageDrain();
   std::string PumpMessage();
   static void registerDomainDispatcherCallback(
       const v8::FunctionCallbackInfo<v8::Value>& args);
