@@ -123,9 +123,10 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   static JsV8InspectorClient* instance_;
 
   std::mutex senderMutex_;
-  // Serializes onFrontendConnected/onFrontendDisconnected, which run on
-  // different connection queues. Taken before senderMutex_ and
-  // workerTargetsMutex_, never while holding either.
+  // Serializes onFrontendConnected/onFrontendDisconnected/
+  // onFrontendMessageReceived, which run on different connection queues.
+  // Taken before senderMutex_, workerTargetsMutex_ and resourceStreamsMutex_,
+  // never while holding any of them.
   std::mutex frontendLifecycleMutex_;
 
   // Routes a frontend message carrying a sessionId to its worker session
@@ -146,7 +147,8 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   void onFrontendConnected(uint64_t connectionId,
                            std::function<void(const std::string&)> sender);
   void onFrontendDisconnected(uint64_t connectionId);
-  void onFrontendMessageReceived(const std::string& message);
+  void onFrontendMessageReceived(uint64_t connectionId,
+                                 const std::string& message);
   // Socket thread: drops the state owned by the departing frontend that does
   // not need the main isolate (IO streams, tracing, worker sessions).
   void ResetFrontendState();

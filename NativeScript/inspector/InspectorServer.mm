@@ -19,7 +19,7 @@ struct Connection {
   dispatch_io_t channel;
   std::atomic<bool> open{true};
   std::function<void(uint64_t)> onDisconnected;
-  std::function<void(const std::string&)> onMessage;
+  std::function<void(uint64_t, const std::string&)> onMessage;
 };
 
 void CloseConnection(const std::shared_ptr<Connection>& connection) {
@@ -73,7 +73,7 @@ void ReadNextMessage(std::shared_ptr<Connection> connection) {
                                                 encoding:NSUTF16LittleEndianStringEncoding];
       const char* utf8 = [payload UTF8String];
       if (utf8 != nullptr) {
-        connection->onMessage(utf8);
+        connection->onMessage(connection->id, utf8);
       }
       ReadNextMessage(connection);
     });
@@ -122,7 +122,7 @@ void Send(std::shared_ptr<Connection> connection, const std::string& message) {
 in_port_t InspectorServer::Init(
     std::function<void(uint64_t connectionId, Sender sender)> onClientConnected,
     std::function<void(uint64_t connectionId)> onClientDisconnected,
-    std::function<void(const std::string&)> onMessage) {
+    std::function<void(uint64_t connectionId, const std::string&)> onMessage) {
   in_port_t listenPort = 18183;
 
   int serverSocket = -1;

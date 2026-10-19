@@ -20,12 +20,14 @@ class InspectorServer {
   // connection closes, after which that sender drops every message.
   // One client at a time: accepting a client closes the previous one. The
   // previous client's onClientDisconnected may still be running on its own
-  // queue when the new onClientConnected starts.
+  // queue when the new onClientConnected starts, and a message it had
+  // already read may still reach onMessage afterwards, so callers must
+  // check the connection id.
   static in_port_t Init(
       std::function<void(uint64_t connectionId, Sender sender)>
           onClientConnected,
       std::function<void(uint64_t connectionId)> onClientDisconnected,
-      std::function<void(const std::string&)> onMessage);
+      std::function<void(uint64_t connectionId, const std::string&)> onMessage);
 };
 
 }  // namespace v8_inspector

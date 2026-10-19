@@ -177,7 +177,9 @@ void JsV8InspectorClient::enableInspector(int argc, char** argv) {
                 this->onFrontendConnected(connectionId, sender);
               },
               [this](uint64_t connectionId) { this->onFrontendDisconnected(connectionId); },
-              [this](const std::string& message) { this->onFrontendMessageReceived(message); });
+              [this](uint64_t connectionId, const std::string& message) {
+                this->onFrontendMessageReceived(connectionId, message);
+              });
         }
 
         LOG_DEBUGGER_PORT(this->listenPort_);
@@ -276,7 +278,20 @@ void JsV8InspectorClient::QueueSessionReset() {
   this->ScheduleMessageDrain();
 }
 
-void JsV8InspectorClient::onFrontendMessageReceived(const std::string& message) {
+void JsV8InspectorClient::onFrontendMessageReceived(uint64_t connectionId,
+                                                    const std::string& message) {
+  // Held through processing so a takeover cannot run between the check and
+  // the enqueue: its reset then drops anything this queued.
+  std::lock_guard<std::mutex> lifecycle(this->frontendLifecycleMutex_);
+  {
+    std::lock_guard<std::mutex> lock(this->senderMutex_);
+    // Read before its connection was replaced; the reply would reach the new
+    // frontend.
+    if (this->connectionId_ != connectionId) {
+      return;
+    }
+  }
+
   // Single parse, on the socket thread, used for routing and fast paths.
   auto parsed = json::parse(message, nullptr, false);
   std::string sessionId;
