@@ -49,28 +49,50 @@ For a better way of generating these arguments, just run the TestRunner scheme o
 
 ## Swift (Symbol Graph) support
 
-You can generate TypeScript from Swift modules by pointing the generator to a directory of `.symbolgraph` files.
+The generator can import Swift modules from symbol graphs (`*.symbols.json`, as
+written by `swiftc -emit-symbol-graph` or `swift symbolgraph-extract`). Graphs
+are loaded structurally into a Swift-specific IR (`src/Swift/SwiftIR.h`): every
+public declaration with its precise USR, kind, access level, parameters and
+labels, effects (`async`/`throws`), settability, generics, availability,
+extension info, and resolved relationships (members, conformances, superclass,
+overrides, protocol requirements). Malformed or unexpected input is reported as
+diagnostics with stable codes (`invalid-json`, `unsupported-format-version`,
+`duplicate-symbol`, `parameter-label-mismatch`, ...); errors make the generator
+exit non-zero.
 
-1. Produce symbol graphs for your Swift module (Swift 5.9+):
-
-```
-swift build
-swift symbolgraph-extract --module-name YourModule \
-	--minimum-access-level public \
-	--output-dir .symbolgraph
-```
-
-2. Run the generator with the new flags:
+Swift declarations are not callable from JavaScript yet, so the emitted
+`swift!<Module>.d.ts` is type-only: it names the module's top-level types and
+declares no members.
 
 ```
 ./objc-metadata-generator \
 	-output-typescript <out_dir> \
-	--swift-symbolgraph-dir <path_to>/.symbolgraph \
+	--swift-symbolgraph-dir <path_to>/symbolgraphs \
+	--swift-ir-output <ir_dir> \
 	--skip-objc
 ```
+
+- `--swift-symbolgraph-dir` – directory searched recursively for symbol graphs
+- `--swift-ir-output` – optional; writes `<Module>.swift-ir.json`, a deterministic dump of the IR
+- `--skip-objc` – skip the Objective-C phase
 
 Environment variables (if using build-step script):
 - `NS_SWIFT_SYMBOLGRAPH_DIR` (or `TNS_SWIFT_SYMBOLGRAPH_DIR`) – path to symbol graph directory
 - `NS_SKIP_OBJC_METADATA` (or `TNS_SKIP_OBJC_METADATA`) – set to `1` to skip Objective-C phase
 
-A tiny sample package is in `TestFixtures/SwiftDemo`. See its README for quick steps.
+### Tests
+
+`swift-symbolgraph-tests` is built alongside the generator and runs against the
+checked-in graphs in `TestFixtures/SwiftDemo/symbolgraphs`, so it needs no Swift
+toolchain:
+
+```
+cmake --build build --target swift-symbolgraph-tests
+./build/bin/swift-symbolgraph-tests            # or: (cd build && ctest)
+./build/bin/swift-symbolgraph-tests Snapshot   # run tests whose name contains "Snapshot"
+```
+
+`IRSnapshot` and `TypeScriptSnapshot` compare against
+`tests/swift/snapshots/`. After an intended output change, regenerate them with
+`NS_UPDATE_SNAPSHOTS=1 ./build/bin/swift-symbolgraph-tests Snapshot` and review
+the diff.

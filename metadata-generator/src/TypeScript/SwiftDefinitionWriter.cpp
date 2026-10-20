@@ -1,55 +1,27 @@
 #include "SwiftDefinitionWriter.h"
 
-#include "Meta/MetaEntities.h"
+#include <sstream>
 
 namespace TypeScript {
-using namespace Meta;
 
 std::string SwiftDefinitionWriter::write() {
-    // Header
-    _buffer << "// Generated from Swift Symbol Graphs\n";
-    _buffer << "// Module: " << _module.first << "\n\n";
+  std::ostringstream out;
+  out << "// Generated from Swift symbol graphs for module " << _module.name
+      << ".\n";
+  out << "// Type-only: no Swift members are callable from JavaScript yet.\n\n";
 
-    for (auto *m : _module.second) {
-        if (m) m->visit(this);
+  for (const auto& id : _module.topLevelIds) {
+    const Swift::Symbol* symbol = _module.find(id);
+    if (!symbol || !Swift::isNominalType(symbol->kind)) {
+      continue;
     }
-
-    return _buffer.str();
+    if (symbol->kind == Swift::SymbolKind::Protocol) {
+      out << "interface " << symbol->name << " {}\n";
+    } else {
+      out << "declare class " << symbol->name << " {}\n";
+    }
+  }
+  return out.str();
 }
 
-void SwiftDefinitionWriter::visit(InterfaceMeta* meta) {
-    _buffer << "declare class " << meta->jsName << " { }\n";
-}
-
-void SwiftDefinitionWriter::visit(ProtocolMeta* meta) {
-    _buffer << "interface " << meta->jsName << " { }\n";
-}
-
-void SwiftDefinitionWriter::visit(CategoryMeta* /*meta*/) {}
-
-void SwiftDefinitionWriter::visit(FunctionMeta* meta) {
-    _buffer << "declare function " << meta->jsName << "(...args: any[]): any;\n";
-}
-
-void SwiftDefinitionWriter::visit(StructMeta* meta) {
-    _buffer << "interface " << meta->jsName << " { }\n";
-    _buffer << "declare var " << meta->jsName << ": interop.StructType<" << meta->jsName << ">;\n";
-}
-
-void SwiftDefinitionWriter::visit(UnionMeta* meta) {
-    _buffer << "interface " << meta->jsName << " { }\n";
-}
-
-void SwiftDefinitionWriter::visit(EnumMeta* meta) {
-    _buffer << "declare const enum " << meta->jsName << " { }\n";
-}
-
-void SwiftDefinitionWriter::visit(VarMeta* meta) {
-    _buffer << "declare var " << meta->jsName << ": any;\n";
-}
-
-void SwiftDefinitionWriter::visit(MethodMeta* /*meta*/) {}
-void SwiftDefinitionWriter::visit(PropertyMeta* /*meta*/) {}
-void SwiftDefinitionWriter::visit(EnumConstantMeta* /*meta*/) {}
-
-} // namespace TypeScript
+}  // namespace TypeScript

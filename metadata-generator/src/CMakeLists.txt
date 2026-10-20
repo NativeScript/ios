@@ -37,7 +37,8 @@ set(GENERATOR_HEADERS
     Yaml/YamlSerializer.h
     
     # Swift support
-    Swift/SymbolGraphParser.h
+    Swift/SwiftIR.h
+    Swift/SymbolGraphLoader.h
     TypeScript/SwiftDefinitionWriter.h
 )
 
@@ -69,7 +70,8 @@ set(GENERATOR_SOURCES
     Utils/memoryStream.cpp
     
     # Swift support
-    Swift/SymbolGraphParser.cpp
+    Swift/SwiftIR.cpp
+    Swift/SymbolGraphLoader.cpp
     TypeScript/SwiftDefinitionWriter.cpp
 )
 
