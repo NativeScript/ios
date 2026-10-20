@@ -203,6 +203,7 @@ declare module "ns:swift/SwiftDemo" {
     subscribe(handler: (arg0: string) => void): void;
   }
 
+  export type Score = import("ns:swift/SwiftDemoKit").Pair<string, number>;
   export function allFlavors(): (Flavor)[];
   export function echoUInt64(value: number | bigint): number;
   export function greetLater(name: (string) | null | undefined, completion: (arg0: string | null) => void): void;
@@ -229,12 +230,14 @@ declare module "ns:swift/SwiftDemo" {
   export function ramp(count: number | bigint): Uint8Array;
   export function tags(views: readonly (UIView)[]): (number)[];
   export function text(note: NSObject): string;
+  export function boxed(money: import("ns:swift/SwiftDemoKit").Money): import("ns:swift/SwiftDemoKit").Box<import("ns:swift/SwiftDemoKit").Money>;
   export function clear(name: { value: (string) | null | undefined }): void;
   export function halve(value: { value: number | bigint }): void;
   export function names(count: number | bigint): (string)[];
   export function shout(name: (string) | null | undefined): string | null;
   export function total(values: readonly (number)[]): number;
   export function append(word: string, words: { value: readonly (string)[] }): void;
+  export function settle(value: number | bigint): import("ns:swift/SwiftDemoKit").Outcome<number>;
   export function explain(error: ShapeError): string;
   export function lengths(table: Readonly<Record<string, string>>): Record<string, number>;
   export function measure(width: number, height: (number) | null | undefined): Measurement;
@@ -242,6 +245,8 @@ declare module "ns:swift/SwiftDemo" {
   export function resolve(path: string, base: string | URL): URL;
   export function centroid(points: readonly (Point)[]): Point;
   export function checksum(data: ArrayBuffer | ArrayBufferView): number;
+  export function countBox(value: number | bigint): import("ns:swift/SwiftDemoKit").Box<number>;
+  export function describe(pair: import("ns:swift/SwiftDemoKit").Pair<number, string>): string;
   export function describe(view: UIView): string;
   export function echoInt8(value: number | bigint): number;
   export function makeNote(text: string): NSObject;
@@ -250,6 +255,7 @@ declare module "ns:swift/SwiftDemo" {
   export function trackers(ids: readonly (number | bigint)[]): (Tracker)[];
   export function countdown(start: number | bigint, tick: (arg0: number, arg1: boolean) => void): void;
   export function makeLabel(text: string): UILabel;
+  export function makeScore(name: string, points: number | bigint): import("ns:swift/SwiftDemoKit").Pair<string, number>;
   export function noteLater(text: string): Promise<NSObject>;
   export function onMeasure(body: (arg0: Measurement) => void): void;
 }

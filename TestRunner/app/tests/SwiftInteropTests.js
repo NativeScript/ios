@@ -524,6 +524,48 @@ describe("ns:swift", function () {
         });
     });
 
+    describe("generic types", function () {
+        var Kit = swift.module("SwiftDemoKit");
+
+        it("gives every instantiation of a generic type one JS class", function () {
+            var pair = new Kit.Pair(1, "one");
+            var score = SwiftDemo.makeScore("ada", 3);
+            expect(pair instanceof Kit.Pair).toBe(true);
+            expect(score instanceof Kit.Pair).toBe(true);
+            expect(pair.first).toBe(1);
+            expect(pair.second).toBe("one");
+            expect(score.first).toBe("ada");
+            expect(score.second).toBe(3);
+        });
+
+        it("picks the instantiation from the constructor's arguments", function () {
+            expect(SwiftDemo.describe(new Kit.Pair(2, "two"))).toBe("2:two");
+            expect(function () { SwiftDemo.describe(new Kit.Pair("two", 2)); })
+                .toThrowError(TypeError);
+            var swapped = new Kit.Pair(2, "two").swapped();
+            expect(swapped.first).toBe("two");
+            expect(swapped.second).toBe(2);
+            expect(swapped.swapped().first).toBe(2);
+        });
+
+        it("calls members of the receiver's own instantiation", function () {
+            var count = SwiftDemo.countBox(4);
+            var money = SwiftDemo.boxed(new Kit.Money(7, "EUR"));
+            expect(count.value).toBe(4);
+            expect(money.value.amount).toBe(7);
+            count.value = 5;
+            expect(count.value).toBe(5);
+            expect(count.replaced(9).value).toBe(9);
+            expect(function () { count.value = "x"; }).toThrowError(TypeError);
+            expect(new Kit.Box(new Kit.Money(1, "EUR")).value.amount).toBe(1);
+        });
+
+        it("bridges generic enums with associated values", function () {
+            expect(SwiftDemo.settle(3)).toEqual({ case: "done", value: 3 });
+            expect(SwiftDemo.settle(-1)).toEqual({ case: "failed", reason: "negative" });
+        });
+    });
+
     describe("Objective-C objects", function () {
         it("passes NativeScript's Objective-C wrappers", function () {
             var view = UIView.new();

@@ -27,7 +27,9 @@ inline const ModuleSet& fixture() {
 inline const Module& demo() {
   static const Module unit = [] {
     ModuleSet set = loadSymbolGraphDirectory(SWIFT_FIXTURE_GRAPHS_DIR);
-    return mergeUnit(set, "SwiftDemo");
+    Module unit = mergeUnit(set, "SwiftDemo");
+    instantiateGenerics(unit);
+    return unit;
   }();
   return unit;
 }

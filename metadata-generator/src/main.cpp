@@ -387,6 +387,9 @@ int main(int argc, const char** argv)
             swiftModules.modules.emplace(unit.name, std::move(unit));
           }
 
+          for (auto& entry : swiftModules.modules) {
+            Swift::instantiateGenerics(entry.second);
+          }
           for (const auto& entry : swiftModules.modules) {
             const Swift::Module& module = entry.second;
             if (!cla_swiftIROutputDir.empty()) {

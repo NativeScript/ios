@@ -32,3 +32,29 @@ public enum Coin {
 }
 
 public func formatted(_ money: Money) -> String { "\(money.amount) \(money.currency)" }
+
+// Generic types, bridged through the concrete instantiations declarations
+// spell.
+
+public struct Pair<First, Second> {
+    public var first: First
+    public var second: Second
+
+    public init(first: First, second: Second) {
+        self.first = first
+        self.second = second
+    }
+
+    public func swapped() -> Pair<Second, First> { Pair<Second, First>(first: second, second: first) }
+}
+
+public final class Box<Value> {
+    public var value: Value
+    public init(_ value: Value) { self.value = value }
+    public func replaced(with value: Value) -> Box<Value> { Box(value) }
+}
+
+public enum Outcome<Value> {
+    case done(Value)
+    case failed(reason: String)
+}

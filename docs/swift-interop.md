@@ -62,6 +62,25 @@ re-exports it: `--swift-reexport SwiftUICore=SwiftUI` (implied for that
 pair). Generate everything an app uses as one unit: modules of different
 units cannot share types.
 
+## Generic types
+
+A generic type is bridged through the concrete instantiations the unit's
+declarations spell: WeatherKit's `lowTemperature: Measurement<UnitTemperature>`
+makes `Measurement<UnitTemperature>` callable. To use an instantiation no API
+spells, declare a public typealias in the app's Swift code:
+
+```swift
+public typealias LengthMeasurement = Measurement<UnitLength>
+```
+
+Every instantiation of a generic type shares one JS class, declared in
+TypeScript as the generic class (`Measurement<UnitType>`): `new
+Measurement(...)` picks the instantiation from its arguments, an instance
+calls the members of its own instantiation, and `instanceof Measurement`
+holds for all of them. A member that does not exist for an instantiation
+(a constrained extension's) is left out of that instantiation. Generic
+functions and methods are not bridged yet.
+
 ## Value model
 
 | Swift | JavaScript |
@@ -197,8 +216,8 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 ## Not yet supported
 
-Closures that return values, async cancellation, generics
-(including `Result`), protocols as values, tuples, sets, optional collection
+Closures that return values, async cancellation, generic functions,
+`Result` and other standard library generics, protocols as values, tuples, sets, optional collection
 elements, subscripts and operators. Each appears in the coverage report with
 its reason.
 

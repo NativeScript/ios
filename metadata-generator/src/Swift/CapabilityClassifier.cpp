@@ -156,6 +156,7 @@ class Classifier {
       }
     }
     resolveNames();
+    classifyTemplates();
     return std::move(_result);
   }
 
@@ -265,7 +266,9 @@ class Classifier {
               reasons.push_back("js-name-conflict");
             }
           }
-          std::set<std::string> generics;
+          std::set<std::string> generics =
+              genericNamesInScope(_module, *member);
+          _substitutions = substitutionsOf(*member);
           for (const auto& parameter : member->parameters) {
             BridgedType bridged = bridge(parameter.type, generics, reasons);
             if (bridged.bridge == Bridge::Closure) {
@@ -297,6 +300,7 @@ class Classifier {
   }
 
   Capability classifyOther(const Symbol& symbol) const {
+    _substitutions = substitutionsOf(symbol);
     Capability capability;
     switch (symbol.kind) {
       case SymbolKind::Deinitializer:
@@ -314,7 +318,17 @@ class Classifier {
       return capability;
     }
     if (symbol.kind == SymbolKind::TypeAlias) {
-      return make(Tier::TypeOnly, "type-alias");
+      // Declared for TypeScript when what it names bridges.
+      Capability alias = make(Tier::TypeOnly, "type-alias");
+      if (symbol.aliasedType && symbol.genericParameters.empty()) {
+        std::vector<std::string> reasons;
+        alias.result = bridge(*symbol.aliasedType,
+                              genericNamesInScope(_module, symbol), reasons);
+        if (!reasons.empty()) {
+          alias.result = BridgedType();
+        }
+      }
+      return alias;
     }
     if (symbol.kind == SymbolKind::AssociatedType) {
       return make(Tier::TypeOnly, "associated-type");
@@ -356,7 +370,7 @@ class Classifier {
       // The owner bridged, so its payloads do (rejectUnbridgedPayloads).
       capability = make(Tier::SwiftGenerated);
       capability.jsName = symbol.baseName;
-      std::set<std::string> generics;
+      std::set<std::string> generics = genericNamesInScope(_module, symbol);
       std::vector<std::string> reasons;
       for (const auto& parameter : symbol.parameters) {
         capability.parameters.push_back(
@@ -485,7 +499,8 @@ class Classifier {
                      std::vector<std::string>& reasons) const {
     bool complete = true;
     BridgedType bridged;
-    bridged.node = parseType(type, generics, &complete);
+    bridged.node =
+        substitute(parseType(type, generics, &complete), _substitutions);
     if (!complete) {
       reasons.push_back("unparsed-type");
       return bridged;
@@ -536,6 +551,12 @@ class Classifier {
         bridged.bridge = Bridge::Void;
         return "";
       case TypeNode::Kind::GenericParameter:
+        if (_template && node.components.size() == 1 &&
+            _templateParameters.count(node.components[0].name)) {
+          bridged.bridge = Bridge::TypeParameter;
+          bridged.objcClass = node.components[0].name;
+          return "";
+        }
         return "generic";
       case TypeNode::Kind::Function: {
         // JS functions stand in for closures that return nothing: a Swift
@@ -617,7 +638,65 @@ class Classifier {
       bridged.bridge = Bridge::Data;
       return "";
     }
-    const Symbol* target = usr.empty() ? nullptr : _module.find(usr);
+    // An instantiation the module spells has its own synthetic type.
+    const Symbol* target = nullptr;
+    const auto& arguments = node.components.empty()
+                                ? std::vector<TypeNode>()
+                                : node.components.back().arguments;
+    if (!usr.empty() && !arguments.empty()) {
+      target = _module.find(instantiationKey(node));
+      if (target || _template) {
+        for (const auto& argument : arguments) {
+          BridgedType bridgedArgument;
+          bridgedArgument.node = argument;
+          const TypeNode* inner = &argument;
+          if (argument.kind == TypeNode::Kind::Optional &&
+              !argument.children.empty()) {
+            bridgedArgument.optional = true;
+            inner = &argument.children[0];
+          }
+          bridgeNonOptional(*inner, bridgedArgument);
+          bridged.typeArguments.push_back(std::move(bridgedArgument));
+        }
+      }
+      // A generic type's own declaration refers to its instantiations
+      // generically.
+      const Symbol* base = _module.find(usr);
+      if (!target && _template && base && _families.count(base->preciseId)) {
+        bridged.bridge = bridgeOwner(*base).bridge;
+        bridged.symbolId = base->preciseId;
+        return "";
+      }
+    }
+    if (!target && !usr.empty()) {
+      target = _module.find(usr);
+    }
+    if (target && target->kind == SymbolKind::TypeAlias &&
+        target->aliasedType && target->genericParameters.empty()) {
+      // A typealias bridges as what it names; Swift code keeps its name.
+      bool complete = true;
+      TypeNode aliased =
+          parseType(*target->aliasedType, genericNamesInScope(_module, *target),
+                    &complete);
+      if (!complete) {
+        return "unparsed-type";
+      }
+      BridgedType resolved;
+      resolved.node = aliased;
+      const TypeNode* inner = &aliased;
+      if (aliased.kind == TypeNode::Kind::Optional ||
+          aliased.kind == TypeNode::Kind::Array ||
+          aliased.kind == TypeNode::Kind::Dictionary) {
+        return "type-alias";
+      }
+      std::string reason = bridgeNonOptional(*inner, resolved);
+      TypeNode spelled = bridged.node;
+      bool optional = bridged.optional;
+      bridged = std::move(resolved);
+      bridged.node = spelled;
+      bridged.optional = optional;
+      return reason;
+    }
     std::string objcClass = objcClassName(usr, target);
     if (!objcClass.empty()) {
       bridged.bridge = Bridge::ObjCObject;
@@ -775,9 +854,85 @@ class Classifier {
     return type.optional ? kind + "?" : kind;
   }
 
+  // Generic types with generated instantiations, and their members'
+  // template capabilities.
+  void classifyTemplates() {
+    for (const auto& entry : _module.symbols) {
+      const Symbol& symbol = entry.second;
+      const Capability* capability = _result.find(entry.first);
+      if (!symbol.genericBase.empty() && isNominalType(symbol.kind) &&
+          capability && capability->tier == Tier::SwiftGenerated) {
+        _families.insert(symbol.genericBase);
+      }
+    }
+    for (const auto& id : _families) {
+      const Symbol* base = _module.find(id);
+      if (!base) {
+        continue;
+      }
+      _template = true;
+      _templateParameters.clear();
+      for (const auto& parameter : base->genericParameters) {
+        _templateParameters.insert(parameter.name);
+      }
+      _substitutions.clear();
+      for (const auto& memberId : base->memberIds) {
+        const Symbol* member = _module.find(memberId);
+        if (!member || isNominalType(member->kind)) {
+          continue;
+        }
+        Capability capability;
+        capability.tier = Tier::SwiftGenerated;
+        capability.jsName = member->kind == SymbolKind::Initializer
+                                ? "constructor"
+                                : member->baseName;
+        std::set<std::string> generics = genericNamesInScope(_module, *member);
+        std::vector<std::string> reasons;
+        for (const auto& parameter : member->parameters) {
+          BridgedType bridged = bridge(parameter.type, generics, reasons);
+          bridged.isInout = parameter.modifier == "inout";
+          capability.parameters.push_back(std::move(bridged));
+        }
+        if (member->kind == SymbolKind::Initializer ||
+            member->kind == SymbolKind::EnumCase) {
+          capability.result = bridgeOwner(*base);
+        } else if (member->valueType) {
+          capability.result = bridge(*member->valueType, generics, reasons);
+        } else if (member->returnType) {
+          capability.result = bridge(*member->returnType, generics, reasons);
+        } else {
+          capability.result.bridge = Bridge::Void;
+        }
+        _result.templates[memberId] = std::move(capability);
+      }
+    }
+    _template = false;
+  }
+
+  // An instantiation's generic parameters and their arguments, for `symbol`
+  // and its enclosing types.
+  std::vector<std::pair<std::string, TypeNode>> substitutionsOf(
+      const Symbol& symbol) const {
+    std::vector<std::pair<std::string, TypeNode>> result;
+    for (const Symbol* current = &symbol; current;
+         current = current->parentId.empty()
+                       ? nullptr
+                       : _module.find(current->parentId)) {
+      result.insert(result.end(), current->substitutions.begin(),
+                    current->substitutions.end());
+    }
+    return result;
+  }
+
   const Module& _module;
   const std::map<std::string, std::string>& _rejections;
   Classification _result;
+  // Those of the declaration being classified (see substitutionsOf).
+  mutable std::vector<std::pair<std::string, TypeNode>> _substitutions;
+  // classifyTemplates: bridging a generic type's own declarations.
+  bool _template = false;
+  std::set<std::string> _templateParameters;
+  std::set<std::string> _families;
 };
 
 }  // namespace

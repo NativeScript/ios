@@ -2,6 +2,7 @@
 
 #include <llvm/ADT/StringExtras.h>
 
+#include <deque>
 #include <map>
 #include <set>
 #include <sstream>
@@ -127,6 +128,7 @@ std::string codeDisplayName(const SwiftSurface& surface,
       break;
     }
     case Bridge::ObjCObject:
+    case Bridge::TypeParameter:
       name = type.objcClass;
       break;
     case Bridge::None:
@@ -156,8 +158,16 @@ class Writer {
   Writer(const Module& module, const Classification& classification,
          const std::string& moduleName)
       : _module(module),
+        _classification(classification),
         _name(moduleName),
-        _surface(describeSurface(module, classification)) {}
+        _surface(describeSurface(module, classification)) {
+    // Instantiations of one generic type are declared once, by the first.
+    for (const auto& type : _surface.types) {
+      if (!type.symbol->genericBase.empty()) {
+        _families.emplace(type.symbol->genericBase, type.index);
+      }
+    }
+  }
 
   std::string write() {
     buildGroups();
@@ -172,6 +182,7 @@ class Writer {
     for (const auto& path : _topLevel) {
       writeNode(_nodes.at(path), "  ");
     }
+    writeTypeAliases();
     writeModuleMembers();
 
     _out << "}\n\n"
@@ -185,9 +196,63 @@ class Writer {
   }
 
  private:
+  // The first instantiation of a generic type's family, or -1.
+  int familyOf(int typeIndex) const {
+    if (typeIndex < 0) {
+      return -1;
+    }
+    auto it = _families.find(_surface.types[typeIndex].symbol->genericBase);
+    return it == _families.end() ? -1 : it->second;
+  }
+
+  // `member` of an instantiation as its generic type declares it, once per
+  // family; null for the repeats.
+  const Member* familyMember(const Member& member) {
+    int family = familyOf(member.owner);
+    const std::string& baseId = member.symbol->genericBase;
+    auto capability = _classification.templates.find(baseId);
+    const Symbol* symbol = _module.find(baseId);
+    if (family < 0 || !_seenFamilyMembers.insert(baseId).second ||
+        capability == _classification.templates.end() || !symbol) {
+      return nullptr;
+    }
+    Member generic = member;
+    generic.owner = family;
+    generic.symbol = symbol;
+    generic.capability = &capability->second;
+    generic.result = capability->second.result;
+    if (generic.kind == SwiftSurface::kInstanceProperty ||
+        generic.kind == SwiftSurface::kStaticProperty) {
+      generic.result = capability->second.result;
+    }
+    _familyMembers.push_back(generic);
+    return &_familyMembers.back();
+  }
+
+  // A family's TypeScript type parameters, "<First, Second>", or "".
+  std::string typeParameters(const SwiftSurface::Type& type) const {
+    const Symbol* base = _module.find(type.symbol->genericBase);
+    if (!base || base->genericParameters.empty()) {
+      return "";
+    }
+    std::vector<std::string> names;
+    for (const auto& parameter : base->genericParameters) {
+      names.push_back(parameter.name);
+    }
+    return "<" + llvm::join(names, ", ") + ">";
+  }
+
   void buildGroups() {
     std::map<std::tuple<int, int, std::string, std::string>, size_t> index;
-    for (const auto& member : _surface.members) {
+    for (const auto& original : _surface.members) {
+      const Member* resolved = &original;
+      if (familyOf(original.owner) >= 0) {
+        resolved = familyMember(original);
+        if (resolved == nullptr) {
+          continue;
+        }
+      }
+      const Member& member = *resolved;
       std::string module = member.owner < 0 ? member.module : "";
       auto key = std::make_tuple(member.owner, static_cast<int>(member.kind),
                                  member.capability->jsName, module);
@@ -332,7 +397,24 @@ class Writer {
 
   std::string typeName(const BridgedType& type) const {
     int index = _surface.indexOf(type.symbolId);
-    return index >= 0 ? typePath(_surface.types[index]) : "unknown";
+    if (index < 0) {
+      // A generic type's own declarations naming the type.
+      auto family = _families.find(type.symbolId);
+      index = family == _families.end() ? -1 : family->second;
+    }
+    if (index < 0) {
+      return "unknown";
+    }
+    std::string name = typePath(_surface.types[index]);
+    if (!type.typeArguments.empty()) {
+      std::vector<std::string> arguments;
+      for (const auto& argument : type.typeArguments) {
+        arguments.push_back(
+            argument.bridge == Bridge::None ? "unknown" : outputType(argument));
+      }
+      name += "<" + llvm::join(arguments, ", ") + ">";
+    }
+    return name;
   }
 
   // `type` as this module's declarations name it.
@@ -377,6 +459,9 @@ class Writer {
         break;
       case Bridge::ObjCObject:
         ts = objcTypeName(type);
+        break;
+      case Bridge::TypeParameter:
+        ts = type.objcClass;
         break;
       case Bridge::Date:
         ts = "Date";
@@ -433,6 +518,9 @@ class Writer {
         break;
       case Bridge::ObjCObject:
         ts = objcTypeName(type);
+        break;
+      case Bridge::TypeParameter:
+        ts = type.objcClass;
         break;
       case Bridge::Date:
         ts = "Date";
@@ -574,7 +662,8 @@ class Writer {
 
   void buildTree() {
     for (const auto& type : _surface.types) {
-      if (type.module != _name) {
+      int family = familyOf(type.index);
+      if (type.module != _name || (family >= 0 && family != type.index)) {
         continue;
       }
       const auto& components = type.symbol->pathComponents;
@@ -614,7 +703,7 @@ class Writer {
     const Symbol& symbol = *type.symbol;
     std::string inner = indent + "  ";
     writeDoc(symbol, indent);
-    _out << indent << "export class " << symbol.name;
+    _out << indent << "export class " << symbol.name << typeParameters(type);
     if (type.superIndex >= 0) {
       _out << " extends " << typePath(_surface.types[type.superIndex]);
     }
@@ -676,8 +765,16 @@ class Writer {
     std::string self = llvm::join(symbol.pathComponents, ".");
     std::string inner = indent + "  ";
     bool tagged = type.kind == SwiftSurface::kTaggedEnum;
+    std::string parameters = typeParameters(type);
+    self += parameters;
+    std::vector<const Member*> caseMembers;
+    for (const Group& group : _groups) {
+      if (group.owner == type.index && group.kind == SwiftSurface::kEnumCase) {
+        caseMembers.push_back(group.overloads[0]);
+      }
+    }
     std::vector<std::string> cases;
-    for (const Member* member : _surface.casesOf(type.index)) {
+    for (const Member* member : caseMembers) {
       const std::string& name = member->capability->jsName;
       if (!tagged) {
         cases.push_back("\"" + name + "\"");
@@ -692,7 +789,7 @@ class Writer {
       cases.push_back(shape + " }");
     }
     writeDoc(symbol, indent);
-    _out << indent << "export type " << symbol.name << " =";
+    _out << indent << "export type " << symbol.name << parameters << " =";
     if (cases.empty()) {
       _out << " never";
     } else if (tagged) {
@@ -762,6 +859,23 @@ class Writer {
     _out << indent << "}\n\n";
   }
 
+  // Top-level typealiases whose type bridges (`Score = Pair<string, number>`).
+  void writeTypeAliases() {
+    for (const auto& id : _module.topLevelIds) {
+      const Symbol* symbol = _module.find(id);
+      const Capability* capability = _classification.find(id);
+      if (!symbol || symbol->kind != SymbolKind::TypeAlias || !capability ||
+          capability->result.bridge == Bridge::None ||
+          (symbol->module.empty() ? _module.name : symbol->module) != _name ||
+          !isIdentifier(symbol->name) || isReserved(symbol->name)) {
+        continue;
+      }
+      writeDoc(*symbol, "  ");
+      _out << "  export type " << symbol->name << " = "
+           << outputType(capability->result) << ";\n";
+    }
+  }
+
   void writeModuleMembers() {
     for (const Group& group : _groups) {
       if (group.owner >= 0 || group.module != _name) {
@@ -790,8 +904,13 @@ class Writer {
   }
 
   const Module& _module;
+  const Classification& _classification;
   // The unit module these declarations are for.
   std::string _name;
+  // Generic type id -> the instantiation that declares the family.
+  std::map<std::string, int> _families;
+  std::set<std::string> _seenFamilyMembers;
+  std::deque<Member> _familyMembers;
   SwiftSurface _surface;
   std::vector<Group> _groups;
   std::map<std::string, Node> _nodes;

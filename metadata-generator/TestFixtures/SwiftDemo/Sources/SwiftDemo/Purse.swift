@@ -22,3 +22,11 @@ extension Money {
 extension Wallet {
     public func summary() -> String { "\(owner): \(formatted(balance))" }
 }
+
+public typealias Score = Pair<String, Int>
+
+public func makeScore(_ name: String, _ points: Int) -> Score { Score(first: name, second: points) }
+public func describe(_ pair: Pair<Int, String>) -> String { "\(pair.first):\(pair.second)" }
+public func boxed(_ money: Money) -> Box<Money> { Box(money) }
+public func countBox(_ value: Int) -> Box<Int> { Box(value) }
+public func settle(_ value: Int) -> Outcome<Int> { value >= 0 ? .done(value) : .failed(reason: "negative") }

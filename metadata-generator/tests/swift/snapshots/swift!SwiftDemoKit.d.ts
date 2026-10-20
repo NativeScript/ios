@@ -2,10 +2,24 @@
 // The JavaScript surface ns:swift exposes for SwiftDemoKit: every declaration is backed by a generated thunk.
 
 declare module "ns:swift/SwiftDemoKit" {
+  export class Box<Value> {
+    constructor(value: Value);
+    value: Value;
+    replaced(value: Value): Box<Value>;
+  }
+
   export type Coin = "dime" | "penny";
   export namespace Coin {
     export const dime: "dime";
     export const penny: "penny";
+  }
+
+  export class Pair<First, Second> {
+    constructor(first: First, second: Second);
+    constructor(args: { first: First; second: Second });
+    first: First;
+    second: Second;
+    swapped(): Pair<Second, First>;
   }
 
   export class Money {
@@ -25,6 +39,12 @@ declare module "ns:swift/SwiftDemoKit" {
     readonly owner: string;
     readonly balance: Money;
     deposit(money: Money): void;
+  }
+
+  export type Outcome<Value> =
+    | { case: "done"; value: Value }
+    | { case: "failed"; reason: string };
+  export namespace Outcome {
   }
 
   export function formatted(money: Money): string;

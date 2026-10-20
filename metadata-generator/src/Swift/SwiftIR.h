@@ -85,6 +85,63 @@ struct Availability {
   bool isUnconditionallyUnavailable = false;
 };
 
+// A Swift type as a tree, parsed from a TypeRef's fragments.
+struct TypeNode {
+  enum class Kind {
+    // A named type, possibly nested (`AttributedString.Index`) and generic
+    // (`Binding<Bool>`). Optional, Array and Dictionary spelled as named
+    // generics are normalized to their own kinds.
+    Nominal,
+    // A generic parameter in scope, `Self`, or a member of one (`T.Value`).
+    GenericParameter,
+    Optional,
+    ImplicitlyUnwrappedOptional,
+    Array,
+    Dictionary,
+    Tuple,
+    Function,
+    Metatype,
+    // `any P` (also `Any`, `AnyObject`).
+    Existential,
+    // `some P`.
+    Opaque,
+    // `P & Q`.
+    Composition,
+    Void,
+    // Anything the parser does not model (parameter packs, `~Copyable`);
+    // `text` holds the spelling.
+    Unknown,
+  };
+
+  struct Component {
+    std::string name;
+    std::string usr;
+    std::vector<TypeNode> arguments;
+  };
+
+  Kind kind = Kind::Unknown;
+  // Nominal: one entry per dot-separated name; GenericParameter: its name(s).
+  std::vector<Component> components;
+  // Element/wrapped types, tuple elements, function parameters, composition
+  // members, dictionary key and value.
+  std::vector<TypeNode> children;
+  std::vector<std::string> labels;
+  // Function result; empty for other kinds.
+  std::vector<TypeNode> result;
+  std::vector<TypeNode> thrownType;
+  bool isAsync = false;
+  bool isThrowing = false;
+  // "@escaping", "@Sendable", "@MainActor", "@convention(c)", ...
+  std::vector<std::string> attributes;
+  // "inout", "borrowing", "consuming", "sending", "repeat each".
+  std::string modifier;
+  std::string text;
+
+  // USR of the last component (Nominal only).
+  const std::string& usr() const;
+  bool hasAttribute(const std::string& attribute) const;
+};
+
 struct GenericParameter {
   std::string name;
   int depth = 0;
@@ -199,6 +256,14 @@ struct Symbol {
   // The module whose graphs declare the symbol; differs from Module::name in
   // a generation unit (see mergeUnit).
   std::string module;
+
+  // A synthetic instantiation of a generic type (see instantiateGenerics),
+  // or a member of one: the generic declaration it was made from, and the
+  // arguments its generic parameters stand for in its types.
+  std::string genericBase;
+  std::vector<std::pair<std::string, TypeNode>> substitutions;
+  // An instantiated type's arguments, in order.
+  std::vector<TypeNode> typeArguments;
 
   // Resolved relationships.
   std::string parentId;

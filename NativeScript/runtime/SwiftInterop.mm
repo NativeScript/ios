@@ -295,6 +295,9 @@ struct TypeInfo {
   const MemberGroup* initializers = nullptr;
   // NSSwiftTypeTaggedEnum: the cases, by case index.
   std::vector<CaseInfo> cases;
+  // Instantiations of one generic type share a module and JS name; they
+  // form a family with one JS class, named by its first type's index.
+  int family = -1;
 };
 
 bool IsEnumKind(uint32_t kind) { return kind == NSSwiftTypeEnum || kind == NSSwiftTypeTaggedEnum; }
@@ -562,10 +565,19 @@ bool IsValidModuleName(const std::string& name) {
   return true;
 }
 
+void BuildFamilies(ModuleInfo& module) {
+  std::map<std::string, int> first;
+  for (TypeInfo& type : module.types) {
+    auto inserted = first.emplace(type.swiftModule + ":" + type.jsName, type.index);
+    type.family = inserted.first->second;
+  }
+}
+
 void BuildGroups(ModuleInfo& module) {
   robin_hood::unordered_map<std::string, MemberGroup*> byKey;
   for (const MemberInfo& member : module.members) {
-    std::string key = std::to_string(member.owner) + ":" + std::to_string(member.kind) + ":" +
+    int owner = member.owner < 0 ? -1 : module.types[member.owner].family;
+    std::string key = std::to_string(owner) + ":" + std::to_string(member.kind) + ":" +
                       member.jsName + (member.owner < 0 ? ":" + member.swiftModule : "");
     auto it = byKey.find(key);
     MemberGroup* group;
@@ -573,7 +585,7 @@ void BuildGroups(ModuleInfo& module) {
       module.groups.push_back(std::make_unique<MemberGroup>());
       group = module.groups.back().get();
       group->module = &module;
-      group->owner = member.owner;
+      group->owner = owner;
       group->swiftModule = member.owner < 0 ? member.swiftModule : "";
       group->kind = member.kind;
       group->jsName = member.jsName;
@@ -584,6 +596,7 @@ void BuildGroups(ModuleInfo& module) {
     group->overloads.push_back(&member);
     if (member.kind == NSSwiftMemberInitializer && member.owner >= 0) {
       module.types[member.owner].initializers = group;
+      module.types[owner].initializers = group;
     }
   }
 
@@ -720,6 +733,7 @@ std::shared_ptr<const ModuleInfo> LoadModuleInfo(const std::string& name, std::s
     if (!problem.empty()) {
       module->error = "Swift module '" + name + "' " + problem;
     } else {
+      BuildFamilies(*module);
       BuildGroups(*module);
       for (const auto& other : module->modules) {
         gModules.emplace(other, module);
@@ -2376,23 +2390,41 @@ bool ReceiverIsEnumArgument(const MemberGroup& group) {
 
 // Methods, functions, and enum instance members (whose receiver, a case
 // name, is the first argument).
+// A family's group holds every instantiation's overloads; an instance call
+// can only reach those of the receiver's own type.
+MemberGroup ForReceiver(Isolate* isolate, const MemberGroup& group, Local<Value> receiver) {
+  SwiftObjectWrapper* wrapper = receiver.IsEmpty() ? nullptr : SwiftWrapperOf(isolate, receiver);
+  if (wrapper == nullptr || wrapper->Module() != group.module) {
+    return group;
+  }
+  MemberGroup filtered = group;
+  filtered.overloads.clear();
+  for (const MemberInfo* member : group.overloads) {
+    if (group.module->IsA(wrapper->TypeIndex(), member->owner)) {
+      filtered.overloads.push_back(member);
+    }
+  }
+  return filtered.overloads.empty() ? group : filtered;
+}
+
 void MethodCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
-  const MemberGroup& group = *GroupOf(info);
+  const MemberGroup& all = *GroupOf(info);
   Local<Value> receiver;
   int first = 0;
-  if (ReceiverIsEnumArgument(group)) {
+  if (ReceiverIsEnumArgument(all)) {
     if (info.Length() < 1) {
-      isolate->ThrowException(Exception::TypeError(tns::ToV8String(
-          isolate, group.jsName + " needs a " + group.module->types[group.owner].jsName +
-                       " case name as its first argument")));
+      isolate->ThrowException(Exception::TypeError(
+          tns::ToV8String(isolate, all.jsName + " needs a " + all.module->types[all.owner].jsName +
+                                       " case name as its first argument")));
       return;
     }
     receiver = info[0];
     first = 1;
-  } else if (IsInstanceKind(group.kind)) {
+  } else if (IsInstanceKind(all.kind)) {
     receiver = info.This();
   }
+  MemberGroup group = ForReceiver(isolate, all, receiver);
 
   std::vector<Local<Value>> arguments = ArgumentsOf(info, first);
   Selection selection;
@@ -2440,8 +2472,9 @@ void ExactCallback(const FunctionCallbackInfo<Value>& info) {
 
 void GetterCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
-  const MemberGroup& group = *GroupOf(info);
-  Local<Value> receiver = IsInstanceKind(group.kind) ? Local<Value>(info.This()) : Local<Value>();
+  const MemberGroup& all = *GroupOf(info);
+  Local<Value> receiver = IsInstanceKind(all.kind) ? Local<Value>(info.This()) : Local<Value>();
+  MemberGroup group = ForReceiver(isolate, all, receiver);
   Local<Value> result;
   if (Invoke(isolate, group, *group.overloads[0], receiver, {}, false, Local<Object>())
           .ToLocal(&result)) {
@@ -2451,8 +2484,9 @@ void GetterCallback(const FunctionCallbackInfo<Value>& info) {
 
 void SetterCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
-  const MemberGroup& group = *GroupOf(info);
-  Local<Value> receiver = IsInstanceKind(group.kind) ? Local<Value>(info.This()) : Local<Value>();
+  const MemberGroup& all = *GroupOf(info);
+  Local<Value> receiver = IsInstanceKind(all.kind) ? Local<Value>(info.This()) : Local<Value>();
+  MemberGroup group = ForReceiver(isolate, all, receiver);
   std::vector<Local<Value>> arguments = {info.Length() > 0 ? info[0]
                                                            : Local<Value>(v8::Undefined(isolate))};
   Invoke(isolate, group, *group.overloads[0], receiver, arguments, true, Local<Object>());
@@ -2565,7 +2599,7 @@ class Builder {
     _loaded.templates.resize(_module.types.size());
     std::vector<Local<FunctionTemplate>> templates(_module.types.size());
     for (const TypeInfo& type : _module.types) {
-      if (IsEnumKind(type.kind)) {
+      if (IsEnumKind(type.kind) || type.family != static_cast<int>(type.index)) {
         continue;
       }
       Local<FunctionTemplate> tmpl =
@@ -2575,8 +2609,13 @@ class Builder {
       templates[type.index] = tmpl;
     }
     for (const TypeInfo& type : _module.types) {
-      if (type.superIndex >= 0 && !templates[type.index].IsEmpty() &&
-          !templates[type.superIndex].IsEmpty()) {
+      if (!IsEnumKind(type.kind)) {
+        templates[type.index] = templates[type.family];
+      }
+    }
+    for (const TypeInfo& type : _module.types) {
+      if (type.family == static_cast<int>(type.index) && type.superIndex >= 0 &&
+          !templates[type.index].IsEmpty() && !templates[type.superIndex].IsEmpty()) {
         templates[type.index]->Inherit(templates[type.superIndex]);
       }
     }
@@ -2584,7 +2623,8 @@ class Builder {
     std::vector<Local<Object>> enums(_module.types.size());
     for (const TypeInfo& type : _module.types) {
       if (IsEnumKind(type.kind)) {
-        enums[type.index] = Object::New(_isolate);
+        enums[type.index] = type.family == static_cast<int>(type.index) ? Object::New(_isolate)
+                                                                        : enums[type.family];
       }
     }
 
@@ -2611,12 +2651,19 @@ class Builder {
         values[type.index] = enums[type.index];
         continue;
       }
+      if (type.family != static_cast<int>(type.index)) {
+        _loaded.templates[type.index].Reset(_isolate, templates[type.index]);
+        continue;
+      }
       Local<v8::Function> function;
       if (!templates[type.index]->GetFunction(_context).ToLocal(&function)) {
         return false;
       }
       _loaded.templates[type.index].Reset(_isolate, templates[type.index]);
       values[type.index] = function;
+    }
+    for (const TypeInfo& type : _module.types) {
+      values[type.index] = values[type.family];
     }
 
     // Nested types hang off their parent by JS path ("Polygon.Style"); a

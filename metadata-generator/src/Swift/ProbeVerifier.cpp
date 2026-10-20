@@ -120,6 +120,9 @@ VerifyResult verifyWithCompiler(const Module& module,
     arguments.push_back(probePath.str().str());
     arguments.push_back(thunkPath.str().str());
     std::vector<llvm::StringRef> argv(arguments.begin(), arguments.end());
+    // The redirect does not truncate: a shorter log would keep the previous
+    // run's tail.
+    llvm::sys::fs::remove(logPath);
     std::optional<llvm::StringRef> redirects[] = {
         std::nullopt, llvm::StringRef(logPath), llvm::StringRef(logPath)};
     std::string executionError;

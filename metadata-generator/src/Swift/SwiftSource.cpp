@@ -16,8 +16,16 @@ std::string declaringModuleName(const Module& module, const Symbol& symbol) {
 }
 
 std::string qualifiedTypeName(const Module& module, const Symbol& symbol) {
-  return declaringModuleName(module, symbol) + "." +
-         llvm::join(symbol.pathComponents, ".");
+  std::string name = declaringModuleName(module, symbol) + "." +
+                     llvm::join(symbol.pathComponents, ".");
+  if (!symbol.typeArguments.empty()) {
+    std::vector<std::string> arguments;
+    for (const auto& argument : symbol.typeArguments) {
+      arguments.push_back(swiftTypeText(argument, module));
+    }
+    name += "<" + llvm::join(arguments, ", ") + ">";
+  }
+  return name;
 }
 
 namespace {
@@ -49,6 +57,12 @@ TypeNode qualify(const TypeNode& node, const Module& module) {
       }
       components.back().usr = symbol->preciseId;
       components.back().arguments = result.components.back().arguments;
+      if (components.back().arguments.empty()) {
+        // A reference to an instantiation by its id.
+        for (const auto& argument : symbol->typeArguments) {
+          components.back().arguments.push_back(qualify(argument, module));
+        }
+      }
       result.components = std::move(components);
     }
   }

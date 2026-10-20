@@ -167,6 +167,7 @@ class Emitter {
                 false};
       }
       case Bridge::Void:
+      case Bridge::TypeParameter:
       case Bridge::None:
         break;
     }
@@ -275,6 +276,7 @@ class Emitter {
                reporter + ".returnString(key); " +
                returnValue(type.elements.at(0), reporter, "element") + " }";
       case Bridge::Closure:
+      case Bridge::TypeParameter:
       case Bridge::None:
         return reporter + ".returnVoid()";
     }

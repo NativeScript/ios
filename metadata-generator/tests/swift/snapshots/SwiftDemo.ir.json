@@ -22,6 +22,12 @@
     "s:9SwiftDemo13starterWallet3for0aB3Kit0D0CSS_tF",
     "s:9SwiftDemo3sum2of0aB3Kit5MoneyVSayAFG_tF",
     "s:9SwiftDemo4flipy0aB3Kit4CoinOAEF",
+    "s:9SwiftDemo5Scorea",
+    "s:9SwiftDemo9makeScorey0aB3Kit4PairVySSSiGSS_SitF",
+    "s:9SwiftDemo8describeySS0aB3Kit4PairVySiSSGF",
+    "s:9SwiftDemo5boxedy0aB3Kit3BoxCyAC5MoneyVGAGF",
+    "s:9SwiftDemo8countBoxy0aB3Kit0D0CySiGSiF",
+    "s:9SwiftDemo6settley0aB3Kit7OutcomeOySiGSiF",
     "s:9SwiftDemo5ShapeP",
     "s:9SwiftDemo7PolygonC",
     "s:9SwiftDemo6SquareC",
@@ -89,7 +95,10 @@
     "s:12SwiftDemoKit5MoneyV",
     "s:12SwiftDemoKit6WalletC",
     "s:12SwiftDemoKit4CoinO",
-    "s:12SwiftDemoKit9formattedySSAA5MoneyVF"
+    "s:12SwiftDemoKit9formattedySSAA5MoneyVF",
+    "s:12SwiftDemoKit4PairV",
+    "s:12SwiftDemoKit3BoxC",
+    "s:12SwiftDemoKit7OutcomeO"
   ],
   "externalTypes": [
     {
@@ -157,6 +166,288 @@
       "superclass": "c:objc(cs)NSObject"
     },
     {
+      "id": "s:12SwiftDemoKit3BoxC",
+      "kind": "class",
+      "path": "Box",
+      "name": "Box",
+      "access": "public",
+      "declaration": "final class Box<Value>",
+      "modifiers": [
+        "final"
+      ],
+      "genericParameters": [
+        {
+          "name": "Value",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:50:19",
+      "graph": "SwiftDemoKit.symbols.json",
+      "members": [
+        "s:12SwiftDemoKit3BoxC5valuexvp",
+        "s:12SwiftDemoKit3BoxCyACyxGxcfc",
+        "s:12SwiftDemoKit3BoxC8replaced4withACyxGx_tF"
+      ]
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC5valuexvp",
+      "kind": "instanceProperty",
+      "path": "Box.value",
+      "name": "value",
+      "access": "public",
+      "declaration": "var value: Value",
+      "valueType": {
+        "spelling": "Value",
+        "references": [
+          "s:12SwiftDemoKit3BoxC5Valuexmfp"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemoKit/Money.swift:51:15",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit3BoxC"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC5valuexvp@s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>",
+      "kind": "instanceProperty",
+      "path": "Box.value",
+      "name": "value",
+      "access": "public",
+      "declaration": "var value: Value",
+      "valueType": {
+        "spelling": "Value",
+        "references": [
+          "s:12SwiftDemoKit3BoxC5Valuexmfp"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemoKit/Money.swift:51:15",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC5valuexvp@s:12SwiftDemoKit3BoxC<s:Si>",
+      "kind": "instanceProperty",
+      "path": "Box.value",
+      "name": "value",
+      "access": "public",
+      "declaration": "var value: Value",
+      "valueType": {
+        "spelling": "Value",
+        "references": [
+          "s:12SwiftDemoKit3BoxC5Valuexmfp"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemoKit/Money.swift:51:15",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit3BoxC<s:Si>"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC8replaced4withACyxGx_tF",
+      "kind": "instanceMethod",
+      "path": "Box.replaced(with:)",
+      "name": "replaced(with:)",
+      "access": "public",
+      "declaration": "func replaced(with value: Value) -> Box<Value>",
+      "parameters": [
+        {
+          "label": "with",
+          "internalName": "value",
+          "type": {
+            "spelling": "Value",
+            "references": [
+              "s:12SwiftDemoKit3BoxC5Valuexmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Box<Value>",
+        "references": [
+          "s:12SwiftDemoKit3BoxC"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "Value",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:53:16",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit3BoxC"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC8replaced4withACyxGx_tF@s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>",
+      "kind": "instanceMethod",
+      "path": "Box.replaced(with:)",
+      "name": "replaced(with:)",
+      "access": "public",
+      "declaration": "func replaced(with value: Value) -> Box<Value>",
+      "parameters": [
+        {
+          "label": "with",
+          "internalName": "value",
+          "type": {
+            "spelling": "Value",
+            "references": [
+              "s:12SwiftDemoKit3BoxC5Valuexmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Box<Value>",
+        "references": [
+          "s:12SwiftDemoKit3BoxC"
+        ]
+      },
+      "location": "file://Sources/SwiftDemoKit/Money.swift:53:16",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC8replaced4withACyxGx_tF@s:12SwiftDemoKit3BoxC<s:Si>",
+      "kind": "instanceMethod",
+      "path": "Box.replaced(with:)",
+      "name": "replaced(with:)",
+      "access": "public",
+      "declaration": "func replaced(with value: Value) -> Box<Value>",
+      "parameters": [
+        {
+          "label": "with",
+          "internalName": "value",
+          "type": {
+            "spelling": "Value",
+            "references": [
+              "s:12SwiftDemoKit3BoxC5Valuexmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Box<Value>",
+        "references": [
+          "s:12SwiftDemoKit3BoxC"
+        ]
+      },
+      "location": "file://Sources/SwiftDemoKit/Money.swift:53:16",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit3BoxC<s:Si>"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>",
+      "kind": "class",
+      "path": "Box",
+      "name": "Box",
+      "access": "public",
+      "declaration": "final class Box<Value>",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:50:19",
+      "graph": "SwiftDemoKit.symbols.json",
+      "members": [
+        "s:12SwiftDemoKit3BoxC5valuexvp@s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>",
+        "s:12SwiftDemoKit3BoxCyACyxGxcfc@s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>",
+        "s:12SwiftDemoKit3BoxC8replaced4withACyxGx_tF@s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>"
+      ]
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC<s:Si>",
+      "kind": "class",
+      "path": "Box",
+      "name": "Box",
+      "access": "public",
+      "declaration": "final class Box<Value>",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:50:19",
+      "graph": "SwiftDemoKit.symbols.json",
+      "members": [
+        "s:12SwiftDemoKit3BoxC5valuexvp@s:12SwiftDemoKit3BoxC<s:Si>",
+        "s:12SwiftDemoKit3BoxCyACyxGxcfc@s:12SwiftDemoKit3BoxC<s:Si>",
+        "s:12SwiftDemoKit3BoxC8replaced4withACyxGx_tF@s:12SwiftDemoKit3BoxC<s:Si>"
+      ]
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxCyACyxGxcfc",
+      "kind": "initializer",
+      "path": "Box.init(_:)",
+      "name": "init(_:)",
+      "access": "public",
+      "declaration": "init(_ value: Value)",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Value",
+            "references": [
+              "s:12SwiftDemoKit3BoxC5Valuexmfp"
+            ]
+          }
+        }
+      ],
+      "genericParameters": [
+        {
+          "name": "Value",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:52:11",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit3BoxC"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxCyACyxGxcfc@s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>",
+      "kind": "initializer",
+      "path": "Box.init(_:)",
+      "name": "init(_:)",
+      "access": "public",
+      "declaration": "init(_ value: Value)",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Value",
+            "references": [
+              "s:12SwiftDemoKit3BoxC5Valuexmfp"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:52:11",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxCyACyxGxcfc@s:12SwiftDemoKit3BoxC<s:Si>",
+      "kind": "initializer",
+      "path": "Box.init(_:)",
+      "name": "init(_:)",
+      "access": "public",
+      "declaration": "init(_ value: Value)",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Value",
+            "references": [
+              "s:12SwiftDemoKit3BoxC5Valuexmfp"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:52:11",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit3BoxC<s:Si>"
+    },
+    {
       "id": "s:12SwiftDemoKit4CoinO",
       "kind": "enum",
       "path": "Coin",
@@ -196,6 +487,348 @@
       "location": "file://Sources/SwiftDemoKit/Money.swift:30:9",
       "graph": "SwiftDemoKit.symbols.json",
       "parent": "s:12SwiftDemoKit4CoinO"
+    },
+    {
+      "id": "s:12SwiftDemoKit4PairV",
+      "kind": "struct",
+      "path": "Pair",
+      "name": "Pair",
+      "access": "public",
+      "declaration": "struct Pair<First, Second>",
+      "genericParameters": [
+        {
+          "name": "First",
+          "depth": 0,
+          "index": 0
+        },
+        {
+          "name": "Second",
+          "depth": 0,
+          "index": 1
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:38:14",
+      "graph": "SwiftDemoKit.symbols.json",
+      "members": [
+        "s:12SwiftDemoKit4PairV5firstxvp",
+        "s:12SwiftDemoKit4PairV6secondq_vp",
+        "s:12SwiftDemoKit4PairV5first6secondACyxq_Gx_q_tcfc",
+        "s:12SwiftDemoKit4PairV7swappedACyq_xGyF"
+      ]
+    },
+    {
+      "id": "s:12SwiftDemoKit4PairV5first6secondACyxq_Gx_q_tcfc",
+      "kind": "initializer",
+      "path": "Pair.init(first:second:)",
+      "name": "init(first:second:)",
+      "access": "public",
+      "declaration": "init(first: First, second: Second)",
+      "parameters": [
+        {
+          "label": "first",
+          "internalName": "first",
+          "type": {
+            "spelling": "First",
+            "references": [
+              "s:12SwiftDemoKit4PairV5Firstxmfp"
+            ]
+          }
+        },
+        {
+          "label": "second",
+          "internalName": "second",
+          "type": {
+            "spelling": "Second",
+            "references": [
+              "s:12SwiftDemoKit4PairV6Secondq_mfp"
+            ]
+          }
+        }
+      ],
+      "genericParameters": [
+        {
+          "name": "First",
+          "depth": 0,
+          "index": 0
+        },
+        {
+          "name": "Second",
+          "depth": 0,
+          "index": 1
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:42:11",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit4PairV"
+    },
+    {
+      "id": "s:12SwiftDemoKit4PairV5first6secondACyxq_Gx_q_tcfc@s:12SwiftDemoKit4PairV<s:SS,s:Si>",
+      "kind": "initializer",
+      "path": "Pair.init(first:second:)",
+      "name": "init(first:second:)",
+      "access": "public",
+      "declaration": "init(first: First, second: Second)",
+      "parameters": [
+        {
+          "label": "first",
+          "internalName": "first",
+          "type": {
+            "spelling": "First",
+            "references": [
+              "s:12SwiftDemoKit4PairV5Firstxmfp"
+            ]
+          }
+        },
+        {
+          "label": "second",
+          "internalName": "second",
+          "type": {
+            "spelling": "Second",
+            "references": [
+              "s:12SwiftDemoKit4PairV6Secondq_mfp"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:42:11",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit4PairV<s:SS,s:Si>"
+    },
+    {
+      "id": "s:12SwiftDemoKit4PairV5first6secondACyxq_Gx_q_tcfc@s:12SwiftDemoKit4PairV<s:Si,s:SS>",
+      "kind": "initializer",
+      "path": "Pair.init(first:second:)",
+      "name": "init(first:second:)",
+      "access": "public",
+      "declaration": "init(first: First, second: Second)",
+      "parameters": [
+        {
+          "label": "first",
+          "internalName": "first",
+          "type": {
+            "spelling": "First",
+            "references": [
+              "s:12SwiftDemoKit4PairV5Firstxmfp"
+            ]
+          }
+        },
+        {
+          "label": "second",
+          "internalName": "second",
+          "type": {
+            "spelling": "Second",
+            "references": [
+              "s:12SwiftDemoKit4PairV6Secondq_mfp"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:42:11",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit4PairV<s:Si,s:SS>"
+    },
+    {
+      "id": "s:12SwiftDemoKit4PairV5firstxvp",
+      "kind": "instanceProperty",
+      "path": "Pair.first",
+      "name": "first",
+      "access": "public",
+      "declaration": "var first: First",
+      "valueType": {
+        "spelling": "First",
+        "references": [
+          "s:12SwiftDemoKit4PairV5Firstxmfp"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemoKit/Money.swift:39:15",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit4PairV"
+    },
+    {
+      "id": "s:12SwiftDemoKit4PairV5firstxvp@s:12SwiftDemoKit4PairV<s:SS,s:Si>",
+      "kind": "instanceProperty",
+      "path": "Pair.first",
+      "name": "first",
+      "access": "public",
+      "declaration": "var first: First",
+      "valueType": {
+        "spelling": "First",
+        "references": [
+          "s:12SwiftDemoKit4PairV5Firstxmfp"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemoKit/Money.swift:39:15",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit4PairV<s:SS,s:Si>"
+    },
+    {
+      "id": "s:12SwiftDemoKit4PairV5firstxvp@s:12SwiftDemoKit4PairV<s:Si,s:SS>",
+      "kind": "instanceProperty",
+      "path": "Pair.first",
+      "name": "first",
+      "access": "public",
+      "declaration": "var first: First",
+      "valueType": {
+        "spelling": "First",
+        "references": [
+          "s:12SwiftDemoKit4PairV5Firstxmfp"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemoKit/Money.swift:39:15",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit4PairV<s:Si,s:SS>"
+    },
+    {
+      "id": "s:12SwiftDemoKit4PairV6secondq_vp",
+      "kind": "instanceProperty",
+      "path": "Pair.second",
+      "name": "second",
+      "access": "public",
+      "declaration": "var second: Second",
+      "valueType": {
+        "spelling": "Second",
+        "references": [
+          "s:12SwiftDemoKit4PairV6Secondq_mfp"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemoKit/Money.swift:40:15",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit4PairV"
+    },
+    {
+      "id": "s:12SwiftDemoKit4PairV6secondq_vp@s:12SwiftDemoKit4PairV<s:SS,s:Si>",
+      "kind": "instanceProperty",
+      "path": "Pair.second",
+      "name": "second",
+      "access": "public",
+      "declaration": "var second: Second",
+      "valueType": {
+        "spelling": "Second",
+        "references": [
+          "s:12SwiftDemoKit4PairV6Secondq_mfp"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemoKit/Money.swift:40:15",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit4PairV<s:SS,s:Si>"
+    },
+    {
+      "id": "s:12SwiftDemoKit4PairV6secondq_vp@s:12SwiftDemoKit4PairV<s:Si,s:SS>",
+      "kind": "instanceProperty",
+      "path": "Pair.second",
+      "name": "second",
+      "access": "public",
+      "declaration": "var second: Second",
+      "valueType": {
+        "spelling": "Second",
+        "references": [
+          "s:12SwiftDemoKit4PairV6Secondq_mfp"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemoKit/Money.swift:40:15",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit4PairV<s:Si,s:SS>"
+    },
+    {
+      "id": "s:12SwiftDemoKit4PairV7swappedACyq_xGyF",
+      "kind": "instanceMethod",
+      "path": "Pair.swapped()",
+      "name": "swapped()",
+      "access": "public",
+      "declaration": "func swapped() -> Pair<Second, First>",
+      "returns": {
+        "spelling": "Pair<Second, First>",
+        "references": [
+          "s:12SwiftDemoKit4PairV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "First",
+          "depth": 0,
+          "index": 0
+        },
+        {
+          "name": "Second",
+          "depth": 0,
+          "index": 1
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:47:16",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit4PairV"
+    },
+    {
+      "id": "s:12SwiftDemoKit4PairV7swappedACyq_xGyF@s:12SwiftDemoKit4PairV<s:SS,s:Si>",
+      "kind": "instanceMethod",
+      "path": "Pair.swapped()",
+      "name": "swapped()",
+      "access": "public",
+      "declaration": "func swapped() -> Pair<Second, First>",
+      "returns": {
+        "spelling": "Pair<Second, First>",
+        "references": [
+          "s:12SwiftDemoKit4PairV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemoKit/Money.swift:47:16",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit4PairV<s:SS,s:Si>"
+    },
+    {
+      "id": "s:12SwiftDemoKit4PairV7swappedACyq_xGyF@s:12SwiftDemoKit4PairV<s:Si,s:SS>",
+      "kind": "instanceMethod",
+      "path": "Pair.swapped()",
+      "name": "swapped()",
+      "access": "public",
+      "declaration": "func swapped() -> Pair<Second, First>",
+      "returns": {
+        "spelling": "Pair<Second, First>",
+        "references": [
+          "s:12SwiftDemoKit4PairV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemoKit/Money.swift:47:16",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit4PairV<s:Si,s:SS>"
+    },
+    {
+      "id": "s:12SwiftDemoKit4PairV<s:SS,s:Si>",
+      "kind": "struct",
+      "path": "Pair",
+      "name": "Pair",
+      "access": "public",
+      "declaration": "struct Pair<First, Second>",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:38:14",
+      "graph": "SwiftDemoKit.symbols.json",
+      "members": [
+        "s:12SwiftDemoKit4PairV5firstxvp@s:12SwiftDemoKit4PairV<s:SS,s:Si>",
+        "s:12SwiftDemoKit4PairV6secondq_vp@s:12SwiftDemoKit4PairV<s:SS,s:Si>",
+        "s:12SwiftDemoKit4PairV5first6secondACyxq_Gx_q_tcfc@s:12SwiftDemoKit4PairV<s:SS,s:Si>",
+        "s:12SwiftDemoKit4PairV7swappedACyq_xGyF@s:12SwiftDemoKit4PairV<s:SS,s:Si>"
+      ]
+    },
+    {
+      "id": "s:12SwiftDemoKit4PairV<s:Si,s:SS>",
+      "kind": "struct",
+      "path": "Pair",
+      "name": "Pair",
+      "access": "public",
+      "declaration": "struct Pair<First, Second>",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:38:14",
+      "graph": "SwiftDemoKit.symbols.json",
+      "members": [
+        "s:12SwiftDemoKit4PairV5firstxvp@s:12SwiftDemoKit4PairV<s:Si,s:SS>",
+        "s:12SwiftDemoKit4PairV6secondq_vp@s:12SwiftDemoKit4PairV<s:Si,s:SS>",
+        "s:12SwiftDemoKit4PairV5first6secondACyxq_Gx_q_tcfc@s:12SwiftDemoKit4PairV<s:Si,s:SS>",
+        "s:12SwiftDemoKit4PairV7swappedACyq_xGyF@s:12SwiftDemoKit4PairV<s:Si,s:SS>"
+      ]
     },
     {
       "id": "s:12SwiftDemoKit5MoneyV",
@@ -477,6 +1110,129 @@
       "location": "file://Sources/SwiftDemoKit/Money.swift:26:16",
       "graph": "SwiftDemoKit.symbols.json",
       "parent": "s:12SwiftDemoKit6WalletC"
+    },
+    {
+      "id": "s:12SwiftDemoKit7OutcomeO",
+      "kind": "enum",
+      "path": "Outcome",
+      "name": "Outcome",
+      "access": "public",
+      "declaration": "enum Outcome<Value>",
+      "genericParameters": [
+        {
+          "name": "Value",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:56:12",
+      "graph": "SwiftDemoKit.symbols.json",
+      "members": [
+        "s:12SwiftDemoKit7OutcomeO4doneyACyxGxcAEmlF",
+        "s:12SwiftDemoKit7OutcomeO6failedyACyxGSS_tcAEmlF"
+      ]
+    },
+    {
+      "id": "s:12SwiftDemoKit7OutcomeO4doneyACyxGxcAEmlF",
+      "kind": "enumCase",
+      "path": "Outcome.done(_:)",
+      "name": "done(_:)",
+      "access": "public",
+      "declaration": "case done(Value)",
+      "parameters": [
+        {
+          "type": {
+            "spelling": "Value",
+            "references": [
+              "s:12SwiftDemoKit7OutcomeO5Valuexmfp"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:57:9",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit7OutcomeO"
+    },
+    {
+      "id": "s:12SwiftDemoKit7OutcomeO4doneyACyxGxcAEmlF@s:12SwiftDemoKit7OutcomeO<s:Si>",
+      "kind": "enumCase",
+      "path": "Outcome.done(_:)",
+      "name": "done(_:)",
+      "access": "public",
+      "declaration": "case done(Value)",
+      "parameters": [
+        {
+          "type": {
+            "spelling": "Value",
+            "references": [
+              "s:12SwiftDemoKit7OutcomeO5Valuexmfp"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:57:9",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit7OutcomeO<s:Si>"
+    },
+    {
+      "id": "s:12SwiftDemoKit7OutcomeO6failedyACyxGSS_tcAEmlF",
+      "kind": "enumCase",
+      "path": "Outcome.failed(reason:)",
+      "name": "failed(reason:)",
+      "access": "public",
+      "declaration": "case failed(reason: String)",
+      "parameters": [
+        {
+          "label": "reason",
+          "internalName": "reason",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:58:9",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit7OutcomeO"
+    },
+    {
+      "id": "s:12SwiftDemoKit7OutcomeO6failedyACyxGSS_tcAEmlF@s:12SwiftDemoKit7OutcomeO<s:Si>",
+      "kind": "enumCase",
+      "path": "Outcome.failed(reason:)",
+      "name": "failed(reason:)",
+      "access": "public",
+      "declaration": "case failed(reason: String)",
+      "parameters": [
+        {
+          "label": "reason",
+          "internalName": "reason",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:58:9",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit7OutcomeO<s:Si>"
+    },
+    {
+      "id": "s:12SwiftDemoKit7OutcomeO<s:Si>",
+      "kind": "enum",
+      "path": "Outcome",
+      "name": "Outcome",
+      "access": "public",
+      "declaration": "enum Outcome<Value>",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:56:12",
+      "graph": "SwiftDemoKit.symbols.json",
+      "members": [
+        "s:12SwiftDemoKit7OutcomeO4doneyACyxGxcAEmlF@s:12SwiftDemoKit7OutcomeO<s:Si>",
+        "s:12SwiftDemoKit7OutcomeO6failedyACyxGSS_tcAEmlF@s:12SwiftDemoKit7OutcomeO<s:Si>"
+      ]
     },
     {
       "id": "s:12SwiftDemoKit9formattedySSAA5MoneyVF",
@@ -2083,6 +2839,24 @@
       "parent": "s:9SwiftDemo5PointV"
     },
     {
+      "id": "s:9SwiftDemo5Scorea",
+      "kind": "typeAlias",
+      "path": "Score",
+      "name": "Score",
+      "access": "public",
+      "declaration": "typealias Score = Pair<String, Int>",
+      "aliasedType": {
+        "spelling": "Pair<String, Int>",
+        "references": [
+          "s:12SwiftDemoKit4PairV",
+          "s:SS",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Purse.swift:25:17",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo5ShapeP",
       "kind": "protocol",
       "path": "Shape",
@@ -2140,6 +2914,34 @@
       "location": "file://Sources/SwiftDemo/Shapes.swift:4:15",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo5ShapeP"
+    },
+    {
+      "id": "s:9SwiftDemo5boxedy0aB3Kit3BoxCyAC5MoneyVGAGF",
+      "kind": "function",
+      "path": "boxed(_:)",
+      "name": "boxed(_:)",
+      "access": "public",
+      "declaration": "func boxed(_ money: Money) -> Box<Money>",
+      "parameters": [
+        {
+          "internalName": "money",
+          "type": {
+            "spelling": "Money",
+            "references": [
+              "s:12SwiftDemoKit5MoneyV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Box<Money>",
+        "references": [
+          "s:12SwiftDemoKit3BoxC",
+          "s:12SwiftDemoKit5MoneyV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Purse.swift:29:12",
+      "graph": "SwiftDemo.symbols.json"
     },
     {
       "id": "s:9SwiftDemo5clearyySSSgzF",
@@ -2988,6 +3790,34 @@
         }
       ],
       "location": "file://Sources/SwiftDemo/Values.swift:166:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo6settley0aB3Kit7OutcomeOySiGSiF",
+      "kind": "function",
+      "path": "settle(_:)",
+      "name": "settle(_:)",
+      "access": "public",
+      "declaration": "func settle(_ value: Int) -> Outcome<Int>",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Outcome<Int>",
+        "references": [
+          "s:12SwiftDemoKit7OutcomeO",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Purse.swift:31:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -4431,6 +5261,63 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo8countBoxy0aB3Kit0D0CySiGSiF",
+      "kind": "function",
+      "path": "countBox(_:)",
+      "name": "countBox(_:)",
+      "access": "public",
+      "declaration": "func countBox(_ value: Int) -> Box<Int>",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Box<Int>",
+        "references": [
+          "s:12SwiftDemoKit3BoxC",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Purse.swift:30:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8describeySS0aB3Kit4PairVySiSSGF",
+      "kind": "function",
+      "path": "describe(_:)",
+      "name": "describe(_:)",
+      "access": "public",
+      "declaration": "func describe(_ pair: Pair<Int, String>) -> String",
+      "parameters": [
+        {
+          "internalName": "pair",
+          "type": {
+            "spelling": "Pair<Int, String>",
+            "references": [
+              "s:12SwiftDemoKit4PairV",
+              "s:Si",
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Purse.swift:28:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo8describeySSSo6UIViewCF",
       "kind": "function",
       "path": "describe(_:)",
@@ -4653,6 +5540,42 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Views.swift:7:23",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo9makeScorey0aB3Kit4PairVySSSiGSS_SitF",
+      "kind": "function",
+      "path": "makeScore(_:_:)",
+      "name": "makeScore(_:_:)",
+      "access": "public",
+      "declaration": "func makeScore(_ name: String, _ points: Int) -> Score",
+      "parameters": [
+        {
+          "internalName": "name",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        },
+        {
+          "internalName": "points",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Score",
+        "references": [
+          "s:9SwiftDemo5Scorea"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Purse.swift:27:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {

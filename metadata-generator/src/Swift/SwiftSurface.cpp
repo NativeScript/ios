@@ -133,6 +133,7 @@ std::string signatureCode(const SwiftSurface& surface,
       code += ")";
       break;
     }
+    case Bridge::TypeParameter:
     case Bridge::None:
       code = "?";
       break;

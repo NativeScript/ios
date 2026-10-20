@@ -82,6 +82,12 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "starterWallet(for:)",
                                        "sum(of:)",
                                        "flip(_:)",
+                                       "Score",
+                                       "makeScore(_:_:)",
+                                       "describe(_:)",
+                                       "boxed(_:)",
+                                       "countBox(_:)",
+                                       "settle(_:)",
                                        "Shape",
                                        "Polygon",
                                        "Square",
@@ -149,7 +155,10 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "Money",
                                        "Wallet",
                                        "Coin",
-                                       "formatted(_:)"};
+                                       "formatted(_:)",
+                                       "Pair",
+                                       "Box",
+                                       "Outcome"};
   CHECK_EQ(llvm::join(names, ","), llvm::join(expected, ","));
 }
 
@@ -523,7 +532,9 @@ TEST(LoadOrderDoesNotChangeTheIR) {
   }
   ModuleSet set = reversed.finish();
   REQUIRE(set.modules.count("SwiftDemo"));
-  CHECK(dumpModuleJSON(mergeUnit(set, "SwiftDemo")) == dumpModuleJSON(demo()));
+  Module unit = mergeUnit(set, "SwiftDemo");
+  instantiateGenerics(unit);
+  CHECK(dumpModuleJSON(unit) == dumpModuleJSON(demo()));
 }
 
 TEST(InvalidJSONIsAnError) {

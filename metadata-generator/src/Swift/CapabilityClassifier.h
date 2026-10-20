@@ -64,6 +64,9 @@ enum class Bridge {
   // An Objective-C class instance: NativeScript's ordinary Objective-C
   // wrapper, with the same identity Objective-C calls give it.
   ObjCObject,
+  // A generic parameter, in a generic type's declarations for TypeScript
+  // only (Classification::templates); never generated.
+  TypeParameter,
 };
 
 struct BridgedType {
@@ -71,8 +74,12 @@ struct BridgedType {
   bool optional = false;
   // Nominal bridges: the module symbol the type refers to.
   std::string symbolId;
-  // ObjCObject: the class's Objective-C runtime name.
+  // ObjCObject: the class's Objective-C runtime name. TypeParameter: the
+  // parameter's name.
   std::string objcClass;
+  // A generic type's arguments, for its TypeScript name (`Pair<number,
+  // string>`).
+  std::vector<BridgedType> typeArguments;
   TypeNode node;
   // Array and Dictionary: the element (value) type. Closure: its
   // parameters.
@@ -122,6 +129,10 @@ struct Capability {
 
 struct Classification {
   std::map<std::string, Capability> bySymbol;
+  // Members of generic types with generated instantiations, with generic
+  // parameters bridged as TypeParameter: one declaration for TypeScript
+  // covering every instantiation.
+  std::map<std::string, Capability> templates;
 
   const Capability* find(const std::string& id) const;
 };

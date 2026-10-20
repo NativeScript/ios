@@ -8,63 +8,6 @@
 
 namespace Swift {
 
-// A Swift type as a tree, parsed from a TypeRef's fragments.
-struct TypeNode {
-  enum class Kind {
-    // A named type, possibly nested (`AttributedString.Index`) and generic
-    // (`Binding<Bool>`). Optional, Array and Dictionary spelled as named
-    // generics are normalized to their own kinds.
-    Nominal,
-    // A generic parameter in scope, `Self`, or a member of one (`T.Value`).
-    GenericParameter,
-    Optional,
-    ImplicitlyUnwrappedOptional,
-    Array,
-    Dictionary,
-    Tuple,
-    Function,
-    Metatype,
-    // `any P` (also `Any`, `AnyObject`).
-    Existential,
-    // `some P`.
-    Opaque,
-    // `P & Q`.
-    Composition,
-    Void,
-    // Anything the parser does not model (parameter packs, `~Copyable`);
-    // `text` holds the spelling.
-    Unknown,
-  };
-
-  struct Component {
-    std::string name;
-    std::string usr;
-    std::vector<TypeNode> arguments;
-  };
-
-  Kind kind = Kind::Unknown;
-  // Nominal: one entry per dot-separated name; GenericParameter: its name(s).
-  std::vector<Component> components;
-  // Element/wrapped types, tuple elements, function parameters, composition
-  // members, dictionary key and value.
-  std::vector<TypeNode> children;
-  std::vector<std::string> labels;
-  // Function result; empty for other kinds.
-  std::vector<TypeNode> result;
-  std::vector<TypeNode> thrownType;
-  bool isAsync = false;
-  bool isThrowing = false;
-  // "@escaping", "@Sendable", "@MainActor", "@convention(c)", ...
-  std::vector<std::string> attributes;
-  // "inout", "borrowing", "consuming", "sending", "repeat each".
-  std::string modifier;
-  std::string text;
-
-  // USR of the last component (Nominal only).
-  const std::string& usr() const;
-  bool hasAttribute(const std::string& attribute) const;
-};
-
 const char* toString(TypeNode::Kind kind);
 
 // Parses `type`. Names in `genericNames` (and `Self`) are generic parameters.
@@ -82,9 +25,27 @@ std::string spelling(const TypeNode& node);
 std::string qualifiedNameFromUSR(const std::string& usr);
 
 // Generic parameter names in scope for `symbol`: its own and those of every
-// enclosing declaration.
+// enclosing declaration, including those an instantiation substitutes.
 std::set<std::string> genericNamesInScope(const Module& module,
                                           const Symbol& symbol);
+
+// `node` with each generic parameter `substitutions` names replaced by its
+// argument.
+TypeNode substitute(
+    const TypeNode& node,
+    const std::vector<std::pair<std::string, TypeNode>>& substitutions);
+
+// The id of the instantiation `node` (a generic nominal with arguments)
+// names: its USR followed by its arguments' keys.
+std::string instantiationKey(const TypeNode& node);
+
+// Adds a synthetic, non-generic type for every concrete instantiation of a
+// module generic type that the module spells (`Forecast<DayWeather>` in a
+// signature or a public typealias), with copies of the generic type's
+// members whose generic parameters stand for its arguments. Instantiations
+// spelled only inside other instantiations' members are followed to a
+// bounded depth.
+void instantiateGenerics(Module& module);
 
 // Well-known USRs of standard library and Foundation types.
 namespace KnownTypes {
