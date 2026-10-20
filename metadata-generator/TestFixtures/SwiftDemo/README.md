@@ -13,8 +13,14 @@ changing `Sources/`, regenerate the graphs and then the test snapshots:
 
 ```
 ./generate-symbolgraphs.sh
-NS_UPDATE_SNAPSHOTS=1 ../../build/bin/swift-symbolgraph-tests Snapshot
+NS_UPDATE_SNAPSHOTS=1 ../../build/bin/swift-symbolgraph-tests
 ```
 
 Review the resulting snapshot diff before committing it; it is the record of
 what the loader extracts.
+
+`Interop/SwiftDemo+NativeScript.swift` holds the generated thunks (regenerated
+by the same `NS_UPDATE_SNAPSHOTS=1` run). TestRunner compiles it with the
+fixture sources and exercises it from `TestRunner/app/tests/SwiftInteropTests.js`;
+`Package.swift` builds the same files as two SwiftPM modules (`SwiftDemo` and
+`SwiftDemoInterop`).

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdlib>
 
+#include "Swift/CapabilityClassifier.h"
 #include "Swift/SymbolGraphLoader.h"
 #include "TestHarness.h"
 #include "TestSupport.h"
@@ -73,15 +74,15 @@ TEST(TopLevelDeclarationsInSourceOrder) {
   for (const auto& id : demo().topLevelIds) {
     names.push_back(demo().find(id)->name);
   }
-  std::vector<std::string> expected = {"Greeter",       "Demo",
-                                       "Point",         "Flavor",
-                                       "Shape",         "Polygon",
-                                       "Square",        "ShapeError",
-                                       "Measurement",   "Ring",
-                                       "Counter",       "Canvas",
-                                       "Loader",        "makeDefaultPoint()",
-                                       "defaultFlavor", "globalCounter",
-                                       "Coordinates"};
+  std::vector<std::string> expected = {
+      "Greeter",         "Demo",          "Point",
+      "Flavor",          "Shape",         "Polygon",
+      "Square",          "Precipitation", "ShapeError",
+      "Measurement",     "Ring",          "Counter",
+      "Canvas",          "Loader",        "makeDefaultPoint()",
+      "defaultFlavor",   "globalCounter", "Coordinates",
+      "checkedSide(_:)", "echoInt8(_:)",  "echoUInt64(_:)",
+      "largestInt()",    "shout(_:)",     "Tracker"};
   CHECK_EQ(llvm::join(names, ","), llvm::join(expected, ","));
 }
 
@@ -436,7 +437,8 @@ TEST(TypeAliases) {
 TEST(IRSnapshot) { checkSnapshot("SwiftDemo.ir.json", dumpModuleJSON(demo())); }
 
 TEST(TypeScriptSnapshot) {
-  TypeScript::SwiftDefinitionWriter writer(demo());
+  Classification classification = classify(demo());
+  TypeScript::SwiftDefinitionWriter writer(demo(), classification);
   checkSnapshot("swift!SwiftDemo.d.ts", writer.write());
 }
 

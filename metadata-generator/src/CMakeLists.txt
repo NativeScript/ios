@@ -43,9 +43,11 @@ set(GENERATOR_HEADERS
     Swift/ProbeEmitter.h
     Swift/ProbeVerifier.h
     Swift/SwiftSource.h
+    Swift/SwiftSurface.h
     Swift/SwiftTypes.h
     Swift/SwiftIR.h
     Swift/SymbolGraphLoader.h
+    Swift/ThunkEmitter.h
     TypeScript/SwiftDefinitionWriter.h
 )
 
@@ -83,9 +85,11 @@ set(GENERATOR_SOURCES
     Swift/ProbeEmitter.cpp
     Swift/ProbeVerifier.cpp
     Swift/SwiftSource.cpp
+    Swift/SwiftSurface.cpp
     Swift/SwiftTypes.cpp
     Swift/SwiftIR.cpp
     Swift/SymbolGraphLoader.cpp
+    Swift/ThunkEmitter.cpp
     TypeScript/SwiftDefinitionWriter.cpp
 )
 

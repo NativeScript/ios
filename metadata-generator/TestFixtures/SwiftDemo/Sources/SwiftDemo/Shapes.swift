@@ -47,6 +47,11 @@ public final class Square: Polygon, Shape {
     override public func scale(by factor: Double) { side *= factor }
 }
 
+// A case named `none` must not be confused with Optional.none.
+public enum Precipitation: String {
+    case rain, snow, none
+}
+
 public enum ShapeError: Error {
     case invalidSide(Double)
     case tooManySides(count: Int, limit: Int)

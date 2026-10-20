@@ -6,6 +6,7 @@
 #include "Swift/ProbeEmitter.h"
 #include "Swift/ProbeVerifier.h"
 #include "Swift/SwiftSource.h"
+#include "SwiftToolchain.h"
 #include "TestHarness.h"
 #include "TestSupport.h"
 
@@ -165,61 +166,6 @@ TEST(ProbeSnapshot) {
                 emitProbes(demo(), classification()).source);
 }
 
-namespace {
-
-// Directory holding SwiftDemo.swiftmodule built from the fixture sources, or
-// "" when no Swift toolchain is available.
-const std::string& fixtureModuleDirectory() {
-  static std::string directory = [] {
-    if (!llvm::sys::findProgramByName("xcrun")) {
-      return std::string();
-    }
-    llvm::SmallString<128> path;
-    if (llvm::sys::fs::createUniqueDirectory("swift-fixture", path)) {
-      return std::string();
-    }
-    std::string command =
-        "xcrun swiftc -emit-module -module-name SwiftDemo "
-        "-target arm64-apple-ios15.0-simulator "
-        "-sdk \"$(xcrun --sdk iphonesimulator --show-sdk-path)\" "
-        "-emit-module-path '" +
-        path.str().str() +
-        "/SwiftDemo.swiftmodule' '" SWIFT_FIXTURE_DIR
-        "'/Sources/SwiftDemo/*.swift";
-    auto shell = llvm::sys::findProgramByName("sh");
-    if (!shell ||
-        llvm::sys::ExecuteAndWait(*shell, {*shell, "-c", command}) != 0) {
-      return std::string();
-    }
-    return path.str().str();
-  }();
-  return directory;
-}
-
-VerifyOptions fixtureVerifyOptions() {
-  VerifyOptions options;
-  options.compiler = {"xcrun", "swiftc"};
-  llvm::SmallString<128> sdkLog;
-  llvm::sys::fs::createTemporaryFile("sdk", "txt", sdkLog);
-  auto shell = llvm::sys::findProgramByName("sh");
-  std::optional<llvm::StringRef> redirects[] = {
-      std::nullopt, llvm::StringRef(sdkLog), std::nullopt};
-  llvm::sys::ExecuteAndWait(
-      *shell, {*shell, "-c", "xcrun --sdk iphonesimulator --show-sdk-path"},
-      std::nullopt, redirects);
-  auto sdk = llvm::MemoryBuffer::getFile(sdkLog);
-  options.sdk = sdk ? (*sdk)->getBuffer().trim().str() : "";
-  llvm::sys::fs::remove(sdkLog);
-  options.target = "arm64-apple-ios15.0-simulator";
-  options.searchPaths = {fixtureModuleDirectory()};
-  llvm::SmallString<128> work;
-  llvm::sys::fs::createUniqueDirectory("swift-verify", work);
-  options.workDirectory = work.str().str();
-  return options;
-}
-
-}  // namespace
-
 TEST(VerifierParsesDiagnostics) {
   std::string log =
       "/tmp/p.swift:12:7: error: value of type 'X' has no member 'y'\n"
@@ -286,50 +232,16 @@ TEST(VerifierDemotesWhatTheCompilerRejects) {
         Tier::SwiftGenerated);
 }
 
-// Builds the fixture module and type-checks the probes against it.
+// Type-checks the probes against the separately compiled fixture module.
 TEST(ProbesTypeCheck) {
-  auto shell = llvm::sys::findProgramByName("sh");
-  auto xcrun = llvm::sys::findProgramByName("xcrun");
-  if (!shell || !xcrun) {
-    std::cout << "  (skipped: xcrun not found)" << std::endl;
+  if (fixtureModuleDirectory().empty()) {
+    std::cout << "  (skipped: no Swift toolchain)" << std::endl;
     return;
   }
-
-  llvm::SmallString<128> directory;
-  REQUIRE(!llvm::sys::fs::createUniqueDirectory("swift-probes", directory));
-  llvm::SmallString<128> probePath(directory);
-  llvm::sys::path::append(probePath, "probe.swift");
-  {
-    std::error_code error;
-    llvm::raw_fd_ostream out(probePath, error, llvm::sys::fs::OF_Text);
-    REQUIRE(!error);
-    out << emitProbes(demo(), classification()).source;
+  std::string errors =
+      typeCheckAgainstFixture(emitProbes(demo(), classification()).source);
+  if (!errors.empty()) {
+    TestHarness::fail(__FILE__, __LINE__,
+                      "probes failed to type-check:\n" + errors);
   }
-
-  std::string dir = directory.str().str();
-  std::string command =
-      "set -e; SDK=$(xcrun --sdk iphonesimulator --show-sdk-path); "
-      "TARGET=arm64-apple-ios15.0-simulator; "
-      "xcrun swiftc -emit-module -module-name SwiftDemo -target $TARGET -sdk "
-      "\"$SDK\" "
-      "-emit-module-path '" +
-      dir +
-      "/SwiftDemo.swiftmodule' '" SWIFT_FIXTURE_DIR
-      "'/Sources/SwiftDemo/*.swift; "
-      "xcrun swiftc -typecheck -I '" +
-      dir + "' -target $TARGET -sdk \"$SDK\" '" + probePath.str().str() + "'";
-  llvm::SmallString<128> log(directory);
-  llvm::sys::path::append(log, "swiftc.log");
-  std::optional<llvm::StringRef> redirects[] = {
-      std::nullopt, llvm::StringRef(log), llvm::StringRef(log)};
-  int status = llvm::sys::ExecuteAndWait(*shell, {*shell, "-c", command},
-                                         std::nullopt, redirects);
-  if (status != 0) {
-    auto output = llvm::MemoryBuffer::getFile(log);
-    TestHarness::fail(
-        __FILE__, __LINE__,
-        "probes failed to type-check:\n" +
-            (output ? (*output)->getBuffer().str() : std::string("(no log)")));
-  }
-  llvm::sys::fs::remove_directories(directory);
 }

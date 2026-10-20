@@ -69,39 +69,41 @@ inline std::string diagnosticCodes(const std::vector<Diagnostic>& diagnostics) {
   return llvm::join(codes, ", ");
 }
 
-// Compares `actual` against a checked-in snapshot. NS_UPDATE_SNAPSHOTS=1
-// rewrites the snapshot instead.
-inline void checkSnapshot(const std::string& fileName,
-                          const std::string& actual) {
-  llvm::SmallString<256> snapshotPath(SWIFT_SNAPSHOT_DIR);
-  llvm::sys::path::append(snapshotPath, fileName);
-
+// Compares `actual` against the checked-in file at `path`.
+// NS_UPDATE_SNAPSHOTS=1 rewrites the file instead.
+inline void checkFile(const std::string& path, const std::string& actual) {
   if (const char* update = std::getenv("NS_UPDATE_SNAPSHOTS");
       update && *update == '1') {
     std::error_code error;
-    llvm::raw_fd_ostream out(snapshotPath, error, llvm::sys::fs::OF_Text);
+    llvm::raw_fd_ostream out(path, error, llvm::sys::fs::OF_Text);
     REQUIRE(!error);
     out << actual;
     return;
   }
 
-  auto expected = llvm::MemoryBuffer::getFile(snapshotPath, /*IsText*/ true);
+  auto expected = llvm::MemoryBuffer::getFile(path, /*IsText*/ true);
   if (!expected) {
-    TestHarness::fail(__FILE__, __LINE__,
-                      "missing snapshot " + snapshotPath.str().str() +
-                          " (run with NS_UPDATE_SNAPSHOTS=1)");
+    TestHarness::fail(
+        __FILE__, __LINE__,
+        "missing snapshot " + path + " (run with NS_UPDATE_SNAPSHOTS=1)");
     return;
   }
   if ((*expected)->getBuffer() != actual) {
-    llvm::SmallString<256> actualPath(snapshotPath);
-    actualPath += ".actual";
+    std::string actualPath = path + ".actual";
     std::error_code error;
     llvm::raw_fd_ostream out(actualPath, error, llvm::sys::fs::OF_Text);
     out << actual;
     TestHarness::fail(__FILE__, __LINE__,
-                      "snapshot mismatch: diff " + snapshotPath.str().str() +
-                          " " + actualPath.str().str());
+                      "snapshot mismatch: diff " + path + " " + actualPath);
   }
+}
+
+// Compares `actual` against tests/swift/snapshots/<fileName>.
+inline void checkSnapshot(const std::string& fileName,
+                          const std::string& actual) {
+  llvm::SmallString<256> path(SWIFT_SNAPSHOT_DIR);
+  llvm::sys::path::append(path, fileName);
+  checkFile(path.str().str(), actual);
 }
 
 }  // namespace TestSupport

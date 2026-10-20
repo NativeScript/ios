@@ -60,9 +60,13 @@ diagnostics with stable codes (`invalid-json`, `unsupported-format-version`,
 `duplicate-symbol`, `parameter-label-mismatch`, ...); errors make the generator
 exit non-zero.
 
-Swift declarations are not callable from JavaScript yet, so the emitted
-`swift!<Module>.d.ts` is type-only: it names the module's top-level types and
-declares no members.
+`--swift-thunk-output <dir>` writes `<Module>+NativeScript.swift`: a Swift
+thunk for every declaration the runtime can call, plus the
+`ns_swift_register_<Module>` function the runtime looks up. `-output-typescript`
+writes `swift!<Module>.d.ts`, declaring exactly that surface as the
+`ns:swift/<Module>` module. Both come from the same registration model
+(`src/Swift/SwiftSurface.h`). See `docs/swift-interop.md` for the app-side
+workflow and the JavaScript semantics.
 
 ### Capability classification and coverage
 
@@ -142,8 +146,12 @@ cmake --build build --target swift-symbolgraph-tests
 ```
 
 The snapshot tests (`IRSnapshot`, `TypeScriptSnapshot`, `CoverageSnapshot`,
-`ProbeSnapshot`) compare against `tests/swift/snapshots/`. `ProbesTypeCheck`
+`ProbeSnapshot`) compare against `tests/swift/snapshots/`;
+`ThunkSourceMatchesFixtureInterop` keeps
+`TestFixtures/SwiftDemo/Interop/SwiftDemo+NativeScript.swift`, which TestRunner
+compiles, identical to the generator's output. `TypeScriptUsageCompiles` runs
+`tsc` (from `PATH` or `NS_TSC`) over `tests/swift/typescript/usage.ts`. `ProbesTypeCheck`
 and the `Verifier*` tests build the fixture module and run the Swift compiler;
 they are skipped when `xcrun` is unavailable. After an intended output change, regenerate them with
-`NS_UPDATE_SNAPSHOTS=1 ./build/bin/swift-symbolgraph-tests Snapshot` and review
+`NS_UPDATE_SNAPSHOTS=1 ./build/bin/swift-symbolgraph-tests` and review
 the diff.

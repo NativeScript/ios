@@ -24,6 +24,7 @@
 #include "Swift/ProbeEmitter.h"
 #include "Swift/ProbeVerifier.h"
 #include "Swift/SymbolGraphLoader.h"
+#include "Swift/ThunkEmitter.h"
 #include "TypeScript/DefinitionWriter.h"
 #include "TypeScript/DocSetManager.h"
 #include "TypeScript/SwiftDefinitionWriter.h"
@@ -86,6 +87,11 @@ llvm::cl::opt<string> cla_swiftWorkDir(
     "swift-work-dir",
     llvm::cl::desc("Scratch directory for --swift-verify (default: a "
                    "temporary directory)"),
+    llvm::cl::value_desc("<dir_path>"));
+llvm::cl::opt<string> cla_swiftThunkOutputDir(
+    "swift-thunk-output",
+    llvm::cl::desc("Directory to write Swift interop thunks "
+                   "(<Module>+NativeScript.swift)"),
     llvm::cl::value_desc("<dir_path>"));
 llvm::cl::opt<string> cla_swiftCoverageOutputDir(
     "swift-coverage-output",
@@ -352,19 +358,15 @@ int main(int argc, const char** argv)
 
           for (const auto& entry : swiftModules.modules) {
             const Swift::Module& module = entry.second;
-            if (!cla_outputDtsFolder.empty()) {
-              TypeScript::SwiftDefinitionWriter swiftWriter(module);
-              swiftFailed |= !writeFile(cla_outputDtsFolder,
-                                        "swift!" + module.name + ".d.ts",
-                                        swiftWriter.write());
-            }
             if (!cla_swiftIROutputDir.empty()) {
               swiftFailed |= !writeFile(cla_swiftIROutputDir,
                                         module.name + ".swift-ir.json",
                                         Swift::dumpModuleJSON(module));
             }
-            if (cla_swiftCoverageOutputDir.empty() &&
-                cla_swiftProbeOutputDir.empty()) {
+            if (cla_outputDtsFolder.empty() &&
+                cla_swiftCoverageOutputDir.empty() &&
+                cla_swiftProbeOutputDir.empty() &&
+                cla_swiftThunkOutputDir.empty()) {
               continue;
             }
             Swift::Classification classification;
@@ -410,10 +412,24 @@ int main(int argc, const char** argv)
             } else {
               classification = Swift::classify(module);
             }
+            if (!cla_outputDtsFolder.empty()) {
+              TypeScript::SwiftDefinitionWriter swiftWriter(module,
+                                                            classification);
+              swiftFailed |= !writeFile(cla_outputDtsFolder,
+                                        "swift!" + module.name + ".d.ts",
+                                        swiftWriter.write());
+            }
             if (!cla_swiftCoverageOutputDir.empty()) {
               swiftFailed |= !writeFile(
                   cla_swiftCoverageOutputDir, module.name + ".coverage.json",
                   Swift::coverageJSON(module, classification, compilerRuns));
+            }
+            if (!cla_swiftThunkOutputDir.empty()) {
+              Swift::ThunkSource thunks =
+                  Swift::emitThunks(module, classification);
+              swiftFailed |= !writeFile(cla_swiftThunkOutputDir,
+                                        module.name + "+NativeScript.swift",
+                                        thunks.source);
             }
             if (!cla_swiftProbeOutputDir.empty()) {
               Swift::ProbeSource probes =
