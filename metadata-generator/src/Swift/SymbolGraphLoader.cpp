@@ -12,6 +12,8 @@
 #include <set>
 #include <tuple>
 
+#include "FragmentTokens.h"
+
 namespace Swift {
 
 namespace {
@@ -67,132 +69,8 @@ bool isGraphFileName(llvm::StringRef fileName) {
 }
 
 // --- Declaration fragment parsing -------------------------------------------
-//
-// Symbol graphs carry most semantics (effects, settability, labels, failable
-// initializers, actor-ness) only inside `declarationFragments`, where
-// structural punctuation is mixed into "text" fragments (e.g. "?) -> ").
-// Text fragments are therefore split into single structural tokens before
-// parsing.
 
-struct Token {
-  enum class Type { Fragment, Punct, Space, Word, Arrow };
-  Type type;
-  // Fragment kind for Fragment tokens, "text" otherwise.
-  std::string kind;
-  std::string text;
-  std::string precise;
-
-  bool isPunct(char c) const {
-    return type == Type::Punct && text.size() == 1 && text[0] == c;
-  }
-  bool isFragment(llvm::StringRef fragmentKind) const {
-    return type == Type::Fragment && kind == fragmentKind;
-  }
-  bool isKeyword(llvm::StringRef keyword) const {
-    return isFragment("keyword") && text == keyword;
-  }
-};
-
-using Tokens = std::vector<Token>;
-
-Tokens tokenize(const Fragments& fragments) {
-  Tokens tokens;
-  for (const auto& fragment : fragments) {
-    // Custom attributes (global actors, property wrappers) arrive as an "@"
-    // fragment followed by the attribute type's name.
-    if (fragment.kind == "attribute" && !tokens.empty() &&
-        tokens.back().isFragment("attribute") && tokens.back().text == "@") {
-      tokens.back().text += fragment.spelling;
-      tokens.back().precise = fragment.preciseIdentifier;
-      continue;
-    }
-    if (fragment.kind != "text") {
-      tokens.push_back(Token{Token::Type::Fragment, fragment.kind,
-                             fragment.spelling, fragment.preciseIdentifier});
-      continue;
-    }
-
-    llvm::StringRef text = fragment.spelling;
-    // Some attributes arrive as plain text ("@backDeployed(before: iOS
-    // 17.0)\n", "@abi(func f(...))"). Only the name becomes the attribute
-    // token; its argument list is tokenized normally so consumeAttribute can
-    // match the parentheses, which may close in a later fragment.
-    if (text.ltrim().startswith("@")) {
-      llvm::StringRef rest = text.ltrim();
-      size_t nameEnd = 1;
-      while (nameEnd < rest.size() &&
-             (llvm::isAlnum(rest[nameEnd]) || rest[nameEnd] == '_')) {
-        nameEnd++;
-      }
-      tokens.push_back(Token{Token::Type::Fragment, "attribute",
-                             rest.take_front(nameEnd).str(), ""});
-      text = rest.drop_front(nameEnd);
-    }
-
-    size_t i = 0;
-    while (i < text.size()) {
-      char c = text[i];
-      if (llvm::isSpace(c)) {
-        size_t end = i;
-        while (end < text.size() && llvm::isSpace(text[end])) {
-          end++;
-        }
-        tokens.push_back(
-            Token{Token::Type::Space, "text", text.slice(i, end).str(), ""});
-        i = end;
-      } else if (text.substr(i).startswith("->")) {
-        tokens.push_back(Token{Token::Type::Arrow, "text", "->", ""});
-        i += 2;
-      } else if (llvm::StringRef("()[]<>,:?!={}&").contains(c)) {
-        tokens.push_back(
-            Token{Token::Type::Punct, "text", std::string(1, c), ""});
-        i++;
-      } else {
-        size_t end = i;
-        while (end < text.size() && !llvm::isSpace(text[end]) &&
-               !llvm::StringRef("()[]<>,:?!={}&").contains(text[end]) &&
-               !text.substr(end).startswith("->")) {
-          end++;
-        }
-        tokens.push_back(
-            Token{Token::Type::Word, "text", text.slice(i, end).str(), ""});
-        i = end;
-      }
-    }
-  }
-  return tokens;
-}
-
-bool opens(const Token& token) {
-  return token.isPunct('(') || token.isPunct('[') || token.isPunct('<');
-}
-
-bool closes(const Token& token) {
-  return token.isPunct(')') || token.isPunct(']') || token.isPunct('>');
-}
-
-TypeRef makeTypeRef(Tokens::const_iterator begin, Tokens::const_iterator end) {
-  while (begin != end && begin->type == Token::Type::Space) {
-    ++begin;
-  }
-  while (end != begin && std::prev(end)->type == Token::Type::Space) {
-    --end;
-  }
-
-  TypeRef type;
-  for (auto it = begin; it != end; ++it) {
-    type.spelling += it->text;
-    if (it->type == Token::Type::Fragment) {
-      type.fragments.push_back(Fragment{it->kind, it->text, it->precise});
-    } else if (!type.fragments.empty() &&
-               type.fragments.back().kind == "text") {
-      type.fragments.back().spelling += it->text;
-    } else {
-      type.fragments.push_back(Fragment{"text", it->text, ""});
-    }
-  }
-  return type;
-}
+using namespace FragmentTokens;
 
 bool isVoid(const TypeRef& type) {
   return type.spelling == "()" || type.spelling == "Void";
@@ -1291,9 +1169,20 @@ void SymbolGraphLoader::addBuffer(llvm::StringRef json,
     }
   };
 
+  // `<Declaring>@<Extended>.symbols.json`: graphs of cross-import overlays
+  // carry the overlay's name only in the file name.
+  std::string declaringModule = llvm::StringRef(path::filename(displayName))
+                                    .split('@')
+                                    .first.split('.')
+                                    .first.str();
+  if (declaringModule == moduleName) {
+    declaringModule.clear();
+  }
+
   forEachObject(symbolsText, "symbols", [&](const Object& object) {
     auto symbol = parseSymbol(object, displayName, _diagnostics);
     if (symbol) {
+      symbol->declaringModule = declaringModule;
       insertSymbol(module, std::move(*symbol), displayName);
     }
   });

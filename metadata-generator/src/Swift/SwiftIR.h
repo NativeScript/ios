@@ -193,6 +193,9 @@ struct Symbol {
   std::optional<SourceLocation> location;
   // Graph file the symbol was read from, relative to the scanned directory.
   std::string sourceGraph;
+  // Set when a cross-import overlay (`_SwiftData_SwiftUI`) rather than the
+  // module itself declares the symbol; code using it must import the overlay.
+  std::string declaringModule;
 
   // Resolved relationships.
   std::string parentId;

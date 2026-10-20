@@ -274,6 +274,7 @@ void writeSymbol(OStream& out, const Symbol& symbol) {
                                     std::to_string(symbol.location->character));
     }
     out.attribute("graph", symbol.sourceGraph);
+    writeNonEmpty(out, "declaringModule", symbol.declaringModule);
 
     writeNonEmpty(out, "parent", symbol.parentId);
     writeStringArray(out, "members", symbol.memberIds);

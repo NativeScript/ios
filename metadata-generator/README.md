@@ -64,6 +64,55 @@ Swift declarations are not callable from JavaScript yet, so the emitted
 `swift!<Module>.d.ts` is type-only: it names the module's top-level types and
 declares no members.
 
+### Capability classification and coverage
+
+Every declaration is classified into one tier, with machine-readable reasons
+for anything not generated (`src/Swift/CapabilityClassifier.h` lists the
+codes):
+
+| Tier | Meaning |
+|---|---|
+| `objc-direct` | Objective-C-visible (`c:` USR); served by the existing metadata runtime |
+| `swift-generated` | callable through a generated Swift thunk |
+| `swift-specialized` | needs an explicit generic specialization first |
+| `type-only` | representable in TypeScript, not callable (protocols, type aliases) |
+| `unsupported` | not bridgeable yet; `reasons` say why |
+| `not-applicable` | not an API surface (deinitializers, macros) |
+
+The generated surface currently bridges `Bool`, integer and floating-point
+types, `String`, optionals of those, module classes and actors (handles),
+module structs (boxed copies) and payload-less enums (case-name strings).
+
+`--swift-coverage-output <dir>` writes `<Module>.coverage.json`: counts per
+tier and kind, a histogram of reasons, and every symbol's classification.
+`effectiveCallable` counts what is callable through either the Objective-C
+runtime or a thunk.
+
+### Compiler verification
+
+Symbol graphs do not carry every fact a call needs (e.g. `~Copyable` is often
+invisible), so the generated surface can be checked by the Swift compiler.
+`--swift-probe-output <dir>` writes `<Module>.probe.swift`, which calls every
+generated declaration the way a thunk will, and a line map back to symbols.
+`--swift-verify` type-checks those probes, demotes every declaration the
+compiler rejects (`compiler-rejected:<message>`), and repeats until the probes
+type-check:
+
+```
+./objc-metadata-generator --skip-objc \
+	--swift-symbolgraph-dir <graphs> \
+	--swift-deployment-target 15.0 \
+	--swift-verify \
+	--swift-sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+	--swift-target arm64-apple-ios15.0-simulator \
+	--swift-search-path <dir containing the module's .swiftmodule> \
+	--swift-coverage-output <out_dir>
+```
+
+`--swift-deployment-target` sets the version availability decisions are made
+against; it defaults to the minimum version recorded in the graphs, which
+`swift-symbolgraph-extract` sets to the SDK version.
+
 ```
 ./objc-metadata-generator \
 	-output-typescript <out_dir> \
@@ -92,7 +141,9 @@ cmake --build build --target swift-symbolgraph-tests
 ./build/bin/swift-symbolgraph-tests Snapshot   # run tests whose name contains "Snapshot"
 ```
 
-`IRSnapshot` and `TypeScriptSnapshot` compare against
-`tests/swift/snapshots/`. After an intended output change, regenerate them with
+The snapshot tests (`IRSnapshot`, `TypeScriptSnapshot`, `CoverageSnapshot`,
+`ProbeSnapshot`) compare against `tests/swift/snapshots/`. `ProbesTypeCheck`
+and the `Verifier*` tests build the fixture module and run the Swift compiler;
+they are skipped when `xcrun` is unavailable. After an intended output change, regenerate them with
 `NS_UPDATE_SNAPSHOTS=1 ./build/bin/swift-symbolgraph-tests Snapshot` and review
 the diff.

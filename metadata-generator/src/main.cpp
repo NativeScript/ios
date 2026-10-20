@@ -2,6 +2,7 @@
 #include <clang/Tooling/Tooling.h>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/Debug.h>
+#include <llvm/Support/JSON.h>
 #include <llvm/Support/Path.h>
 #include <pwd.h>
 
@@ -18,6 +19,10 @@
 #include "Meta/Filters/ModulesBlacklist.h"
 #include "Meta/Filters/RemoveDuplicateMembersFilter.h"
 #include "Meta/Filters/ResolveGlobalNamesCollisionsFilter.h"
+#include "Swift/CapabilityClassifier.h"
+#include "Swift/CoverageReport.h"
+#include "Swift/ProbeEmitter.h"
+#include "Swift/ProbeVerifier.h"
 #include "Swift/SymbolGraphLoader.h"
 #include "TypeScript/DefinitionWriter.h"
 #include "TypeScript/DocSetManager.h"
@@ -47,6 +52,50 @@ llvm::cl::opt<string> cla_swiftIROutputDir(
     "swift-ir-output",
     llvm::cl::desc("Directory to write the Swift IR (<Module>.swift-ir.json) "
                    "for each imported module"),
+    llvm::cl::value_desc("<dir_path>"));
+llvm::cl::opt<string> cla_swiftDeploymentTarget(
+    "swift-deployment-target",
+    llvm::cl::desc("Deployment target (e.g. 15.0) for Swift availability "
+                   "decisions; defaults to the minimum version recorded in "
+                   "the symbol graphs"),
+    llvm::cl::value_desc("<version>"));
+llvm::cl::opt<bool> cla_swiftVerify(
+    "swift-verify",
+    llvm::cl::desc("Type-check the Swift-generated surface with the Swift "
+                   "compiler and demote every declaration it rejects"),
+    llvm::cl::init(false));
+llvm::cl::opt<string> cla_swiftCompiler(
+    "swift-compiler",
+    llvm::cl::desc("Swift compiler command for --swift-verify"),
+    llvm::cl::init("xcrun swiftc"));
+llvm::cl::opt<string> cla_swiftSDK(
+    "swift-sdk", llvm::cl::desc("SDK path for --swift-verify"),
+    llvm::cl::value_desc("<path>"));
+llvm::cl::opt<string> cla_swiftTarget(
+    "swift-target", llvm::cl::desc("Target triple for --swift-verify"),
+    llvm::cl::value_desc("<triple>"));
+llvm::cl::list<string> cla_swiftSearchPaths(
+    "swift-search-path",
+    llvm::cl::desc("Module search path (-I) for --swift-verify"),
+    llvm::cl::value_desc("<dir_path>"));
+llvm::cl::list<string> cla_swiftFrameworkSearchPaths(
+    "swift-framework-search-path",
+    llvm::cl::desc("Framework search path (-F) for --swift-verify"),
+    llvm::cl::value_desc("<dir_path>"));
+llvm::cl::opt<string> cla_swiftWorkDir(
+    "swift-work-dir",
+    llvm::cl::desc("Scratch directory for --swift-verify (default: a "
+                   "temporary directory)"),
+    llvm::cl::value_desc("<dir_path>"));
+llvm::cl::opt<string> cla_swiftCoverageOutputDir(
+    "swift-coverage-output",
+    llvm::cl::desc("Directory to write Swift coverage reports "
+                   "(<Module>.coverage.json)"),
+    llvm::cl::value_desc("<dir_path>"));
+llvm::cl::opt<string> cla_swiftProbeOutputDir(
+    "swift-probe-output",
+    llvm::cl::desc("Directory to write compiler-validation probes "
+                   "(<Module>.probe.swift and <Module>.probe-map.json)"),
     llvm::cl::value_desc("<dir_path>"));
 
 class MetaGenerationConsumer : public clang::ASTConsumer {
@@ -282,6 +331,25 @@ int main(int argc, const char** argv)
             return true;
           };
 
+          if (!cla_swiftDeploymentTarget.empty()) {
+            Swift::Version target;
+            llvm::StringRef rest = cla_swiftDeploymentTarget.getValue();
+            auto major = rest.split('.');
+            auto minor = major.second.split('.');
+            if (major.first.getAsInteger(10, target.major) ||
+                (!minor.first.empty() &&
+                 minor.first.getAsInteger(10, target.minor)) ||
+                (!minor.second.empty() &&
+                 minor.second.getAsInteger(10, target.patch))) {
+              std::cerr << "error: invalid --swift-deployment-target '"
+                        << cla_swiftDeploymentTarget << "'" << std::endl;
+              return 1;
+            }
+            for (auto& entry : swiftModules.modules) {
+              entry.second.platform.minimumVersion = target;
+            }
+          }
+
           for (const auto& entry : swiftModules.modules) {
             const Swift::Module& module = entry.second;
             if (!cla_outputDtsFolder.empty()) {
@@ -294,6 +362,77 @@ int main(int argc, const char** argv)
               swiftFailed |= !writeFile(cla_swiftIROutputDir,
                                         module.name + ".swift-ir.json",
                                         Swift::dumpModuleJSON(module));
+            }
+            if (cla_swiftCoverageOutputDir.empty() &&
+                cla_swiftProbeOutputDir.empty()) {
+              continue;
+            }
+            Swift::Classification classification;
+            int compilerRuns = -1;
+            if (cla_swiftVerify) {
+              Swift::VerifyOptions options;
+              options.compiler.clear();
+              llvm::SmallVector<llvm::StringRef, 4> words;
+              llvm::StringRef(cla_swiftCompiler).split(words, ' ', -1, false);
+              for (auto word : words) {
+                options.compiler.push_back(word.str());
+              }
+              options.sdk = cla_swiftSDK;
+              options.target = cla_swiftTarget;
+              options.searchPaths.assign(cla_swiftSearchPaths.begin(),
+                                         cla_swiftSearchPaths.end());
+              options.frameworkSearchPaths.assign(
+                  cla_swiftFrameworkSearchPaths.begin(),
+                  cla_swiftFrameworkSearchPaths.end());
+              options.workDirectory = cla_swiftWorkDir;
+              if (options.workDirectory.empty()) {
+                llvm::SmallString<128> temporary;
+                llvm::sys::fs::createUniqueDirectory("ns-swift-verify",
+                                                     temporary);
+                options.workDirectory = temporary.str().str();
+              }
+              Swift::VerifyResult verified =
+                  Swift::verifyWithCompiler(module, options);
+              if (!verified.failure.empty()) {
+                std::cerr << "error: swift [verification-failed] "
+                          << module.name << ": " << verified.failure
+                          << std::endl;
+                swiftFailed = true;
+                continue;
+              }
+              for (const auto& rejection : verified.rejections) {
+                std::cerr << "warning: swift [compiler-rejected] "
+                          << module.name << " (" << rejection.first
+                          << "): " << rejection.second << std::endl;
+              }
+              classification = std::move(verified.classification);
+              compilerRuns = verified.compilerRuns;
+            } else {
+              classification = Swift::classify(module);
+            }
+            if (!cla_swiftCoverageOutputDir.empty()) {
+              swiftFailed |= !writeFile(
+                  cla_swiftCoverageOutputDir, module.name + ".coverage.json",
+                  Swift::coverageJSON(module, classification, compilerRuns));
+            }
+            if (!cla_swiftProbeOutputDir.empty()) {
+              Swift::ProbeSource probes =
+                  Swift::emitProbes(module, classification);
+              std::string map;
+              llvm::raw_string_ostream mapStream(map);
+              llvm::json::OStream mapJSON(mapStream, 2);
+              mapJSON.object([&] {
+                for (const auto& line : probes.lineToSymbol) {
+                  mapJSON.attribute(std::to_string(line.first), line.second);
+                }
+              });
+              mapStream << "\n";
+              mapStream.flush();
+              swiftFailed |=
+                  !writeFile(cla_swiftProbeOutputDir,
+                             module.name + ".probe.swift", probes.source);
+              swiftFailed |= !writeFile(cla_swiftProbeOutputDir,
+                                        module.name + ".probe-map.json", map);
             }
           }
         }

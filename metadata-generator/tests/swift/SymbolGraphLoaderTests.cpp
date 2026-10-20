@@ -9,62 +9,13 @@
 
 #include "Swift/SymbolGraphLoader.h"
 #include "TestHarness.h"
+#include "TestSupport.h"
 #include "TypeScript/SwiftDefinitionWriter.h"
 
 using namespace Swift;
+using namespace TestSupport;
 
 namespace {
-
-const ModuleSet& fixture() {
-  static ModuleSet set = loadSymbolGraphDirectory(SWIFT_FIXTURE_GRAPHS_DIR);
-  return set;
-}
-
-const Module& demo() {
-  static const Module empty;
-  auto it = fixture().modules.find("SwiftDemo");
-  return it == fixture().modules.end() ? empty : it->second;
-}
-
-std::vector<const Symbol*> symbolsAt(const Module& module,
-                                     const std::string& path) {
-  std::vector<const Symbol*> result;
-  for (const auto& entry : module.symbols) {
-    if (llvm::join(entry.second.pathComponents, ".") == path) {
-      result.push_back(&entry.second);
-    }
-  }
-  return result;
-}
-
-const Symbol* symbolAt(const Module& module, const std::string& path) {
-  auto symbols = symbolsAt(module, path);
-  return symbols.size() == 1 ? symbols.front() : nullptr;
-}
-
-std::vector<std::string> memberNames(const Module& module,
-                                     const Symbol& symbol) {
-  std::vector<std::string> names;
-  for (const auto& id : symbol.memberIds) {
-    if (const Symbol* member = module.find(id)) {
-      names.push_back(member->name);
-    }
-  }
-  return names;
-}
-
-bool contains(const std::vector<std::string>& values,
-              const std::string& value) {
-  return std::find(values.begin(), values.end(), value) != values.end();
-}
-
-std::string diagnosticCodes(const std::vector<Diagnostic>& diagnostics) {
-  std::vector<std::string> codes;
-  for (const auto& diagnostic : diagnostics) {
-    codes.push_back(diagnostic.code + "(" + diagnostic.message + ")");
-  }
-  return llvm::join(codes, ", ");
-}
 
 ModuleSet loadBuffers(
     const std::vector<std::pair<std::string, std::string>>& buffers) {
@@ -98,44 +49,11 @@ std::string symbolJSON(const std::string& id, const std::string& kind,
     rest = split.second;
   }
   path += "\"" + name + "\"";
-  return R"({"kind":{"identifier":")" + kind + R"("},"identifier":{"precise":")" +
-         id + R"("},"pathComponents":[)" + path +
+  return R"({"kind":{"identifier":")" + kind +
+         R"("},"identifier":{"precise":")" + id + R"("},"pathComponents":[)" +
+         path +
          R"(],"names":{"title":"x"},"accessLevel":"public","declarationFragments":[)" +
          declaration + "]}";
-}
-
-// Compares `actual` against a checked-in snapshot. NS_UPDATE_SNAPSHOTS=1
-// rewrites the snapshot instead.
-void checkSnapshot(const std::string& fileName, const std::string& actual) {
-  llvm::SmallString<256> snapshotPath(SWIFT_SNAPSHOT_DIR);
-  llvm::sys::path::append(snapshotPath, fileName);
-
-  if (const char* update = std::getenv("NS_UPDATE_SNAPSHOTS");
-      update && *update == '1') {
-    std::error_code error;
-    llvm::raw_fd_ostream out(snapshotPath, error, llvm::sys::fs::OF_Text);
-    REQUIRE(!error);
-    out << actual;
-    return;
-  }
-
-  auto expected = llvm::MemoryBuffer::getFile(snapshotPath, /*IsText*/ true);
-  if (!expected) {
-    TestHarness::fail(__FILE__, __LINE__,
-                      "missing snapshot " + snapshotPath.str().str() +
-                          " (run with NS_UPDATE_SNAPSHOTS=1)");
-    return;
-  }
-  if ((*expected)->getBuffer() != actual) {
-    llvm::SmallString<256> actualPath(snapshotPath);
-    actualPath += ".actual";
-    std::error_code error;
-    llvm::raw_fd_ostream out(actualPath, error, llvm::sys::fs::OF_Text);
-    out << actual;
-    TestHarness::fail(__FILE__, __LINE__,
-                      "snapshot mismatch: diff " + snapshotPath.str().str() +
-                          " " + actualPath.str().str());
-  }
 }
 
 }  // namespace
@@ -632,10 +550,11 @@ TEST(AsyncImportVariantsAreBothKept) {
                              R"(","target":"c:objc(cs)Mini"})";
 
   for (bool asyncFirst : {false, true}) {
-    std::string symbols = type + "," + (asyncFirst ? async + "," + callback
-                                                   : callback + "," + async);
-    ModuleSet set = loadBuffers(
-        {{"mini.symbols.json", graphJSON(symbols, relationship)}});
+    std::string symbols =
+        type + "," +
+        (asyncFirst ? async + "," + callback : callback + "," + async);
+    ModuleSet set =
+        loadBuffers({{"mini.symbols.json", graphJSON(symbols, relationship)}});
     CHECK_EQ(diagnosticCodes(set.diagnostics), std::string());
     REQUIRE(set.modules.count("Mini"));
     const Module& module = set.modules.at("Mini");
@@ -668,7 +587,8 @@ TEST(SubclassRedeclarationsAreKeyedByOwner) {
             accessors + R"json({"kind":"text","spelling":" }"})json",
         owner);
   };
-  std::string base = subscript("NSArray", R"json({"kind":"keyword","spelling":"get"},)json");
+  std::string base =
+      subscript("NSArray", R"json({"kind":"keyword","spelling":"get"},)json");
   std::string mutableVariant = subscript(
       "NSMutableArray",
       R"json({"kind":"keyword","spelling":"get"},{"kind":"text","spelling":" "},{"kind":"keyword","spelling":"set"},)json");
@@ -681,8 +601,8 @@ TEST(SubclassRedeclarationsAreKeyedByOwner) {
     std::string symbols = type("NSArray") + "," + type("NSMutableArray") + "," +
                           (mutableFirst ? mutableVariant + "," + base
                                         : base + "," + mutableVariant);
-    ModuleSet set = loadBuffers(
-        {{"mini.symbols.json", graphJSON(symbols, relationships)}});
+    ModuleSet set =
+        loadBuffers({{"mini.symbols.json", graphJSON(symbols, relationships)}});
     CHECK_EQ(diagnosticCodes(set.diagnostics), std::string());
     REQUIRE(set.modules.count("Mini"));
     const Module& module = set.modules.at("Mini");
@@ -723,8 +643,9 @@ TEST(SkimmerHandlesStringsAndNesting) {
   std::string symbol = symbolJSON(
       "s:4Mini1fyyF", "swift.func", "f()",
       R"json({"kind":"keyword","spelling":"func"},{"kind":"text","spelling":" "},{"kind":"identifier","spelling":"f"},{"kind":"text","spelling":"()"})json");
-  symbol.insert(symbol.size() - 1,
-                R"json(,"docComment":{"lines":[{"text":"a } ] { [ \"quoted\" \\"}]})json");
+  symbol.insert(
+      symbol.size() - 1,
+      R"json(,"docComment":{"lines":[{"text":"a } ] { [ \"quoted\" \\"}]})json");
   ModuleSet set = loadBuffers({{"mini.symbols.json", graphJSON(symbol, "")}});
   CHECK_EQ(diagnosticCodes(set.diagnostics), std::string());
   REQUIRE(set.modules.count("Mini"));
@@ -753,8 +674,4 @@ TEST(MissingDirectoryIsAnError) {
       loadSymbolGraphDirectory(SWIFT_FIXTURE_GRAPHS_DIR "/does-not-exist");
   CHECK(set.hasErrors());
   CHECK_EQ(set.diagnostics[0].code, std::string("missing-directory"));
-}
-
-int main(int argc, char** argv) {
-  return TestHarness::runAll(argc > 1 ? argv[1] : "");
 }

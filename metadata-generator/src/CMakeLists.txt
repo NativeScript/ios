@@ -37,6 +37,13 @@ set(GENERATOR_HEADERS
     Yaml/YamlSerializer.h
     
     # Swift support
+    Swift/CapabilityClassifier.h
+    Swift/CoverageReport.h
+    Swift/FragmentTokens.h
+    Swift/ProbeEmitter.h
+    Swift/ProbeVerifier.h
+    Swift/SwiftSource.h
+    Swift/SwiftTypes.h
     Swift/SwiftIR.h
     Swift/SymbolGraphLoader.h
     TypeScript/SwiftDefinitionWriter.h
@@ -70,6 +77,13 @@ set(GENERATOR_SOURCES
     Utils/memoryStream.cpp
     
     # Swift support
+    Swift/CapabilityClassifier.cpp
+    Swift/CoverageReport.cpp
+    Swift/FragmentTokens.cpp
+    Swift/ProbeEmitter.cpp
+    Swift/ProbeVerifier.cpp
+    Swift/SwiftSource.cpp
+    Swift/SwiftTypes.cpp
     Swift/SwiftIR.cpp
     Swift/SymbolGraphLoader.cpp
     TypeScript/SwiftDefinitionWriter.cpp

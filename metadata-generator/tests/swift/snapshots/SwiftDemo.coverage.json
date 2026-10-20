@@ -1,0 +1,1022 @@
+{
+  "module": "SwiftDemo",
+  "totals": {
+    "declarations": {
+      "total": 95,
+      "objc-direct": 0,
+      "swift-generated": 52,
+      "swift-specialized": 5,
+      "type-only": 6,
+      "unsupported": 32,
+      "not-applicable": 0
+    },
+    "callable": {
+      "total": 80,
+      "objc-direct": 0,
+      "swift-generated": 43,
+      "swift-specialized": 5,
+      "type-only": 3,
+      "unsupported": 29,
+      "not-applicable": 0
+    },
+    "effectiveCallable": 43,
+    "compilerVerified": false,
+    "compiledThunks": null,
+    "runtimeTested": null
+  },
+  "byKind": {
+    "actor": {
+      "total": 1,
+      "objc-direct": 0,
+      "swift-generated": 1,
+      "swift-specialized": 0,
+      "type-only": 0,
+      "unsupported": 0,
+      "not-applicable": 0
+    },
+    "class": {
+      "total": 5,
+      "objc-direct": 0,
+      "swift-generated": 5,
+      "swift-specialized": 0,
+      "type-only": 0,
+      "unsupported": 0,
+      "not-applicable": 0
+    },
+    "enum": {
+      "total": 3,
+      "objc-direct": 0,
+      "swift-generated": 1,
+      "swift-specialized": 0,
+      "type-only": 0,
+      "unsupported": 2,
+      "not-applicable": 0
+    },
+    "enumCase": {
+      "total": 8,
+      "objc-direct": 0,
+      "swift-generated": 2,
+      "swift-specialized": 0,
+      "type-only": 0,
+      "unsupported": 6,
+      "not-applicable": 0
+    },
+    "function": {
+      "total": 1,
+      "objc-direct": 0,
+      "swift-generated": 1,
+      "swift-specialized": 0,
+      "type-only": 0,
+      "unsupported": 0,
+      "not-applicable": 0
+    },
+    "initializer": {
+      "total": 11,
+      "objc-direct": 0,
+      "swift-generated": 9,
+      "swift-specialized": 0,
+      "type-only": 0,
+      "unsupported": 2,
+      "not-applicable": 0
+    },
+    "instanceMethod": {
+      "total": 31,
+      "objc-direct": 0,
+      "swift-generated": 12,
+      "swift-specialized": 5,
+      "type-only": 1,
+      "unsupported": 13,
+      "not-applicable": 0
+    },
+    "instanceProperty": {
+      "total": 18,
+      "objc-direct": 0,
+      "swift-generated": 12,
+      "swift-specialized": 0,
+      "type-only": 1,
+      "unsupported": 5,
+      "not-applicable": 0
+    },
+    "instanceSubscript": {
+      "total": 1,
+      "objc-direct": 0,
+      "swift-generated": 0,
+      "swift-specialized": 0,
+      "type-only": 0,
+      "unsupported": 1,
+      "not-applicable": 0
+    },
+    "operator": {
+      "total": 2,
+      "objc-direct": 0,
+      "swift-generated": 0,
+      "swift-specialized": 0,
+      "type-only": 0,
+      "unsupported": 2,
+      "not-applicable": 0
+    },
+    "protocol": {
+      "total": 2,
+      "objc-direct": 0,
+      "swift-generated": 0,
+      "swift-specialized": 0,
+      "type-only": 2,
+      "unsupported": 0,
+      "not-applicable": 0
+    },
+    "struct": {
+      "total": 3,
+      "objc-direct": 0,
+      "swift-generated": 2,
+      "swift-specialized": 0,
+      "type-only": 0,
+      "unsupported": 1,
+      "not-applicable": 0
+    },
+    "typeAlias": {
+      "total": 1,
+      "objc-direct": 0,
+      "swift-generated": 0,
+      "swift-specialized": 0,
+      "type-only": 1,
+      "unsupported": 0,
+      "not-applicable": 0
+    },
+    "typeMethod": {
+      "total": 2,
+      "objc-direct": 0,
+      "swift-generated": 2,
+      "swift-specialized": 0,
+      "type-only": 0,
+      "unsupported": 0,
+      "not-applicable": 0
+    },
+    "typeProperty": {
+      "total": 4,
+      "objc-direct": 0,
+      "swift-generated": 3,
+      "swift-specialized": 0,
+      "type-only": 1,
+      "unsupported": 0,
+      "not-applicable": 0
+    },
+    "variable": {
+      "total": 2,
+      "objc-direct": 0,
+      "swift-generated": 2,
+      "swift-specialized": 0,
+      "type-only": 0,
+      "unsupported": 0,
+      "not-applicable": 0
+    }
+  },
+  "reasons": {
+    "actor-isolated": 2,
+    "async": 2,
+    "closure": 4,
+    "collection": 1,
+    "enum-associated-values": 2,
+    "external-type-extension": 2,
+    "generic": 5,
+    "inout-parameter": 2,
+    "main-actor": 2,
+    "nested-type": 1,
+    "operator": 2,
+    "owner-not-bridged": 10,
+    "subscript": 1,
+    "unbridged-type": 3
+  },
+  "symbols": [
+    {
+      "id": "s:9SwiftDemo0B0C",
+      "path": "Demo",
+      "kind": "class",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Demo.swift:5"
+    },
+    {
+      "id": "s:9SwiftDemo0B0C5greet4name5timesS2S_SitF",
+      "path": "Demo.greet(name:times:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "greet",
+      "location": "file://Sources/SwiftDemo/Extensions.swift:2"
+    },
+    {
+      "id": "s:9SwiftDemo0B0C5greet4nameS2S_tF",
+      "path": "Demo.greet(name:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "greet",
+      "location": "file://Sources/SwiftDemo/Demo.swift:7"
+    },
+    {
+      "id": "s:9SwiftDemo0B0C7versionSSvpZ",
+      "path": "Demo.version",
+      "kind": "typeProperty",
+      "tier": "swift-generated",
+      "jsName": "version",
+      "location": "file://Sources/SwiftDemo/Extensions.swift:6"
+    },
+    {
+      "id": "s:9SwiftDemo0B0CACycfc",
+      "path": "Demo.init()",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Demo.swift:6"
+    },
+    {
+      "id": "s:9SwiftDemo10ShapeErrorO",
+      "path": "ShapeError",
+      "kind": "enum",
+      "tier": "unsupported",
+      "reasons": [
+        "enum-associated-values"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:50"
+    },
+    {
+      "id": "s:9SwiftDemo10ShapeErrorO11invalidSideyACSdcACmF",
+      "path": "ShapeError.invalidSide(_:)",
+      "kind": "enumCase",
+      "tier": "unsupported",
+      "reasons": [
+        "owner-not-bridged"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:51"
+    },
+    {
+      "id": "s:9SwiftDemo10ShapeErrorO12tooManySidesyACSi_SitcACmF",
+      "path": "ShapeError.tooManySides(count:limit:)",
+      "kind": "enumCase",
+      "tier": "unsupported",
+      "reasons": [
+        "owner-not-bridged"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:52"
+    },
+    {
+      "id": "s:9SwiftDemo10ShapeErrorO7unknownyA2CmF",
+      "path": "ShapeError.unknown",
+      "kind": "enumCase",
+      "tier": "unsupported",
+      "reasons": [
+        "owner-not-bridged"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:53"
+    },
+    {
+      "id": "s:9SwiftDemo11Coordinatesa",
+      "path": "Coordinates",
+      "kind": "typeAlias",
+      "tier": "type-only",
+      "reasons": [
+        "type-alias"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:137"
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO",
+      "path": "Measurement",
+      "kind": "enum",
+      "tier": "unsupported",
+      "reasons": [
+        "enum-associated-values"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:56"
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO4UnitV",
+      "path": "Measurement.Unit",
+      "kind": "struct",
+      "tier": "unsupported",
+      "reasons": [
+        "nested-type"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:61"
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO4UnitV6symbolAESS_tcfc",
+      "path": "Measurement.Unit.init(symbol:)",
+      "kind": "initializer",
+      "tier": "unsupported",
+      "reasons": [
+        "owner-not-bridged"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:63"
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO4UnitV6symbolSSvp",
+      "path": "Measurement.Unit.symbol",
+      "kind": "instanceProperty",
+      "tier": "unsupported",
+      "reasons": [
+        "owner-not-bridged"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:62"
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO4areayACSd_SdtcACmF",
+      "path": "Measurement.area(width:height:)",
+      "kind": "enumCase",
+      "tier": "unsupported",
+      "reasons": [
+        "owner-not-bridged"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:58"
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO4noneyA2CmF",
+      "path": "Measurement.none",
+      "kind": "enumCase",
+      "tier": "unsupported",
+      "reasons": [
+        "owner-not-bridged"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:59"
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO6isNoneSbvp",
+      "path": "Measurement.isNone",
+      "kind": "instanceProperty",
+      "tier": "unsupported",
+      "reasons": [
+        "owner-not-bridged"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:66"
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO6lengthyACSdcACmF",
+      "path": "Measurement.length(_:)",
+      "kind": "enumCase",
+      "tier": "unsupported",
+      "reasons": [
+        "owner-not-bridged"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:57"
+    },
+    {
+      "id": "s:9SwiftDemo13defaultFlavorAA0D0Ovp",
+      "path": "defaultFlavor",
+      "kind": "variable",
+      "tier": "swift-generated",
+      "jsName": "defaultFlavor",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:135"
+    },
+    {
+      "id": "s:9SwiftDemo13globalCounterSivp",
+      "path": "globalCounter",
+      "kind": "variable",
+      "tier": "swift-generated",
+      "jsName": "globalCounter",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:136"
+    },
+    {
+      "id": "s:9SwiftDemo16makeDefaultPointAA0E0VyF",
+      "path": "makeDefaultPoint()",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "makeDefaultPoint",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:134"
+    },
+    {
+      "id": "s:9SwiftDemo4RingV",
+      "path": "Ring",
+      "kind": "struct",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:72"
+    },
+    {
+      "id": "s:9SwiftDemo4RingV1poiyA2C_ACtFZ",
+      "path": "Ring.+(_:_:)",
+      "kind": "operator",
+      "tier": "unsupported",
+      "reasons": [
+        "operator"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:86"
+    },
+    {
+      "id": "s:9SwiftDemo4RingV5inner5outerAcA5PointV_AGtcfc",
+      "path": "Ring.init(inner:outer:)",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:76"
+    },
+    {
+      "id": "s:9SwiftDemo4RingV5innerAA5PointVvp",
+      "path": "Ring.inner",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "inner",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:73"
+    },
+    {
+      "id": "s:9SwiftDemo4RingV5outerAA5PointVvp",
+      "path": "Ring.outer",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "outer",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:74"
+    },
+    {
+      "id": "s:9SwiftDemo4RingV6expand2byySd_tF",
+      "path": "Ring.expand(by:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "expand",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:81"
+    },
+    {
+      "id": "s:9SwiftDemo5PointV",
+      "path": "Point",
+      "kind": "struct",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Demo.swift:10"
+    },
+    {
+      "id": "s:9SwiftDemo5PointV11descriptionSSvp",
+      "path": "Point.description",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "description",
+      "location": "file://Sources/SwiftDemo/Extensions.swift:10"
+    },
+    {
+      "id": "s:9SwiftDemo5PointV1x1yACSd_Sdtcfc",
+      "path": "Point.init(x:y:)",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Demo.swift:13"
+    },
+    {
+      "id": "s:9SwiftDemo5PointV1xSdvp",
+      "path": "Point.x",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "x",
+      "location": "file://Sources/SwiftDemo/Demo.swift:11"
+    },
+    {
+      "id": "s:9SwiftDemo5PointV1ySdvp",
+      "path": "Point.y",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "y",
+      "location": "file://Sources/SwiftDemo/Demo.swift:12"
+    },
+    {
+      "id": "s:9SwiftDemo5PointV6lengthSdvp",
+      "path": "Point.length",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "length",
+      "location": "file://Sources/SwiftDemo/Extensions.swift:11"
+    },
+    {
+      "id": "s:9SwiftDemo5ShapeP",
+      "path": "Shape",
+      "kind": "protocol",
+      "tier": "type-only",
+      "reasons": [
+        "protocol"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:3"
+    },
+    {
+      "id": "s:9SwiftDemo5ShapeP4areaSdvp",
+      "path": "Shape.area",
+      "kind": "instanceProperty",
+      "tier": "type-only",
+      "reasons": [
+        "protocol-requirement"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:4"
+    },
+    {
+      "id": "s:9SwiftDemo5ShapeP5sidesSivpZ",
+      "path": "Shape.sides",
+      "kind": "typeProperty",
+      "tier": "type-only",
+      "reasons": [
+        "protocol-requirement"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:5"
+    },
+    {
+      "id": "s:9SwiftDemo6CanvasC",
+      "path": "Canvas",
+      "kind": "class",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:102"
+    },
+    {
+      "id": "s:9SwiftDemo6CanvasC4drawyyAA5Shape_pF",
+      "path": "Canvas.draw(_:)",
+      "kind": "instanceMethod",
+      "tier": "unsupported",
+      "reasons": [
+        "main-actor"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:104"
+    },
+    {
+      "id": "s:9SwiftDemo6CanvasCACycfc",
+      "path": "Canvas.init()",
+      "kind": "initializer",
+      "tier": "unsupported",
+      "reasons": [
+        "main-actor"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:103"
+    },
+    {
+      "id": "s:9SwiftDemo6FlavorO",
+      "path": "Flavor",
+      "kind": "enum",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Demo.swift:16"
+    },
+    {
+      "id": "s:9SwiftDemo6FlavorO11descriptionSSvp",
+      "path": "Flavor.description",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "description",
+      "location": "file://Sources/SwiftDemo/Extensions.swift:15"
+    },
+    {
+      "id": "s:9SwiftDemo6FlavorO7vanillayA2CmF",
+      "path": "Flavor.vanilla",
+      "kind": "enumCase",
+      "tier": "swift-generated",
+      "jsName": "vanilla",
+      "location": "file://Sources/SwiftDemo/Demo.swift:16"
+    },
+    {
+      "id": "s:9SwiftDemo6FlavorO8rawValueACSgSi_tcfc",
+      "path": "Flavor.init(rawValue:)",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor"
+    },
+    {
+      "id": "s:9SwiftDemo6FlavorO9chocolateyA2CmF",
+      "path": "Flavor.chocolate",
+      "kind": "enumCase",
+      "tier": "swift-generated",
+      "jsName": "chocolate",
+      "location": "file://Sources/SwiftDemo/Demo.swift:16"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC",
+      "path": "Loader",
+      "kind": "class",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:107"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC10modernOnlyyyF",
+      "path": "Loader.modernOnly()",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "modernOnly",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:125"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC11legacyFetchyyF",
+      "path": "Loader.legacyFetch()",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "legacyFetch",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:128"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC14withCompletionyyys6ResultOySSAA10ShapeErrorOGcF",
+      "path": "Loader.withCompletion(_:)",
+      "kind": "instanceMethod",
+      "tier": "unsupported",
+      "reasons": [
+        "closure"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:117"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC4eachyyySiXEF",
+      "path": "Loader.each(_:)",
+      "kind": "instanceMethod",
+      "tier": "unsupported",
+      "reasons": [
+        "closure"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:118"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC4load4path10Foundation4DataVSS_tKF",
+      "path": "Loader.load(path:)",
+      "kind": "instanceMethod",
+      "tier": "unsupported",
+      "reasons": [
+        "unbridged-type:Foundation.Data"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:110"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC4wait7secondsySd_tYaF",
+      "path": "Loader.wait(seconds:)",
+      "kind": "instanceMethod",
+      "tier": "unsupported",
+      "reasons": [
+        "async"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:112"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC5fetch3urlSS10Foundation3URLV_tYaKF",
+      "path": "Loader.fetch(url:)",
+      "kind": "instanceMethod",
+      "tier": "unsupported",
+      "reasons": [
+        "async"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:111"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC5first2ofxSgSayxG_tlF",
+      "path": "Loader.first(of:)",
+      "kind": "instanceMethod",
+      "tier": "swift-specialized",
+      "reasons": [
+        "generic"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:115"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC6lookup5table3keySiSgSDySSSiG_SStF",
+      "path": "Loader.lookup(table:key:)",
+      "kind": "instanceMethod",
+      "tier": "unsupported",
+      "reasons": [
+        "collection"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:120"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC6updateyyAA5PointVzF",
+      "path": "Loader.update(_:)",
+      "kind": "instanceMethod",
+      "tier": "unsupported",
+      "reasons": [
+        "inout-parameter"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:122"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC8oldFetchyyF",
+      "path": "Loader.oldFetch()",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "oldFetch",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:131"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC9transformyxxAA5ShapeRzlF",
+      "path": "Loader.transform(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-specialized",
+      "reasons": [
+        "generic"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:114"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderCACycfc",
+      "path": "Loader.init()",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:108"
+    },
+    {
+      "id": "s:9SwiftDemo6SquareC",
+      "path": "Square",
+      "kind": "class",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:35"
+    },
+    {
+      "id": "s:9SwiftDemo6SquareC4areaSdvp",
+      "path": "Square.area",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "area",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:43"
+    },
+    {
+      "id": "s:9SwiftDemo6SquareC4sideACSd_tcfc",
+      "path": "Square.init(side:)",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:38"
+    },
+    {
+      "id": "s:9SwiftDemo6SquareC4sideSdvp",
+      "path": "Square.side",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "side",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:36"
+    },
+    {
+      "id": "s:9SwiftDemo6SquareC5greet4nameS2S_tF",
+      "path": "Square.greet(name:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "greet",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:45"
+    },
+    {
+      "id": "s:9SwiftDemo6SquareC5scale2byySd_tF",
+      "path": "Square.scale(by:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "scale",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:47"
+    },
+    {
+      "id": "s:9SwiftDemo6SquareC5sidesSivpZ",
+      "path": "Square.sides",
+      "kind": "typeProperty",
+      "tier": "swift-generated",
+      "jsName": "sides",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:44"
+    },
+    {
+      "id": "s:9SwiftDemo7CounterC",
+      "path": "Counter",
+      "kind": "actor",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:91"
+    },
+    {
+      "id": "s:9SwiftDemo7CounterC5labelSSyF",
+      "path": "Counter.label()",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "label",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:98"
+    },
+    {
+      "id": "s:9SwiftDemo7CounterC5valueSivp",
+      "path": "Counter.value",
+      "kind": "instanceProperty",
+      "tier": "unsupported",
+      "reasons": [
+        "actor-isolated"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:92"
+    },
+    {
+      "id": "s:9SwiftDemo7CounterC9incrementSiyF",
+      "path": "Counter.increment()",
+      "kind": "instanceMethod",
+      "tier": "unsupported",
+      "reasons": [
+        "actor-isolated"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:94"
+    },
+    {
+      "id": "s:9SwiftDemo7CounterCACycfc",
+      "path": "Counter.init()",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:93"
+    },
+    {
+      "id": "s:9SwiftDemo7GreeterP",
+      "path": "Greeter",
+      "kind": "protocol",
+      "tier": "type-only",
+      "reasons": [
+        "protocol"
+      ],
+      "location": "file://Sources/SwiftDemo/Demo.swift:1"
+    },
+    {
+      "id": "s:9SwiftDemo7GreeterP5greet4nameS2S_tF",
+      "path": "Greeter.greet(name:)",
+      "kind": "instanceMethod",
+      "tier": "type-only",
+      "reasons": [
+        "protocol-requirement"
+      ],
+      "location": "file://Sources/SwiftDemo/Demo.swift:2"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC",
+      "path": "Polygon",
+      "kind": "class",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:8"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC11vertexCountSivp",
+      "path": "Polygon.vertexCount",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "vertexCount",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:10"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC4makeACyFZ",
+      "path": "Polygon.make()",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "make",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:27"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC4name11vertexCountACSS_Sitcfc",
+      "path": "Polygon.init(name:vertexCount:)",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:13"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC4nameACSgSS_tcfc",
+      "path": "Polygon.init(name:)",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:18"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC4nameSSvp",
+      "path": "Polygon.name",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "name",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:9"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC5scale1x1yySd_SdtF",
+      "path": "Polygon.scale(x:y:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "scale",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:25"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC5scale2byySd_tF",
+      "path": "Polygon.scale(by:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "scale",
+      "ambiguousOverload": true,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:23"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC5scale2byySi_tF",
+      "path": "Polygon.scale(by:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "scale",
+      "ambiguousOverload": true,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:24"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC6sharedACvpZ",
+      "path": "Polygon.shared",
+      "kind": "typeProperty",
+      "tier": "swift-generated",
+      "jsName": "shared",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:11"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC8describeySSACSgFZ",
+      "path": "Polygon.describe(_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "describe",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:28"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonCyAA5PointVSicip",
+      "path": "Polygon.subscript(_:)",
+      "kind": "instanceSubscript",
+      "tier": "unsupported",
+      "reasons": [
+        "subscript"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:30"
+    },
+    {
+      "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo6FlavorO",
+      "path": "Flavor.!=(_:_:)",
+      "kind": "operator",
+      "tier": "unsupported",
+      "reasons": [
+        "operator"
+      ]
+    },
+    {
+      "id": "s:SS9SwiftDemoE7shoutedSSvp",
+      "path": "String.shouted",
+      "kind": "instanceProperty",
+      "tier": "unsupported",
+      "reasons": [
+        "external-type-extension"
+      ],
+      "location": "file://Sources/SwiftDemo/Extensions.swift:19"
+    },
+    {
+      "id": "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo6FlavorO",
+      "path": "Flavor.hashValue",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "hashValue"
+    },
+    {
+      "id": "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF::SYNTHESIZED::s:9SwiftDemo6FlavorO",
+      "path": "Flavor.hash(into:)",
+      "kind": "instanceMethod",
+      "tier": "unsupported",
+      "reasons": [
+        "inout-parameter"
+      ]
+    },
+    {
+      "id": "s:Sa9SwiftDemoAA5PointVRszlE8centroidACyF",
+      "path": "Array.centroid()",
+      "kind": "instanceMethod",
+      "tier": "unsupported",
+      "reasons": [
+        "external-type-extension"
+      ],
+      "location": "file://Sources/SwiftDemo/Extensions.swift:23"
+    },
+    {
+      "id": "s:ScA12_ConcurrencyE14assertIsolated_4file4lineySSyXK_s12StaticStringVSutF::SYNTHESIZED::s:9SwiftDemo7CounterC",
+      "path": "Counter.assertIsolated(_:file:line:)",
+      "kind": "instanceMethod",
+      "tier": "unsupported",
+      "reasons": [
+        "closure",
+        "unbridged-type:Swift.StaticString"
+      ]
+    },
+    {
+      "id": "s:ScA12_ConcurrencyE14assumeIsolated_4file4lineqd__qd__xYiKXE_s12StaticStringVSutKs8SendableRd__lF::SYNTHESIZED::s:9SwiftDemo7CounterC",
+      "path": "Counter.assumeIsolated(_:file:line:)",
+      "kind": "instanceMethod",
+      "tier": "swift-specialized",
+      "reasons": [
+        "generic"
+      ]
+    },
+    {
+      "id": "s:ScA12_ConcurrencyE18withSerialExecutoryqd__qd__Scf_pYaqd_0_YKYCXEYaqd_0_YKs5ErrorRd_0_Ri_d__r0_lF::SYNTHESIZED::s:9SwiftDemo7CounterC",
+      "path": "Counter.withSerialExecutor(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-specialized",
+      "reasons": [
+        "generic"
+      ]
+    },
+    {
+      "id": "s:ScA12_ConcurrencyE18withSerialExecutoryqd__qd__Scf_pqd_0_YKXEqd_0_YKs5ErrorRd_0_Ri_d__r0_lF::SYNTHESIZED::s:9SwiftDemo7CounterC",
+      "path": "Counter.withSerialExecutor(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-specialized",
+      "reasons": [
+        "generic"
+      ]
+    },
+    {
+      "id": "s:ScA12_ConcurrencyE20preconditionIsolated_4file4lineySSyXK_s12StaticStringVSutF::SYNTHESIZED::s:9SwiftDemo7CounterC",
+      "path": "Counter.preconditionIsolated(_:file:line:)",
+      "kind": "instanceMethod",
+      "tier": "unsupported",
+      "reasons": [
+        "closure",
+        "unbridged-type:Swift.StaticString"
+      ]
+    },
+    {
+      "id": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo10ShapeErrorO",
+      "path": "ShapeError.localizedDescription",
+      "kind": "instanceProperty",
+      "tier": "unsupported",
+      "reasons": [
+        "owner-not-bridged"
+      ]
+    }
+  ]
+}
