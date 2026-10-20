@@ -253,6 +253,7 @@ struct ModuleInfo;
 
 struct MemberInfo {
   int owner = -1;
+  std::string swiftModule;
   uint32_t kind = 0;
   uint32_t flags = 0;
   std::string jsName;
@@ -268,6 +269,8 @@ struct MemberInfo {
 struct MemberGroup {
   const ModuleInfo* module = nullptr;
   int owner = -1;
+  // Module-level groups: the Swift module whose namespace holds them.
+  std::string swiftModule;
   uint32_t kind = 0;
   std::string jsName;
   std::vector<const MemberInfo*> overloads;
@@ -283,6 +286,7 @@ struct CaseInfo {
 struct TypeInfo {
   uint32_t index = 0;
   uint32_t kind = 0;
+  std::string swiftModule;
   std::string jsName;
   std::string swiftName;
   int superIndex = -1;
@@ -295,8 +299,12 @@ struct TypeInfo {
 
 bool IsEnumKind(uint32_t kind) { return kind == NSSwiftTypeEnum || kind == NSSwiftTypeTaggedEnum; }
 
+// A registered unit: one or more Swift modules sharing one type table.
 struct ModuleInfo {
+  // The unit's name.
   std::string name;
+  // Its Swift modules, each an `ns:swift/<name>` namespace.
+  std::vector<std::string> modules;
   std::string fingerprint;
   uint32_t abiVersion = 0;
   NSSwiftRelease release = nullptr;
@@ -399,15 +407,22 @@ void ApiRegisterModule(NSSwiftRegistrar* registrar, uint32_t abiVersion, const c
                        const char* fingerprint, NSSwiftRelease release) {
   ModuleInfo* module = static_cast<Registrar*>(registrar)->module;
   module->abiVersion = abiVersion;
-  if (name != nullptr && module->name != name) {
-    module->error = "registers as '" + std::string(name) + "'";
-  }
+  module->name = name ? name : "";
   module->fingerprint = fingerprint ? fingerprint : "";
   module->release = release;
 }
 
-void ApiRegisterType(NSSwiftRegistrar* registrar, uint32_t index, uint32_t kind, const char* jsName,
-                     const char* swiftName, int32_t superIndex) {
+void ApiRegisterUnitModule(NSSwiftRegistrar* registrar, const char* name) {
+  ModuleInfo* module = static_cast<Registrar*>(registrar)->module;
+  if (name != nullptr &&
+      std::find(module->modules.begin(), module->modules.end(), name) == module->modules.end()) {
+    module->modules.push_back(name);
+  }
+}
+
+void ApiRegisterType(NSSwiftRegistrar* registrar, uint32_t index, uint32_t kind,
+                     const char* swiftModule, const char* jsName, const char* swiftName,
+                     int32_t superIndex) {
   ModuleInfo* module = static_cast<Registrar*>(registrar)->module;
   if (index != module->types.size()) {
     module->error = "type indices are not dense";
@@ -416,6 +431,7 @@ void ApiRegisterType(NSSwiftRegistrar* registrar, uint32_t index, uint32_t kind,
   TypeInfo type;
   type.index = index;
   type.kind = kind;
+  type.swiftModule = swiftModule ? swiftModule : "";
   type.jsName = jsName ? jsName : "";
   type.swiftName = swiftName ? swiftName : "";
   type.superIndex = superIndex;
@@ -423,11 +439,12 @@ void ApiRegisterType(NSSwiftRegistrar* registrar, uint32_t index, uint32_t kind,
 }
 
 void ApiRegisterMember(NSSwiftRegistrar* registrar, int32_t owner, uint32_t kind, uint32_t flags,
-                       const char* jsName, const char* swiftName, const char* signature,
-                       NSSwiftThunk thunk, NSSwiftThunk setter) {
+                       const char* swiftModule, const char* jsName, const char* swiftName,
+                       const char* signature, NSSwiftThunk thunk, NSSwiftThunk setter) {
   ModuleInfo* module = static_cast<Registrar*>(registrar)->module;
   MemberInfo member;
   member.owner = owner;
+  member.swiftModule = swiftModule ? swiftModule : "";
   member.kind = kind;
   member.flags = flags;
   member.jsName = jsName ? jsName : "";
@@ -505,6 +522,7 @@ void ApiWriteBackBegin(NSSwiftCall* call, intptr_t index);
 void ApiWriteBackEnd(NSSwiftCall* call);
 void ApiReturnObjC(NSSwiftCall* call, void* object);
 void ApiCompleteObjC(void* token, void* object);
+void ApiRegisterUnitModule(NSSwiftRegistrar* registrar, const char* name);
 
 const NSSwiftAPI kAPI = {
     ApiReturnVoid,           ApiReturnBool,           ApiReturnInt64,
@@ -521,6 +539,7 @@ const NSSwiftAPI kAPI = {
     ApiCallbackRelease,      ApiReturnCaseBegin,      ApiCompleteCaseBegin,
     ApiReturnArrayEnd,       ApiCompleteContainerEnd, ApiWriteBackBegin,
     ApiWriteBackEnd,         ApiReturnObjC,           ApiCompleteObjC,
+    ApiRegisterUnitModule,
 };
 
 // "Polygon.Style" -> "Style".
@@ -546,8 +565,8 @@ bool IsValidModuleName(const std::string& name) {
 void BuildGroups(ModuleInfo& module) {
   robin_hood::unordered_map<std::string, MemberGroup*> byKey;
   for (const MemberInfo& member : module.members) {
-    std::string key =
-        std::to_string(member.owner) + ":" + std::to_string(member.kind) + ":" + member.jsName;
+    std::string key = std::to_string(member.owner) + ":" + std::to_string(member.kind) + ":" +
+                      member.jsName + (member.owner < 0 ? ":" + member.swiftModule : "");
     auto it = byKey.find(key);
     MemberGroup* group;
     if (it == byKey.end()) {
@@ -555,6 +574,7 @@ void BuildGroups(ModuleInfo& module) {
       group = module.groups.back().get();
       group->module = &module;
       group->owner = member.owner;
+      group->swiftModule = member.owner < 0 ? member.swiftModule : "";
       group->kind = member.kind;
       group->jsName = member.jsName;
       byKey.emplace(key, group);
@@ -606,6 +626,19 @@ std::string Validate(const ModuleInfo& module) {
   }
   if (module.release == nullptr) {
     return "registered no release function";
+  }
+  auto inUnit = [&](const std::string& name) {
+    return std::find(module.modules.begin(), module.modules.end(), name) != module.modules.end();
+  };
+  for (const TypeInfo& type : module.types) {
+    if (!inUnit(type.swiftModule)) {
+      return "type " + type.swiftName + " names an unregistered module";
+    }
+  }
+  for (const MemberInfo& member : module.members) {
+    if (member.owner < 0 && !inUnit(member.swiftModule)) {
+      return member.swiftName + " names an unregistered module";
+    }
   }
   auto validType = [&](int index) {
     return index >= 0 && index < static_cast<int>(module.types.size());
@@ -662,7 +695,6 @@ std::shared_ptr<const ModuleInfo> LoadModuleInfo(const std::string& name, std::s
   }
 
   auto module = std::make_shared<ModuleInfo>();
-  module->name = name;
   std::string symbol = "ns_swift_register_" + name;
   auto registerFunction =
       reinterpret_cast<NSSwiftRegisterFunction>(dlsym(RTLD_DEFAULT, symbol.c_str()));
@@ -675,10 +707,23 @@ std::shared_ptr<const ModuleInfo> LoadModuleInfo(const std::string& name, std::s
     registrar.module = module.get();
     registerFunction(&registrar);
     std::string problem = Validate(*module);
+    if (problem.empty() &&
+        std::find(module->modules.begin(), module->modules.end(), name) == module->modules.end()) {
+      problem = "registers a unit without it";
+    }
+    for (const auto& other : module->modules) {
+      auto registered = gModules.find(other);
+      if (problem.empty() && other != name && registered != gModules.end()) {
+        problem = "shares module '" + other + "' with another unit";
+      }
+    }
     if (!problem.empty()) {
       module->error = "Swift module '" + name + "' " + problem;
     } else {
       BuildGroups(*module);
+      for (const auto& other : module->modules) {
+        gModules.emplace(other, module);
+      }
     }
   }
   gModules.emplace(name, module);
@@ -693,9 +738,11 @@ std::shared_ptr<const ModuleInfo> LoadModuleInfo(const std::string& name, std::s
 
 class SwiftObjectWrapper;
 
+// A unit as one isolate sees it.
 struct LoadedModule {
   std::shared_ptr<const ModuleInfo> info;
-  Global<Object> exports;
+  // Each Swift module's namespace.
+  robin_hood::unordered_map<std::string, Global<Object>> exports;
   // Constructor templates by type index; empty for enums.
   std::vector<Global<FunctionTemplate>> templates;
 };
@@ -707,12 +754,11 @@ struct PendingAsync {
 };
 
 struct IsolateState {
-  robin_hood::unordered_map<std::string, std::unique_ptr<LoadedModule>> modules;
   // Resolvers stay here, on the isolate's thread: a v8::Global must not be
   // destroyed by the thread that completes the call.
   robin_hood::unordered_map<uint64_t, std::unique_ptr<PendingAsync>> pending;
   uint64_t nextAsyncId = 1;
-  robin_hood::unordered_map<const ModuleInfo*, LoadedModule*> byInfo;
+  robin_hood::unordered_map<const ModuleInfo*, std::unique_ptr<LoadedModule>> byInfo;
   // Swift object -> its JS wrapper, so a Swift object has one JS identity.
   robin_hood::unordered_map<void*, SwiftObjectWrapper*> identity;
   // Thunk calls in progress on the isolate's thread, innermost last.
@@ -1321,9 +1367,10 @@ bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
       void* object = node.object;
       // WrapSwiftObject takes over the retain.
       node.object = nullptr;
-      Local<Object> wrapper = WrapSwiftObject(
-          isolate, context, node.module, loaded == state->byInfo.end() ? nullptr : loaded->second,
-          state, object, node.typeIndex, nullptr);
+      Local<Object> wrapper =
+          WrapSwiftObject(isolate, context, node.module,
+                          loaded == state->byInfo.end() ? nullptr : loaded->second.get(), state,
+                          object, node.typeIndex, nullptr);
       if (wrapper.IsEmpty()) {
         return failed("returned an object JavaScript cannot wrap");
       }
@@ -2214,7 +2261,7 @@ LoadedModule* LoadedFor(Isolate* isolate, const ModuleInfo* module) {
     return nullptr;
   }
   auto it = state->byInfo.find(module);
-  return it == state->byInfo.end() ? nullptr : it->second;
+  return it == state->byInfo.end() ? nullptr : it->second.get();
 }
 
 // Calls `member`'s getter/call thunk (or its setter when `setter`) with
@@ -2508,8 +2555,12 @@ class Builder {
   Builder(Isolate* isolate, Local<Context> context, LoadedModule& loaded)
       : _isolate(isolate), _context(context), _loaded(loaded), _module(*loaded.info) {}
 
-  MaybeLocal<Object> Build() {
-    Local<Object> exports = Object::New(_isolate);
+  // Fills the unit's templates and every module's namespace.
+  bool Build() {
+    std::map<std::string, Local<Object>> exports;
+    for (const auto& name : _module.modules) {
+      exports[name] = Object::New(_isolate);
+    }
 
     _loaded.templates.resize(_module.types.size());
     std::vector<Local<FunctionTemplate>> templates(_module.types.size());
@@ -2562,7 +2613,7 @@ class Builder {
       }
       Local<v8::Function> function;
       if (!templates[type.index]->GetFunction(_context).ToLocal(&function)) {
-        return MaybeLocal<Object>();
+        return false;
       }
       _loaded.templates[type.index].Reset(_isolate, templates[type.index]);
       values[type.index] = function;
@@ -2570,9 +2621,10 @@ class Builder {
 
     // Nested types hang off their parent by JS path ("Polygon.Style"); a
     // parent that is not bridged gets a plain namespace object.
+    // Keyed by module and path: modules have their own namespaces.
     std::map<std::string, Local<Object>> containers;
     for (const TypeInfo& type : _module.types) {
-      containers[type.jsName] = values[type.index];
+      containers[type.swiftModule + ":" + type.jsName] = values[type.index];
     }
     std::vector<const TypeInfo*> byDepth;
     for (const TypeInfo& type : _module.types) {
@@ -2584,19 +2636,19 @@ class Builder {
     });
     std::vector<Local<Object>> namespaces;
     for (const TypeInfo* type : byDepth) {
-      Local<Object> container = exports;
-      std::string path;
+      Local<Object> container = exports[type->swiftModule];
+      std::string path = type->swiftModule + ":";
       size_t start = 0;
       for (size_t dot = type->jsName.find('.'); dot != std::string::npos;
            dot = type->jsName.find('.', start)) {
         std::string component = type->jsName.substr(start, dot - start);
-        path += (path.empty() ? "" : ".") + component;
+        path += (path.back() == ':' ? "" : ".") + component;
         auto existing = containers.find(path);
         if (existing == containers.end()) {
           Local<Object> space = Object::New(_isolate);
           if (!container->Set(_context, tns::ToV8String(_isolate, component), space)
                    .FromMaybe(false)) {
-            return MaybeLocal<Object>();
+            return false;
           }
           existing = containers.emplace(path, space).first;
           namespaces.push_back(space);
@@ -2608,18 +2660,18 @@ class Builder {
                ->Set(_context, tns::ToV8String(_isolate, LastComponent(type->jsName)),
                      values[type->index])
                .FromMaybe(false)) {
-        return MaybeLocal<Object>();
+        return false;
       }
     }
 
     for (const MemberGroup* group : enumGroups) {
       if (!InstallOnObject(enums[group->owner], *group)) {
-        return MaybeLocal<Object>();
+        return false;
       }
     }
     for (const MemberGroup* group : moduleGroups) {
-      if (!InstallOnObject(exports, *group)) {
-        return MaybeLocal<Object>();
+      if (!InstallOnObject(exports[group->swiftModule], *group)) {
+        return false;
       }
     }
     for (Local<Object> enumObject : enums) {
@@ -2630,8 +2682,11 @@ class Builder {
     for (Local<Object> space : namespaces) {
       space->SetIntegrityLevel(_context, IntegrityLevel::kFrozen).Check();
     }
-    exports->SetIntegrityLevel(_context, IntegrityLevel::kFrozen).Check();
-    return exports;
+    for (auto& entry : exports) {
+      entry.second->SetIntegrityLevel(_context, IntegrityLevel::kFrozen).Check();
+      _loaded.exports[entry.first].Reset(_isolate, entry.second);
+    }
+    return true;
   }
 
  private:
@@ -2774,7 +2829,8 @@ void ModuleInfoCallback(const FunctionCallbackInfo<Value>& info) {
     return;
   }
   Local<Object> result = Object::New(isolate);
-  result->Set(context, tns::ToV8String(isolate, "name"), tns::ToV8String(isolate, module->name))
+  result->Set(context, tns::ToV8String(isolate, "name"), info[0]).Check();
+  result->Set(context, tns::ToV8String(isolate, "unit"), tns::ToV8String(isolate, module->name))
       .Check();
   result
       ->Set(context, tns::ToV8String(isolate, "fingerprint"),
@@ -2805,11 +2861,6 @@ MaybeLocal<Object> LoadModule(Local<Context> context, const std::string& name) {
   if (state == nullptr) {
     return MaybeLocal<Object>();
   }
-  auto cached = state->modules.find(name);
-  if (cached != state->modules.end()) {
-    return cached->second->exports.Get(isolate);
-  }
-
   std::string error;
   std::shared_ptr<const ModuleInfo> module = LoadModuleInfo(name, error);
   if (!module) {
@@ -2817,18 +2868,18 @@ MaybeLocal<Object> LoadModule(Local<Context> context, const std::string& name) {
     return MaybeLocal<Object>();
   }
 
-  auto loaded = std::make_unique<LoadedModule>();
-  loaded->info = module;
-  LoadedModule* raw = loaded.get();
-  state->byInfo[module.get()] = raw;
-  Local<Object> exports;
-  if (!Builder(isolate, context, *raw).Build().ToLocal(&exports)) {
-    state->byInfo.erase(module.get());
-    return MaybeLocal<Object>();
+  auto loaded = state->byInfo.find(module.get());
+  if (loaded == state->byInfo.end()) {
+    auto unit = std::make_unique<LoadedModule>();
+    unit->info = module;
+    LoadedModule* raw = unit.get();
+    loaded = state->byInfo.emplace(module.get(), std::move(unit)).first;
+    if (!Builder(isolate, context, *raw).Build()) {
+      state->byInfo.erase(module.get());
+      return MaybeLocal<Object>();
+    }
   }
-  loaded->exports.Reset(isolate, exports);
-  state->modules.emplace(name, std::move(loaded));
-  return exports;
+  return loaded->second->exports[name].Get(isolate);
 }
 
 MaybeLocal<Object> CreateBinding(Local<Context> context) {

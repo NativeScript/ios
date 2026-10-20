@@ -196,6 +196,9 @@ struct Symbol {
   // Set when a cross-import overlay (`_SwiftData_SwiftUI`) rather than the
   // module itself declares the symbol; code using it must import the overlay.
   std::string declaringModule;
+  // The module whose graphs declare the symbol; differs from Module::name in
+  // a generation unit (see mergeUnit).
+  std::string module;
 
   // Resolved relationships.
   std::string parentId;
@@ -232,6 +235,9 @@ struct Platform {
 
 struct Module {
   std::string name;
+  // A generation unit: the modules merged into this one, in order. Empty for
+  // a single module.
+  std::vector<std::string> unitModules;
   Platform platform;
   Version formatVersion;
   std::string generator;
@@ -247,6 +253,9 @@ struct Module {
   std::vector<std::string> topLevelIds;
 
   const Symbol* find(const std::string& preciseId) const;
+
+  // The Swift modules this module covers: unitModules, or just `name`.
+  std::vector<std::string> swiftModules() const;
 };
 
 enum class Severity { Warning, Error };

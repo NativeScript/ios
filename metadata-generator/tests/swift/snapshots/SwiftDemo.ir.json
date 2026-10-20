@@ -10,13 +10,18 @@
   },
   "graphFiles": [
     "SwiftDemo.symbols.json",
-    "SwiftDemo@Swift.symbols.json"
+    "SwiftDemo@Swift.symbols.json",
+    "SwiftDemo@SwiftDemoKit.symbols.json",
+    "SwiftDemoKit.symbols.json"
   ],
   "topLevel": [
     "s:9SwiftDemo7GreeterP",
     "s:9SwiftDemo0B0C",
     "s:9SwiftDemo5PointV",
     "s:9SwiftDemo6FlavorO",
+    "s:9SwiftDemo13starterWallet3for0aB3Kit0D0CSS_tF",
+    "s:9SwiftDemo3sum2of0aB3Kit5MoneyVSayAFG_tF",
+    "s:9SwiftDemo4flipy0aB3Kit4CoinOAEF",
     "s:9SwiftDemo5ShapeP",
     "s:9SwiftDemo7PolygonC",
     "s:9SwiftDemo6SquareC",
@@ -80,7 +85,11 @@
     "c:@M@SwiftDemo@objc(cs)Note",
     "s:9SwiftDemo8makeNoteyAA0D0CSSF",
     "s:9SwiftDemo4text2ofSSAA4NoteC_tF",
-    "s:9SwiftDemo9noteLateryAA4NoteCSSYaF"
+    "s:9SwiftDemo9noteLateryAA4NoteCSSYaF",
+    "s:12SwiftDemoKit5MoneyV",
+    "s:12SwiftDemoKit6WalletC",
+    "s:12SwiftDemoKit4CoinO",
+    "s:12SwiftDemoKit9formattedySSAA5MoneyVF"
   ],
   "externalTypes": [
     {
@@ -146,6 +155,355 @@
         "s:s7CVarArgP"
       ],
       "superclass": "c:objc(cs)NSObject"
+    },
+    {
+      "id": "s:12SwiftDemoKit4CoinO",
+      "kind": "enum",
+      "path": "Coin",
+      "name": "Coin",
+      "access": "public",
+      "declaration": "enum Coin",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:29:12",
+      "graph": "SwiftDemoKit.symbols.json",
+      "members": [
+        "s:12SwiftDemoKit4CoinO5pennyyA2CmF",
+        "s:12SwiftDemoKit4CoinO4dimeyA2CmF",
+        "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:12SwiftDemoKit4CoinO"
+      ],
+      "conformances": [
+        "s:SH",
+        "s:SQ"
+      ]
+    },
+    {
+      "id": "s:12SwiftDemoKit4CoinO4dimeyA2CmF",
+      "kind": "enumCase",
+      "path": "Coin.dime",
+      "name": "dime",
+      "access": "public",
+      "declaration": "case dime",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:30:16",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit4CoinO"
+    },
+    {
+      "id": "s:12SwiftDemoKit4CoinO5pennyyA2CmF",
+      "kind": "enumCase",
+      "path": "Coin.penny",
+      "name": "penny",
+      "access": "public",
+      "declaration": "case penny",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:30:9",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit4CoinO"
+    },
+    {
+      "id": "s:12SwiftDemoKit5MoneyV",
+      "kind": "struct",
+      "path": "Money",
+      "name": "Money",
+      "access": "public",
+      "declaration": "struct Money",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:3:14",
+      "graph": "SwiftDemoKit.symbols.json",
+      "members": [
+        "s:12SwiftDemoKit5MoneyV6amountSivp",
+        "s:12SwiftDemoKit5MoneyV8currencySSvp",
+        "s:12SwiftDemoKit5MoneyV6amount8currencyACSi_SStcfc",
+        "s:12SwiftDemoKit5MoneyV6addingyA2CF",
+        "s:12SwiftDemoKit5MoneyV0aB0E6isZeroSbvp",
+        "s:12SwiftDemoKit5MoneyV0aB0E7doubledACyF"
+      ]
+    },
+    {
+      "id": "s:12SwiftDemoKit5MoneyV0aB0E6isZeroSbvp",
+      "kind": "instanceProperty",
+      "path": "Money.isZero",
+      "name": "isZero",
+      "access": "public",
+      "declaration": "var isZero: Bool { get }",
+      "valueType": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "SwiftDemoKit",
+        "typeKind": "swift.struct"
+      },
+      "location": "file://Sources/SwiftDemo/Purse.swift:17:15",
+      "graph": "SwiftDemo@SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit5MoneyV"
+    },
+    {
+      "id": "s:12SwiftDemoKit5MoneyV0aB0E7doubledACyF",
+      "kind": "instanceMethod",
+      "path": "Money.doubled()",
+      "name": "doubled()",
+      "access": "public",
+      "declaration": "func doubled() -> Money",
+      "returns": {
+        "spelling": "Money",
+        "references": [
+          "s:12SwiftDemoKit5MoneyV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftDemoKit",
+        "typeKind": "swift.struct"
+      },
+      "location": "file://Sources/SwiftDemo/Purse.swift:18:16",
+      "graph": "SwiftDemo@SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit5MoneyV"
+    },
+    {
+      "id": "s:12SwiftDemoKit5MoneyV6addingyA2CF",
+      "kind": "instanceMethod",
+      "path": "Money.adding(_:)",
+      "name": "adding(_:)",
+      "access": "public",
+      "declaration": "func adding(_ other: Money) -> Money",
+      "parameters": [
+        {
+          "internalName": "other",
+          "type": {
+            "spelling": "Money",
+            "references": [
+              "s:12SwiftDemoKit5MoneyV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Money",
+        "references": [
+          "s:12SwiftDemoKit5MoneyV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemoKit/Money.swift:12:16",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit5MoneyV"
+    },
+    {
+      "id": "s:12SwiftDemoKit5MoneyV6amount8currencyACSi_SStcfc",
+      "kind": "initializer",
+      "path": "Money.init(amount:currency:)",
+      "name": "init(amount:currency:)",
+      "access": "public",
+      "declaration": "init(amount: Int, currency: String)",
+      "parameters": [
+        {
+          "label": "amount",
+          "internalName": "amount",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "label": "currency",
+          "internalName": "currency",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:7:11",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit5MoneyV"
+    },
+    {
+      "id": "s:12SwiftDemoKit5MoneyV6amountSivp",
+      "kind": "instanceProperty",
+      "path": "Money.amount",
+      "name": "amount",
+      "access": "public",
+      "declaration": "var amount: Int",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemoKit/Money.swift:4:15",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit5MoneyV"
+    },
+    {
+      "id": "s:12SwiftDemoKit5MoneyV8currencySSvp",
+      "kind": "instanceProperty",
+      "path": "Money.currency",
+      "name": "currency",
+      "access": "public",
+      "declaration": "var currency: String",
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemoKit/Money.swift:5:15",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit5MoneyV"
+    },
+    {
+      "id": "s:12SwiftDemoKit6WalletC",
+      "kind": "class",
+      "path": "Wallet",
+      "name": "Wallet",
+      "access": "public",
+      "declaration": "final class Wallet",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:17:19",
+      "graph": "SwiftDemoKit.symbols.json",
+      "members": [
+        "s:12SwiftDemoKit6WalletC5ownerSSvp",
+        "s:12SwiftDemoKit6WalletC7balanceAA5MoneyVvp",
+        "s:12SwiftDemoKit6WalletC5ownerACSS_tcfc",
+        "s:12SwiftDemoKit6WalletC7deposityyAA5MoneyVF",
+        "s:12SwiftDemoKit6WalletC0aB0E7summarySSyF"
+      ]
+    },
+    {
+      "id": "s:12SwiftDemoKit6WalletC0aB0E7summarySSyF",
+      "kind": "instanceMethod",
+      "path": "Wallet.summary()",
+      "name": "summary()",
+      "access": "public",
+      "declaration": "func summary() -> String",
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftDemoKit",
+        "typeKind": "swift.class"
+      },
+      "location": "file://Sources/SwiftDemo/Purse.swift:22:16",
+      "graph": "SwiftDemo@SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit6WalletC"
+    },
+    {
+      "id": "s:12SwiftDemoKit6WalletC5ownerACSS_tcfc",
+      "kind": "initializer",
+      "path": "Wallet.init(owner:)",
+      "name": "init(owner:)",
+      "access": "public",
+      "declaration": "init(owner: String)",
+      "parameters": [
+        {
+          "label": "owner",
+          "internalName": "owner",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:21:11",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit6WalletC"
+    },
+    {
+      "id": "s:12SwiftDemoKit6WalletC5ownerSSvp",
+      "kind": "instanceProperty",
+      "path": "Wallet.owner",
+      "name": "owner",
+      "access": "public",
+      "declaration": "let owner: String",
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "let": true,
+      "location": "file://Sources/SwiftDemoKit/Money.swift:18:15",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit6WalletC"
+    },
+    {
+      "id": "s:12SwiftDemoKit6WalletC7balanceAA5MoneyVvp",
+      "kind": "instanceProperty",
+      "path": "Wallet.balance",
+      "name": "balance",
+      "access": "public",
+      "declaration": "var balance: Money { get }",
+      "valueType": {
+        "spelling": "Money",
+        "references": [
+          "s:12SwiftDemoKit5MoneyV"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemoKit/Money.swift:19:28",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit6WalletC"
+    },
+    {
+      "id": "s:12SwiftDemoKit6WalletC7deposityyAA5MoneyVF",
+      "kind": "instanceMethod",
+      "path": "Wallet.deposit(_:)",
+      "name": "deposit(_:)",
+      "access": "public",
+      "declaration": "func deposit(_ money: Money)",
+      "parameters": [
+        {
+          "internalName": "money",
+          "type": {
+            "spelling": "Money",
+            "references": [
+              "s:12SwiftDemoKit5MoneyV"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:26:16",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit6WalletC"
+    },
+    {
+      "id": "s:12SwiftDemoKit9formattedySSAA5MoneyVF",
+      "kind": "function",
+      "path": "formatted(_:)",
+      "name": "formatted(_:)",
+      "access": "public",
+      "declaration": "func formatted(_ money: Money) -> String",
+      "parameters": [
+        {
+          "internalName": "money",
+          "type": {
+            "spelling": "Money",
+            "references": [
+              "s:12SwiftDemoKit5MoneyV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemoKit/Money.swift:33:12",
+      "graph": "SwiftDemoKit.symbols.json"
     },
     {
       "id": "s:9SwiftDemo0B0C",
@@ -976,6 +1334,34 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo13starterWallet3for0aB3Kit0D0CSS_tF",
+      "kind": "function",
+      "path": "starterWallet(for:)",
+      "name": "starterWallet(for:)",
+      "access": "public",
+      "declaration": "func starterWallet(for owner: String) -> Wallet",
+      "parameters": [
+        {
+          "label": "for",
+          "internalName": "owner",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Wallet",
+        "references": [
+          "s:12SwiftDemoKit6WalletC"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Purse.swift:4:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo16makeDefaultPointAA0E0VyF",
       "kind": "function",
       "path": "makeDefaultPoint()",
@@ -1122,6 +1508,34 @@
       "location": "file://Sources/SwiftDemo/Values.swift:160:19",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo3JobO6TicketV"
+    },
+    {
+      "id": "s:9SwiftDemo3sum2of0aB3Kit5MoneyVSayAFG_tF",
+      "kind": "function",
+      "path": "sum(of:)",
+      "name": "sum(of:)",
+      "access": "public",
+      "declaration": "func sum(of amounts: [Money]) -> Money",
+      "parameters": [
+        {
+          "label": "of",
+          "internalName": "amounts",
+          "type": {
+            "spelling": "[Money]",
+            "references": [
+              "s:12SwiftDemoKit5MoneyV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Money",
+        "references": [
+          "s:12SwiftDemoKit5MoneyV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Purse.swift:10:12",
+      "graph": "SwiftDemo.symbols.json"
     },
     {
       "id": "s:9SwiftDemo4NoteC4textACSS_tcfc",
@@ -1393,6 +1807,33 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:152:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo4flipy0aB3Kit4CoinOAEF",
+      "kind": "function",
+      "path": "flip(_:)",
+      "name": "flip(_:)",
+      "access": "public",
+      "declaration": "func flip(_ coin: Coin) -> Coin",
+      "parameters": [
+        {
+          "internalName": "coin",
+          "type": {
+            "spelling": "Coin",
+            "references": [
+              "s:12SwiftDemoKit4CoinO"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Coin",
+        "references": [
+          "s:12SwiftDemoKit4CoinO"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Purse.swift:14:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -4263,6 +4704,48 @@
       ],
       "location": "file://Sources/SwiftDemo/Values.swift:118:12",
       "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:12SwiftDemoKit4CoinO",
+      "kind": "operator",
+      "path": "Coin.!=(_:_:)",
+      "name": "!=(_:_:)",
+      "access": "public",
+      "declaration": "static func != (lhs: borrowing Self, rhs: borrowing Self) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit4CoinO",
+      "sourceOrigin": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ"
     },
     {
       "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo13PrecipitationO",

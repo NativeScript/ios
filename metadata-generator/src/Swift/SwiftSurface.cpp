@@ -158,7 +158,9 @@ SwiftSurface describeSurface(const Module& module,
         : symbol.kind == SymbolKind::Actor ? SwiftSurface::kActor
                                            : SwiftSurface::kClass;
     int index = static_cast<int>(surface.types.size());
-    surface.types.push_back(SwiftSurface::Type{&symbol, index, kind, -1});
+    surface.types.push_back(SwiftSurface::Type{
+        &symbol, index, kind, -1,
+        symbol.module.empty() ? module.name : symbol.module});
     surface.typeIndex[symbol.preciseId] = index;
   }
   for (auto& type : surface.types) {
@@ -179,6 +181,9 @@ SwiftSurface describeSurface(const Module& module,
     member.symbol = &symbol;
     member.capability = capability;
     member.owner = owner ? surface.indexOf(owner->preciseId) : -1;
+    member.module = member.owner >= 0       ? surface.types[member.owner].module
+                    : symbol.module.empty() ? module.name
+                                            : symbol.module;
     member.kind = memberKind(symbol.kind);
     member.flags =
         (symbol.isThrowing ? SwiftSurface::kThrows : 0) |

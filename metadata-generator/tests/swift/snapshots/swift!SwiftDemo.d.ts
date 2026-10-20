@@ -217,11 +217,14 @@ declare module "ns:swift/SwiftDemo" {
   export function swapTrackers(a: { value: Tracker }, b: { value: Tracker }): void;
   export const defaultFlavor: Flavor;
   export let globalCounter: number;
+  export function starterWallet(owner: string): import("ns:swift/SwiftDemoKit").Wallet;
   export function makeDefaultPoint(): Point;
   export function makeTrackerLater(id: number | bigint): Promise<Tracker>;
+  export function sum(amounts: readonly (import("ns:swift/SwiftDemoKit").Money)[]): import("ns:swift/SwiftDemoKit").Money;
   export function area(measurement: Measurement): number;
   export function bump(value: { value: number | bigint }): void;
   export function echo(payload: Payload): Payload;
+  export function flip(coin: import("ns:swift/SwiftDemoKit").Coin): import("ns:swift/SwiftDemoKit").Coin;
   export function host(url: string | URL): string | null;
   export function ramp(count: number | bigint): Uint8Array;
   export function tags(views: readonly (UIView)[]): (number)[];

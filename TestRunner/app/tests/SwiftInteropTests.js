@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module"]);
-            expect(swift.abiVersion).toBe(7);
+            expect(swift.abiVersion).toBe(8);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(7);
+            expect(info.abiVersion).toBe(8);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -491,6 +491,36 @@ describe("ns:swift", function () {
                 fail(error);
                 done();
             });
+        });
+    });
+
+    describe("units", function () {
+        // SwiftDemo and SwiftDemoKit are generated as one unit.
+        var Kit = swift.module("SwiftDemoKit");
+
+        it("gives each module of a unit its own namespace", function () {
+            expect(Kit).not.toBe(SwiftDemo);
+            expect(typeof Kit.Money).toBe("function");
+            expect(SwiftDemo.Money).toBeUndefined();
+            expect(require("ns:swift/SwiftDemoKit")).toBe(Kit);
+            expect(swift.info("SwiftDemoKit").unit).toBe("SwiftDemo");
+        });
+
+        it("passes another module's types", function () {
+            var wallet = SwiftDemo.starterWallet("ada");
+            expect(wallet instanceof Kit.Wallet).toBe(true);
+            expect(wallet.balance.amount).toBe(5);
+            expect(SwiftDemo.flip("penny")).toBe("dime");
+            var sum = SwiftDemo.sum([new Kit.Money(1, "EUR"), new Kit.Money(2, "EUR")]);
+            expect(sum instanceof Kit.Money).toBe(true);
+            expect(sum.amount).toBe(3);
+            expect(Kit.formatted(sum)).toBe("3 EUR");
+        });
+
+        it("installs extensions on the extended type", function () {
+            expect(new Kit.Money(0, "EUR").isZero).toBe(true);
+            expect(new Kit.Money(4, "EUR").doubled().amount).toBe(8);
+            expect(SwiftDemo.starterWallet("ada").summary()).toBe("ada: 5 EUR");
         });
     });
 

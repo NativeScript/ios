@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 202,
+      "total": 223,
       "objc-direct": 1,
-      "swift-generated": 165,
+      "swift-generated": 185,
       "swift-specialized": 5,
       "type-only": 6,
-      "unsupported": 25,
+      "unsupported": 26,
       "not-applicable": 0
     },
     "callable": {
-      "total": 176,
+      "total": 194,
       "objc-direct": 0,
-      "swift-generated": 144,
+      "swift-generated": 161,
       "swift-specialized": 5,
       "type-only": 3,
-      "unsupported": 24,
+      "unsupported": 25,
       "not-applicable": 0
     },
-    "effectiveCallable": 144,
+    "effectiveCallable": 161,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -35,63 +35,63 @@
       "not-applicable": 0
     },
     "class": {
-      "total": 9,
+      "total": 10,
       "objc-direct": 1,
-      "swift-generated": 8,
+      "swift-generated": 9,
       "swift-specialized": 0,
       "type-only": 0,
       "unsupported": 0,
       "not-applicable": 0
     },
     "enum": {
-      "total": 8,
+      "total": 9,
       "objc-direct": 0,
-      "swift-generated": 7,
+      "swift-generated": 8,
       "swift-specialized": 0,
       "type-only": 0,
       "unsupported": 1,
       "not-applicable": 0
     },
     "enumCase": {
-      "total": 23,
+      "total": 25,
       "objc-direct": 0,
-      "swift-generated": 21,
+      "swift-generated": 23,
       "swift-specialized": 0,
       "type-only": 0,
       "unsupported": 2,
       "not-applicable": 0
     },
     "function": {
-      "total": 44,
+      "total": 48,
       "objc-direct": 0,
-      "swift-generated": 44,
+      "swift-generated": 48,
       "swift-specialized": 0,
       "type-only": 0,
       "unsupported": 0,
       "not-applicable": 0
     },
     "initializer": {
-      "total": 19,
+      "total": 21,
       "objc-direct": 0,
-      "swift-generated": 18,
+      "swift-generated": 20,
       "swift-specialized": 0,
       "type-only": 0,
       "unsupported": 1,
       "not-applicable": 0
     },
     "instanceMethod": {
-      "total": 41,
+      "total": 45,
       "objc-direct": 0,
-      "swift-generated": 27,
+      "swift-generated": 31,
       "swift-specialized": 5,
       "type-only": 1,
       "unsupported": 8,
       "not-applicable": 0
     },
     "instanceProperty": {
-      "total": 32,
+      "total": 37,
       "objc-direct": 0,
-      "swift-generated": 26,
+      "swift-generated": 31,
       "swift-specialized": 0,
       "type-only": 1,
       "unsupported": 5,
@@ -107,12 +107,12 @@
       "not-applicable": 0
     },
     "operator": {
-      "total": 4,
+      "total": 5,
       "objc-direct": 0,
       "swift-generated": 0,
       "swift-specialized": 0,
       "type-only": 0,
-      "unsupported": 4,
+      "unsupported": 5,
       "not-applicable": 0
     },
     "protocol": {
@@ -125,9 +125,9 @@
       "not-applicable": 0
     },
     "struct": {
-      "total": 5,
+      "total": 6,
       "objc-direct": 0,
-      "swift-generated": 5,
+      "swift-generated": 6,
       "swift-specialized": 0,
       "type-only": 0,
       "unsupported": 0,
@@ -176,7 +176,7 @@
     "existential": 1,
     "external-type-extension": 2,
     "generic": 8,
-    "operator": 4,
+    "operator": 5,
     "owner-not-bridged": 4,
     "subscript": 1,
     "unbridged-type": 12
@@ -191,6 +191,139 @@
         "objc-visible"
       ],
       "location": "file://Sources/SwiftDemo/Views.swift:18"
+    },
+    {
+      "id": "s:12SwiftDemoKit4CoinO",
+      "path": "Coin",
+      "kind": "enum",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:30"
+    },
+    {
+      "id": "s:12SwiftDemoKit4CoinO4dimeyA2CmF",
+      "path": "Coin.dime",
+      "kind": "enumCase",
+      "tier": "swift-generated",
+      "jsName": "dime",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:31"
+    },
+    {
+      "id": "s:12SwiftDemoKit4CoinO5pennyyA2CmF",
+      "path": "Coin.penny",
+      "kind": "enumCase",
+      "tier": "swift-generated",
+      "jsName": "penny",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:31"
+    },
+    {
+      "id": "s:12SwiftDemoKit5MoneyV",
+      "path": "Money",
+      "kind": "struct",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:4"
+    },
+    {
+      "id": "s:12SwiftDemoKit5MoneyV0aB0E6isZeroSbvp",
+      "path": "Money.isZero",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "isZero",
+      "location": "file://Sources/SwiftDemo/Purse.swift:18"
+    },
+    {
+      "id": "s:12SwiftDemoKit5MoneyV0aB0E7doubledACyF",
+      "path": "Money.doubled()",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "doubled",
+      "location": "file://Sources/SwiftDemo/Purse.swift:19"
+    },
+    {
+      "id": "s:12SwiftDemoKit5MoneyV6addingyA2CF",
+      "path": "Money.adding(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "adding",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:13"
+    },
+    {
+      "id": "s:12SwiftDemoKit5MoneyV6amount8currencyACSi_SStcfc",
+      "path": "Money.init(amount:currency:)",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:8"
+    },
+    {
+      "id": "s:12SwiftDemoKit5MoneyV6amountSivp",
+      "path": "Money.amount",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "amount",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:5"
+    },
+    {
+      "id": "s:12SwiftDemoKit5MoneyV8currencySSvp",
+      "path": "Money.currency",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "currency",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:6"
+    },
+    {
+      "id": "s:12SwiftDemoKit6WalletC",
+      "path": "Wallet",
+      "kind": "class",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:18"
+    },
+    {
+      "id": "s:12SwiftDemoKit6WalletC0aB0E7summarySSyF",
+      "path": "Wallet.summary()",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "summary",
+      "location": "file://Sources/SwiftDemo/Purse.swift:23"
+    },
+    {
+      "id": "s:12SwiftDemoKit6WalletC5ownerACSS_tcfc",
+      "path": "Wallet.init(owner:)",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:22"
+    },
+    {
+      "id": "s:12SwiftDemoKit6WalletC5ownerSSvp",
+      "path": "Wallet.owner",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "owner",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:19"
+    },
+    {
+      "id": "s:12SwiftDemoKit6WalletC7balanceAA5MoneyVvp",
+      "path": "Wallet.balance",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "balance",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:20"
+    },
+    {
+      "id": "s:12SwiftDemoKit6WalletC7deposityyAA5MoneyVF",
+      "path": "Wallet.deposit(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "deposit",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:27"
+    },
+    {
+      "id": "s:12SwiftDemoKit9formattedySSAA5MoneyVF",
+      "path": "formatted(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "formatted",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:34"
     },
     {
       "id": "s:9SwiftDemo0B0C",
@@ -485,6 +618,14 @@
       "location": "file://Sources/SwiftDemo/Shapes.swift:142"
     },
     {
+      "id": "s:9SwiftDemo13starterWallet3for0aB3Kit0D0CSS_tF",
+      "path": "starterWallet(for:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "starterWallet",
+      "location": "file://Sources/SwiftDemo/Purse.swift:5"
+    },
+    {
       "id": "s:9SwiftDemo16makeDefaultPointAA0E0VyF",
       "path": "makeDefaultPoint()",
       "kind": "function",
@@ -553,6 +694,14 @@
       "tier": "swift-generated",
       "jsName": "id",
       "location": "file://Sources/SwiftDemo/Values.swift:161"
+    },
+    {
+      "id": "s:9SwiftDemo3sum2of0aB3Kit5MoneyVSayAFG_tF",
+      "path": "sum(of:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "sum",
+      "location": "file://Sources/SwiftDemo/Purse.swift:11"
     },
     {
       "id": "s:9SwiftDemo4NoteC4textACSS_tcfc",
@@ -646,6 +795,14 @@
       "tier": "swift-generated",
       "jsName": "echo",
       "location": "file://Sources/SwiftDemo/Values.swift:153"
+    },
+    {
+      "id": "s:9SwiftDemo4flipy0aB3Kit4CoinOAEF",
+      "path": "flip(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "flip",
+      "location": "file://Sources/SwiftDemo/Purse.swift:15"
     },
     {
       "id": "s:9SwiftDemo4host2ofSSSg10Foundation3URLV_tF",
@@ -1628,6 +1785,15 @@
       "tier": "swift-generated",
       "jsName": "onMeasure",
       "location": "file://Sources/SwiftDemo/Values.swift:119"
+    },
+    {
+      "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:12SwiftDemoKit4CoinO",
+      "path": "Coin.!=(_:_:)",
+      "kind": "operator",
+      "tier": "unsupported",
+      "reasons": [
+        "operator"
+      ]
     },
     {
       "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo13PrecipitationO",

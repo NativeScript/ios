@@ -60,11 +60,12 @@ std::string symbolJSON(const std::string& id, const std::string& kind,
 }  // namespace
 
 TEST(LoadsFixtureWithoutDiagnostics) {
-  CHECK_EQ(fixture().modules.size(), size_t(1));
+  CHECK_EQ(fixture().modules.size(), size_t(2));
   CHECK_EQ(diagnosticCodes(fixture().diagnostics), std::string());
   const Module& module = demo();
   CHECK_EQ(module.name, std::string("SwiftDemo"));
-  CHECK_EQ(module.graphFiles.size(), size_t(2));
+  CHECK_EQ(llvm::join(module.unitModules, ","), std::string("SwiftDemo,SwiftDemoKit"));
+  CHECK_EQ(module.graphFiles.size(), size_t(4));
   CHECK_EQ(module.platform.operatingSystem, std::string("ios"));
   CHECK_EQ(module.platform.environment, std::string("simulator"));
 }
@@ -78,6 +79,9 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "Demo",
                                        "Point",
                                        "Flavor",
+                                       "starterWallet(for:)",
+                                       "sum(of:)",
+                                       "flip(_:)",
                                        "Shape",
                                        "Polygon",
                                        "Square",
@@ -141,7 +145,11 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "Note",
                                        "makeNote(_:)",
                                        "text(of:)",
-                                       "noteLater(_:)"};
+                                       "noteLater(_:)",
+                                       "Money",
+                                       "Wallet",
+                                       "Coin",
+                                       "formatted(_:)"};
   CHECK_EQ(llvm::join(names, ","), llvm::join(expected, ","));
 }
 
@@ -497,15 +505,17 @@ TEST(IRSnapshot) { checkSnapshot("SwiftDemo.ir.json", dumpModuleJSON(demo())); }
 
 TEST(TypeScriptSnapshot) {
   Classification classification = classify(demo());
-  TypeScript::SwiftDefinitionWriter writer(demo(), classification);
-  checkSnapshot("swift!SwiftDemo.d.ts", writer.write());
+  for (const auto& name : demo().swiftModules()) {
+    TypeScript::SwiftDefinitionWriter writer(demo(), classification, name);
+    checkSnapshot("swift!" + name + ".d.ts", writer.write());
+  }
 }
 
 TEST(LoadOrderDoesNotChangeTheIR) {
   std::vector<Diagnostic> diagnostics;
   auto files =
       SymbolGraphLoader::findGraphFiles(SWIFT_FIXTURE_GRAPHS_DIR, diagnostics);
-  REQUIRE(files.size() == 2);
+  REQUIRE(files.size() == 4);
 
   SymbolGraphLoader reversed;
   for (auto it = files.rbegin(); it != files.rend(); ++it) {
@@ -513,7 +523,7 @@ TEST(LoadOrderDoesNotChangeTheIR) {
   }
   ModuleSet set = reversed.finish();
   REQUIRE(set.modules.count("SwiftDemo"));
-  CHECK(dumpModuleJSON(set.modules.at("SwiftDemo")) == dumpModuleJSON(demo()));
+  CHECK(dumpModuleJSON(mergeUnit(set, "SwiftDemo")) == dumpModuleJSON(demo()));
 }
 
 TEST(InvalidJSONIsAnError) {

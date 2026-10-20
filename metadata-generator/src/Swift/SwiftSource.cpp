@@ -9,7 +9,10 @@
 namespace Swift {
 
 std::string declaringModuleName(const Module& module, const Symbol& symbol) {
-  return symbol.declaringModule.empty() ? module.name : symbol.declaringModule;
+  if (!symbol.declaringModule.empty()) {
+    return symbol.declaringModule;
+  }
+  return symbol.module.empty() ? module.name : symbol.module;
 }
 
 std::string qualifiedTypeName(const Module& module, const Symbol& symbol) {
@@ -129,6 +132,10 @@ namespace {
 const char* frameworkOfObjCClass(llvm::StringRef name) {
   static const std::pair<const char*, const char*> prefixes[] = {
       {"UI", "UIKit"},
+      {"NSManaged", "CoreData"},
+      {"NSPersistent", "CoreData"},
+      {"NSFetch", "CoreData"},
+      {"NSEntity", "CoreData"},
       {"NS", "Foundation"},
       {"CL", "CoreLocation"},
       {"AV", "AVFoundation"},
@@ -206,6 +213,9 @@ std::string swiftImports(const Module& module,
     }
   }
   std::string out;
+  for (const auto& name : module.swiftModules()) {
+    out += "import " + name + "\n";
+  }
   for (const auto& overlay : overlays) {
     out += "import " + overlay + "\n";
   }
@@ -221,7 +231,8 @@ Invocation describeInvocation(const Module& module, const Symbol& symbol,
   Invocation invocation;
   const Symbol* owner =
       symbol.parentId.empty() ? nullptr : module.find(symbol.parentId);
-  invocation.owner = owner ? ownerTypeText(module, *owner) : module.name;
+  invocation.owner = owner ? ownerTypeText(module, *owner)
+                           : declaringModuleName(module, symbol);
   invocation.member = symbol.baseName;
   invocation.isThrowing = symbol.isThrowing;
   invocation.isAsync = capability.isAsync;

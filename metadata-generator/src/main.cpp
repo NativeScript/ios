@@ -47,7 +47,22 @@ llvm::cl::opt<string> cla_clangArgumentsDelimiter(llvm::cl::Positional, llvm::cl
 llvm::cl::list<string> cla_clangArguments(llvm::cl::ConsumeAfter, llvm::cl::desc("<clang arguments>..."));
 
 // Swift support
-llvm::cl::opt<string> cla_swiftSymbolGraphDir("swift-symbolgraph-dir", llvm::cl::desc("Directory containing Swift .symbolgraph files to import"), llvm::cl::value_desc("<dir_path>"));
+llvm::cl::list<string> cla_swiftSymbolGraphDir(
+    "swift-symbolgraph-dir",
+    llvm::cl::desc(
+        "Directory containing Swift .symbolgraph files to import (repeatable)"),
+    llvm::cl::value_desc("<dir_path>"));
+llvm::cl::list<string> cla_swiftReexports(
+    "swift-reexport",
+    llvm::cl::desc("<Detail>=<Module>: module Detail is an implementation "
+                   "detail Module re-exports; generated code names it through "
+                   "Module (repeatable; SwiftUICore=SwiftUI is implied)"),
+    llvm::cl::value_desc("<detail>=<module>"));
+llvm::cl::opt<string> cla_swiftUnit(
+    "swift-unit",
+    llvm::cl::desc("Generate every imported Swift module as one unit with this "
+                   "name: one thunk file, cross-module types and extensions"),
+    llvm::cl::value_desc("<name>"));
 llvm::cl::opt<bool>   cla_skipObjC("skip-objc", llvm::cl::desc("Skip Objective-C parsing and only run Swift symbolgraph import"), llvm::cl::init(false));
 llvm::cl::opt<string> cla_swiftIROutputDir(
     "swift-ir-output",
@@ -305,8 +320,9 @@ int main(int argc, const char** argv)
         // Swift: read symbol graphs and emit TS
         bool swiftFailed = false;
         if (!cla_swiftSymbolGraphDir.empty()) {
-          Swift::ModuleSet swiftModules =
-              Swift::loadSymbolGraphDirectory(cla_swiftSymbolGraphDir);
+          Swift::ModuleSet swiftModules = Swift::loadSymbolGraphDirectories(
+              std::vector<std::string>(cla_swiftSymbolGraphDir.begin(),
+                                       cla_swiftSymbolGraphDir.end()));
           for (const auto& diagnostic : swiftModules.diagnostics) {
             std::cerr << (diagnostic.severity == Swift::Severity::Error
                               ? "error"
@@ -354,6 +370,21 @@ int main(int argc, const char** argv)
             for (auto& entry : swiftModules.modules) {
               entry.second.platform.minimumVersion = target;
             }
+          }
+          if (!cla_swiftUnit.empty() && !swiftFailed) {
+            std::map<std::string, std::string> reexports = {
+                {"SwiftUICore", "SwiftUI"}};
+            for (const auto& entry : cla_swiftReexports) {
+              auto parts = llvm::StringRef(entry).split('=');
+              reexports[parts.first.str()] = parts.second.str();
+            }
+            for (auto it = reexports.begin(); it != reexports.end();) {
+              it = swiftModules.modules.count(it->second) ? std::next(it)
+                                                          : reexports.erase(it);
+            }
+            Swift::Module unit =
+                Swift::mergeUnit(swiftModules, cla_swiftUnit, reexports);
+            swiftModules.modules.emplace(unit.name, std::move(unit));
           }
 
           for (const auto& entry : swiftModules.modules) {
@@ -413,11 +444,13 @@ int main(int argc, const char** argv)
               classification = Swift::classify(module);
             }
             if (!cla_outputDtsFolder.empty()) {
-              TypeScript::SwiftDefinitionWriter swiftWriter(module,
-                                                            classification);
-              swiftFailed |= !writeFile(cla_outputDtsFolder,
-                                        "swift!" + module.name + ".d.ts",
-                                        swiftWriter.write());
+              for (const auto& name : module.swiftModules()) {
+                TypeScript::SwiftDefinitionWriter swiftWriter(
+                    module, classification, name);
+                swiftFailed |=
+                    !writeFile(cla_outputDtsFolder, "swift!" + name + ".d.ts",
+                               swiftWriter.write());
+              }
             }
             if (!cla_swiftCoverageOutputDir.empty()) {
               swiftFailed |= !writeFile(

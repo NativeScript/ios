@@ -11,7 +11,8 @@ let package = Package(
         .library(name: "SwiftDemoInterop", targets: ["SwiftDemoInterop"]),
     ],
     targets: [
-        .target(name: "SwiftDemo", path: "Sources/SwiftDemo"),
-        .target(name: "SwiftDemoInterop", dependencies: ["SwiftDemo"], path: "Interop"),
+        .target(name: "SwiftDemoKit", path: "Sources/SwiftDemoKit"),
+        .target(name: "SwiftDemo", dependencies: ["SwiftDemoKit"], path: "Sources/SwiftDemo"),
+        .target(name: "SwiftDemoInterop", dependencies: ["SwiftDemo", "SwiftDemoKit"], path: "Interop"),
     ]
 )

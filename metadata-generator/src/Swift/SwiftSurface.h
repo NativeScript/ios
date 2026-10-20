@@ -45,6 +45,8 @@ struct SwiftSurface {
     TypeKind kind;
     // Type index of the registered superclass, or -1.
     int superIndex;
+    // The Swift module whose JS namespace exposes the type.
+    std::string module;
   };
 
   struct Member {
@@ -52,6 +54,8 @@ struct SwiftSurface {
     const Capability* capability;
     // Type index, or -1 for module-level functions and variables.
     int owner;
+    // The owner's module, or the declaring module of a module-level member.
+    std::string module;
     MemberKind kind;
     int flags;
     std::string signature;

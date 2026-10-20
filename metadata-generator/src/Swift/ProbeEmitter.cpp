@@ -48,7 +48,6 @@ ProbeSource emitProbes(const Module& module,
       "for");
   out.line("// the Swift-generated surface of module " + module.name + ".");
   out.line("import Foundation");
-  out.line("import " + module.name);
   llvm::SmallVector<llvm::StringRef, 8> imports;
   std::string text = swiftImports(module, classification);
   llvm::StringRef(text).split(imports, '\n', -1, false);

@@ -17,6 +17,7 @@ namespace {
 constexpr int kRegisterModuleSlot = 10 * 8;
 constexpr int kRegisterTypeSlot = 11 * 8;
 constexpr int kRegisterMemberSlot = 12 * 8;
+constexpr int kRegisterUnitModuleSlot = 42 * 8;
 
 std::string quoted(const std::string& text) {
   std::string out = "\"";
@@ -38,7 +39,9 @@ class Emitter {
 
   ThunkSource run() {
     ThunkSource result;
-    result.registerSymbol = "ns_swift_register_" + _module.name;
+    for (const auto& name : _module.swiftModules()) {
+      result.registerSymbols.push_back("ns_swift_register_" + name);
+    }
 
     std::string thunks;
     for (const auto& member : _surface.members) {
@@ -393,16 +396,12 @@ class Emitter {
     Invocation invocation = describeInvocation(_module, symbol, capability);
     const Symbol* owner =
         symbol.parentId.empty() ? nullptr : _module.find(symbol.parentId);
-    int ownerIndex = member.owner;
-    int kind = member.kind;
     int flags = member.flags;
-    const std::string& signature = member.signature;
     const BridgedType& result = member.result;
 
-    if (kind == SwiftSurface::kEnumCase) {
-      // Case values are their names; nothing to call.
-      addRegistration(ownerIndex, kind, flags, capability.jsName, symbol.name,
-                      signature, "nil", "nil");
+    if (member.kind == SwiftSurface::kEnumCase) {
+      // Cases are values (names, or objects JS builds); nothing to call.
+      addRegistration(member, "nil", "nil");
       return "";
     }
 
@@ -490,21 +489,19 @@ class Emitter {
       setterName = "__nsThunk" + std::to_string(setterIndex);
     }
 
-    addRegistration(ownerIndex, kind, flags, capability.jsName, symbol.name,
-                    signature, "__nsThunk" + std::to_string(getterIndex),
+    addRegistration(member, "__nsThunk" + std::to_string(getterIndex),
                     setterName);
     return code;
   }
 
-  void addRegistration(int owner, int kind, int flags,
-                       const std::string& jsName, const std::string& swiftName,
-                       const std::string& signature, const std::string& thunk,
-                       const std::string& setter) {
+  void addRegistration(const SwiftSurface::Member& member,
+                       const std::string& thunk, const std::string& setter) {
     _registrations.push_back(
-        "  registerMember(registrar, " + std::to_string(owner) + ", " +
-        std::to_string(kind) + ", " + std::to_string(flags) + ", " +
-        quoted(jsName) + ", " + quoted(swiftName) + ", " + quoted(signature) +
-        ", " + thunk + ", " + setter + ")");
+        "  registerMember(registrar, " + std::to_string(member.owner) + ", " +
+        std::to_string(member.kind) + ", " + std::to_string(member.flags) +
+        ", " + quoted(member.module) + ", " +
+        quoted(member.capability->jsName) + ", " + quoted(member.symbol->name) +
+        ", " + quoted(member.signature) + ", " + thunk + ", " + setter + ")");
   }
 
   std::string header() const {
@@ -514,9 +511,7 @@ class Emitter {
                       "// NativeScript Swift interop thunks, ABI " +
                       std::to_string(kThunkABIVersion) +
                       ": see NativeScript/runtime/SwiftInterop.h.\n"
-                      "import Foundation\n"
-                      "import " +
-                      _module.name + "\n";
+                      "import Foundation\n";
     return out + swiftImports(_module, _classification) + "\n";
   }
 
@@ -1065,39 +1060,41 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
   }
 
   std::string registration(const ThunkSource& result) const {
-    std::string out = "#if hasAttribute(c)\n@c(" + result.registerSymbol +
-                      ")\n#else\n@_cdecl(\"" + result.registerSymbol +
-                      "\")\n#endif\n"
-                      "public func __nsRegister_" +
-                      _module.name +
-                      "(_ registrar: UnsafeMutableRawPointer) {\n"
-                      "  let api = registrar.load(as: UnsafeRawPointer.self)\n"
-                      "  let registerModule = api.load(fromByteOffset: " +
-                      std::to_string(kRegisterModuleSlot) +
-                      ", as: (@convention(c) (UnsafeMutableRawPointer, UInt32, "
-                      "UnsafePointer<CChar>, "
-                      "UnsafePointer<CChar>, __NSRelease) -> Void).self)\n"
-                      "  let registerType = api.load(fromByteOffset: " +
-                      std::to_string(kRegisterTypeSlot) +
-                      ", as: (@convention(c) (UnsafeMutableRawPointer, UInt32, "
-                      "UInt32, UnsafePointer<CChar>, "
-                      "UnsafePointer<CChar>, Int32) -> Void).self)\n"
-                      "  let registerMember = api.load(fromByteOffset: " +
-                      std::to_string(kRegisterMemberSlot) +
-                      ", as: (@convention(c) (UnsafeMutableRawPointer, Int32, "
-                      "UInt32, UInt32, "
-                      "UnsafePointer<CChar>, UnsafePointer<CChar>, "
-                      "UnsafePointer<CChar>, __NSThunk?, "
-                      "__NSThunk?) -> Void).self)\n\n"
-                      "  registerModule(registrar, " +
-                      std::to_string(kThunkABIVersion) + ", " +
-                      quoted(_module.name) + ", " + quoted(result.fingerprint) +
-                      ", __nsRelease)\n";
+    std::string out =
+        "private func __nsRegister(_ registrar: UnsafeMutableRawPointer) {\n"
+        "  let api = registrar.load(as: UnsafeRawPointer.self)\n"
+        "  let registerModule = api.load(fromByteOffset: " +
+        std::to_string(kRegisterModuleSlot) +
+        ", as: (@convention(c) (UnsafeMutableRawPointer, UInt32, "
+        "UnsafePointer<CChar>, "
+        "UnsafePointer<CChar>, __NSRelease) -> Void).self)\n"
+        "  let registerType = api.load(fromByteOffset: " +
+        std::to_string(kRegisterTypeSlot) +
+        ", as: (@convention(c) (UnsafeMutableRawPointer, UInt32, "
+        "UInt32, UnsafePointer<CChar>, UnsafePointer<CChar>, "
+        "UnsafePointer<CChar>, Int32) -> Void).self)\n"
+        "  let registerMember = api.load(fromByteOffset: " +
+        std::to_string(kRegisterMemberSlot) +
+        ", as: (@convention(c) (UnsafeMutableRawPointer, Int32, "
+        "UInt32, UInt32, UnsafePointer<CChar>, "
+        "UnsafePointer<CChar>, UnsafePointer<CChar>, "
+        "UnsafePointer<CChar>, __NSThunk?, "
+        "__NSThunk?) -> Void).self)\n"
+        "  let registerUnitModule = api.load(fromByteOffset: " +
+        std::to_string(kRegisterUnitModuleSlot) +
+        ", as: (@convention(c) (UnsafeMutableRawPointer, "
+        "UnsafePointer<CChar>) -> Void).self)\n\n"
+        "  registerModule(registrar, " +
+        std::to_string(kThunkABIVersion) + ", " + quoted(_module.name) + ", " +
+        quoted(result.fingerprint) + ", __nsRelease)\n";
+    for (const auto& name : _module.swiftModules()) {
+      out += "  registerUnitModule(registrar, " + quoted(name) + ")\n";
+    }
     for (const auto& type : _surface.types) {
       const Symbol& symbol = *type.symbol;
       int kind = type.kind;
       out += "  registerType(registrar, " + std::to_string(type.index) + ", " +
-             std::to_string(kind) + ", " +
+             std::to_string(kind) + ", " + quoted(type.module) + ", " +
              quoted(llvm::join(symbol.pathComponents, ".")) + ", " +
              quoted(qualifiedTypeName(_module, symbol)) + ", " +
              std::to_string(type.superIndex) + ")\n";
@@ -1105,7 +1102,16 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
     for (const auto& line : _registrations) {
       out += line + "\n";
     }
-    return out + "}\n";
+    out += "}\n";
+    for (size_t i = 0; i < result.registerSymbols.size(); i++) {
+      const std::string& symbol = result.registerSymbols[i];
+      out += "\n#if hasAttribute(c)\n@c(" + symbol + ")\n#else\n@_cdecl(\"" +
+             symbol + "\")\n#endif\npublic func __nsRegister_" +
+             _module.swiftModules()[i] +
+             "(_ registrar: UnsafeMutableRawPointer) {\n  "
+             "__nsRegister(registrar)\n}\n";
+    }
+    return out;
   }
 
   std::string fingerprint(const std::vector<std::string>& registrations) const {

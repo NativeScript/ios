@@ -46,6 +46,22 @@ the fixture sources together with the generated `Interop/` file, whose
 contents the generator tests keep identical to the generator's output. The
 fixture's `Package.swift` builds the same files as two SwiftPM modules.
 
+## Generation units
+
+Modules generated together form a unit: `--swift-unit <Name>` with one
+`--swift-symbolgraph-dir` per module writes one `<Name>+NativeScript.swift`
+and one `swift!<Module>.d.ts` per module. Within a unit, a module's
+declarations can take and return another module's types, and its extensions
+of those types become their members (`Money.doubled()` declared in SwiftDemo
+on SwiftDemoKit's `Money`). Every module keeps its own `ns:swift/<Module>`
+namespace; a type has one JS class wherever it appears.
+
+A module that is an implementation detail of another (SwiftUICore of
+SwiftUI) cannot be imported, so its declarations join the module that
+re-exports it: `--swift-reexport SwiftUICore=SwiftUI` (implied for that
+pair). Generate everything an app uses as one unit: modules of different
+units cannot share types.
+
 ## Value model
 
 | Swift | JavaScript |

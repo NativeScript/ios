@@ -47,4 +47,17 @@ class SymbolGraphLoader {
 // Convenience: find, load and resolve every graph under `directory`.
 ModuleSet loadSymbolGraphDirectory(const std::string& directory);
 
+// Every graph under each of `directories`, as one set.
+ModuleSet loadSymbolGraphDirectories(
+    const std::vector<std::string>& directories);
+
+// Merges the modules of `set` into one generation unit named `name`, so
+// declarations can name each other's types and extend them. Symbols keep
+// their own module (Symbol::module); a module's extensions of another
+// module's types become members of those types. `reexports` maps a module
+// that is an implementation detail of another (SwiftUICore -> SwiftUI) to
+// the module code imports and names it through; its symbols join that one.
+Module mergeUnit(ModuleSet& set, const std::string& name,
+                 const std::map<std::string, std::string>& reexports = {});
+
 }  // namespace Swift

@@ -94,6 +94,10 @@ const Symbol* Module::find(const std::string& preciseId) const {
   return it == symbols.end() ? nullptr : &it->second;
 }
 
+std::vector<std::string> Module::swiftModules() const {
+  return unitModules.empty() ? std::vector<std::string>{name} : unitModules;
+}
+
 bool ModuleSet::hasErrors() const {
   for (const auto& diagnostic : diagnostics) {
     if (diagnostic.severity == Severity::Error) {

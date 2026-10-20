@@ -18,9 +18,12 @@
 // Any change to a layout, an API table slot, a tag, a kind or a signature
 // code requires bumping NS_SWIFT_ABI_VERSION in both places.
 //
-// A Swift module `M` exposes one C symbol, `ns_swift_register_M`, taking an
-// NSSwiftRegistrar*. It registers the module, its types and its members with
-// the API table's register* entries. Each member carries a thunk:
+// Thunks are generated per unit: one or more Swift modules whose declarations
+// may name and extend each other's types. Every module `M` of a unit exposes
+// a C symbol, `ns_swift_register_M`, taking an NSSwiftRegistrar*; each
+// registers the whole unit (its modules, types and members) with the API
+// table's register* entries. Types and members name the module whose
+// `ns:swift/<M>` namespace exposes them. Each member carries a thunk:
 //
 //   void thunk(NSSwiftCall* call, const NSSwiftValue* args, intptr_t count)
 //
@@ -37,7 +40,7 @@
 // calls it by reporting the arguments as an array: callbackBegin, each
 // argument through the complete* entries, then completeArrayEnd.
 
-#define NS_SWIFT_ABI_VERSION 7
+#define NS_SWIFT_ABI_VERSION 8
 
 #ifdef __cplusplus
 extern "C" {
@@ -185,20 +188,23 @@ struct NSSwiftAPI {
                              intptr_t typeLength);
   /* 9 */ void (*throwTypeError)(NSSwiftCall* call, const uint8_t* message,
                                  intptr_t length);
+  // `name` names the unit.
   /* 10 */ void (*registerModule)(NSSwiftRegistrar* registrar,
                                   uint32_t abiVersion, const char* name,
                                   const char* fingerprint,
                                   NSSwiftRelease release);
   // `superIndex` is the type index of a registered superclass, or -1.
   /* 11 */ void (*registerType)(NSSwiftRegistrar* registrar, uint32_t index,
-                                uint32_t kind, const char* jsName,
-                                const char* swiftName, int32_t superIndex);
-  // `owner` is a type index, or -1 for module-level functions and variables.
+                                uint32_t kind, const char* module,
+                                const char* jsName, const char* swiftName,
+                                int32_t superIndex);
+  // `owner` is a type index, or -1 for module-level functions and
+  // variables; a member of a type belongs to the type's module.
   /* 12 */ void (*registerMember)(NSSwiftRegistrar* registrar, int32_t owner,
                                   uint32_t kind, uint32_t flags,
-                                  const char* jsName, const char* swiftName,
-                                  const char* signature, NSSwiftThunk thunk,
-                                  NSSwiftThunk setter);
+                                  const char* module, const char* jsName,
+                                  const char* swiftName, const char* signature,
+                                  NSSwiftThunk thunk, NSSwiftThunk setter);
 
   // Async calls. beginAsync makes the call's JS result a Promise and returns
   // a token; exactly one complete* entry settles it. Those may be called from
@@ -256,6 +262,10 @@ struct NSSwiftAPI {
   // An Objective-C object, retained (+1); the runtime takes ownership.
   /* 40 */ void (*returnObjC)(NSSwiftCall* call, void* object);
   /* 41 */ void (*completeObjC)(void* token, void* object);
+
+  // A Swift module of the unit, registered before its types and members.
+  /* 42 */ void (*registerUnitModule)(NSSwiftRegistrar* registrar,
+                                      const char* name);
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);

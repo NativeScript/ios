@@ -1253,6 +1253,9 @@ ModuleSet SymbolGraphLoader::finish() {
   ModuleSet result;
   for (auto& entry : _modules) {
     resolve(entry.second, _diagnostics);
+    for (auto& symbol : entry.second.symbols) {
+      symbol.second.module = entry.second.name;
+    }
   }
   result.modules = std::move(_modules);
   result.diagnostics = std::move(_diagnostics);
@@ -1260,20 +1263,103 @@ ModuleSet SymbolGraphLoader::finish() {
 }
 
 ModuleSet loadSymbolGraphDirectory(const std::string& directory) {
-  std::vector<Diagnostic> diagnostics;
-  auto files = SymbolGraphLoader::findGraphFiles(directory, diagnostics);
+  return loadSymbolGraphDirectories({directory});
+}
 
+ModuleSet loadSymbolGraphDirectories(
+    const std::vector<std::string>& directories) {
+  std::vector<Diagnostic> diagnostics;
   SymbolGraphLoader loader;
-  for (const auto& file : files) {
-    llvm::StringRef relative = file;
-    relative.consume_front(directory);
-    relative = relative.ltrim('/');
-    loader.addFile(file, relative.str());
+  for (const auto& directory : directories) {
+    auto files = SymbolGraphLoader::findGraphFiles(directory, diagnostics);
+    for (const auto& file : files) {
+      llvm::StringRef relative = file;
+      relative.consume_front(directory);
+      relative = relative.ltrim('/');
+      loader.addFile(file, relative.str());
+    }
   }
   ModuleSet result = loader.finish();
   result.diagnostics.insert(result.diagnostics.begin(), diagnostics.begin(),
                             diagnostics.end());
   return result;
+}
+
+Module mergeUnit(ModuleSet& set, const std::string& name,
+                 const std::map<std::string, std::string>& reexports) {
+  Module unit;
+  unit.name = name;
+  for (auto& entry : set.modules) {
+    Module& module = entry.second;
+    if (unit.unitModules.empty()) {
+      unit.platform = module.platform;
+      unit.formatVersion = module.formatVersion;
+      unit.generator = module.generator;
+    }
+    auto reexport = reexports.find(module.name);
+    std::string owner =
+        reexport == reexports.end() ? module.name : reexport->second;
+    if (std::find(unit.unitModules.begin(), unit.unitModules.end(), owner) ==
+        unit.unitModules.end()) {
+      unit.unitModules.push_back(owner);
+    }
+    if (owner != module.name) {
+      for (auto& symbol : module.symbols) {
+        symbol.second.module = owner;
+      }
+    }
+    unit.graphFiles.insert(unit.graphFiles.end(), module.graphFiles.begin(),
+                           module.graphFiles.end());
+    for (auto& symbol : module.symbols) {
+      unit.symbols.emplace(symbol.first, std::move(symbol.second));
+    }
+    for (auto& external : module.externalNames) {
+      unit.externalNames.insert(external);
+    }
+    unit.relationships.insert(unit.relationships.end(),
+                              module.relationships.begin(),
+                              module.relationships.end());
+    unit.topLevelIds.insert(unit.topLevelIds.end(), module.topLevelIds.begin(),
+                            module.topLevelIds.end());
+  }
+  // Extensions of a type another module of the unit declares.
+  for (auto& entry : set.modules) {
+    for (auto& external : entry.second.externalTypes) {
+      auto target = unit.symbols.find(external.first);
+      if (target == unit.symbols.end()) {
+        ExternalType& kept = unit.externalTypes[external.first];
+        if (kept.preciseId.empty()) {
+          kept = external.second;
+        } else {
+          kept.memberIds.insert(kept.memberIds.end(),
+                                external.second.memberIds.begin(),
+                                external.second.memberIds.end());
+          kept.conformances.insert(kept.conformances.end(),
+                                   external.second.conformances.begin(),
+                                   external.second.conformances.end());
+        }
+        continue;
+      }
+      Symbol& type = target->second;
+      for (const auto& id : external.second.memberIds) {
+        if (std::find(type.memberIds.begin(), type.memberIds.end(), id) ==
+            type.memberIds.end()) {
+          type.memberIds.push_back(id);
+        }
+      }
+      for (const auto& id : external.second.conformances) {
+        if (std::find(type.conformances.begin(), type.conformances.end(), id) ==
+            type.conformances.end()) {
+          type.conformances.push_back(id);
+        }
+      }
+    }
+  }
+  for (const auto& id : unit.symbols) {
+    unit.externalNames.erase(id.first);
+  }
+  set.modules.clear();
+  return unit;
 }
 
 }  // namespace Swift

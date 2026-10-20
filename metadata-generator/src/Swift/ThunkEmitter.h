@@ -9,12 +9,13 @@ namespace Swift {
 
 // ABI version the emitted thunks implement; must match NS_SWIFT_ABI_VERSION
 // in NativeScript/runtime/SwiftInterop.h, which documents the contract.
-constexpr int kThunkABIVersion = 7;
+constexpr int kThunkABIVersion = 8;
 
 struct ThunkSource {
   std::string source;
-  // Exported C symbol the runtime calls to register the module.
-  std::string registerSymbol;
+  // Exported C symbols the runtime looks up to register the unit, one per
+  // Swift module (`ns_swift_register_<Module>`); each registers all of it.
+  std::vector<std::string> registerSymbols;
   // Changes whenever the registered surface changes.
   std::string fingerprint;
   int thunkCount = 0;

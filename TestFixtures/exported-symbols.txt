@@ -222,3 +222,4 @@ __SCNVector4FromFloat4
 __SCNMatrix4FromMat4
 _getStructFromCallback
 _ns_swift_register_SwiftDemo
+_ns_swift_register_SwiftDemoKit
