@@ -61,6 +61,9 @@ enum class Bridge {
   // A closure parameter returning Void: a JS function. `elements` holds the
   // closure's parameters.
   Closure,
+  // An Objective-C class instance: NativeScript's ordinary Objective-C
+  // wrapper, with the same identity Objective-C calls give it.
+  ObjCObject,
 };
 
 struct BridgedType {
@@ -68,6 +71,8 @@ struct BridgedType {
   bool optional = false;
   // Nominal bridges: the module symbol the type refers to.
   std::string symbolId;
+  // ObjCObject: the class's Objective-C runtime name.
+  std::string objcClass;
   TypeNode node;
   // Array and Dictionary: the element (value) type. Closure: its
   // parameters.

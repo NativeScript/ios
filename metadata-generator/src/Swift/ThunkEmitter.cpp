@@ -109,6 +109,8 @@ class Emitter {
         return {read("bytes"), false};
       case Bridge::ClassHandle:
         return {read("object") + " as? " + typeName(type.symbolId), true};
+      case Bridge::ObjCObject:
+        return {read("object") + " as? " + valueTypeName(type), true};
       case Bridge::StructBox:
         return {"(" + read("object") + " as? __NSBox<" +
                     typeName(type.symbolId) + ">)?.value",
@@ -208,6 +210,8 @@ class Emitter {
       case Bridge::ClassHandle:
       case Bridge::StructBox:
         return typeName(type.symbolId);
+      case Bridge::ObjCObject:
+        return "a " + valueTypeName(type);
       default:
         return valueTypeName(type);
     }
@@ -245,6 +249,8 @@ class Emitter {
       case Bridge::StructBox:
         return reporter + ".returnObject(__NSBox(" + value + "), " +
                std::to_string(typeIndexOf(type.symbolId)) + ")";
+      case Bridge::ObjCObject:
+        return reporter + ".returnObjC(" + value + ")";
       case Bridge::EnumCase:
         return reporter + ".returnString(__nsEnumName" +
                std::to_string(typeIndexOf(type.symbolId)) + "(" + value + "))";
@@ -511,18 +517,7 @@ class Emitter {
                       "import Foundation\n"
                       "import " +
                       _module.name + "\n";
-    std::set<std::string> overlays;
-    for (const auto& entry : _module.symbols) {
-      const Capability* capability = _classification.find(entry.first);
-      if (capability && capability->tier == Tier::SwiftGenerated &&
-          !entry.second.declaringModule.empty()) {
-        overlays.insert(entry.second.declaringModule);
-      }
-    }
-    for (const auto& overlay : overlays) {
-      out += "import " + overlay + "\n";
-    }
-    return out + "\n";
+    return out + swiftImports(_module, _classification) + "\n";
   }
 
   static std::string support() {
@@ -549,6 +544,7 @@ private protocol __NSReporter {
   func returnMap<Value>(_ values: [String: Value], _ each: (String, Value) -> Void)
   func returnObject(_ object: AnyObject, _ typeIndex: UInt32)
   func returnCase(_ index: Int, _ values: () -> Void)
+  func returnObjC(_ object: AnyObject)
 }
 
 // Reads arguments (24-byte slots) and reports results through the runtime's
@@ -689,6 +685,10 @@ private struct __NSCall: __NSReporter {
     slot(7, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer, UInt32) -> Void).self)(
       call, Unmanaged.passRetained(object).toOpaque(), typeIndex)
   }
+  func returnObjC(_ object: AnyObject) {
+    slot(40, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void).self)(
+      call, Unmanaged.passRetained(object).toOpaque())
+  }
   func throwError(_ error: any Error) {
     report(String(describing: error), String(reflecting: type(of: error)))
   }
@@ -781,6 +781,10 @@ private struct __NSCompletion: @unchecked Sendable, __NSReporter {
   func returnObject(_ object: AnyObject, _ typeIndex: UInt32) {
     slot(21, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer, UInt32) -> Void).self)(
       token, Unmanaged.passRetained(object).toOpaque(), typeIndex)
+  }
+  func returnObjC(_ object: AnyObject) {
+    slot(41, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void).self)(
+      token, Unmanaged.passRetained(object).toOpaque())
   }
   func throwError(_ error: any Error) {
     var message = String(describing: error)

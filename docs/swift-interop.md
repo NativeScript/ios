@@ -65,6 +65,7 @@ fixture's `Package.swift` builds the same files as two SwiftPM modules.
 | `[T]` | array copy |
 | `[String: T]` | plain object copy |
 | `(A, B) -> Void` (parameters only) | `function (a, b)` |
+| Objective-C class (`UIView`, an `NSObject` subclass) | NativeScript's ordinary Objective-C wrapper, with the identity Objective-C calls give it |
 
 Collections are copied in both directions; their elements follow the same
 table (optional elements are not supported yet), and dictionary keys must be
@@ -76,6 +77,13 @@ unlabeled values are keyed by position (`{ case: "sum", 0: a, 1: b }`).
 TypeScript declares the enum as a union of its cases, so `switch (m.case)`
 narrows. An enum is bridged only when every case's values are; recursive
 (`indirect`) enums are.
+
+Thunks import the framework an Objective-C class most likely comes from
+(`UIView` -> UIKit), guessed from its prefix since symbol graphs do not
+record it; compiler verification drops declarations whose types still do not
+resolve. TypeScript names these classes by their global `@nativescript/types`
+name, and Swift classes without `@objc(Name)` as `NSObject`. Swift-only
+members of Objective-C-visible Swift classes are not exposed yet.
 
 Structs have value semantics: reading a struct-typed property, passing a struct
 argument, or returning one copies it, so a JS object never aliases another

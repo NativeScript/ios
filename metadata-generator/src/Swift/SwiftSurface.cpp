@@ -107,6 +107,9 @@ std::string signatureCode(const SwiftSurface& surface,
     case Bridge::TaggedEnum:
       code = "t" + std::to_string(surface.indexOf(type.symbolId));
       break;
+    case Bridge::ObjCObject:
+      code = "@" + type.objcClass;
+      break;
     case Bridge::Date:
       code = "D";
       break;

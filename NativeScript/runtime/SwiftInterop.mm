@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include "ArgConverter.h"
 #include "Caches.h"
 #include "DataWrapper.h"
 #include "EventLoop.h"
@@ -53,6 +54,7 @@ struct ValueCode {
     Map,
     Function,
     Tagged,
+    ObjC,
   };
   Kind kind = Kind::Void;
   int bits = 64;
@@ -60,6 +62,9 @@ struct ValueCode {
   bool optional = false;
   // A parameter passed as a reference object (`&` prefix).
   bool inout = false;
+  // ObjC: the class's runtime name, and the class when it is loaded.
+  std::string className;
+  Class objcClass = nil;
   // Array and Map: the element (value) code. Function: its parameter codes.
   std::vector<ValueCode> element;
 };
@@ -170,6 +175,11 @@ bool ParseCode(std::string text, ValueCode& code) {
     case 't':
       code.kind = ValueCode::Kind::Tagged;
       return number(text.substr(1), code.typeIndex);
+    case '@':
+      code.kind = ValueCode::Kind::ObjC;
+      code.className = text.substr(1);
+      code.objcClass = NSClassFromString([NSString stringWithUTF8String:code.className.c_str()]);
+      return !code.className.empty();
     default:
       return false;
   }
@@ -363,6 +373,9 @@ std::string TypeDisplayName(const ModuleInfo& module, const ValueCode& code) {
         name = "(" + name + ")";
       }
       break;
+    case ValueCode::Kind::ObjC:
+      name = code.className;
+      break;
   }
   return (code.inout ? "inout " : "") + (code.optional ? name + "?" : name);
 }
@@ -490,6 +503,8 @@ void ApiReturnCaseBegin(NSSwiftCall* call, intptr_t caseIndex);
 void ApiCompleteCaseBegin(void* token, intptr_t caseIndex);
 void ApiWriteBackBegin(NSSwiftCall* call, intptr_t index);
 void ApiWriteBackEnd(NSSwiftCall* call);
+void ApiReturnObjC(NSSwiftCall* call, void* object);
+void ApiCompleteObjC(void* token, void* object);
 
 const NSSwiftAPI kAPI = {
     ApiReturnVoid,           ApiReturnBool,           ApiReturnInt64,
@@ -505,7 +520,7 @@ const NSSwiftAPI kAPI = {
     ApiCompleteContainerEnd, ApiCallbackBegin,        ApiCallbackRetain,
     ApiCallbackRelease,      ApiReturnCaseBegin,      ApiCompleteCaseBegin,
     ApiReturnArrayEnd,       ApiCompleteContainerEnd, ApiWriteBackBegin,
-    ApiWriteBackEnd,
+    ApiWriteBackEnd,         ApiReturnObjC,           ApiCompleteObjC,
 };
 
 // "Polygon.Style" -> "Style".
@@ -851,6 +866,48 @@ void ThrowRange(CallContext* context, const std::string& what) {
       tns::ToV8String(context->isolate, RangeMessage(what, context->member->swiftName))));
 }
 
+// NativeScript's wrapper of `object`, taking over a +1 reference to it.
+MaybeLocal<Value> WrapObjC(Isolate* isolate, Local<Context> context, id object) {
+  if (object == nil) {
+    return v8::Null(isolate);
+  }
+  Local<Value> result;
+  auto cached = ArgConverter::FindCachedInstance(isolate, Caches::Get(isolate), object);
+  if (cached != nullptr) {
+    result = cached->Get(isolate);
+  } else {
+    ObjCDataWrapper* wrapper = new ObjCDataWrapper(object);
+    result = ArgConverter::ConvertArgument(context, wrapper);
+    tns::DeleteWrapperIfUnused(isolate, result, wrapper);
+  }
+  [object release];
+  return result.IsEmpty() ? MaybeLocal<Value>() : MaybeLocal<Value>(result);
+}
+
+// The Objective-C object a NativeScript wrapper holds, or nil.
+id ObjCObjectOf(Isolate* isolate, Local<Value> value) {
+  if (!value->IsObject()) {
+    return nil;
+  }
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+  return wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject
+             ? static_cast<ObjCDataWrapper*>(wrapper)->Data()
+             : nil;
+}
+
+bool IsObjCInstance(id object, const ValueCode& code) {
+  return object != nil && (code.objcClass == nil || [object isKindOfClass:code.objcClass]);
+}
+
+void ApiReturnObjC(NSSwiftCall* call, void* object) {
+  CallContext* context = ContextOf(call);
+  Local<Value> value;
+  if (!WrapObjC(context->isolate, context->context, static_cast<id>(object)).ToLocal(&value)) {
+    return Fail(context);
+  }
+  Complete(context, value);
+}
+
 // A Uint8Array holding a copy of `bytes`.
 MaybeLocal<Value> MakeBytes(Isolate* isolate, const uint8_t* bytes, size_t length) {
   Local<v8::ArrayBuffer> buffer = v8::ArrayBuffer::New(isolate, length);
@@ -1170,6 +1227,7 @@ struct AsyncOutcome {
     Array,
     Map,
     Case,
+    ObjC,
   };
   Kind kind = Kind::Void;
   bool boolean = false;
@@ -1271,6 +1329,12 @@ bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
       }
       out = wrapper;
       return true;
+    }
+    case AsyncOutcome::Kind::ObjC: {
+      id object = static_cast<id>(node.object);
+      node.object = nullptr;
+      return WrapObjC(isolate, context, object).ToLocal(&out) ||
+             failed("returned an object JavaScript cannot wrap");
     }
     case AsyncOutcome::Kind::Array: {
       if (code.element.empty()) {
@@ -1624,6 +1688,12 @@ void ApiCompleteMapBegin(void* token, intptr_t /*count*/) {
   Emit(token, Outcome(AsyncOutcome::Kind::Map));
 }
 
+void ApiCompleteObjC(void* token, void* object) {
+  auto outcome = Outcome(AsyncOutcome::Kind::ObjC);
+  outcome->object = object;
+  Emit(token, outcome);
+}
+
 void ApiCompleteCaseBegin(void* token, intptr_t caseIndex) {
   auto outcome = Outcome(AsyncOutcome::Kind::Case);
   outcome->int64 = caseIndex;
@@ -1700,6 +1770,8 @@ bool Accepts(Isolate* isolate, const ModuleInfo& module, const ValueCode& code,
     }
     case ValueCode::Kind::Function:
       return value->IsFunction();
+    case ValueCode::Kind::ObjC:
+      return IsObjCInstance(ObjCObjectOf(isolate, value), code);
     case ValueCode::Kind::Void:
       return false;
   }
@@ -2020,6 +2092,16 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
       slot.tag = NSSwiftTagCase;
       slot.payload.object = values.data();
       slot.length = values.size();
+      return true;
+    }
+
+    case ValueCode::Kind::ObjC: {
+      id object = ObjCObjectOf(isolate, value);
+      if (!IsObjCInstance(object, code)) {
+        return ThrowArgument(isolate, member, index, "must be a " + code.className);
+      }
+      slot.tag = NSSwiftTagObjC;
+      slot.payload.object = object;
       return true;
     }
 

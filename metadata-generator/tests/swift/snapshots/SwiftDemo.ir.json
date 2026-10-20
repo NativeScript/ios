@@ -72,7 +72,15 @@
     "s:9SwiftDemo6append_2toySS_SaySSGztF",
     "s:9SwiftDemo5halveyySizKF",
     "s:9SwiftDemo5clearyySSSgzF",
-    "s:9SwiftDemo12swapTrackersyyAA7TrackerCz_ADztF"
+    "s:9SwiftDemo12swapTrackersyyAA7TrackerCz_ADztF",
+    "s:9SwiftDemo8describeySSSo6UIViewCF",
+    "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
+    "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
+    "s:9SwiftDemo12firstSubview2ofSo6UIViewCSgAE_tF",
+    "c:@M@SwiftDemo@objc(cs)Note",
+    "s:9SwiftDemo8makeNoteyAA0D0CSSF",
+    "s:9SwiftDemo4text2ofSSAA4NoteC_tF",
+    "s:9SwiftDemo9noteLateryAA4NoteCSSYaF"
   ],
   "externalTypes": [
     {
@@ -95,6 +103,8 @@
     }
   ],
   "externalNames": {
+    "c:objc(cs)NSObject": "ObjectiveC.NSObject",
+    "c:objc(pl)NSObject": "ObjectiveC.NSObjectProtocol",
     "s:SH": "Swift.Hashable",
     "s:SQ": "Swift.Equatable",
     "s:SS": "Swift.String",
@@ -103,12 +113,40 @@
     "s:ScA": "_Concurrency.Actor",
     "s:s16SendableMetatypeP": "Swift.SendableMetatype",
     "s:s23CustomStringConvertibleP": "Swift.CustomStringConvertible",
+    "s:s28CustomDebugStringConvertibleP": "Swift.CustomDebugStringConvertible",
     "s:s5ErrorP": "Swift.Error",
+    "s:s7CVarArgP": "Swift.CVarArg",
     "s:s8CopyableP": "Swift.Copyable",
     "s:s8SendableP": "Swift.Sendable",
     "s:s9EscapableP": "Swift.Escapable"
   },
   "symbols": [
+    {
+      "id": "c:@M@SwiftDemo@objc(cs)Note",
+      "kind": "class",
+      "path": "Note",
+      "name": "Note",
+      "access": "public",
+      "declaration": "final class Note",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Views.swift:17:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo4NoteC4textSSvp",
+        "s:9SwiftDemo4NoteC4textACSS_tcfc"
+      ],
+      "conformances": [
+        "c:objc(pl)NSObject",
+        "s:SH",
+        "s:SQ",
+        "s:s23CustomStringConvertibleP",
+        "s:s28CustomDebugStringConvertibleP",
+        "s:s7CVarArgP"
+      ],
+      "superclass": "c:objc(cs)NSObject"
+    },
     {
       "id": "s:9SwiftDemo0B0C",
       "kind": "class",
@@ -716,6 +754,34 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo12firstSubview2ofSo6UIViewCSgAE_tF",
+      "kind": "function",
+      "path": "firstSubview(of:)",
+      "name": "firstSubview(of:)",
+      "access": "public",
+      "declaration": "func firstSubview(of view: UIView) -> UIView?",
+      "parameters": [
+        {
+          "label": "of",
+          "internalName": "view",
+          "type": {
+            "spelling": "UIView",
+            "references": [
+              "c:objc(cs)UIView"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "UIView?",
+        "references": [
+          "c:objc(cs)UIView"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:15:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo12measureLateryAA11MeasurementOSdYaF",
       "kind": "function",
       "path": "measureLater(_:)",
@@ -806,6 +872,8 @@
         "s:9SwiftDemo13PrecipitationO4noneyA2CmF",
         "s:9SwiftDemo13PrecipitationO8rawValueACSgSS_tcfc",
         "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo13PrecipitationO",
+        "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE013rawAttachmentD14RepresentationAA0cfD0Vvp::SYNTHESIZED::s:9SwiftDemo13PrecipitationO",
+        "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE08makeFromf10AttachmentD0yxSgAA0cfD0VFZ::SYNTHESIZED::s:9SwiftDemo13PrecipitationO",
         "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo13PrecipitationO",
         "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF::SYNTHESIZED::s:9SwiftDemo13PrecipitationO"
       ],
@@ -1054,6 +1122,48 @@
       "location": "file://Sources/SwiftDemo/Values.swift:160:19",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo3JobO6TicketV"
+    },
+    {
+      "id": "s:9SwiftDemo4NoteC4textACSS_tcfc",
+      "kind": "initializer",
+      "path": "Note.init(text:)",
+      "name": "init(text:)",
+      "access": "public",
+      "declaration": "init(text: String)",
+      "parameters": [
+        {
+          "label": "text",
+          "internalName": "text",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Views.swift:19:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "c:@M@SwiftDemo@objc(cs)Note"
+    },
+    {
+      "id": "s:9SwiftDemo4NoteC4textSSvp",
+      "kind": "instanceProperty",
+      "path": "Note.text",
+      "name": "text",
+      "access": "public",
+      "declaration": "let text: String",
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "let": true,
+      "location": "file://Sources/SwiftDemo/Views.swift:18:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "c:@M@SwiftDemo@objc(cs)Note"
     },
     {
       "id": "s:9SwiftDemo4RingV",
@@ -1338,6 +1448,61 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:68:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
+      "kind": "function",
+      "path": "tags(_:)",
+      "name": "tags(_:)",
+      "access": "public",
+      "declaration": "func tags(_ views: [UIView]) -> [Int]",
+      "parameters": [
+        {
+          "internalName": "views",
+          "type": {
+            "spelling": "[UIView]",
+            "references": [
+              "c:objc(cs)UIView"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[Int]",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:13:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo4text2ofSSAA4NoteC_tF",
+      "kind": "function",
+      "path": "text(of:)",
+      "name": "text(of:)",
+      "access": "public",
+      "declaration": "func text(of note: Note) -> String",
+      "parameters": [
+        {
+          "label": "of",
+          "internalName": "note",
+          "type": {
+            "spelling": "Note",
+            "references": [
+              "c:@M@SwiftDemo@objc(cs)Note"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:23:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -1738,6 +1903,8 @@
         "s:9SwiftDemo6FlavorO11descriptionSSvp",
         "s:9SwiftDemo6FlavorO8rawValueACSgSi_tcfc",
         "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo6FlavorO",
+        "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE013rawAttachmentD14RepresentationAA0cfD0Vvp::SYNTHESIZED::s:9SwiftDemo6FlavorO",
+        "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE08makeFromf10AttachmentD0yxSgAA0cfD0VFZ::SYNTHESIZED::s:9SwiftDemo6FlavorO",
         "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo6FlavorO",
         "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF::SYNTHESIZED::s:9SwiftDemo6FlavorO"
       ],
@@ -3031,6 +3198,8 @@
         "s:9SwiftDemo7PolygonC5StyleO6dashedyA2EmF",
         "s:9SwiftDemo7PolygonC5StyleO8rawValueAESgSS_tcfc",
         "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO",
+        "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE013rawAttachmentD14RepresentationAA0cfD0Vvp::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO",
+        "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE08makeFromf10AttachmentD0yxSgAA0cfD0VFZ::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO",
         "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO",
         "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO"
       ],
@@ -3821,6 +3990,33 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo8describeySSSo6UIViewCF",
+      "kind": "function",
+      "path": "describe(_:)",
+      "name": "describe(_:)",
+      "access": "public",
+      "declaration": "func describe(_ view: UIView) -> String",
+      "parameters": [
+        {
+          "internalName": "view",
+          "type": {
+            "spelling": "UIView",
+            "references": [
+              "c:objc(cs)UIView"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:5:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo8echoInt8ys0D0VADF",
       "kind": "function",
       "path": "echoInt8(_:)",
@@ -3845,6 +4041,33 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:10:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8makeNoteyAA0D0CSSF",
+      "kind": "function",
+      "path": "makeNote(_:)",
+      "name": "makeNote(_:)",
+      "access": "public",
+      "declaration": "func makeNote(_ text: String) -> Note",
+      "parameters": [
+        {
+          "internalName": "text",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Note",
+        "references": [
+          "c:@M@SwiftDemo@objc(cs)Note"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:22:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -3959,6 +4182,64 @@
         }
       ],
       "location": "file://Sources/SwiftDemo/Values.swift:74:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
+      "kind": "function",
+      "path": "makeLabel(_:)",
+      "name": "makeLabel(_:)",
+      "access": "public",
+      "declaration": "@MainActor func makeLabel(_ text: String) -> UILabel",
+      "attributes": [
+        "@MainActor"
+      ],
+      "parameters": [
+        {
+          "internalName": "text",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "UILabel",
+        "references": [
+          "c:objc(cs)UILabel"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:7:23",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo9noteLateryAA4NoteCSSYaF",
+      "kind": "function",
+      "path": "noteLater(_:)",
+      "name": "noteLater(_:)",
+      "access": "public",
+      "declaration": "func noteLater(_ text: String) async -> Note",
+      "parameters": [
+        {
+          "internalName": "text",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Note",
+        "references": [
+          "c:@M@SwiftDemo@objc(cs)Note"
+        ]
+      },
+      "async": true,
+      "location": "file://Sources/SwiftDemo/Views.swift:25:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -4130,6 +4411,381 @@
       "location": "file://Sources/SwiftDemo/Extensions.swift:18:15",
       "graph": "SwiftDemo@Swift.symbols.json",
       "parent": "s:SS"
+    },
+    {
+      "id": "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE013rawAttachmentD14RepresentationAA0cfD0Vvp::SYNTHESIZED::s:9SwiftDemo13PrecipitationO",
+      "kind": "instanceProperty",
+      "path": "Precipitation.rawAttachmentValueRepresentation",
+      "name": "rawAttachmentValueRepresentation",
+      "access": "public",
+      "declaration": "var rawAttachmentValueRepresentation: CVAttachmentRawValue { get }",
+      "synthesized": true,
+      "valueType": {
+        "spelling": "CVAttachmentRawValue",
+        "references": [
+          "s:9CoreVideo20CVAttachmentRawValueV"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self.RawValue",
+            "rhs": "CVAttachmentValueRepresentable",
+            "rhsPrecise": "s:9CoreVideo30CVAttachmentValueRepresentableP"
+          }
+        ]
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "27.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo13PrecipitationO",
+      "sourceOrigin": "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE013rawAttachmentD14RepresentationAA0cfD0Vvp"
+    },
+    {
+      "id": "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE013rawAttachmentD14RepresentationAA0cfD0Vvp::SYNTHESIZED::s:9SwiftDemo6FlavorO",
+      "kind": "instanceProperty",
+      "path": "Flavor.rawAttachmentValueRepresentation",
+      "name": "rawAttachmentValueRepresentation",
+      "access": "public",
+      "declaration": "var rawAttachmentValueRepresentation: CVAttachmentRawValue { get }",
+      "synthesized": true,
+      "valueType": {
+        "spelling": "CVAttachmentRawValue",
+        "references": [
+          "s:9CoreVideo20CVAttachmentRawValueV"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self.RawValue",
+            "rhs": "CVAttachmentValueRepresentable",
+            "rhsPrecise": "s:9CoreVideo30CVAttachmentValueRepresentableP"
+          }
+        ]
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "27.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6FlavorO",
+      "sourceOrigin": "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE013rawAttachmentD14RepresentationAA0cfD0Vvp"
+    },
+    {
+      "id": "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE013rawAttachmentD14RepresentationAA0cfD0Vvp::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO",
+      "kind": "instanceProperty",
+      "path": "Polygon.Style.rawAttachmentValueRepresentation",
+      "name": "rawAttachmentValueRepresentation",
+      "access": "public",
+      "declaration": "var rawAttachmentValueRepresentation: CVAttachmentRawValue { get }",
+      "synthesized": true,
+      "valueType": {
+        "spelling": "CVAttachmentRawValue",
+        "references": [
+          "s:9CoreVideo20CVAttachmentRawValueV"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self.RawValue",
+            "rhs": "CVAttachmentValueRepresentable",
+            "rhsPrecise": "s:9CoreVideo30CVAttachmentValueRepresentableP"
+          }
+        ]
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "27.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC5StyleO",
+      "sourceOrigin": "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE013rawAttachmentD14RepresentationAA0cfD0Vvp"
+    },
+    {
+      "id": "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE08makeFromf10AttachmentD0yxSgAA0cfD0VFZ::SYNTHESIZED::s:9SwiftDemo13PrecipitationO",
+      "kind": "typeMethod",
+      "path": "Precipitation.makeFromRawAttachmentValue(_:)",
+      "name": "makeFromRawAttachmentValue(_:)",
+      "access": "public",
+      "declaration": "static func makeFromRawAttachmentValue(_ repr: CVAttachmentRawValue) -> Self?",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "repr",
+          "type": {
+            "spelling": "CVAttachmentRawValue",
+            "references": [
+              "s:9CoreVideo20CVAttachmentRawValueV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Self?"
+      },
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "Self.RawValue",
+          "rhs": "CVAttachmentValueRepresentable",
+          "rhsPrecise": "s:9CoreVideo30CVAttachmentValueRepresentableP"
+        }
+      ],
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self.RawValue",
+            "rhs": "CVAttachmentValueRepresentable",
+            "rhsPrecise": "s:9CoreVideo30CVAttachmentValueRepresentableP"
+          }
+        ]
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "27.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo13PrecipitationO",
+      "sourceOrigin": "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE08makeFromf10AttachmentD0yxSgAA0cfD0VFZ"
+    },
+    {
+      "id": "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE08makeFromf10AttachmentD0yxSgAA0cfD0VFZ::SYNTHESIZED::s:9SwiftDemo6FlavorO",
+      "kind": "typeMethod",
+      "path": "Flavor.makeFromRawAttachmentValue(_:)",
+      "name": "makeFromRawAttachmentValue(_:)",
+      "access": "public",
+      "declaration": "static func makeFromRawAttachmentValue(_ repr: CVAttachmentRawValue) -> Self?",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "repr",
+          "type": {
+            "spelling": "CVAttachmentRawValue",
+            "references": [
+              "s:9CoreVideo20CVAttachmentRawValueV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Self?"
+      },
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "Self.RawValue",
+          "rhs": "CVAttachmentValueRepresentable",
+          "rhsPrecise": "s:9CoreVideo30CVAttachmentValueRepresentableP"
+        }
+      ],
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self.RawValue",
+            "rhs": "CVAttachmentValueRepresentable",
+            "rhsPrecise": "s:9CoreVideo30CVAttachmentValueRepresentableP"
+          }
+        ]
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "27.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6FlavorO",
+      "sourceOrigin": "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE08makeFromf10AttachmentD0yxSgAA0cfD0VFZ"
+    },
+    {
+      "id": "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE08makeFromf10AttachmentD0yxSgAA0cfD0VFZ::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO",
+      "kind": "typeMethod",
+      "path": "Polygon.Style.makeFromRawAttachmentValue(_:)",
+      "name": "makeFromRawAttachmentValue(_:)",
+      "access": "public",
+      "declaration": "static func makeFromRawAttachmentValue(_ repr: CVAttachmentRawValue) -> Self?",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "repr",
+          "type": {
+            "spelling": "CVAttachmentRawValue",
+            "references": [
+              "s:9CoreVideo20CVAttachmentRawValueV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Self?"
+      },
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "Self.RawValue",
+          "rhs": "CVAttachmentValueRepresentable",
+          "rhsPrecise": "s:9CoreVideo30CVAttachmentValueRepresentableP"
+        }
+      ],
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self.RawValue",
+            "rhs": "CVAttachmentValueRepresentable",
+            "rhsPrecise": "s:9CoreVideo30CVAttachmentValueRepresentableP"
+          }
+        ]
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "27.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "27.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC5StyleO",
+      "sourceOrigin": "s:SY9CoreVideoAA30CVAttachmentValueRepresentable03RawD0RpzrlE08makeFromf10AttachmentD0yxSgAA0cfD0VFZ"
     },
     {
       "id": "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo13PrecipitationO",

@@ -124,6 +124,9 @@ std::string codeDisplayName(const SwiftSurface& surface,
       name = "(" + llvm::join(parameters, ", ") + ") -> Void";
       break;
     }
+    case Bridge::ObjCObject:
+      name = type.objcClass;
+      break;
     case Bridge::None:
       name = "?";
       break;
@@ -327,6 +330,12 @@ class Writer {
                : "unknown";
   }
 
+  // NativeScript's Objective-C typings declare classes globally by their
+  // runtime name; Swift classes without @objc(Name) have none there.
+  static std::string objcTypeName(const BridgedType& type) {
+    return isIdentifier(type.objcClass) ? type.objcClass : "NSObject";
+  }
+
   std::string inputType(const BridgedType& type) const {
     if (type.isInout) {
       BridgedType value = type;
@@ -352,6 +361,9 @@ class Writer {
       case Bridge::EnumCase:
       case Bridge::TaggedEnum:
         ts = typeName(type);
+        break;
+      case Bridge::ObjCObject:
+        ts = objcTypeName(type);
         break;
       case Bridge::Date:
         ts = "Date";
@@ -405,6 +417,9 @@ class Writer {
       case Bridge::EnumCase:
       case Bridge::TaggedEnum:
         ts = typeName(type);
+        break;
+      case Bridge::ObjCObject:
+        ts = objcTypeName(type);
         break;
       case Bridge::Date:
         ts = "Date";

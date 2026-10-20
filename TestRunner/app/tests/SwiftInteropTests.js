@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module"]);
-            expect(swift.abiVersion).toBe(6);
+            expect(swift.abiVersion).toBe(7);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(6);
+            expect(info.abiVersion).toBe(7);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -491,6 +491,48 @@ describe("ns:swift", function () {
                 fail(error);
                 done();
             });
+        });
+    });
+
+    describe("Objective-C objects", function () {
+        it("passes NativeScript's Objective-C wrappers", function () {
+            var view = UIView.new();
+            view.tag = 7;
+            expect(SwiftDemo.describe(view)).toBe("UIView 7");
+            var label = UILabel.new();
+            label.tag = 3;
+            expect(SwiftDemo.tags([view, label])).toEqual([7, 3]);
+        });
+
+        it("returns objects with their Objective-C identity", function () {
+            var view = UIView.new();
+            expect(SwiftDemo.firstSubview(view)).toBeNull();
+            var child = UIView.new();
+            view.addSubview(child);
+            expect(SwiftDemo.firstSubview(view)).toBe(child);
+
+            var label = SwiftDemo.makeLabel("hello");
+            expect(label instanceof UILabel).toBe(true);
+            expect(label.text).toBe("hello");
+        });
+
+        it("round-trips Swift classes that are Objective-C visible", function (done) {
+            var note = SwiftDemo.makeNote("memo");
+            expect(note instanceof NSObject).toBe(true);
+            expect(SwiftDemo.text(note)).toBe("memo");
+            SwiftDemo.noteLater("later").then(function (later) {
+                expect(SwiftDemo.text(later)).toBe("later");
+                done();
+            }, function (error) {
+                fail(error);
+                done();
+            });
+        });
+
+        it("refuses other values", function () {
+            expect(function () { SwiftDemo.describe({}); }).toThrowError(TypeError);
+            expect(function () { SwiftDemo.describe(NSObject.new()); }).toThrowError(TypeError);
+            expect(function () { SwiftDemo.text(UIView.new()); }).toThrowError(TypeError);
         });
     });
 

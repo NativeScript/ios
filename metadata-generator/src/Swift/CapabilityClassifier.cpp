@@ -618,6 +618,12 @@ class Classifier {
       return "";
     }
     const Symbol* target = usr.empty() ? nullptr : _module.find(usr);
+    std::string objcClass = objcClassName(usr, target);
+    if (!objcClass.empty()) {
+      bridged.bridge = Bridge::ObjCObject;
+      bridged.objcClass = objcClass;
+      return "";
+    }
     if (target) {
       const Capability* capability = _result.find(target->preciseId);
       if (capability && capability->tier == Tier::SwiftGenerated &&
@@ -634,6 +640,31 @@ class Classifier {
     }
     std::string qualified = qualifiedNameFromUSR(usr);
     return "unbridged-type:" + (qualified.empty() ? spelling(node) : qualified);
+  }
+
+  // The runtime name of the Objective-C class `usr` names, or "" when it
+  // names no class. Swift classes keep their module-qualified name unless
+  // they declare @objc(Name).
+  std::string objcClassName(const std::string& usr,
+                            const Symbol* target) const {
+    llvm::StringRef ref(usr);
+    if (ref.consume_front("c:objc(cs)")) {
+      return ref.str();
+    }
+    size_t marker = ref.find("@objc(cs)");
+    if (!ref.startswith("c:@M@") || marker == llvm::StringRef::npos) {
+      return "";
+    }
+    if (target) {
+      for (const auto& attribute : target->attributes) {
+        llvm::StringRef text(attribute);
+        if (text.consume_front("@objc(") && text.consume_back(")")) {
+          return text.str();
+        }
+      }
+    }
+    llvm::StringRef module = ref.substr(5).split('@').first;
+    return module.str() + "." + ref.substr(marker + 9).str();
   }
 
   // JS names for SwiftGenerated members and overload ambiguity.
@@ -733,6 +764,9 @@ class Classifier {
         break;
       case Bridge::Closure:
         kind = "function";
+        break;
+      case Bridge::ObjCObject:
+        kind = "objc";
         break;
       default:
         kind = "other";

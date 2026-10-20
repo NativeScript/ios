@@ -133,7 +133,15 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "append(_:to:)",
                                        "halve(_:)",
                                        "clear(_:)",
-                                       "swapTrackers(_:_:)"};
+                                       "swapTrackers(_:_:)",
+                                       "describe(_:)",
+                                       "makeLabel(_:)",
+                                       "tags(_:)",
+                                       "firstSubview(of:)",
+                                       "Note",
+                                       "makeNote(_:)",
+                                       "text(of:)",
+                                       "noteLater(_:)"};
   CHECK_EQ(llvm::join(names, ","), llvm::join(expected, ","));
 }
 

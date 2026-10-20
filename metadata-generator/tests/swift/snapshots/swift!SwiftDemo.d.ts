@@ -211,6 +211,7 @@ declare module "ns:swift/SwiftDemo" {
   export function wordCounts(words: readonly (string)[]): Record<string, number>;
   export function checkedSide(side: number): number;
   export function delayedEcho(text: string, seconds: number): Promise<string>;
+  export function firstSubview(view: UIView): UIView | null;
   export function measureLater(width: number): Promise<Measurement>;
   export function measurements(): (Measurement)[];
   export function swapTrackers(a: { value: Tracker }, b: { value: Tracker }): void;
@@ -223,6 +224,8 @@ declare module "ns:swift/SwiftDemo" {
   export function echo(payload: Payload): Payload;
   export function host(url: string | URL): string | null;
   export function ramp(count: number | bigint): Uint8Array;
+  export function tags(views: readonly (UIView)[]): (number)[];
+  export function text(note: NSObject): string;
   export function clear(name: { value: (string) | null | undefined }): void;
   export function halve(value: { value: number | bigint }): void;
   export function names(count: number | bigint): (string)[];
@@ -236,11 +239,15 @@ declare module "ns:swift/SwiftDemo" {
   export function resolve(path: string, base: string | URL): URL;
   export function centroid(points: readonly (Point)[]): Point;
   export function checksum(data: ArrayBuffer | ArrayBufferView): number;
+  export function describe(view: UIView): string;
   export function echoInt8(value: number | bigint): number;
+  export function makeNote(text: string): NSObject;
   export function mirrored(grid: readonly (readonly (number | bigint)[])[]): ((number)[])[];
   export function simplify(formula: Formula): Formula;
   export function trackers(ids: readonly (number | bigint)[]): (Tracker)[];
   export function countdown(start: number | bigint, tick: (arg0: number, arg1: boolean) => void): void;
+  export function makeLabel(text: string): UILabel;
+  export function noteLater(text: string): Promise<NSObject>;
   export function onMeasure(body: (arg0: Measurement) => void): void;
 }
 

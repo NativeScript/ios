@@ -37,7 +37,7 @@
 // calls it by reporting the arguments as an array: callbackBegin, each
 // argument through the complete* entries, then completeArrayEnd.
 
-#define NS_SWIFT_ABI_VERSION 6
+#define NS_SWIFT_ABI_VERSION 7
 
 #ifdef __cplusplus
 extern "C" {
@@ -78,6 +78,8 @@ enum {
   // An enum with associated values: payload.object points at `length`
   // slots, the case index (NSSwiftTagInt64) then the case's values.
   NSSwiftTagCase = 10,
+  // An Objective-C object borrowed (+0) for the duration of the call.
+  NSSwiftTagObjC = 11,
 };
 
 typedef struct NSSwiftAPI NSSwiftAPI;
@@ -147,6 +149,8 @@ enum {
 //   (<code>,...)
 //               closure returning Void, of the listed parameters
 //               (NSSwiftTagFunction) <- JS function; parameters only
+//   @<Name>     instance of Objective-C class <Name> (its runtime name)
+//               (NSSwiftTagObjC) <-> NativeScript's Objective-C wrapper
 //   <code>?     optional: JS null/undefined <-> NSSwiftTagNull
 //   &<code>     inout parameter: JS passes a reference object `{ value }`;
 //               the slot holds its value, and a successful call reports the
@@ -248,6 +252,10 @@ struct NSSwiftAPI {
   // Reported before the call's result.
   /* 38 */ void (*writeBackBegin)(NSSwiftCall* call, intptr_t index);
   /* 39 */ void (*writeBackEnd)(NSSwiftCall* call);
+
+  // An Objective-C object, retained (+1); the runtime takes ownership.
+  /* 40 */ void (*returnObjC)(NSSwiftCall* call, void* object);
+  /* 41 */ void (*completeObjC)(void* token, void* object);
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);

@@ -19,6 +19,12 @@ std::string declaringModuleName(const Module& module, const Symbol& symbol);
 // `Module.Outer.Inner` for a module-local type.
 std::string qualifiedTypeName(const Module& module, const Symbol& symbol);
 
+// The modules generated Swift imports besides Foundation and `module`:
+// cross-import overlays, and frameworks of Objective-C classes in bridged
+// signatures (as `#if canImport` blocks).
+std::string swiftImports(const Module& module,
+                         const Classification& classification);
+
 // `name` escaped for use as a Swift identifier or member name.
 std::string swiftIdentifier(const std::string& name);
 

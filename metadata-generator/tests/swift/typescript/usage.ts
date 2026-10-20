@@ -2,7 +2,7 @@
 // the generated swift!SwiftDemo.d.ts snapshot. Every @ts-expect-error line
 // must fail to compile: an unused directive is itself an error.
 import * as swift from "ns:swift";
-import { Demo, Point, Flavor, Polygon, Measurement, Square, Tracker, Counter, Palette, shout, globalCounter, delayedEcho, makeTrackerLater, countdown, greetLater, Notifier, measure, area, simplify, echo, Formula, bump, append } from "ns:swift/SwiftDemo";
+import { Demo, Point, Flavor, Polygon, Measurement, Square, Tracker, Counter, Palette, shout, globalCounter, delayedEcho, makeTrackerLater, countdown, greetLater, Notifier, measure, area, simplify, echo, Formula, bump, append, describe, firstSubview, makeNote } from "ns:swift/SwiftDemo";
 
 const SwiftDemo = swift.module("SwiftDemo");
 const demo: Demo = new SwiftDemo.Demo();
@@ -46,6 +46,11 @@ bump(counterRef);
 const words = { value: ["a"] };
 append("b", words);
 void [counterRef.value.toFixed(), words.value.length];
+const view = new UIView();
+const subview: UIView | null = firstSubview(view);
+void [describe(view), subview, makeNote("n")];
+// @ts-expect-error  Objective-C parameters are typed
+describe("view");
 // @ts-expect-error  inout parameters take a reference object
 bump(1);
 // @ts-expect-error  a case's values are typed

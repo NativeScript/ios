@@ -102,6 +102,8 @@ TEST(ClassifyRejections) {
   EXPECT_TIER("greetLater(_:completion:)", Tier::SwiftGenerated);
   EXPECT_TIER("Notifier.subscribe(_:)", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.update(_:)", Tier::SwiftGenerated);
+  EXPECT_TIER("tags(_:)", Tier::SwiftGenerated);
+  EXPECT_TIER("Note", Tier::ObjCDirect, "objc-visible");
   EXPECT_TIER("halve(_:)", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.lookup(table:key:)", Tier::SwiftGenerated);
   EXPECT_TIER("Canvas.draw(_:)", Tier::Unsupported, "existential");

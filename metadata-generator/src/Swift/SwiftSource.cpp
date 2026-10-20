@@ -2,6 +2,8 @@
 
 #include <llvm/ADT/StringExtras.h>
 
+#include <cstring>
+#include <set>
 #include <tuple>
 
 namespace Swift {
@@ -118,6 +120,100 @@ std::string availabilityCondition(const Module& module, const Symbol& symbol) {
          std::to_string(introduced->minor) +
          (introduced->patch ? "." + std::to_string(introduced->patch) : "") +
          ", *";
+}
+
+namespace {
+
+// Symbol graphs do not say which module declares an Objective-C class; its
+// prefix usually does. A wrong guess fails compiler verification.
+const char* frameworkOfObjCClass(llvm::StringRef name) {
+  static const std::pair<const char*, const char*> prefixes[] = {
+      {"UI", "UIKit"},
+      {"NS", "Foundation"},
+      {"CL", "CoreLocation"},
+      {"AV", "AVFoundation"},
+      {"MK", "MapKit"},
+      {"CA", "QuartzCore"},
+      {"WK", "WebKit"},
+      {"PH", "Photos"},
+      {"CN", "Contacts"},
+      {"EK", "EventKit"},
+      {"HK", "HealthKit"},
+      {"GK", "GameKit"},
+      {"SCN", "SceneKit"},
+      {"SK", "SpriteKit"},
+      {"MTL", "Metal"},
+      {"MTK", "MetalKit"},
+      {"AR", "ARKit"},
+      {"CB", "CoreBluetooth"},
+      {"CM", "CoreMotion"},
+      {"CK", "CloudKit"},
+      {"PK", "PassKit"},
+      {"SF", "SafariServices"},
+      {"UN", "UserNotifications"},
+      {"VN", "Vision"},
+      {"ML", "CoreML"},
+      {"WC", "WatchConnectivity"},
+  };
+  const char* best = nullptr;
+  size_t length = 0;
+  for (const auto& prefix : prefixes) {
+    size_t size = strlen(prefix.first);
+    if (size > length && name.startswith(prefix.first) && name.size() > size &&
+        name[size] >= 'A' && name[size] <= 'Z') {
+      best = prefix.second;
+      length = size;
+    }
+  }
+  return best;
+}
+
+void collectObjCClasses(const BridgedType& type, std::set<std::string>& out) {
+  if (type.bridge == Bridge::ObjCObject &&
+      type.objcClass.find('.') == std::string::npos) {
+    out.insert(type.objcClass);
+  }
+  for (const auto& element : type.elements) {
+    collectObjCClasses(element, out);
+  }
+}
+
+}  // namespace
+
+std::string swiftImports(const Module& module,
+                         const Classification& classification) {
+  std::set<std::string> overlays;
+  std::set<std::string> classes;
+  for (const auto& entry : module.symbols) {
+    const Capability* capability = classification.find(entry.first);
+    if (!capability || capability->tier != Tier::SwiftGenerated) {
+      continue;
+    }
+    if (!entry.second.declaringModule.empty()) {
+      overlays.insert(entry.second.declaringModule);
+    }
+    for (const auto& parameter : capability->parameters) {
+      collectObjCClasses(parameter, classes);
+    }
+    collectObjCClasses(capability->result, classes);
+  }
+  std::set<std::string> frameworks;
+  for (const auto& name : classes) {
+    const char* framework = frameworkOfObjCClass(name);
+    if (framework && llvm::StringRef(framework) != "Foundation" &&
+        !overlays.count(framework)) {
+      frameworks.insert(framework);
+    }
+  }
+  std::string out;
+  for (const auto& overlay : overlays) {
+    out += "import " + overlay + "\n";
+  }
+  for (const auto& framework : frameworks) {
+    out +=
+        "#if canImport(" + framework + ")\nimport " + framework + "\n#endif\n";
+  }
+  return out;
 }
 
 Invocation describeInvocation(const Module& module, const Symbol& symbol,
