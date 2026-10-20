@@ -2,7 +2,7 @@
 // the generated swift!SwiftDemo.d.ts snapshot. Every @ts-expect-error line
 // must fail to compile: an unused directive is itself an error.
 import * as swift from "ns:swift";
-import { Demo, Point, Flavor, Polygon, Measurement, Square, Tracker, Counter, Palette, shout, globalCounter, delayedEcho, makeTrackerLater } from "ns:swift/SwiftDemo";
+import { Demo, Point, Flavor, Polygon, Measurement, Square, Tracker, Counter, Palette, shout, globalCounter, delayedEcho, makeTrackerLater, countdown, greetLater, Notifier } from "ns:swift/SwiftDemo";
 
 const SwiftDemo = swift.module("SwiftDemo");
 const demo: Demo = new SwiftDemo.Demo();
@@ -31,6 +31,13 @@ const counterValue: Promise<number> = new Counter().value;
 const strokes: number = new Palette().stroke();
 void [echoed, later, counterValue, strokes];
 
+countdown(3, (value, done) => void (value.toFixed() + (done ? "!" : "")));
+greetLater(null, (greeting) => greeting?.toUpperCase());
+const notifier = new Notifier();
+notifier.subscribe((message) => message.length);
+
+// @ts-expect-error  closure arguments are typed
+countdown(3, (value: string) => value);
 // @ts-expect-error  actor state is not assignable from outside the actor
 new Counter().step = 2;
 // @ts-expect-error  description is read-only

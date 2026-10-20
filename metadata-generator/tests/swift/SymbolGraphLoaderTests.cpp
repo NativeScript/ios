@@ -114,7 +114,10 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "resolve(_:against:)",
                                        "checksum(_:)",
                                        "ramp(_:)",
-                                       "namesLater(_:)"};
+                                       "namesLater(_:)",
+                                       "countdown(from:_:)",
+                                       "greetLater(_:completion:)",
+                                       "Notifier"};
   CHECK_EQ(llvm::join(names, ","), llvm::join(expected, ","));
 }
 

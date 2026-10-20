@@ -134,10 +134,13 @@ Invocation describeInvocation(const Module& module, const Symbol& symbol,
 
   for (size_t i = 0; i < symbol.parameters.size(); i++) {
     invocation.labels.push_back(symbol.parameters[i].label);
-    invocation.parameterTypes.push_back(
-        i < capability.parameters.size()
-            ? typeText(capability.parameters[i], module)
-            : "");
+    std::string type = i < capability.parameters.size()
+                           ? typeText(capability.parameters[i], module)
+                           : "";
+    if (i < capability.parameters.size() && capability.parameters[i].escaping) {
+      type = "@escaping " + type;
+    }
+    invocation.parameterTypes.push_back(type);
   }
 
   bool valueOwner = owner && (owner->kind == SymbolKind::Struct ||

@@ -20,6 +20,7 @@
 #include "Helpers.h"
 #include "IsolateTracked.h"
 #include "IsolateWrapper.h"
+#include "NativeScriptException.h"
 #include "NativeScriptPlatform.h"
 #include "robin_hood.h"
 
@@ -50,14 +51,41 @@ struct ValueCode {
     Data,
     Array,
     Map,
+    Function,
   };
   Kind kind = Kind::Void;
   int bits = 64;
   int typeIndex = -1;
   bool optional = false;
-  // Array and Map: the element (value) code.
+  // Array and Map: the element (value) code. Function: its parameter codes.
   std::vector<ValueCode> element;
 };
+
+// Splits "a,[b],(c,d)" at its top-level commas.
+bool SplitCodes(const std::string& text, std::vector<std::string>& parts) {
+  int depth = 0;
+  size_t start = 0;
+  for (size_t i = 0; i < text.size(); i++) {
+    char c = text[i];
+    if (c == '[' || c == '{' || c == '(') {
+      depth++;
+    } else if (c == ']' || c == '}' || c == ')') {
+      if (--depth < 0) {
+        return false;
+      }
+    } else if (c == ',' && depth == 0) {
+      parts.push_back(text.substr(start, i - start));
+      start = i + 1;
+    }
+  }
+  if (depth != 0) {
+    return false;
+  }
+  if (!text.empty()) {
+    parts.push_back(text.substr(start));
+  }
+  return true;
+}
 
 bool ParseCode(std::string text, ValueCode& code) {
   if (!text.empty() && text.back() == '?') {
@@ -72,7 +100,24 @@ bool ParseCode(std::string text, ValueCode& code) {
     code.element.emplace_back();
     ValueCode& element = code.element.back();
     return ParseCode(text.substr(1, text.size() - 2), element) &&
-           element.kind != ValueCode::Kind::Void && !element.optional;
+           element.kind != ValueCode::Kind::Void && element.kind != ValueCode::Kind::Function &&
+           !element.optional;
+  }
+  if (text.front() == '(' && text.back() == ')') {
+    code.kind = ValueCode::Kind::Function;
+    std::vector<std::string> parts;
+    if (!SplitCodes(text.substr(1, text.size() - 2), parts)) {
+      return false;
+    }
+    for (const std::string& part : parts) {
+      code.element.emplace_back();
+      ValueCode& parameter = code.element.back();
+      if (!ParseCode(part, parameter) || parameter.kind == ValueCode::Kind::Void ||
+          parameter.kind == ValueCode::Kind::Function) {
+        return false;
+      }
+    }
+    return true;
   }
   auto number = [](const std::string& digits, int& out) {
     if (digits.empty() || digits.size() > 6) {
@@ -144,23 +189,19 @@ bool ParseSignature(const std::string& text, Signature& signature) {
   if (arrow == std::string::npos) {
     return false;
   }
-  std::string parameters = text.substr(0, arrow);
-  size_t start = 0;
-  while (start < parameters.size()) {
-    size_t comma = parameters.find(',', start);
-    std::string part =
-        parameters.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+  std::vector<std::string> parts;
+  if (!SplitCodes(text.substr(0, arrow), parts)) {
+    return false;
+  }
+  for (const std::string& part : parts) {
     ValueCode code;
     if (!ParseCode(part, code) || code.kind == ValueCode::Kind::Void) {
       return false;
     }
     signature.parameters.push_back(code);
-    if (comma == std::string::npos) {
-      break;
-    }
-    start = comma + 1;
   }
-  return ParseCode(text.substr(arrow + 1), signature.result);
+  return ParseCode(text.substr(arrow + 1), signature.result) &&
+         signature.result.kind != ValueCode::Kind::Function;
 }
 
 // "greet(name:times:)" -> {"name", "times"}; "describe(_:)" -> {""}.
@@ -291,6 +332,16 @@ std::string TypeDisplayName(const ModuleInfo& module, const ValueCode& code) {
                  ? module.types[code.typeIndex].jsName
                  : "?";
       break;
+    case ValueCode::Kind::Function:
+      name = "(";
+      for (size_t i = 0; i < code.element.size(); i++) {
+        name += (i > 0 ? ", " : "") + TypeDisplayName(module, code.element[i]);
+      }
+      name += ") -> Void";
+      if (code.optional) {
+        name = "(" + name + ")";
+      }
+      break;
   }
   return code.optional ? name + "?" : name;
 }
@@ -388,6 +439,9 @@ void ApiReturnMapEnd(NSSwiftCall* call);
 void ApiCompleteArrayBegin(void* token, intptr_t count);
 void ApiCompleteMapBegin(void* token, intptr_t count);
 void ApiCompleteContainerEnd(void* token);
+void* ApiCallbackBegin(void* callback);
+void ApiCallbackRetain(void* callback);
+void ApiCallbackRelease(void* callback);
 
 const NSSwiftAPI kAPI = {
     ApiReturnVoid,           ApiReturnBool,       ApiReturnInt64,          ApiReturnUInt64,
@@ -397,7 +451,8 @@ const NSSwiftAPI kAPI = {
     ApiCompleteInt64,        ApiCompleteUInt64,   ApiCompleteDouble,       ApiCompleteString,
     ApiCompleteNull,         ApiCompleteObject,   ApiCompleteError,        ApiReturnArrayBegin,
     ApiReturnArrayEnd,       ApiReturnMapBegin,   ApiReturnMapEnd,         ApiCompleteArrayBegin,
-    ApiCompleteContainerEnd, ApiCompleteMapBegin, ApiCompleteContainerEnd,
+    ApiCompleteContainerEnd, ApiCompleteMapBegin, ApiCompleteContainerEnd, ApiCallbackBegin,
+    ApiCallbackRetain,       ApiCallbackRelease,
 };
 
 // "Polygon.Style" -> "Style".
@@ -587,6 +642,8 @@ struct IsolateState {
   robin_hood::unordered_map<const ModuleInfo*, LoadedModule*> byInfo;
   // Swift object -> its JS wrapper, so a Swift object has one JS identity.
   robin_hood::unordered_map<void*, SwiftObjectWrapper*> identity;
+  // Thunk calls in progress on the isolate's thread, innermost last.
+  std::vector<CallContext*> calls;
 };
 
 // Owns one retain of a Swift object for as long as its JS wrapper lives.
@@ -658,6 +715,9 @@ struct CallContext : NSSwiftCall {
   Local<Value> result;
   bool completed = false;
   bool threw = false;
+  // The first exception a JS callback threw while the thunk ran; it is
+  // thrown from the call once the thunk returns.
+  Global<Value> callbackException;
 };
 
 CallContext* ContextOf(NSSwiftCall* call) { return static_cast<CallContext*>(call); }
@@ -977,20 +1037,21 @@ struct AsyncToken {
   std::shared_ptr<AsyncOutcome> root;
   // Arrays and maps still being reported.
   std::vector<AsyncOutcome*> open;
+  // Set for a callback invocation; the token holds a reference.
+  struct SwiftCallback* callback = nullptr;
 };
 
 // Converts `node` (of `code`) to JS; on failure sets `rejection` and returns
 // false.
 bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
-                 const MemberInfo& member, AsyncOutcome& node, const ValueCode& code,
+                 const std::string& name, AsyncOutcome& node, const ValueCode& code,
                  Local<Value>& out, Local<Value>& rejection) {
   auto range = [&](const std::string& value) {
-    rejection =
-        Exception::RangeError(tns::ToV8String(isolate, RangeMessage(value, member.swiftName)));
+    rejection = Exception::RangeError(tns::ToV8String(isolate, RangeMessage(value, name)));
     return false;
   };
   auto failed = [&](const char* what) {
-    rejection = Exception::Error(tns::ToV8String(isolate, member.swiftName + ": " + what));
+    rejection = Exception::Error(tns::ToV8String(isolate, name + ": " + what));
     return false;
   };
   switch (node.kind) {
@@ -1056,8 +1117,8 @@ bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
       Local<v8::Array> array = v8::Array::New(isolate, static_cast<int>(node.children.size()));
       for (uint32_t i = 0; i < node.children.size(); i++) {
         Local<Value> element;
-        if (!OutcomeToJS(isolate, context, state, member, *node.children[i], code.element[0],
-                         element, rejection) ||
+        if (!OutcomeToJS(isolate, context, state, name, *node.children[i], code.element[0], element,
+                         rejection) ||
             !array->Set(context, i, element).FromMaybe(false)) {
           return false;
         }
@@ -1073,9 +1134,9 @@ bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
       for (size_t i = 0; i + 1 < node.children.size(); i += 2) {
         Local<Value> key;
         Local<Value> value;
-        if (!OutcomeToJS(isolate, context, state, member, *node.children[i], KeyCode(), key,
+        if (!OutcomeToJS(isolate, context, state, name, *node.children[i], KeyCode(), key,
                          rejection) ||
-            !OutcomeToJS(isolate, context, state, member, *node.children[i + 1], code.element[0],
+            !OutcomeToJS(isolate, context, state, name, *node.children[i + 1], code.element[0],
                          value, rejection) ||
             !object->Set(context, key, value).FromMaybe(false)) {
           return false;
@@ -1107,7 +1168,7 @@ void SettleOnIsolate(Isolate* isolate, uint64_t id, AsyncOutcome& outcome) {
   Local<Promise::Resolver> resolver = pending->resolver.Get(isolate);
   Local<Value> value;
   Local<Value> rejection;
-  if (OutcomeToJS(isolate, context, state, *pending->member, outcome,
+  if (OutcomeToJS(isolate, context, state, pending->member->swiftName, outcome,
                   pending->member->signature.result, value, rejection)) {
     resolver->Resolve(context, value).Check();
   } else {
@@ -1115,9 +1176,132 @@ void SettleOnIsolate(Isolate* isolate, uint64_t id, AsyncOutcome& outcome) {
   }
 }
 
+// --- Callbacks ---------------------------------------------------------------------
+
+// A JS function passed for a closure parameter. The call's arena holds one
+// reference, each Swift closure capturing it another, and each invocation in
+// flight one more. `function` is only touched on the isolate's thread.
+struct SwiftCallback {
+  SwiftCallback(Isolate* isolate, const ModuleInfo* module, const ValueCode& code,
+                const std::string& name, Local<v8::Function> function)
+      : isolate(isolate),
+        wrapper(isolate),
+        module(module),
+        code(code),
+        name(name),
+        function(isolate, function) {}
+
+  Isolate* isolate;
+  IsolateWrapper wrapper;
+  const ModuleInfo* module;
+  ValueCode code;
+  std::string name;
+  Global<v8::Function> function;
+  std::atomic<int> references{1};
+};
+
+// Runs `body` on the isolate's thread with the isolate locked and valid:
+// now when called there, otherwise queued. Returns false when it will not run.
+bool OnIsolateThread(Isolate* isolate, IsolateWrapper wrapper, std::function<void()> body) {
+  if (Isolate::TryGetCurrent() == isolate) {
+    v8::Locker locker(isolate);
+    if (!wrapper.IsValid()) {
+      return false;
+    }
+    body();
+    return true;
+  }
+  NativeScriptPlatform* platform = NativeScriptPlatform::Instance();
+  std::shared_ptr<EventLoop> loop =
+      platform ? platform->LookupEventLoop(isolate) : std::shared_ptr<EventLoop>();
+  return loop && loop->PostInternal([wrapper, body = std::move(body)]() {
+    if (wrapper.IsValid()) {
+      body();
+    }
+  });
+}
+
+void ReleaseCallback(SwiftCallback* callback) {
+  if (callback->references.fetch_sub(1, std::memory_order_acq_rel) != 1) {
+    return;
+  }
+  // When it cannot run (the isolate is gone) the callback is leaked: its
+  // handle can no longer be reset.
+  OnIsolateThread(callback->isolate, callback->wrapper, [callback]() { delete callback; });
+}
+
+void RunCallback(SwiftCallback* callback, AsyncOutcome& arguments) {
+  Isolate* isolate = callback->isolate;
+  Isolate::Scope isolateScope(isolate);
+  HandleScope handleScope(isolate);
+  auto* state = Caches::StateFor<IsolateState>(isolate);
+  if (state == nullptr) {
+    return;
+  }
+  Local<Context> context = Caches::Get(isolate)->GetContext();
+  Context::Scope contextScope(context);
+
+  // On the isolate's thread the innermost call in progress is the one whose
+  // thunk invoked the closure; after its callback threw, the rest are
+  // skipped.
+  CallContext* call = state->calls.empty() ? nullptr : state->calls.back();
+  if (call != nullptr && !call->callbackException.IsEmpty()) {
+    return;
+  }
+
+  TryCatch tryCatch(isolate);
+  Local<Value> exception;
+  const std::vector<ValueCode>& parameters = callback->code.element;
+  std::vector<Local<Value>> argv;
+  if (arguments.children.size() != parameters.size()) {
+    exception = Exception::Error(
+        tns::ToV8String(isolate, callback->name + ": a closure reported " +
+                                     std::to_string(arguments.children.size()) +
+                                     " arguments, expected " + std::to_string(parameters.size())));
+  }
+  for (size_t i = 0; exception.IsEmpty() && i < parameters.size(); i++) {
+    Local<Value> value;
+    if (!OutcomeToJS(isolate, context, state, callback->name, *arguments.children[i], parameters[i],
+                     value, exception)) {
+      break;
+    }
+    argv.push_back(value);
+  }
+  if (exception.IsEmpty()) {
+    Local<Value> ignored;
+    if (callback->function.Get(isolate)
+            ->Call(context, v8::Undefined(isolate), static_cast<int>(argv.size()), argv.data())
+            .ToLocal(&ignored) ||
+        !tryCatch.HasCaught() || !tryCatch.CanContinue()) {
+      return;
+    }
+    exception = tryCatch.Exception();
+  }
+  if (call != nullptr) {
+    call->callbackException.Reset(isolate, exception);
+  } else {
+    NativeScriptException::ReportToJsHandlersAndLog(isolate, exception, tryCatch.Message());
+  }
+}
+
+void DeliverCallback(std::unique_ptr<AsyncToken> token) {
+  SwiftCallback* callback = token->callback;
+  std::shared_ptr<AsyncOutcome> arguments = token->root;
+  bool scheduled = OnIsolateThread(callback->isolate, callback->wrapper, [callback, arguments]() {
+    RunCallback(callback, *arguments);
+    ReleaseCallback(callback);
+  });
+  if (!scheduled) {
+    ReleaseCallback(callback);
+  }
+}
+
 // Consumes `token`. Safe on any thread.
 void Deliver(AsyncToken* rawToken) {
   std::unique_ptr<AsyncToken> token(rawToken);
+  if (token->callback != nullptr) {
+    return DeliverCallback(std::move(token));
+  }
   std::shared_ptr<AsyncOutcome> outcome = token->root;
   NativeScriptPlatform* platform = NativeScriptPlatform::Instance();
   std::shared_ptr<EventLoop> loop =
@@ -1179,6 +1363,27 @@ void* ApiBeginAsync(NSSwiftCall* call) {
   }
   return new AsyncToken{isolate, IsolateWrapper(isolate), id, context->module, nullptr, {}};
 }
+
+void* ApiCallbackBegin(void* rawCallback) {
+  auto* callback = static_cast<SwiftCallback*>(rawCallback);
+  callback->references.fetch_add(1, std::memory_order_relaxed);
+  auto* token = new AsyncToken{callback->isolate,
+                               callback->wrapper,
+                               0,
+                               callback->module,
+                               Outcome(AsyncOutcome::Kind::Array),
+                               {}};
+  token->root->module = callback->module;
+  token->open.push_back(token->root.get());
+  token->callback = callback;
+  return token;
+}
+
+void ApiCallbackRetain(void* callback) {
+  static_cast<SwiftCallback*>(callback)->references.fetch_add(1, std::memory_order_relaxed);
+}
+
+void ApiCallbackRelease(void* callback) { ReleaseCallback(static_cast<SwiftCallback*>(callback)); }
 
 void ApiCompleteVoid(void* token) { Emit(token, Outcome(AsyncOutcome::Kind::Void)); }
 
@@ -1296,6 +1501,8 @@ bool Accepts(Isolate* isolate, const ModuleInfo& module, const ValueCode& code,
       return wrapper && wrapper->Module() == &module &&
              module.IsA(wrapper->TypeIndex(), code.typeIndex);
     }
+    case ValueCode::Kind::Function:
+      return value->IsFunction();
     case ValueCode::Kind::Void:
       return false;
   }
@@ -1316,6 +1523,16 @@ bool ThrowArgument(Isolate* isolate, const MemberInfo& member, size_t index,
 struct SlotArena {
   std::deque<std::string> strings;
   std::deque<std::vector<NSSwiftValue>> slots;
+  std::vector<SwiftCallback*> callbacks;
+
+  SlotArena() = default;
+  SlotArena(const SlotArena&) = delete;
+  SlotArena& operator=(const SlotArena&) = delete;
+  ~SlotArena() {
+    for (SwiftCallback* callback : callbacks) {
+      ReleaseCallback(callback);
+    }
+  }
 };
 
 void PointAtBytes(NSSwiftValue& slot, const void* bytes, size_t length) {
@@ -1544,6 +1761,18 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
       return true;
     }
 
+    case ValueCode::Kind::Function: {
+      if (!value->IsFunction()) {
+        return ThrowArgument(isolate, member, index, "must be a function");
+      }
+      auto* callback =
+          new SwiftCallback(isolate, &module, code, member.swiftName, value.As<v8::Function>());
+      arena.callbacks.push_back(callback);
+      slot.tag = NSSwiftTagFunction;
+      slot.payload.object = callback;
+      return true;
+    }
+
     case ValueCode::Kind::Void:
       break;
   }
@@ -1715,9 +1944,15 @@ MaybeLocal<Value> Invoke(Isolate* isolate, const MemberGroup& group, const Membe
   call.resultCode = &member.signature.result;
 
   NSSwiftThunk thunk = setter ? member.setter : member.thunk;
+  state->calls.push_back(&call);
   thunk(&call, slots.empty() ? nullptr : slots.data(), static_cast<intptr_t>(slots.size()));
+  state->calls.pop_back();
 
   if (call.threw) {
+    return MaybeLocal<Value>();
+  }
+  if (!call.callbackException.IsEmpty()) {
+    isolate->ThrowException(call.callbackException.Get(isolate));
     return MaybeLocal<Value>();
   }
   if (!call.completed) {

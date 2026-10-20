@@ -130,6 +130,33 @@ class Emitter {
                     "? in " + inner.code + " })",
                 true};
       }
+      case Bridge::Closure: {
+        // A closure that reports its arguments to the JS function; the
+        // explicit type keeps attributes (@Sendable, @MainActor) the
+        // parameter requires.
+        std::vector<std::string> parameters;
+        std::vector<std::string> reports;
+        for (size_t i = 0; i < type.elements.size(); i++) {
+          const BridgedType& element = type.elements[i];
+          std::string name = "p" + std::to_string(i);
+          parameters.push_back(name + ": " +
+                               swiftTypeText(element.node, _module));
+          std::string report = returnValue(element, "r", name);
+          reports.push_back(element.optional
+                                ? "if let " + name + " { " + report +
+                                      " } else { r.returnNull() }"
+                                : report);
+        }
+        std::string closureType = swiftTypeText(unwrappedNode(type), _module);
+        std::string body =
+            reports.empty() ? "_ in" : "r in " + llvm::join(reports, "; ");
+        return {"{ () -> " + closureType +
+                    " in let callback = __NSCallback(api: rt.api, handle: " +
+                    read("callback") + "); return { (" +
+                    llvm::join(parameters, ", ") + ") in callback.invoke { " +
+                    body + " } } }()",
+                false};
+      }
       case Bridge::Void:
       case Bridge::None:
         break;
@@ -230,6 +257,7 @@ class Emitter {
         return reporter + ".returnMap(" + value + ") { key, element in " +
                reporter + ".returnString(key); " +
                returnValue(type.elements.at(0), reporter, "element") + " }";
+      case Bridge::Closure:
       case Bridge::None:
         return reporter + ".returnVoid()";
     }
@@ -495,6 +523,9 @@ private struct __NSSlots {
     let pointer = base!.load(fromByteOffset: i * 24 + 8, as: UnsafeMutableRawPointer.self)
     return Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue()
   }
+  func callback(_ i: Int) -> UnsafeMutableRawPointer {
+    base!.load(fromByteOffset: i * 24 + 8, as: UnsafeMutableRawPointer.self)
+  }
   func elements(_ i: Int) -> (__NSSlots, Int) {
     let start = base!.load(fromByteOffset: i * 24 + 8, as: UnsafeRawPointer?.self)
     return (__NSSlots(base: start), Int(base!.load(fromByteOffset: i * 24 + 16, as: UInt64.self)))
@@ -539,6 +570,7 @@ private struct __NSCall {
     call.load(as: UnsafeRawPointer.self).load(fromByteOffset: index * 8, as: Function.self)
   }
 
+  var api: UnsafeRawPointer { call.load(as: UnsafeRawPointer.self) }
   func string(_ i: Int) -> String { slots.string(i) }
   func object(_ i: Int) -> AnyObject { slots.object(i) }
 
@@ -692,6 +724,32 @@ private struct __NSCompletion: @unchecked Sendable {
           token, messageBytes.baseAddress, messageBytes.count, typeBytes.baseAddress, typeBytes.count)
       }
     }
+  }
+}
+
+// A JS function held as a Swift closure. Calls may come from any thread; the
+// runtime runs the function on its isolate's thread.
+private final class __NSCallback: @unchecked Sendable {
+  let api: UnsafeRawPointer
+  let handle: UnsafeMutableRawPointer
+
+  init(api: UnsafeRawPointer, handle: UnsafeMutableRawPointer) {
+    self.api = api
+    self.handle = handle
+    api.load(fromByteOffset: 32 * 8, as: (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(handle)
+  }
+
+  deinit {
+    api.load(fromByteOffset: 33 * 8, as: (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(handle)
+  }
+
+  // `arguments` reports each argument through the ordinary return entries.
+  func invoke(_ arguments: (__NSCompletion) -> Void) {
+    let begin = api.load(fromByteOffset: 31 * 8,
+                         as: (@convention(c) (UnsafeMutableRawPointer) -> UnsafeMutableRawPointer).self)
+    let completion = __NSCompletion(api: api, token: begin(handle))
+    arguments(completion)
+    api.load(fromByteOffset: 28 * 8, as: (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(completion.token)
   }
 }
 

@@ -9,7 +9,7 @@ namespace Swift {
 
 // ABI version the emitted thunks implement; must match NS_SWIFT_ABI_VERSION
 // in NativeScript/runtime/SwiftInterop.h, which documents the contract.
-constexpr int kThunkABIVersion = 3;
+constexpr int kThunkABIVersion = 4;
 
 struct ThunkSource {
   std::string source;

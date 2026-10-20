@@ -69,6 +69,7 @@ declare module "ns:swift/SwiftDemo" {
      * @deprecated Use fetch(url:) instead
      */
     legacyFetch(): void;
+    each(body: (arg0: number) => void): void;
     load(path: string): Uint8Array;
     wait(seconds: number): Promise<void>;
     fetch(url: string | URL): Promise<string>;
@@ -150,8 +151,18 @@ declare module "ns:swift/SwiftDemo" {
     static readonly liveCount: number;
   }
 
+  export class Notifier {
+    constructor();
+    publishLater(message: string): void;
+    clear(): void;
+    readonly count: number;
+    publish(message: string): void;
+    subscribe(handler: (arg0: string) => void): void;
+  }
+
   export function allFlavors(): (Flavor)[];
   export function echoUInt64(value: number | bigint): number;
+  export function greetLater(name: (string) | null | undefined, completion: (arg0: string | null) => void): void;
   export function largestInt(): number;
   export function namesLater(count: number | bigint): Promise<(string)[]>;
   export function wordCounts(words: readonly (string)[]): Record<string, number>;
@@ -174,6 +185,7 @@ declare module "ns:swift/SwiftDemo" {
   export function echoInt8(value: number | bigint): number;
   export function mirrored(grid: readonly (readonly (number | bigint)[])[]): ((number)[])[];
   export function trackers(ids: readonly (number | bigint)[]): (Tracker)[];
+  export function countdown(start: number | bigint, tick: (arg0: number, arg1: boolean) => void): void;
 }
 
 declare module "ns:swift" {

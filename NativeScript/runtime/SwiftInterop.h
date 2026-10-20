@@ -31,8 +31,13 @@
 // itself (throwTypeError). A thunk reports its outcome by calling exactly one
 // return* or throw* entry of call->api, or calls beginAsync and later
 // exactly one complete* entry with the token it returned (from any thread).
+//
+// A closure argument is a callback handle, borrowed for the call. A Swift
+// closure that captures it holds a reference (callbackRetain/Release) and
+// calls it by reporting the arguments as an array: callbackBegin, each
+// argument through the complete* entries, then completeArrayEnd.
 
-#define NS_SWIFT_ABI_VERSION 3
+#define NS_SWIFT_ABI_VERSION 4
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,6 +73,8 @@ enum {
   // payload.object points at 2 * `length` slots: key, value, key, value...
   // Keys are strings.
   NSSwiftTagMap = 8,
+  // payload.object is a callback handle.
+  NSSwiftTagFunction = 9,
 };
 
 typedef struct NSSwiftAPI NSSwiftAPI;
@@ -129,6 +136,9 @@ enum {
 //   B           Data: bytes (NSSwiftTagString) <-> Uint8Array copy
 //   [<code>]    array (NSSwiftTagArray) <-> JS array copy
 //   {<code>}    [String: <code>] (NSSwiftTagMap) <-> plain JS object copy
+//   (<code>,...)
+//               closure returning Void, of the listed parameters
+//               (NSSwiftTagFunction) <- JS function; parameters only
 //   <code>?     optional: JS null/undefined <-> NSSwiftTagNull
 // e.g. "s,i64>s" is (String, Int) -> String; ">o2?" returns an optional
 // instance of type 2.
@@ -199,6 +209,15 @@ struct NSSwiftAPI {
   /* 28 */ void (*completeArrayEnd)(void* token);
   /* 29 */ void (*completeMapBegin)(void* token, intptr_t count);
   /* 30 */ void (*completeMapEnd)(void* token);
+
+  // Closures. callbackBegin returns a token for one invocation; it is
+  // consumed by completeArrayEnd once the arguments are reported. Any entry
+  // may be called from any thread: a call on the isolate's thread runs the
+  // function before returning, any other is queued to that thread (Swift
+  // does not wait for it).
+  /* 31 */ void* (*callbackBegin)(void* callback);
+  /* 32 */ void (*callbackRetain)(void* callback);
+  /* 33 */ void (*callbackRelease)(void* callback);
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);

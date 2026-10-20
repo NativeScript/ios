@@ -53,7 +53,10 @@
     "s:9SwiftDemo7resolve_7against10Foundation3URLVSS_AFtF",
     "s:9SwiftDemo8checksumySi10Foundation4DataVF",
     "s:9SwiftDemo4rampy10Foundation4DataVSiF",
-    "s:9SwiftDemo10namesLaterySaySSGSiYaF"
+    "s:9SwiftDemo10namesLaterySaySSGSiYaF",
+    "s:9SwiftDemo9countdown4from_ySi_ySi_SbtXEtF",
+    "s:9SwiftDemo10greetLater_10completionySSSg_yADYbctF",
+    "s:9SwiftDemo8NotifierC"
   ],
   "externalTypes": [
     {
@@ -346,6 +349,42 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:11:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo10greetLater_10completionySSSg_yADYbctF",
+      "kind": "function",
+      "path": "greetLater(_:completion:)",
+      "name": "greetLater(_:completion:)",
+      "access": "public",
+      "declaration": "func greetLater(_ name: String?, completion: @escaping @Sendable (String?) -> Void)",
+      "parameters": [
+        {
+          "internalName": "name",
+          "type": {
+            "spelling": "String?",
+            "references": [
+              "s:SS"
+            ]
+          }
+        },
+        {
+          "label": "completion",
+          "internalName": "completion",
+          "type": {
+            "spelling": "(String?) -> Void",
+            "references": [
+              "s:SS",
+              "s:s4Voida"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:80:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -2948,6 +2987,142 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo8NotifierC",
+      "kind": "class",
+      "path": "Notifier",
+      "name": "Notifier",
+      "access": "public",
+      "declaration": "final class Notifier",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:86:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo8NotifierCACycfc",
+        "s:9SwiftDemo8NotifierC5countSivp",
+        "s:9SwiftDemo8NotifierC9subscribeyyySSYbcF",
+        "s:9SwiftDemo8NotifierC7publishyySSF",
+        "s:9SwiftDemo8NotifierC12publishLateryySSF",
+        "s:9SwiftDemo8NotifierC5clearyyF"
+      ],
+      "conformances": [
+        "s:s16SendableMetatypeP",
+        "s:s8SendableP"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo8NotifierC12publishLateryySSF",
+      "kind": "instanceMethod",
+      "path": "Notifier.publishLater(_:)",
+      "name": "publishLater(_:)",
+      "access": "public",
+      "declaration": "func publishLater(_ message: String)",
+      "parameters": [
+        {
+          "internalName": "message",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:92:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo8NotifierC"
+    },
+    {
+      "id": "s:9SwiftDemo8NotifierC5clearyyF",
+      "kind": "instanceMethod",
+      "path": "Notifier.clear()",
+      "name": "clear()",
+      "access": "public",
+      "declaration": "func clear()",
+      "location": "file://Sources/SwiftDemo/Values.swift:96:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo8NotifierC"
+    },
+    {
+      "id": "s:9SwiftDemo8NotifierC5countSivp",
+      "kind": "instanceProperty",
+      "path": "Notifier.count",
+      "name": "count",
+      "access": "public",
+      "declaration": "var count: Int { get }",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Values.swift:89:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo8NotifierC"
+    },
+    {
+      "id": "s:9SwiftDemo8NotifierC7publishyySSF",
+      "kind": "instanceMethod",
+      "path": "Notifier.publish(_:)",
+      "name": "publish(_:)",
+      "access": "public",
+      "declaration": "func publish(_ message: String)",
+      "parameters": [
+        {
+          "internalName": "message",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:91:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo8NotifierC"
+    },
+    {
+      "id": "s:9SwiftDemo8NotifierC9subscribeyyySSYbcF",
+      "kind": "instanceMethod",
+      "path": "Notifier.subscribe(_:)",
+      "name": "subscribe(_:)",
+      "access": "public",
+      "declaration": "func subscribe(_ handler: @escaping @Sendable (String) -> Void)",
+      "parameters": [
+        {
+          "internalName": "handler",
+          "type": {
+            "spelling": "(String) -> Void",
+            "references": [
+              "s:SS",
+              "s:s4Voida"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:90:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo8NotifierC"
+    },
+    {
+      "id": "s:9SwiftDemo8NotifierCACycfc",
+      "kind": "initializer",
+      "path": "Notifier.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "location": "file://Sources/SwiftDemo/Values.swift:88:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo8NotifierC"
+    },
+    {
       "id": "s:9SwiftDemo8centroid2ofAA5PointVSayAEG_tF",
       "kind": "function",
       "path": "centroid(of:)",
@@ -3081,6 +3256,39 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:62:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo9countdown4from_ySi_ySi_SbtXEtF",
+      "kind": "function",
+      "path": "countdown(from:_:)",
+      "name": "countdown(from:_:)",
+      "access": "public",
+      "declaration": "func countdown(from start: Int, _ tick: (Int, Bool) -> Void)",
+      "parameters": [
+        {
+          "label": "from",
+          "internalName": "start",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "internalName": "tick",
+          "type": {
+            "spelling": "(Int, Bool) -> Void",
+            "references": [
+              "s:Si",
+              "s:Sb",
+              "s:s4Voida"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:74:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {

@@ -55,6 +55,9 @@ enum class Bridge {
   Array,
   // [String: T]: a plain JS object copy; `elements` holds T.
   Dictionary,
+  // A closure parameter returning Void: a JS function. `elements` holds the
+  // closure's parameters.
+  Closure,
 };
 
 struct BridgedType {
@@ -65,6 +68,9 @@ struct BridgedType {
   TypeNode node;
   // Array and Dictionary: the element (value) type.
   std::vector<BridgedType> elements;
+  // Closure parameters declared @escaping (valid only in parameter
+  // position, so kept out of `node`).
+  bool escaping = false;
 };
 
 struct Capability {

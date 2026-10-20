@@ -93,8 +93,11 @@ TEST(ClassifyRejections) {
   EXPECT_TIER("Loader.fetch(url:)", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.transform(_:)", Tier::SwiftSpecialized, "generic");
   EXPECT_TIER("Loader.first(of:)", Tier::SwiftSpecialized, "generic");
-  EXPECT_TIER("Loader.withCompletion(_:)", Tier::Unsupported, "closure");
-  EXPECT_TIER("Loader.each(_:)", Tier::Unsupported, "closure");
+  EXPECT_TIER("Loader.withCompletion(_:)", Tier::Unsupported, "unbridged-type:Swift.Result");
+  EXPECT_TIER("Loader.each(_:)", Tier::SwiftGenerated);
+  EXPECT_TIER("countdown(from:_:)", Tier::SwiftGenerated);
+  EXPECT_TIER("greetLater(_:completion:)", Tier::SwiftGenerated);
+  EXPECT_TIER("Notifier.subscribe(_:)", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.update(_:)", Tier::Unsupported, "inout-parameter");
   EXPECT_TIER("Loader.lookup(table:key:)", Tier::SwiftGenerated);
   EXPECT_TIER("Canvas.draw(_:)", Tier::Unsupported, "existential");

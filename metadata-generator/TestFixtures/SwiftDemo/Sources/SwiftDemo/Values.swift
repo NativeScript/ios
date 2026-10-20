@@ -71,3 +71,28 @@ public func namesLater(_ count: Int) async -> [String] {
     await Task.yield()
     return names(count)
 }
+
+public func countdown(from start: Int, _ tick: (Int, Bool) -> Void) {
+    for value in stride(from: start, through: 0, by: -1) {
+        tick(value, value == 0)
+    }
+}
+
+public func greetLater(_ name: String?, completion: @escaping @Sendable (String?) -> Void) {
+    DispatchQueue.global().async {
+        completion(name.map { "hi \($0)" })
+    }
+}
+
+public final class Notifier: @unchecked Sendable {
+    private var handlers: [@Sendable (String) -> Void] = []
+    public init() {}
+    public var count: Int { handlers.count }
+    public func subscribe(_ handler: @escaping @Sendable (String) -> Void) { handlers.append(handler) }
+    public func publish(_ message: String) { handlers.forEach { $0(message) } }
+    public func publishLater(_ message: String) {
+        let handlers = self.handlers
+        DispatchQueue.global().async { handlers.forEach { $0(message) } }
+    }
+    public func clear() { handlers.removeAll() }
+}

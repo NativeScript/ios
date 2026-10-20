@@ -320,6 +320,19 @@ class Classifier {
         continue;
       }
       BridgedType bridged = bridge(parameter.type, generics, reasons);
+      if (bridged.bridge == Bridge::Closure) {
+        // The declaration parser lifts type attributes onto the parameter;
+        // the closure type needs them back (@Sendable, @MainActor).
+        TypeNode& node =
+            bridged.optional ? bridged.node.children[0] : bridged.node;
+        for (const auto& attribute : parameter.attributes) {
+          if (attribute == "@escaping") {
+            bridged.escaping = true;
+          } else if (!node.hasAttribute(attribute)) {
+            node.attributes.push_back(attribute);
+          }
+        }
+      }
       capability.parameters.push_back(std::move(bridged));
     }
 
@@ -330,8 +343,14 @@ class Classifier {
       capability.result = std::move(self);
     } else if (symbol.valueType) {
       capability.result = bridge(*symbol.valueType, generics, reasons);
+      if (capability.result.bridge == Bridge::Closure) {
+        reasons.push_back("closure");
+      }
     } else if (symbol.returnType) {
       capability.result = bridge(*symbol.returnType, generics, reasons);
+      if (capability.result.bridge == Bridge::Closure) {
+        reasons.push_back("closure");
+      }
     } else {
       capability.result.bridge = Bridge::Void;
     }
@@ -409,6 +428,9 @@ class Classifier {
     if (reason.empty() && element.bridge == Bridge::Void) {
       reason = "unbridged-type:Void";
     }
+    if (reason.empty() && element.bridge == Bridge::Closure) {
+      reason = "closure";
+    }
     container.elements.push_back(std::move(element));
     return reason;
   }
@@ -422,8 +444,39 @@ class Classifier {
         return "";
       case TypeNode::Kind::GenericParameter:
         return "generic";
-      case TypeNode::Kind::Function:
-        return "closure";
+      case TypeNode::Kind::Function: {
+        // JS functions stand in for closures that return nothing: a Swift
+        // caller cannot wait for a value from another thread's JS.
+        if (node.isAsync || node.isThrowing ||
+            (!node.result.empty() &&
+             node.result[0].kind != TypeNode::Kind::Void)) {
+          return "closure";
+        }
+        bridged.bridge = Bridge::Closure;
+        for (const auto& parameter : node.children) {
+          BridgedType element;
+          element.node = parameter;
+          const TypeNode* inner = &parameter;
+          if (!parameter.modifier.empty()) {
+            return "closure";
+          }
+          if (inner->kind == TypeNode::Kind::Optional ||
+              inner->kind == TypeNode::Kind::ImplicitlyUnwrappedOptional) {
+            element.optional = true;
+            inner = &inner->children[0];
+          }
+          std::string reason = bridgeNonOptional(*inner, element);
+          if (reason.empty() && (element.bridge == Bridge::Void ||
+                                 element.bridge == Bridge::Closure)) {
+            reason = "closure";
+          }
+          if (!reason.empty()) {
+            return reason;
+          }
+          bridged.elements.push_back(std::move(element));
+        }
+        return "";
+      }
       case TypeNode::Kind::Tuple:
         return "tuple";
       case TypeNode::Kind::Array:
@@ -580,6 +633,9 @@ class Classifier {
         break;
       case Bridge::Dictionary:
         kind = "record";
+        break;
+      case Bridge::Closure:
+        kind = "function";
         break;
       default:
         kind = "other";

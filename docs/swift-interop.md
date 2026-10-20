@@ -63,6 +63,7 @@ fixture's `Package.swift` builds the same files as two SwiftPM modules.
 | `Data` | `Uint8Array` copy (inputs accept any `ArrayBuffer` or view) |
 | `[T]` | array copy |
 | `[String: T]` | plain object copy |
+| `(A, B) -> Void` (parameters only) | `function (a, b)` |
 
 Collections are copied in both directions; their elements follow the same
 table (optional elements are not supported yet), and dictionary keys must be
@@ -95,6 +96,24 @@ holds.
 - Nested types hang off their parent: `Polygon.Style.dashed`,
   `new Polygon.Metrics({ perimeter: 3 })`. When the parent itself is not
   bridged, a frozen namespace object stands in for it.
+
+## Closures
+
+A closure parameter that returns `Void` takes a JS function; its arguments
+follow the value table. The Swift closure keeps the function alive for as long
+as Swift holds the closure, and drops it when Swift releases the closure.
+
+- Called on the JS thread, the closure runs the function before returning.
+  That includes every call made while the Swift call is in progress
+  (`countdown(3, (n) => ...)`). When the function throws during the call, the
+  call throws that exception, and later invocations in the same call are
+  skipped.
+- Called from any other thread (a completion handler run by a background
+  queue), the invocation is queued to the isolate's thread and Swift does not
+  wait for it. A throw there is reported as an uncaught error.
+- Closures that return a value, throw, or are `async`, `@autoclosure`
+  parameters, closures with `inout` parameters, and closures returned from
+  Swift are not bridged yet.
 
 ## Async, actors and the main actor
 
@@ -141,7 +160,7 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 ## Not yet supported
 
-Closures and callbacks, async cancellation, `inout` parameters, generics,
+Closures that return values, async cancellation, `inout` parameters, generics,
 protocols as values, tuples, sets, optional collection elements, enums with
 associated values, subscripts and operators. Each appears in the coverage
 report with its reason.
@@ -158,6 +177,6 @@ are demoted as `compiler-rejected`.
 
 `NativeScript/runtime/SwiftInterop.h` is the binary contract between the
 runtime and generated thunks (value slots, the API table, kinds and signature
-codes, and the async completion entries). Thunks are stamped with
+codes, and the async completion and callback entries). Thunks are stamped with
 `NS_SWIFT_ABI_VERSION`; the runtime refuses a module generated for another
 version.

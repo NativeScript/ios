@@ -115,6 +115,14 @@ std::string codeDisplayName(const SwiftSurface& surface,
     case Bridge::Dictionary:
       name = "[String: " + codeDisplayName(surface, type.elements.at(0)) + "]";
       break;
+    case Bridge::Closure: {
+      std::vector<std::string> parameters;
+      for (const auto& element : type.elements) {
+        parameters.push_back(codeDisplayName(surface, element));
+      }
+      name = "(" + llvm::join(parameters, ", ") + ") -> Void";
+      break;
+    }
     case Bridge::None:
       name = "?";
       break;
@@ -235,7 +243,8 @@ class Writer {
     };
     if (a.bridge == b.bridge &&
         (a.bridge == Bridge::Date || a.bridge == Bridge::Data ||
-         a.bridge == Bridge::Array || a.bridge == Bridge::Dictionary)) {
+         a.bridge == Bridge::Array || a.bridge == Bridge::Dictionary ||
+         a.bridge == Bridge::Closure)) {
       return true;
     }
     if (numeric(a.bridge) && numeric(b.bridge)) {
@@ -339,6 +348,16 @@ class Writer {
       case Bridge::Dictionary:
         ts = "Readonly<Record<string, " + inputType(type.elements.at(0)) + ">>";
         break;
+      case Bridge::Closure: {
+        // The function receives what Swift passes: output types.
+        std::vector<std::string> parameters;
+        for (size_t i = 0; i < type.elements.size(); i++) {
+          parameters.push_back("arg" + std::to_string(i) + ": " +
+                               outputType(type.elements[i]));
+        }
+        ts = "(" + llvm::join(parameters, ", ") + ") => void";
+        break;
+      }
       default:
         ts = "never";
         break;
@@ -380,6 +399,9 @@ class Writer {
         break;
       case Bridge::Dictionary:
         ts = "Record<string, " + outputType(type.elements.at(0)) + ">";
+        break;
+      case Bridge::Closure:
+        ts = "never";
         break;
       case Bridge::None:
         ts = "never";

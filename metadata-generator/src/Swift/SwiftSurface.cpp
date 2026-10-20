@@ -108,6 +108,14 @@ std::string signatureCode(const SwiftSurface& surface,
     case Bridge::Dictionary:
       code = "{" + signatureCode(surface, type.elements.at(0)) + "}";
       break;
+    case Bridge::Closure: {
+      code = "(";
+      for (size_t i = 0; i < type.elements.size(); i++) {
+        code += (i > 0 ? "," : "") + signatureCode(surface, type.elements[i]);
+      }
+      code += ")";
+      break;
+    }
     case Bridge::None:
       code = "?";
       break;

@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module"]);
-            expect(swift.abiVersion).toBe(3);
+            expect(swift.abiVersion).toBe(4);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(3);
+            expect(info.abiVersion).toBe(4);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -414,6 +414,7 @@ describe("ns:swift", function () {
                 expect(event.data.palette).toMatch(/isolated to the main actor/);
                 expect(event.data.trackerId).toBe(5);
                 expect(event.data.echo).toBe("from worker");
+                expect(event.data.callback).toBe("hi worker");
                 worker.terminate();
                 done();
             };
@@ -422,6 +423,85 @@ describe("ns:swift", function () {
                 fail("worker error: " + event.message);
                 done();
             };
+        });
+    });
+
+    describe("closures", function () {
+        it("calls JS functions passed for closures while the call runs", function () {
+            var ticks = [];
+            SwiftDemo.countdown(3, function (value, last) {
+                ticks.push([value, last]);
+            });
+            expect(ticks).toEqual([[3, false], [2, false], [1, false], [0, true]]);
+
+            var loader = new SwiftDemo.Loader();
+            var seen = [];
+            loader.each(function (value) { seen.push(value); });
+            expect(seen).toEqual([]);
+        });
+
+        it("throws a callback's exception from the call and skips later calls", function () {
+            var calls = 0;
+            expect(function () {
+                SwiftDemo.countdown(5, function () {
+                    calls++;
+                    throw new Error("stop");
+                });
+            }).toThrowError("stop");
+            expect(calls).toBe(1);
+        });
+
+        it("refuses values that are not functions", function () {
+            expect(function () { SwiftDemo.countdown(1, 5); })
+                .toThrowError(TypeError, /countdown.*\(Int, Bool\) -> Void/);
+        });
+
+        it("runs closures called from other threads on the JS thread", function (done) {
+            SwiftDemo.greetLater("ns", function (greeting) {
+                expect(greeting).toBe("hi ns");
+                expect(NSThread.isMainThread).toBe(true);
+                SwiftDemo.greetLater(null, function (nothing) {
+                    expect(nothing).toBeNull();
+                    done();
+                });
+            });
+        });
+
+        it("keeps escaping closures until Swift releases them", function (done) {
+            var notifier = new SwiftDemo.Notifier();
+            var received = [];
+            notifier.subscribe(function (message) {
+                received.push(message);
+                if (message === "later") {
+                    expect(received).toEqual(["now", "later"]);
+                    notifier.clear();
+                    expect(notifier.count).toBe(0);
+                    done();
+                }
+            });
+            gc();
+            expect(notifier.count).toBe(1);
+            notifier.publish("now");
+            expect(received).toEqual(["now"]);
+            notifier.publishLater("later");
+        });
+
+        it("releases the JS function once Swift drops the closure", function (done) {
+            var notifier = new SwiftDemo.Notifier();
+            var handler = function () {};
+            var weakHandler = new WeakRef(handler);
+            notifier.subscribe(handler);
+            handler = null;
+            setTimeout(function () {
+                gc();
+                expect(!!weakHandler.deref()).toBe(true);
+                notifier.clear();
+                setTimeout(function () {
+                    gc();
+                    expect(!!weakHandler.deref()).toBe(false);
+                    done();
+                }, 0);
+            }, 0);
         });
     });
 
