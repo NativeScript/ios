@@ -75,6 +75,9 @@ struct BridgedType {
   // Closure parameters declared @escaping (valid only in parameter
   // position, so kept out of `node`).
   bool escaping = false;
+  // An inout parameter: JS passes a reference object, `{ value }`, whose
+  // value is the argument and receives the final value.
+  bool isInout = false;
 };
 
 struct Capability {

@@ -391,7 +391,8 @@ class Classifier {
     std::set<std::string> generics = genericNamesInScope(_module, symbol);
     std::vector<std::string> reasons;
     for (const auto& parameter : symbol.parameters) {
-      if (parameter.modifier == "inout") {
+      // An async call returns before its arguments' final values exist.
+      if (parameter.modifier == "inout" && capability.isAsync) {
         reasons.push_back("inout-parameter");
         continue;
       }
@@ -405,6 +406,12 @@ class Classifier {
         continue;
       }
       BridgedType bridged = bridge(parameter.type, generics, reasons);
+      if (parameter.modifier == "inout") {
+        if (bridged.bridge == Bridge::Closure) {
+          reasons.push_back("inout-parameter");
+        }
+        bridged.isInout = true;
+      }
       if (bridged.bridge == Bridge::Closure) {
         // The declaration parser lifts type attributes onto the parameter;
         // the closure type needs them back (@Sendable, @MainActor).
@@ -687,6 +694,9 @@ class Classifier {
   }
 
   static std::string jsKind(const BridgedType& type) {
+    if (type.isInout) {
+      return "record";
+    }
     std::string kind;
     switch (type.bridge) {
       case Bridge::Bool:

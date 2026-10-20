@@ -99,6 +99,7 @@ declare module "ns:swift/SwiftDemo" {
     wait(seconds: number): Promise<void>;
     fetch(url: string | URL): Promise<string>;
     lookup(table: Readonly<Record<string, number | bigint>>, key: string): number | null;
+    update(point: { value: Point }): void;
     /**
      * @deprecated Renamed to `fetch(url:)`.
      */
@@ -212,17 +213,22 @@ declare module "ns:swift/SwiftDemo" {
   export function delayedEcho(text: string, seconds: number): Promise<string>;
   export function measureLater(width: number): Promise<Measurement>;
   export function measurements(): (Measurement)[];
+  export function swapTrackers(a: { value: Tracker }, b: { value: Tracker }): void;
   export const defaultFlavor: Flavor;
   export let globalCounter: number;
   export function makeDefaultPoint(): Point;
   export function makeTrackerLater(id: number | bigint): Promise<Tracker>;
   export function area(measurement: Measurement): number;
+  export function bump(value: { value: number | bigint }): void;
   export function echo(payload: Payload): Payload;
   export function host(url: string | URL): string | null;
   export function ramp(count: number | bigint): Uint8Array;
+  export function clear(name: { value: (string) | null | undefined }): void;
+  export function halve(value: { value: number | bigint }): void;
   export function names(count: number | bigint): (string)[];
   export function shout(name: (string) | null | undefined): string | null;
   export function total(values: readonly (number)[]): number;
+  export function append(word: string, words: { value: readonly (string)[] }): void;
   export function explain(error: ShapeError): string;
   export function lengths(table: Readonly<Record<string, string>>): Record<string, number>;
   export function measure(width: number, height: (number) | null | undefined): Measurement;

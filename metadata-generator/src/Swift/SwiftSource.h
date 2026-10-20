@@ -43,6 +43,8 @@ struct Invocation {
   std::string member;
   std::vector<std::string> labels;
   std::vector<std::string> parameterTypes;
+  // Per parameter: passed `inout` (the argument is written `&name`).
+  std::vector<bool> inoutParameters;
   // Qualified result type ("Void" when there is none).
   std::string resultType;
   bool isThrowing = false;

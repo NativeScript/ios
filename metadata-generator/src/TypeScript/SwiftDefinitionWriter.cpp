@@ -128,7 +128,7 @@ std::string codeDisplayName(const SwiftSurface& surface,
       name = "?";
       break;
   }
-  return type.optional ? name + "?" : name;
+  return (type.isInout ? "inout " : "") + (type.optional ? name + "?" : name);
 }
 
 std::string typedKey(const SwiftSurface& surface, const Member& member) {
@@ -232,6 +232,14 @@ class Writer {
   // Whether some JS value is accepted as both `a` and `b` (overload
   // resolution in the runtime would then see both).
   bool overlaps(const BridgedType& a, const BridgedType& b) const {
+    if (a.isInout || b.isInout) {
+      // A reference object is a record.
+      auto record = [](const BridgedType& type) {
+        return type.isInout || type.bridge == Bridge::Dictionary ||
+               type.bridge == Bridge::TaggedEnum;
+      };
+      return record(a) && record(b);
+    }
     if (a.optional && b.optional) {
       return true;
     }
@@ -320,6 +328,11 @@ class Writer {
   }
 
   std::string inputType(const BridgedType& type) const {
+    if (type.isInout) {
+      BridgedType value = type;
+      value.isInout = false;
+      return "{ value: " + inputType(value) + " }";
+    }
     std::string ts;
     switch (type.bridge) {
       case Bridge::Bool:

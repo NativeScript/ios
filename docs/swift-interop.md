@@ -100,6 +100,11 @@ holds.
 - Enum initializers are `Enum.init(...)`, returning a case or `null`. Enum
   instance members are functions taking the case first:
   `Flavor.description("vanilla")`, `Measurement.isNone({ case: "none" })`.
+- An `inout` parameter takes a reference object: `bump(ref)` with
+  `ref = { value: 41 }` leaves `ref.value === 42`. The value is read before
+  the call and replaced after it succeeds; a throw leaves it unchanged. A
+  struct comes back as a new copy, so the object passed in is not mutated.
+  `async` functions with `inout` parameters are not exposed.
 - Properties are accessors; read-only Swift properties have no setter.
 - Nested types hang off their parent: `Polygon.Style.dashed`,
   `new Polygon.Metrics({ perimeter: 3 })`. When the parent itself is not
@@ -168,7 +173,7 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 ## Not yet supported
 
-Closures that return values, async cancellation, `inout` parameters, generics
+Closures that return values, async cancellation, generics
 (including `Result`), protocols as values, tuples, sets, optional collection
 elements, subscripts and operators. Each appears in the coverage report with
 its reason.

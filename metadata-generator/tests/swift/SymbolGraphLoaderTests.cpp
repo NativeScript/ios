@@ -128,7 +128,12 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "simplify(_:)",
                                        "Payload",
                                        "echo(_:)",
-                                       "Job"};
+                                       "Job",
+                                       "bump(_:)",
+                                       "append(_:to:)",
+                                       "halve(_:)",
+                                       "clear(_:)",
+                                       "swapTrackers(_:_:)"};
   CHECK_EQ(llvm::join(names, ","), llvm::join(expected, ","));
 }
 

@@ -77,7 +77,7 @@ SwiftSurface describeSurface(const Module& module,
                              const Classification& classification);
 
 // Signature code of one value ("i64", "o3?", "t2", "[s]", "{f64}",
-// "(i64,s)"...).
+// "(i64,s)", "&i64"...).
 std::string signatureCode(const SwiftSurface& surface, const BridgedType& type);
 
 // Signed/unsigned integer width of an Integer bridge: {code, Swift type,

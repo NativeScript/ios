@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 181,
+      "total": 186,
       "objc-direct": 0,
-      "swift-generated": 152,
+      "swift-generated": 158,
       "swift-specialized": 5,
       "type-only": 6,
-      "unsupported": 18,
-      "not-applicable": 0
-    },
-    "callable": {
-      "total": 156,
-      "objc-direct": 0,
-      "swift-generated": 131,
-      "swift-specialized": 5,
-      "type-only": 3,
       "unsupported": 17,
       "not-applicable": 0
     },
-    "effectiveCallable": 131,
+    "callable": {
+      "total": 161,
+      "objc-direct": 0,
+      "swift-generated": 137,
+      "swift-specialized": 5,
+      "type-only": 3,
+      "unsupported": 16,
+      "not-applicable": 0
+    },
+    "effectiveCallable": 137,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -62,9 +62,9 @@
       "not-applicable": 0
     },
     "function": {
-      "total": 32,
+      "total": 37,
       "objc-direct": 0,
-      "swift-generated": 32,
+      "swift-generated": 37,
       "swift-specialized": 0,
       "type-only": 0,
       "unsupported": 0,
@@ -82,10 +82,10 @@
     "instanceMethod": {
       "total": 41,
       "objc-direct": 0,
-      "swift-generated": 26,
+      "swift-generated": 27,
       "swift-specialized": 5,
       "type-only": 1,
-      "unsupported": 9,
+      "unsupported": 8,
       "not-applicable": 0
     },
     "instanceProperty": {
@@ -176,11 +176,10 @@
     "existential": 1,
     "external-type-extension": 2,
     "generic": 5,
-    "inout-parameter": 4,
     "operator": 4,
     "owner-not-bridged": 2,
     "subscript": 1,
-    "unbridged-type": 3
+    "unbridged-type": 6
   },
   "symbols": [
     {
@@ -406,6 +405,14 @@
       "location": "file://Sources/SwiftDemo/Values.swift:112"
     },
     {
+      "id": "s:9SwiftDemo12swapTrackersyyAA7TrackerCz_ADztF",
+      "path": "swapTrackers(_:_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "swapTrackers",
+      "location": "file://Sources/SwiftDemo/Values.swift:173"
+    },
+    {
       "id": "s:9SwiftDemo13PrecipitationO",
       "path": "Precipitation",
       "kind": "enum",
@@ -587,6 +594,14 @@
       "location": "file://Sources/SwiftDemo/Values.swift:100"
     },
     {
+      "id": "s:9SwiftDemo4bumpyySizF",
+      "path": "bump(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "bump",
+      "location": "file://Sources/SwiftDemo/Values.swift:166"
+    },
+    {
       "id": "s:9SwiftDemo4echoyAA7PayloadOADF",
       "path": "echo(_:)",
       "kind": "function",
@@ -686,6 +701,22 @@
         "protocol-requirement"
       ],
       "location": "file://Sources/SwiftDemo/Shapes.swift:5"
+    },
+    {
+      "id": "s:9SwiftDemo5clearyySSSgzF",
+      "path": "clear(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "clear",
+      "location": "file://Sources/SwiftDemo/Values.swift:172"
+    },
+    {
+      "id": "s:9SwiftDemo5halveyySizKF",
+      "path": "halve(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "halve",
+      "location": "file://Sources/SwiftDemo/Values.swift:168"
     },
     {
       "id": "s:9SwiftDemo5namesySaySSGSiF",
@@ -861,10 +892,8 @@
       "id": "s:9SwiftDemo6LoaderC6updateyyAA5PointVzF",
       "path": "Loader.update(_:)",
       "kind": "instanceMethod",
-      "tier": "unsupported",
-      "reasons": [
-        "inout-parameter"
-      ],
+      "tier": "swift-generated",
+      "jsName": "update",
       "location": "file://Sources/SwiftDemo/Shapes.swift:128"
     },
     {
@@ -947,6 +976,14 @@
       "tier": "swift-generated",
       "jsName": "sides",
       "location": "file://Sources/SwiftDemo/Shapes.swift:44"
+    },
+    {
+      "id": "s:9SwiftDemo6append_2toySS_SaySSGztF",
+      "path": "append(_:to:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "append",
+      "location": "file://Sources/SwiftDemo/Values.swift:167"
     },
     {
       "id": "s:9SwiftDemo7CounterC",
@@ -1570,7 +1607,7 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "inout-parameter"
+        "unbridged-type:Swift.Hasher"
       ]
     },
     {
@@ -1579,7 +1616,7 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "inout-parameter"
+        "unbridged-type:Swift.Hasher"
       ]
     },
     {
@@ -1588,7 +1625,7 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "inout-parameter"
+        "unbridged-type:Swift.Hasher"
       ]
     },
     {

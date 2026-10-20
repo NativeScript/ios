@@ -58,6 +58,8 @@ struct ValueCode {
   int bits = 64;
   int typeIndex = -1;
   bool optional = false;
+  // A parameter passed as a reference object (`&` prefix).
+  bool inout = false;
   // Array and Map: the element (value) code. Function: its parameter codes.
   std::vector<ValueCode> element;
 };
@@ -199,9 +201,12 @@ bool ParseSignature(const std::string& text, Signature& signature) {
   }
   for (const std::string& part : parts) {
     ValueCode code;
-    if (!ParseCode(part, code) || code.kind == ValueCode::Kind::Void) {
+    bool inout = !part.empty() && part[0] == '&';
+    if (!ParseCode(inout ? part.substr(1) : part, code) || code.kind == ValueCode::Kind::Void ||
+        (inout && code.kind == ValueCode::Kind::Function)) {
       return false;
     }
+    code.inout = inout;
     signature.parameters.push_back(code);
   }
   return ParseCode(text.substr(arrow + 1), signature.result) &&
@@ -359,7 +364,7 @@ std::string TypeDisplayName(const ModuleInfo& module, const ValueCode& code) {
       }
       break;
   }
-  return code.optional ? name + "?" : name;
+  return (code.inout ? "inout " : "") + (code.optional ? name + "?" : name);
 }
 
 // "scale(by: Double)": distinguishes overloads that share a Swift name.
@@ -483,6 +488,8 @@ void ApiCallbackRetain(void* callback);
 void ApiCallbackRelease(void* callback);
 void ApiReturnCaseBegin(NSSwiftCall* call, intptr_t caseIndex);
 void ApiCompleteCaseBegin(void* token, intptr_t caseIndex);
+void ApiWriteBackBegin(NSSwiftCall* call, intptr_t index);
+void ApiWriteBackEnd(NSSwiftCall* call);
 
 const NSSwiftAPI kAPI = {
     ApiReturnVoid,           ApiReturnBool,           ApiReturnInt64,
@@ -497,7 +504,8 @@ const NSSwiftAPI kAPI = {
     ApiCompleteArrayBegin,   ApiCompleteContainerEnd, ApiCompleteMapBegin,
     ApiCompleteContainerEnd, ApiCallbackBegin,        ApiCallbackRetain,
     ApiCallbackRelease,      ApiReturnCaseBegin,      ApiCompleteCaseBegin,
-    ApiReturnArrayEnd,       ApiCompleteContainerEnd,
+    ApiReturnArrayEnd,       ApiCompleteContainerEnd, ApiWriteBackBegin,
+    ApiWriteBackEnd,
 };
 
 // "Polygon.Style" -> "Style".
@@ -750,7 +758,12 @@ struct ResultFrame {
   const ValueCode* element = nullptr;
   // Set for a case: its values' keys and codes.
   const CaseInfo* tagged = nullptr;
+  // An inout argument's reference object, whose `value` receives the one
+  // value reported (of code `element`).
+  bool writeBack = false;
 };
+
+struct SlotArena;
 
 struct CallContext : NSSwiftCall {
   Isolate* isolate = nullptr;
@@ -770,6 +783,8 @@ struct CallContext : NSSwiftCall {
   // The first exception a JS callback threw while the thunk ran; it is
   // thrown from the call once the thunk returns.
   Global<Value> callbackException;
+  // The arguments' storage, including inout arguments' reference objects.
+  const SlotArena* arena = nullptr;
 };
 
 CallContext* ContextOf(NSSwiftCall* call) { return static_cast<CallContext*>(call); }
@@ -780,6 +795,9 @@ const ValueCode* CurrentCode(CallContext* context) {
     return context->resultCode;
   }
   const ResultFrame& frame = context->frames.back();
+  if (frame.writeBack) {
+    return frame.element;
+  }
   if (frame.tagged != nullptr) {
     return frame.next < frame.tagged->codes.size() ? &frame.tagged->codes[frame.next] : nullptr;
   }
@@ -799,7 +817,10 @@ void Complete(CallContext* context, Local<Value> value) {
   }
   ResultFrame& frame = context->frames.back();
   bool stored = true;
-  if (frame.tagged != nullptr) {
+  if (frame.writeBack) {
+    stored = frame.target->Set(context->context, tns::ToV8String(context->isolate, "value"), value)
+                 .FromMaybe(false);
+  } else if (frame.tagged != nullptr) {
     stored = frame.next < frame.tagged->keys.size() &&
              frame.target
                  ->Set(context->context,
@@ -982,6 +1003,36 @@ const CaseInfo* CaseOf(const ModuleInfo& module, const ValueCode* code, intptr_t
   const auto& cases = module.types[code->typeIndex].cases;
   return caseIndex >= 0 && caseIndex < static_cast<intptr_t>(cases.size()) ? &cases[caseIndex]
                                                                            : nullptr;
+}
+
+Local<Object> ReferenceAt(const SlotArena* arena, intptr_t index);
+
+void ApiWriteBackBegin(NSSwiftCall* call, intptr_t index) {
+  CallContext* context = ContextOf(call);
+  const auto& parameters = context->member->signature.parameters;
+  Local<Object> reference;
+  if (index >= 0 && index < static_cast<intptr_t>(parameters.size()) && parameters[index].inout) {
+    reference = ReferenceAt(context->arena, index);
+  }
+  if (reference.IsEmpty()) {
+    Fail(context);
+    context->isolate->ThrowException(Exception::Error(tns::ToV8String(
+        context->isolate, context->member->swiftName + " reported an unexpected inout value")));
+    return;
+  }
+  ResultFrame frame;
+  frame.target = reference;
+  frame.element = &parameters[index];
+  frame.writeBack = true;
+  context->frames.push_back(frame);
+}
+
+void ApiWriteBackEnd(NSSwiftCall* call) {
+  CallContext* context = ContextOf(call);
+  if (context->frames.empty() || !context->frames.back().writeBack) {
+    return Fail(context);
+  }
+  context->frames.pop_back();
 }
 
 void ApiReturnCaseBegin(NSSwiftCall* call, intptr_t caseIndex) {
@@ -1606,6 +1657,9 @@ bool IsRecord(Isolate* isolate, Local<Value> value) {
 // user code). Collections are checked by kind only; Convert checks elements.
 bool Accepts(Isolate* isolate, const ModuleInfo& module, const ValueCode& code,
              Local<Value> value) {
+  if (code.inout) {
+    return IsRecord(isolate, value);
+  }
   if (value->IsNullOrUndefined()) {
     return code.optional;
   }
@@ -1667,6 +1721,8 @@ struct SlotArena {
   std::deque<std::string> strings;
   std::deque<std::vector<NSSwiftValue>> slots;
   std::vector<SwiftCallback*> callbacks;
+  // By parameter index; empty except for inout arguments.
+  std::vector<Local<Object>> references;
 
   SlotArena() = default;
   SlotArena(const SlotArena&) = delete;
@@ -1677,6 +1733,12 @@ struct SlotArena {
     }
   }
 };
+
+Local<Object> ReferenceAt(const SlotArena* arena, intptr_t index) {
+  return arena != nullptr && index < static_cast<intptr_t>(arena->references.size())
+             ? arena->references[index]
+             : Local<Object>();
+}
 
 void PointAtBytes(NSSwiftValue& slot, const void* bytes, size_t length) {
   slot.tag = NSSwiftTagString;
@@ -1701,6 +1763,24 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
              const MemberInfo& member, size_t index, const ValueCode& code, Local<Value> value,
              NSSwiftValue& slot, SlotArena& arena) {
   slot = NSSwiftValue{};
+  if (code.inout) {
+    ValueCode inner = code;
+    inner.inout = false;
+    if (!IsRecord(isolate, value)) {
+      return ThrowArgument(
+          isolate, member, index,
+          "is inout: pass a reference object, { value: " + TypeDisplayName(module, inner) + " }");
+    }
+    Local<Value> current;
+    if (!value.As<Object>()->Get(context, tns::ToV8String(isolate, "value")).ToLocal(&current)) {
+      return false;
+    }
+    if (arena.references.size() <= index) {
+      arena.references.resize(index + 1);
+    }
+    arena.references[index] = value.As<Object>();
+    return Convert(isolate, context, module, member, index, inner, current, slot, arena);
+  }
   if (value->IsNullOrUndefined()) {
     if (!code.optional) {
       return ThrowArgument(isolate, member, index,
@@ -2124,6 +2204,8 @@ MaybeLocal<Value> Invoke(Isolate* isolate, const MemberGroup& group, const Membe
   call.member = &member;
   call.constructTarget = constructTarget;
   call.resultCode = &member.signature.result;
+
+  call.arena = &arena;
 
   NSSwiftThunk thunk = setter ? member.setter : member.thunk;
   state->calls.push_back(&call);

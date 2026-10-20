@@ -67,7 +67,12 @@
     "s:9SwiftDemo8simplifyyAA7FormulaOADF",
     "s:9SwiftDemo7PayloadO",
     "s:9SwiftDemo4echoyAA7PayloadOADF",
-    "s:9SwiftDemo3JobO"
+    "s:9SwiftDemo3JobO",
+    "s:9SwiftDemo4bumpyySizF",
+    "s:9SwiftDemo6append_2toySS_SaySSGztF",
+    "s:9SwiftDemo5halveyySizKF",
+    "s:9SwiftDemo5clearyySSSgzF",
+    "s:9SwiftDemo12swapTrackersyyAA7TrackerCz_ADztF"
   ],
   "externalTypes": [
     {
@@ -755,6 +760,38 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo12swapTrackersyyAA7TrackerCz_ADztF",
+      "kind": "function",
+      "path": "swapTrackers(_:_:)",
+      "name": "swapTrackers(_:_:)",
+      "access": "public",
+      "declaration": "func swapTrackers(_ a: inout Tracker, _ b: inout Tracker)",
+      "parameters": [
+        {
+          "internalName": "a",
+          "type": {
+            "spelling": "Tracker",
+            "references": [
+              "s:9SwiftDemo7TrackerC"
+            ]
+          },
+          "modifier": "inout"
+        },
+        {
+          "internalName": "b",
+          "type": {
+            "spelling": "Tracker",
+            "references": [
+              "s:9SwiftDemo7TrackerC"
+            ]
+          },
+          "modifier": "inout"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:172:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo13PrecipitationO",
       "kind": "enum",
       "path": "Precipitation",
@@ -1200,6 +1237,28 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo4bumpyySizF",
+      "kind": "function",
+      "path": "bump(_:)",
+      "name": "bump(_:)",
+      "access": "public",
+      "declaration": "func bump(_ value: inout Int)",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          },
+          "modifier": "inout"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:165:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo4echoyAA7PayloadOADF",
       "kind": "function",
       "path": "echo(_:)",
@@ -1475,6 +1534,51 @@
       "location": "file://Sources/SwiftDemo/Shapes.swift:4:15",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo5ShapeP"
+    },
+    {
+      "id": "s:9SwiftDemo5clearyySSSgzF",
+      "kind": "function",
+      "path": "clear(_:)",
+      "name": "clear(_:)",
+      "access": "public",
+      "declaration": "func clear(_ name: inout String?)",
+      "parameters": [
+        {
+          "internalName": "name",
+          "type": {
+            "spelling": "String?",
+            "references": [
+              "s:SS"
+            ]
+          },
+          "modifier": "inout"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:171:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo5halveyySizKF",
+      "kind": "function",
+      "path": "halve(_:)",
+      "name": "halve(_:)",
+      "access": "public",
+      "declaration": "func halve(_ value: inout Int) throws",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          },
+          "modifier": "inout"
+        }
+      ],
+      "throws": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:167:12",
+      "graph": "SwiftDemo.symbols.json"
     },
     {
       "id": "s:9SwiftDemo5namesySaySSGSiF",
@@ -2245,6 +2349,38 @@
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6SquareC",
       "sourceOrigin": "s:9SwiftDemo5ShapeP5sidesSivpZ"
+    },
+    {
+      "id": "s:9SwiftDemo6append_2toySS_SaySSGztF",
+      "kind": "function",
+      "path": "append(_:to:)",
+      "name": "append(_:to:)",
+      "access": "public",
+      "declaration": "func append(_ word: String, to words: inout [String])",
+      "parameters": [
+        {
+          "internalName": "word",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        },
+        {
+          "label": "to",
+          "internalName": "words",
+          "type": {
+            "spelling": "[String]",
+            "references": [
+              "s:SS"
+            ]
+          },
+          "modifier": "inout"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:166:12",
+      "graph": "SwiftDemo.symbols.json"
     },
     {
       "id": "s:9SwiftDemo7CounterC",

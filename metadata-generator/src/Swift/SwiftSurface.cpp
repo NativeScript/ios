@@ -134,7 +134,7 @@ std::string signatureCode(const SwiftSurface& surface,
       code = "?";
       break;
   }
-  return type.optional ? code + "?" : code;
+  return (type.isInout ? "&" : "") + (type.optional ? code + "?" : code);
 }
 
 SwiftSurface describeSurface(const Module& module,

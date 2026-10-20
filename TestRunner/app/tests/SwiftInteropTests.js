@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module"]);
-            expect(swift.abiVersion).toBe(5);
+            expect(swift.abiVersion).toBe(6);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(5);
+            expect(info.abiVersion).toBe(6);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -51,7 +51,6 @@ describe("ns:swift", function () {
 
         it("exposes only the generated surface", function () {
             // Unsupported declarations (async, generic, closures, ...) are absent.
-            expect(SwiftDemo.Loader.prototype.update).toBeUndefined();
             expect(SwiftDemo.Loader.prototype.transform).toBeUndefined();
             expect(SwiftDemo.Loader.prototype.withCompletion).toBeUndefined();
         });
@@ -492,6 +491,53 @@ describe("ns:swift", function () {
                 fail(error);
                 done();
             });
+        });
+    });
+
+    describe("inout parameters", function () {
+        it("writes the final value back to the reference object", function () {
+            var counter = { value: 41 };
+            SwiftDemo.bump(counter);
+            expect(counter.value).toBe(42);
+
+            var words = { value: ["a"] };
+            SwiftDemo.append("b", words);
+            expect(words.value).toEqual(["a", "b"]);
+
+            var name = { value: "x" };
+            SwiftDemo.clear(name);
+            expect(name.value).toBeNull();
+        });
+
+        it("writes back structs and objects", function () {
+            var point = new SwiftDemo.Point(1, 2);
+            var ref = { value: point };
+            new SwiftDemo.Loader().update(ref);
+            expect(ref.value.x).toBe(2);
+            // Value semantics: the struct passed in is a separate copy.
+            expect(point.x).toBe(1);
+
+            var first = new SwiftDemo.Tracker(1);
+            var second = new SwiftDemo.Tracker(2);
+            var a = { value: first };
+            var b = { value: second };
+            SwiftDemo.swapTrackers(a, b);
+            expect(a.value).toBe(second);
+            expect(b.value).toBe(first);
+        });
+
+        it("leaves the reference unchanged when the call throws", function () {
+            var even = { value: 8 };
+            SwiftDemo.halve(even);
+            expect(even.value).toBe(4);
+            var odd = { value: 3 };
+            expect(function () { SwiftDemo.halve(odd); }).toThrowError(/invalidSide/);
+            expect(odd.value).toBe(3);
+        });
+
+        it("requires a reference object", function () {
+            expect(function () { SwiftDemo.bump(1); }).toThrowError(TypeError, /inout Int/);
+            expect(function () { SwiftDemo.bump({ value: "1" }); }).toThrowError(TypeError);
         });
     });
 

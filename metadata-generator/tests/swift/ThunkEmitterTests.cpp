@@ -45,11 +45,15 @@ TEST(ThunkRegistration) {
   CHECK_EQ(thunks().registerSymbol, std::string("ns_swift_register_SwiftDemo"));
   CHECK_EQ(thunks().fingerprint.size(), size_t(16));
   CHECK(thunks().thunkCount > 0);
-  CHECK(registers("registerModule(registrar, 5, \"SwiftDemo\", \"" +
+  CHECK(registers("registerModule(registrar, 6, \"SwiftDemo\", \"" +
                   thunks().fingerprint + "\", __nsRelease)"));
   // Cases of a tagged enum register their associated values' codes.
   CHECK(registers("\"tooManySides\", \"tooManySides(count:limit:)\", \"i64,i64>t"));
   CHECK(registers("\"area\", \"area(of:)\", \"t"));
+  // Inout parameters are marked; the thunk writes their final value back.
+  CHECK(registers("\"append\", \"append(_:to:)\", \"s,&[s]>v\""));
+  CHECK(registers("\"swapTrackers\", \"swapTrackers(_:_:)\", \"&o"));
+  CHECK(thunks().source.find("rt.writeBack(1) { rt.returnArray(a1)") != std::string::npos);
   // Closure parameters list the closure's own parameter codes.
   CHECK(registers("\"countdown\", \"countdown(from:_:)\", \"i64,(i64,b)>v\""));
   CHECK(registers("\"greetLater\", \"greetLater(_:completion:)\", \"s?,(s?)>v\""));

@@ -162,3 +162,12 @@ public enum Job {
         public init(id: Int) { self.id = id }
     }
 }
+
+public func bump(_ value: inout Int) { value += 1 }
+public func append(_ word: String, to words: inout [String]) { words.append(word) }
+public func halve(_ value: inout Int) throws {
+    guard value.isMultiple(of: 2) else { throw ShapeError.invalidSide(Double(value)) }
+    value /= 2
+}
+public func clear(_ name: inout String?) { name = nil }
+public func swapTrackers(_ a: inout Tracker, _ b: inout Tracker) { swap(&a, &b) }

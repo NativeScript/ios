@@ -37,7 +37,7 @@
 // calls it by reporting the arguments as an array: callbackBegin, each
 // argument through the complete* entries, then completeArrayEnd.
 
-#define NS_SWIFT_ABI_VERSION 5
+#define NS_SWIFT_ABI_VERSION 6
 
 #ifdef __cplusplus
 extern "C" {
@@ -148,6 +148,9 @@ enum {
 //               closure returning Void, of the listed parameters
 //               (NSSwiftTagFunction) <- JS function; parameters only
 //   <code>?     optional: JS null/undefined <-> NSSwiftTagNull
+//   &<code>     inout parameter: JS passes a reference object `{ value }`;
+//               the slot holds its value, and a successful call reports the
+//               final value (writeBackBegin) into it
 // e.g. "s,i64>s" is (String, Int) -> String; ">o2?" returns an optional
 // instance of type 2.
 //
@@ -239,6 +242,12 @@ struct NSSwiftAPI {
   /* 35 */ void (*completeCaseBegin)(void* token, intptr_t caseIndex);
   /* 36 */ void (*returnCaseEnd)(NSSwiftCall* call);
   /* 37 */ void (*completeCaseEnd)(void* token);
+
+  // The final value of inout argument `index` (0 is the first parameter,
+  // not the receiver): Begin, the value through the return* entries, End.
+  // Reported before the call's result.
+  /* 38 */ void (*writeBackBegin)(NSSwiftCall* call, intptr_t index);
+  /* 39 */ void (*writeBackEnd)(NSSwiftCall* call);
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);

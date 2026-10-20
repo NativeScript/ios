@@ -137,10 +137,13 @@ Invocation describeInvocation(const Module& module, const Symbol& symbol,
     std::string type = i < capability.parameters.size()
                            ? typeText(capability.parameters[i], module)
                            : "";
+    bool isInout =
+        i < capability.parameters.size() && capability.parameters[i].isInout;
     if (i < capability.parameters.size() && capability.parameters[i].escaping) {
       type = "@escaping " + type;
     }
-    invocation.parameterTypes.push_back(type);
+    invocation.parameterTypes.push_back(isInout ? "inout " + type : type);
+    invocation.inoutParameters.push_back(isInout);
   }
 
   bool valueOwner = owner && (owner->kind == SymbolKind::Struct ||
@@ -200,7 +203,12 @@ std::string invocationExpression(const Invocation& invocation,
     }
     const std::string& label =
         i < invocation.labels.size() ? invocation.labels[i] : "";
-    argumentList += label.empty() ? arguments[i] : label + ": " + arguments[i];
+    std::string argument =
+        (i < invocation.inoutParameters.size() && invocation.inoutParameters[i]
+             ? "&"
+             : "") +
+        arguments[i];
+    argumentList += label.empty() ? argument : label + ": " + argument;
   }
 
   std::string expression;

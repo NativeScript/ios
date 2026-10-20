@@ -2,7 +2,7 @@
 // the generated swift!SwiftDemo.d.ts snapshot. Every @ts-expect-error line
 // must fail to compile: an unused directive is itself an error.
 import * as swift from "ns:swift";
-import { Demo, Point, Flavor, Polygon, Measurement, Square, Tracker, Counter, Palette, shout, globalCounter, delayedEcho, makeTrackerLater, countdown, greetLater, Notifier, measure, area, simplify, echo, Formula } from "ns:swift/SwiftDemo";
+import { Demo, Point, Flavor, Polygon, Measurement, Square, Tracker, Counter, Palette, shout, globalCounter, delayedEcho, makeTrackerLater, countdown, greetLater, Notifier, measure, area, simplify, echo, Formula, bump, append } from "ns:swift/SwiftDemo";
 
 const SwiftDemo = swift.module("SwiftDemo");
 const demo: Demo = new SwiftDemo.Demo();
@@ -41,6 +41,13 @@ const width: number = measured.case === "area" ? measured.width : 0;
 const sum: Formula = simplify({ case: "sum", 0: { case: "number", value: 1 }, 1: { case: "number", value: 2 } });
 const payload = echo({ case: "maybe", value: null });
 void [width, sum, payload, area({ case: "none" })];
+const counterRef = { value: 1 };
+bump(counterRef);
+const words = { value: ["a"] };
+append("b", words);
+void [counterRef.value.toFixed(), words.value.length];
+// @ts-expect-error  inout parameters take a reference object
+bump(1);
 // @ts-expect-error  a case's values are typed
 area({ case: "area", width: "2", height: 3 });
 // @ts-expect-error  only the enum's cases are accepted

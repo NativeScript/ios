@@ -413,11 +413,24 @@ class Emitter {
       receiver = bindReceiver(*owner, code);
     }
     std::vector<std::string> arguments;
+    // Reports of inout arguments' final values, after a successful call.
+    std::string writeBacks;
     for (size_t i = 0; i < capability.parameters.size(); i++) {
+      const BridgedType& parameter = capability.parameters[i];
       std::string name = "a" + std::to_string(i);
-      code += readArgument(capability.parameters[i],
-                           firstArgument + static_cast<int>(i), name,
+      std::string read = parameter.isInout ? "v" + std::to_string(i) : name;
+      code += readArgument(parameter, firstArgument + static_cast<int>(i), read,
                            "argument " + std::to_string(i + 1));
+      if (parameter.isInout) {
+        code += "  var " + name + " = " + read + "\n";
+        std::string statement = returnValue(parameter, "rt", name);
+        writeBacks +=
+            "rt.writeBack(" + std::to_string(i) + ") { " +
+            (parameter.optional ? "if let " + name + " { " + statement +
+                                      " } else { rt.returnNull() }"
+                                : statement) +
+            " }\n";
+      }
       arguments.push_back(name);
     }
     std::string expression =
@@ -428,14 +441,24 @@ class Emitter {
       code += asyncCall(owner, hasReceiver, arguments, expression, binding,
                         resultType, result, symbol.isThrowing);
     } else {
+      auto indented = [&](const std::string& indent) {
+        std::string out;
+        llvm::SmallVector<llvm::StringRef, 4> lines;
+        llvm::StringRef(writeBacks).split(lines, '\n', -1, false);
+        for (llvm::StringRef line : lines) {
+          out += indent + line.str() + "\n";
+        }
+        return out;
+      };
       std::string body;
       if (symbol.isThrowing) {
         body = "  do {\n    let " + binding + ": " + resultType + " = " +
-               expression + "\n" + returnResult(result, "    ") +
+               expression + "\n" + indented("    ") +
+               returnResult(result, "    ") +
                "  } catch {\n    rt.throwError(error)\n  }\n";
       } else {
         body = "  let " + binding + ": " + resultType + " = " + expression +
-               "\n" + returnResult(result, "  ");
+               "\n" + indented("  ") + returnResult(result, "  ");
       }
       code += invocation.isMainActor ? onMainActor(symbol, body) : body;
     }
@@ -655,6 +678,12 @@ private struct __NSCall: __NSReporter {
     slot(34, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(call, index)
     values()
     slot(36, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(call)
+  }
+  // `value` reports the final value of inout argument `index`.
+  func writeBack(_ index: Int, _ value: () -> Void) {
+    slot(38, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(call, index)
+    value()
+    slot(39, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(call)
   }
   func returnObject(_ object: AnyObject, _ typeIndex: UInt32) {
     slot(7, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer, UInt32) -> Void).self)(

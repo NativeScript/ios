@@ -101,7 +101,8 @@ TEST(ClassifyRejections) {
   EXPECT_TIER("countdown(from:_:)", Tier::SwiftGenerated);
   EXPECT_TIER("greetLater(_:completion:)", Tier::SwiftGenerated);
   EXPECT_TIER("Notifier.subscribe(_:)", Tier::SwiftGenerated);
-  EXPECT_TIER("Loader.update(_:)", Tier::Unsupported, "inout-parameter");
+  EXPECT_TIER("Loader.update(_:)", Tier::SwiftGenerated);
+  EXPECT_TIER("halve(_:)", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.lookup(table:key:)", Tier::SwiftGenerated);
   EXPECT_TIER("Canvas.draw(_:)", Tier::Unsupported, "existential");
   EXPECT_TIER("Ring.+(_:_:)", Tier::Unsupported, "operator");
@@ -109,7 +110,7 @@ TEST(ClassifyRejections) {
   EXPECT_TIER("String.shouted", Tier::Unsupported, "external-type-extension");
   EXPECT_TIER("Measurement.isNone", Tier::SwiftGenerated);
   EXPECT_TIER("Job.idle", Tier::Unsupported, "owner-not-bridged");
-  EXPECT_TIER("Flavor.hash(into:)", Tier::Unsupported, "inout-parameter");
+  EXPECT_TIER("Flavor.hash(into:)", Tier::Unsupported, "unbridged-type:Swift.Hasher");
 }
 
 TEST(ClassifyIsolationAndAsync) {
