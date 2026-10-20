@@ -24,3 +24,28 @@ public final class Tracker {
 
     public func same() -> Tracker { self }
 }
+
+public func delayedEcho(_ text: String, after seconds: Double) async throws -> String {
+    if seconds < 0 { throw ShapeError.invalidSide(seconds) }
+    try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+    return text
+}
+
+public func makeTrackerLater(id: Int) async -> Tracker {
+    await Task.yield()
+    return Tracker(id: id)
+}
+
+@MainActor
+public final class Palette {
+    public private(set) var strokes = 0
+    public init() {}
+    public func stroke() -> Int {
+        strokes += 1
+        return strokes
+    }
+    public func strokeLater() async -> Int {
+        await Task.yield()
+        return stroke()
+    }
+}

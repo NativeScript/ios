@@ -38,7 +38,7 @@ declare module "ns:swift/SwiftDemo" {
   }
 
   export class Canvas {
-    private constructor();
+    constructor();
   }
 
   export type Flavor = "vanilla" | "chocolate";
@@ -60,6 +60,7 @@ declare module "ns:swift/SwiftDemo" {
      * @deprecated Use fetch(url:) instead
      */
     legacyFetch(): void;
+    wait(seconds: number): Promise<void>;
     /**
      * @deprecated Renamed to `fetch(url:)`.
      */
@@ -81,7 +82,17 @@ declare module "ns:swift/SwiftDemo" {
 
   export class Counter {
     constructor();
+    readonly step: Promise<number>;
     label(): string;
+    readonly value: Promise<number>;
+    increment(): Promise<number>;
+  }
+
+  export class Palette {
+    constructor();
+    strokeLater(): Promise<number>;
+    stroke(): number;
+    readonly strokes: number;
   }
 
   export class Polygon {
@@ -111,9 +122,11 @@ declare module "ns:swift/SwiftDemo" {
   export function echoUInt64(value: number | bigint): number;
   export function largestInt(): number;
   export function checkedSide(side: number): number;
+  export function delayedEcho(text: string, seconds: number): Promise<string>;
   export const defaultFlavor: Flavor;
   export let globalCounter: number;
   export function makeDefaultPoint(): Point;
+  export function makeTrackerLater(id: number | bigint): Promise<Tracker>;
   export function shout(name: string | null | undefined): string | null;
   export function echoInt8(value: number | bigint): number;
 }

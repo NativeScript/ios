@@ -84,6 +84,20 @@ holds.
   `Flavor.description("vanilla")`.
 - Properties are accessors; read-only Swift properties have no setter.
 
+## Async, actors and the main actor
+
+- `async` functions return a Promise. The call reads its arguments
+  synchronously, runs in a Swift `Task`, and settles the Promise on the
+  calling isolate's thread (main or Worker); a `throw` rejects it with the
+  Swift error. If the isolate is gone by then, the outcome is dropped.
+- Members of an `actor` are awaited from outside it, exactly as in Swift:
+  `await counter.increment()`, `await counter.value`. Actor properties are
+  never assignable from JavaScript. `nonisolated` members stay synchronous.
+- `@MainActor` members run synchronously on the main thread. Called from a
+  Worker, they throw instead of trapping; their `async` members hop to the main
+  actor on their own and work from any isolate.
+- `async` initializers are not exposed: `new` cannot await.
+
 ## Errors
 
 - A Swift `throw` becomes a JS `Error` with `name === "SwiftError"`,
@@ -114,15 +128,24 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 ## Not yet supported
 
-`async` functions, actor-isolated and `@MainActor` members, closures and
-callbacks, `inout` parameters, generics, protocols as values, collections,
+Closures and callbacks, async cancellation, `inout` parameters, generics,
+protocols as values, collections,
 tuples, enums with associated values, nested types, subscripts, operators, and
 Foundation value types (`URL`, `Data`, `Date`). Each appears in the coverage
 report with its reason.
+
+## Swift language mode
+
+The thunks compile in Swift 5 and Swift 6 language modes. In Swift 6 mode,
+code outside a module may not touch that module's nonisolated mutable globals
+(`public var counter = 0`); run `--swift-verify` with the same mode
+(`--swift-compiler "xcrun swiftc -swift-version 6"`) and those declarations
+are demoted as `compiler-rejected`.
 
 ## ABI
 
 `NativeScript/runtime/SwiftInterop.h` is the binary contract between the
 runtime and generated thunks (value slots, the API table, kinds and signature
-codes). Thunks are stamped with `NS_SWIFT_ABI_VERSION`; the runtime refuses a
-module generated for another version.
+codes, and the async completion entries). Thunks are stamped with
+`NS_SWIFT_ABI_VERSION`; the runtime refuses a module generated for another
+version.

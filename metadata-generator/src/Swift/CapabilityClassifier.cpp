@@ -276,18 +276,23 @@ class Classifier {
       return make(Tier::SwiftSpecialized, "generic");
     }
 
+    // Isolation decides how a call is made, not whether it can be: actor
+    // members are awaited from outside their actor, main-actor members run
+    // only on the main thread.
     bool nonisolated = hasAttribute(symbol, "nonisolated");
-    if (!nonisolated && (hasAttribute(symbol, "@MainActor") ||
-                         (owner && hasAttribute(*owner, "@MainActor")))) {
-      return make(Tier::Unsupported, "main-actor");
+    bool actorIsolated = owner && owner->kind == SymbolKind::Actor &&
+                         !nonisolated && !symbol.isStatic &&
+                         symbol.kind != SymbolKind::Initializer;
+    capability.isAsync = symbol.isAsync || actorIsolated;
+    if (capability.isAsync && symbol.kind == SymbolKind::Initializer) {
+      // `new` cannot await.
+      return make(Tier::Unsupported, "async-initializer");
     }
-    if (owner && owner->kind == SymbolKind::Actor && !nonisolated &&
-        !symbol.isStatic && symbol.kind != SymbolKind::Initializer) {
-      return make(Tier::Unsupported, "actor-isolated");
-    }
-    if (symbol.isAsync) {
-      return make(Tier::Unsupported, "async");
-    }
+    capability.isMainActor =
+        !nonisolated && (hasAttribute(symbol, "@MainActor") ||
+                         (owner && hasAttribute(*owner, "@MainActor")));
+    // Another actor's state cannot be assigned from outside it.
+    capability.isSettable = symbol.isSettable && !capability.isAsync;
 
     std::set<std::string> generics = genericNamesInScope(_module, symbol);
     std::vector<std::string> reasons;
@@ -328,13 +333,10 @@ class Classifier {
       bool onlyGeneric =
           std::all_of(reasons.begin(), reasons.end(),
                       [](const std::string& r) { return r == "generic"; });
-      return Capability{
-          onlyGeneric ? Tier::SwiftSpecialized : Tier::Unsupported,
-          reasons,
-          "",
-          false,
-          {},
-          {}};
+      Capability rejected;
+      rejected.tier = onlyGeneric ? Tier::SwiftSpecialized : Tier::Unsupported;
+      rejected.reasons = reasons;
+      return rejected;
     }
 
     capability.tier = Tier::SwiftGenerated;

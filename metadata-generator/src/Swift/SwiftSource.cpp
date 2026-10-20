@@ -128,7 +128,9 @@ Invocation describeInvocation(const Module& module, const Symbol& symbol,
   invocation.owner = owner ? ownerTypeText(module, *owner) : module.name;
   invocation.member = symbol.baseName;
   invocation.isThrowing = symbol.isThrowing;
-  invocation.isSettable = symbol.isSettable;
+  invocation.isAsync = capability.isAsync;
+  invocation.isMainActor = capability.isMainActor && !capability.isAsync;
+  invocation.isSettable = capability.isSettable;
 
   for (size_t i = 0; i < symbol.parameters.size(); i++) {
     invocation.labels.push_back(symbol.parameters[i].label);
@@ -220,7 +222,9 @@ std::string invocationExpression(const Invocation& invocation,
       expression = invocation.owner + "." + member;
       break;
   }
-  return invocation.isThrowing ? "try " + expression : expression;
+  std::string effects = std::string(invocation.isThrowing ? "try " : "") +
+                        (invocation.isAsync ? "await " : "");
+  return effects + expression;
 }
 
 std::string assignmentStatement(const Invocation& invocation,

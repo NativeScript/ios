@@ -147,47 +147,48 @@ class Emitter {
   }
 
   // Statements returning `value` (a non-optional expression of `type`).
-  std::string returnValue(const BridgedType& type,
+  std::string returnValue(const BridgedType& type, const std::string& reporter,
                           const std::string& value) const {
     switch (type.bridge) {
       case Bridge::Void:
-        return "rt.returnVoid()";
+        return reporter + ".returnVoid()";
       case Bridge::Bool:
-        return "rt.returnBool(" + value + ")";
+        return reporter + ".returnBool(" + value + ")";
       case Bridge::Integer: {
         const IntegerWidth* info = integerWidth(type);
         if (info && !info->isSigned) {
-          return "rt.returnUInt64(UInt64(" + value + "))";
+          return reporter + ".returnUInt64(UInt64(" + value + "))";
         }
-        return "rt.returnInt64(Int64(" + value + "))";
+        return reporter + ".returnInt64(Int64(" + value + "))";
       }
       case Bridge::Floating:
-        return "rt.returnDouble(Double(" + value + "))";
+        return reporter + ".returnDouble(Double(" + value + "))";
       case Bridge::String:
-        return "rt.returnString(" + value + ")";
+        return reporter + ".returnString(" + value + ")";
       case Bridge::ClassHandle:
-        return "rt.returnObject(" + value + ", __nsTypeIndex(" + value + ", " +
-               std::to_string(typeIndexOf(type.symbolId)) + "))";
+        return reporter + ".returnObject(" + value + ", __nsTypeIndex(" +
+               value + ", " + std::to_string(typeIndexOf(type.symbolId)) + "))";
       case Bridge::StructBox:
-        return "rt.returnObject(__NSBox(" + value + "), " +
+        return reporter + ".returnObject(__NSBox(" + value + "), " +
                std::to_string(typeIndexOf(type.symbolId)) + ")";
       case Bridge::EnumCase:
-        return "rt.returnString(__nsEnumName" +
+        return reporter + ".returnString(__nsEnumName" +
                std::to_string(typeIndexOf(type.symbolId)) + "(" + value + "))";
       case Bridge::None:
-        return "rt.returnVoid()";
+        return reporter + ".returnVoid()";
     }
-    return "rt.returnVoid()";
+    return reporter + ".returnVoid()";
   }
 
-  std::string returnResult(const BridgedType& type,
-                           const std::string& indent) const {
+  std::string returnResult(const BridgedType& type, const std::string& indent,
+                           const std::string& reporter = "rt") const {
     if (type.optional) {
       return indent + "if let result {\n" + indent + "  " +
-             returnValue(type, "result") + "\n" + indent + "} else {\n" +
-             indent + "  rt.returnNull()\n" + indent + "}\n";
+             returnValue(type, reporter, "result") + "\n" + indent +
+             "} else {\n" + indent + "  " + reporter + ".returnNull()\n" +
+             indent + "}\n";
     }
-    return indent + returnValue(type, "result") + "\n";
+    return indent + returnValue(type, reporter, "result") + "\n";
   }
 
   // Receiver binding for instance members; returns the receiver expression.
@@ -229,6 +230,60 @@ class Emitter {
     return "  guard #available(" + invocation.availability +
            ") else { return rt.throwMessage(" +
            quoted(symbol.name + " requires " + platformVersion) + ") }\n";
+  }
+
+  // `body` run on the main actor, after rejecting calls from other threads
+  // (assumeIsolated would trap).
+  std::string onMainActor(const Symbol& symbol, const std::string& body) const {
+    std::string indented;
+    llvm::SmallVector<llvm::StringRef, 16> lines;
+    llvm::StringRef(body).split(lines, '\n', -1, false);
+    for (llvm::StringRef line : lines) {
+      indented += "  " + line.str() + "\n";
+    }
+    return "  guard Thread.isMainThread else { return rt.throwMessage(" +
+           quoted(
+               symbol.name +
+               " is isolated to the main actor; call it on the main thread") +
+           ") }\n  MainActor.assumeIsolated {\n" + indented + "  }\n";
+  }
+
+  // Starts the call in a Task and settles the call's Promise from there.
+  // Arguments are read before the Task starts: their slots only live for
+  // the synchronous call.
+  std::string asyncCall(const Symbol* owner, bool hasReceiver,
+                        const std::vector<std::string>& arguments,
+                        const std::string& expression,
+                        const std::string& binding,
+                        const std::string& resultType,
+                        const BridgedType& result, bool throwing) const {
+    std::vector<std::string> captured;
+    if (hasReceiver) {
+      captured.push_back(
+          owner && owner->kind == SymbolKind::Struct ? "box" : "receiver");
+    }
+    captured.insert(captured.end(), arguments.begin(), arguments.end());
+
+    std::string code = "  let completion = rt.beginAsync()\n";
+    std::string unpack;
+    if (captured.size() == 1) {
+      code += "  let captured = __NSUnchecked(" + captured[0] + ")\n";
+      unpack = "    let " + captured[0] + " = captured.value\n";
+    } else if (!captured.empty()) {
+      std::string list = llvm::join(captured, ", ");
+      code += "  let captured = __NSUnchecked((" + list + "))\n";
+      unpack = "    let (" + list + ") = captured.value\n";
+    }
+    code += "  Task {\n" + unpack;
+    if (throwing) {
+      code += "    do {\n      let " + binding + ": " + resultType + " = " +
+              expression + "\n" + returnResult(result, "      ", "completion") +
+              "    } catch {\n      completion.throwError(error)\n    }\n";
+    } else {
+      code += "    let " + binding + ": " + resultType + " = " + expression +
+              "\n" + returnResult(result, "    ", "completion");
+    }
+    return code + "  }\n";
   }
 
   std::string emitMember(const SwiftSurface::Member& member) {
@@ -274,13 +329,20 @@ class Emitter {
         invocationExpression(invocation, receiver, arguments);
     std::string binding = result.bridge == Bridge::Void ? "_" : "result";
     std::string resultType = invocation.resultType;
-    if (symbol.isThrowing) {
-      code += "  do {\n    let " + binding + ": " + resultType + " = " +
-              expression + "\n" + returnResult(result, "    ") +
-              "  } catch {\n    rt.throwError(error)\n  }\n";
+    if (invocation.isAsync) {
+      code += asyncCall(owner, hasReceiver, arguments, expression, binding,
+                        resultType, result, symbol.isThrowing);
     } else {
-      code += "  let " + binding + ": " + resultType + " = " + expression +
-              "\n" + returnResult(result, "  ");
+      std::string body;
+      if (symbol.isThrowing) {
+        body = "  do {\n    let " + binding + ": " + resultType + " = " +
+               expression + "\n" + returnResult(result, "    ") +
+               "  } catch {\n    rt.throwError(error)\n  }\n";
+      } else {
+        body = "  let " + binding + ": " + resultType + " = " + expression +
+               "\n" + returnResult(result, "  ");
+      }
+      code += invocation.isMainActor ? onMainActor(symbol, body) : body;
     }
     code += "}\n\n";
 
@@ -296,10 +358,11 @@ class Emitter {
       }
       code +=
           readArgument(capability.result, firstArgument, "newValue", "value");
-      code += "  " +
-              assignmentStatement(invocation, setterReceiver, "newValue") +
-              "\n";
-      code += "  rt.returnVoid()\n}\n\n";
+      std::string body =
+          "  " + assignmentStatement(invocation, setterReceiver, "newValue") +
+          "\n  rt.returnVoid()\n";
+      code += invocation.isMainActor ? onMainActor(symbol, body) : body;
+      code += "}\n\n";
       setterName = "__nsThunk" + std::to_string(setterIndex);
     }
 
@@ -378,6 +441,11 @@ private struct __NSCall {
     return Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue()
   }
 
+  func beginAsync() -> __NSCompletion {
+    let token = slot(13, (@convention(c) (UnsafeMutableRawPointer) -> UnsafeMutableRawPointer).self)(call)
+    return __NSCompletion(api: call.load(as: UnsafeRawPointer.self), token: token)
+  }
+
   func returnVoid() {
     slot(0, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(call)
   }
@@ -428,6 +496,65 @@ private struct __NSCall {
         slot(8, (@convention(c) (UnsafeMutableRawPointer, UnsafePointer<UInt8>?, Int,
                                  UnsafePointer<UInt8>?, Int) -> Void).self)(
           call, messageBytes.baseAddress, messageBytes.count, typeBytes.baseAddress, typeBytes.count)
+      }
+    }
+  }
+}
+
+// Carries values into a Task; the runtime only touches them on one thread at
+// a time.
+private final class __NSUnchecked<Value>: @unchecked Sendable {
+  let value: Value
+  init(_ value: Value) { self.value = value }
+}
+
+// Settles an async call's Promise from any thread; the first report consumes
+// the token.
+private struct __NSCompletion: @unchecked Sendable {
+  let api: UnsafeRawPointer
+  let token: UnsafeMutableRawPointer
+
+  private func slot<Function>(_ index: Int, _: Function.Type) -> Function {
+    api.load(fromByteOffset: index * 8, as: Function.self)
+  }
+
+  func returnVoid() {
+    slot(14, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(token)
+  }
+  func returnBool(_ value: Bool) {
+    slot(15, (@convention(c) (UnsafeMutableRawPointer, UInt8) -> Void).self)(token, value ? 1 : 0)
+  }
+  func returnInt64(_ value: Int64) {
+    slot(16, (@convention(c) (UnsafeMutableRawPointer, Int64) -> Void).self)(token, value)
+  }
+  func returnUInt64(_ value: UInt64) {
+    slot(17, (@convention(c) (UnsafeMutableRawPointer, UInt64) -> Void).self)(token, value)
+  }
+  func returnDouble(_ value: Double) {
+    slot(18, (@convention(c) (UnsafeMutableRawPointer, Double) -> Void).self)(token, value)
+  }
+  func returnString(_ value: String) {
+    var value = value
+    value.withUTF8 {
+      slot(19, (@convention(c) (UnsafeMutableRawPointer, UnsafePointer<UInt8>?, Int) -> Void).self)(
+        token, $0.baseAddress, $0.count)
+    }
+  }
+  func returnNull() {
+    slot(20, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(token)
+  }
+  func returnObject(_ object: AnyObject, _ typeIndex: UInt32) {
+    slot(21, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer, UInt32) -> Void).self)(
+      token, Unmanaged.passRetained(object).toOpaque(), typeIndex)
+  }
+  func throwError(_ error: any Error) {
+    var message = String(describing: error)
+    var type = String(reflecting: Swift.type(of: error))
+    message.withUTF8 { messageBytes in
+      type.withUTF8 { typeBytes in
+        slot(22, (@convention(c) (UnsafeMutableRawPointer, UnsafePointer<UInt8>?, Int,
+                                  UnsafePointer<UInt8>?, Int) -> Void).self)(
+          token, messageBytes.baseAddress, messageBytes.count, typeBytes.baseAddress, typeBytes.count)
       }
     }
   }

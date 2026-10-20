@@ -74,15 +74,33 @@ TEST(TopLevelDeclarationsInSourceOrder) {
   for (const auto& id : demo().topLevelIds) {
     names.push_back(demo().find(id)->name);
   }
-  std::vector<std::string> expected = {
-      "Greeter",         "Demo",          "Point",
-      "Flavor",          "Shape",         "Polygon",
-      "Square",          "Precipitation", "ShapeError",
-      "Measurement",     "Ring",          "Counter",
-      "Canvas",          "Loader",        "makeDefaultPoint()",
-      "defaultFlavor",   "globalCounter", "Coordinates",
-      "checkedSide(_:)", "echoInt8(_:)",  "echoUInt64(_:)",
-      "largestInt()",    "shout(_:)",     "Tracker"};
+  std::vector<std::string> expected = {"Greeter",
+                                       "Demo",
+                                       "Point",
+                                       "Flavor",
+                                       "Shape",
+                                       "Polygon",
+                                       "Square",
+                                       "Precipitation",
+                                       "ShapeError",
+                                       "Measurement",
+                                       "Ring",
+                                       "Counter",
+                                       "Canvas",
+                                       "Loader",
+                                       "makeDefaultPoint()",
+                                       "defaultFlavor",
+                                       "globalCounter",
+                                       "Coordinates",
+                                       "checkedSide(_:)",
+                                       "echoInt8(_:)",
+                                       "echoUInt64(_:)",
+                                       "largestInt()",
+                                       "shout(_:)",
+                                       "Tracker",
+                                       "delayedEcho(_:after:)",
+                                       "makeTrackerLater(id:)",
+                                       "Palette"};
   CHECK_EQ(llvm::join(names, ","), llvm::join(expected, ","));
 }
 

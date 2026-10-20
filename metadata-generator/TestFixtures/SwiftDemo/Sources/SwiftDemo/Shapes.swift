@@ -95,9 +95,10 @@ public struct Ring {
 
 public actor Counter {
     public private(set) var value: Int = 0
+    public var step: Int = 1
     public init() {}
     public func increment() -> Int {
-        value += 1
+        value += step
         return value
     }
     public nonisolated func label() -> String { "counter" }

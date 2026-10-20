@@ -116,8 +116,12 @@ ProbeSource emitProbes(const Module& module,
     if (!invocation.availability.empty()) {
       out.line("@available(" + invocation.availability + ")");
     }
+    if (invocation.isMainActor) {
+      out.line("@MainActor");
+    }
     out.line("func __nsProbe" + std::to_string(index++) + "(" + signature +
-             ")" + (invocation.isThrowing ? " throws" : "") + " {");
+             ")" + (invocation.isAsync ? " async" : "") +
+             (invocation.isThrowing ? " throws" : "") + " {");
     const std::string receiver = "receiver";
     out.line("  let _: " + invocation.resultType + " = " +
              invocationExpression(invocation, receiver, arguments));

@@ -87,23 +87,47 @@ TEST(ClassifyCallables) {
 
 TEST(ClassifyRejections) {
   EXPECT_TIER("Greeter.greet(name:)", Tier::TypeOnly, "protocol-requirement");
-  EXPECT_TIER("Loader.fetch(url:)", Tier::Unsupported, "async");
-  EXPECT_TIER("Loader.wait(seconds:)", Tier::Unsupported, "async");
+  EXPECT_TIER("Loader.fetch(url:)", Tier::Unsupported,
+              "unbridged-type:Foundation.URL");
   EXPECT_TIER("Loader.transform(_:)", Tier::SwiftSpecialized, "generic");
   EXPECT_TIER("Loader.first(of:)", Tier::SwiftSpecialized, "generic");
   EXPECT_TIER("Loader.withCompletion(_:)", Tier::Unsupported, "closure");
   EXPECT_TIER("Loader.each(_:)", Tier::Unsupported, "closure");
   EXPECT_TIER("Loader.update(_:)", Tier::Unsupported, "inout-parameter");
   EXPECT_TIER("Loader.lookup(table:key:)", Tier::Unsupported, "collection");
-  EXPECT_TIER("Counter.increment()", Tier::Unsupported, "actor-isolated");
-  EXPECT_TIER("Counter.value", Tier::Unsupported, "actor-isolated");
-  EXPECT_TIER("Canvas.init()", Tier::Unsupported, "main-actor");
-  EXPECT_TIER("Canvas.draw(_:)", Tier::Unsupported, "main-actor");
+  EXPECT_TIER("Canvas.draw(_:)", Tier::Unsupported, "existential");
   EXPECT_TIER("Ring.+(_:_:)", Tier::Unsupported, "operator");
   EXPECT_TIER("Polygon.subscript(_:)", Tier::Unsupported, "subscript");
   EXPECT_TIER("String.shouted", Tier::Unsupported, "external-type-extension");
   EXPECT_TIER("Measurement.isNone", Tier::Unsupported, "owner-not-bridged");
   EXPECT_TIER("Flavor.hash(into:)", Tier::Unsupported, "inout-parameter");
+}
+
+TEST(ClassifyIsolationAndAsync) {
+  auto flags = [](const std::string& path) {
+    const Capability* capability = capabilityAt(path);
+    if (!capability || capability->tier != Tier::SwiftGenerated) {
+      return std::string("not generated");
+    }
+    return std::string(capability->isAsync ? "async" : "sync") +
+           (capability->isMainActor ? ",main" : "") +
+           (capability->isSettable ? ",settable" : "");
+  };
+  CHECK_EQ(flags("Loader.wait(seconds:)"), std::string("async"));
+  CHECK_EQ(flags("delayedEcho(_:after:)"), std::string("async"));
+  CHECK_EQ(flags("makeTrackerLater(id:)"), std::string("async"));
+  // Actor members are awaited from outside, and never assignable.
+  CHECK_EQ(flags("Counter.increment()"), std::string("async"));
+  CHECK_EQ(flags("Counter.value"), std::string("async"));
+  CHECK_EQ(flags("Counter.step"), std::string("async"));
+  CHECK_EQ(flags("Counter.label()"), std::string("sync"));
+  CHECK_EQ(flags("Counter.init()"), std::string("sync"));
+  // Main-actor members run on the main thread; async ones hop there.
+  CHECK_EQ(flags("Palette.init()"), std::string("sync,main"));
+  CHECK_EQ(flags("Palette.stroke()"), std::string("sync,main"));
+  CHECK_EQ(flags("Palette.strokes"), std::string("sync,main"));
+  CHECK_EQ(flags("Palette.strokeLater()"), std::string("async,main"));
+  CHECK_EQ(flags("Canvas.init()"), std::string("sync,main"));
 }
 
 TEST(ClassifyBridges) {

@@ -46,6 +46,10 @@ struct Invocation {
   // Qualified result type ("Void" when there is none).
   std::string resultType;
   bool isThrowing = false;
+  // The call is awaited (`async`, or an actor member called from outside).
+  bool isAsync = false;
+  // Synchronous main-actor isolation: the caller must be on the main actor.
+  bool isMainActor = false;
   bool isSettable = false;
   // The receiver must be passed `inout` (mutating members and setters of
   // value types).
@@ -63,7 +67,7 @@ Invocation describeInvocation(const Module& module, const Symbol& symbol,
 // deployment target, empty otherwise.
 std::string availabilityCondition(const Module& module, const Symbol& symbol);
 
-// The expression that reads/calls the symbol, including `try`.
+// The expression that reads/calls the symbol, including `try`/`await`.
 std::string invocationExpression(const Invocation& invocation,
                                  const std::string& receiver,
                                  const std::vector<std::string>& arguments);

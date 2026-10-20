@@ -25,7 +25,13 @@ struct SwiftSurface {
     kVariable = 6,
     kEnumCase = 7,
   };
-  enum Flags { kThrows = 1 << 0, kSettable = 1 << 1, kAmbiguous = 1 << 2 };
+  enum Flags {
+    kThrows = 1 << 0,
+    kSettable = 1 << 1,
+    kAmbiguous = 1 << 2,
+    kAsync = 1 << 3,
+    kMainActor = 1 << 4,
+  };
 
   struct Type {
     const Symbol* symbol;

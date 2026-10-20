@@ -338,6 +338,13 @@ class Writer {
     return type.optional ? ts + " | null" : ts;
   }
 
+  // A member's JS result: a Promise for async calls.
+  std::string resultOf(const Member& member) const {
+    std::string type = outputType(member.result);
+    return (member.flags & SwiftSurface::kAsync) ? "Promise<" + type + ">"
+                                                 : type;
+  }
+
   std::string parameterList(const Member& member,
                             const std::string& receiver = "") const {
     std::vector<std::string> parts;
@@ -426,14 +433,14 @@ class Writer {
       }
       writeDoc(*member->symbol, indent);
       _out << indent << prefix << propertyKey(group.jsName) << "("
-           << parameterList(*member, receiver)
-           << "): " << outputType(member->result) << ";\n";
+           << parameterList(*member, receiver) << "): " << resultOf(*member)
+           << ";\n";
     }
     for (const auto& key : overloadKeys(group)) {
       writeDoc(*key.second->symbol, indent);
       _out << indent << prefix << propertyKey(key.first) << "("
            << parameterList(*key.second, receiver)
-           << "): " << outputType(key.second->result) << ";\n";
+           << "): " << resultOf(*key.second) << ";\n";
     }
   }
 
@@ -478,8 +485,7 @@ class Writer {
           _out << "    "
                << (group.kind == SwiftSurface::kStaticProperty ? "static " : "")
                << ((first.flags & SwiftSurface::kSettable) ? "" : "readonly ")
-               << propertyKey(group.jsName) << ": " << outputType(first.result)
-               << ";\n";
+               << propertyKey(group.jsName) << ": " << resultOf(first) << ";\n";
           break;
         case SwiftSurface::kInstanceMethod:
           writeMethodGroup(group, "    ", "");
@@ -522,21 +528,20 @@ class Writer {
           for (const Member* member : group.overloads) {
             writeDoc(*member->symbol, "    ");
             _out << "    init(" << parameterList(*member)
-                 << "): " << outputType(member->result) << ";\n";
+                 << "): " << resultOf(*member) << ";\n";
           }
           break;
         case SwiftSurface::kStaticProperty:
           writeDoc(*first.symbol, "    ");
           _out << "    "
                << ((first.flags & SwiftSurface::kSettable) ? "" : "readonly ")
-               << propertyKey(group.jsName) << ": " << outputType(first.result)
-               << ";\n";
+               << propertyKey(group.jsName) << ": " << resultOf(first) << ";\n";
           break;
         case SwiftSurface::kInstanceProperty:
           // A case name has no properties; instance members take it first.
           writeDoc(*first.symbol, "    ");
           _out << "    " << propertyKey(group.jsName)
-               << "(value: " << symbol.name << "): " << outputType(first.result)
+               << "(value: " << symbol.name << "): " << resultOf(first)
                << ";\n";
           break;
         case SwiftSurface::kInstanceMethod:
@@ -565,7 +570,7 @@ class Writer {
         writeDoc(*first.symbol, "  ");
         _out << "  export "
              << ((first.flags & SwiftSurface::kSettable) ? "let " : "const ")
-             << group.jsName << ": " << outputType(first.result) << ";\n";
+             << group.jsName << ": " << resultOf(first) << ";\n";
         continue;
       }
       for (const Member* member : group.overloads) {
@@ -574,8 +579,7 @@ class Writer {
         }
         writeDoc(*member->symbol, "  ");
         _out << "  export function " << group.jsName << "("
-             << parameterList(*member) << "): " << outputType(member->result)
-             << ";\n";
+             << parameterList(*member) << "): " << resultOf(*member) << ";\n";
       }
     }
   }

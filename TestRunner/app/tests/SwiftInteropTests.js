@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module"]);
-            expect(swift.abiVersion).toBe(1);
+            expect(swift.abiVersion).toBe(2);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(1);
+            expect(info.abiVersion).toBe(2);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -244,6 +244,95 @@ describe("ns:swift", function () {
                 expect(e.swiftType).toBe("SwiftDemo.ShapeError");
                 expect(e.message).toContain("invalidSide(-1.0)");
             }
+        });
+    });
+
+    describe("async", function () {
+        it("resolves async functions with their result", function (done) {
+            var loader = new SwiftDemo.Loader();
+            var waited = loader.wait(0.001);
+            expect(waited instanceof Promise).toBe(true);
+            waited.then(function (value) {
+                expect(value).toBeUndefined();
+                return SwiftDemo.delayedEcho("later", 0.001);
+            }).then(function (text) {
+                expect(text).toBe("later");
+                done();
+            }, function (error) {
+                fail(error);
+                done();
+            });
+        });
+
+        it("rejects with the Swift error", function (done) {
+            SwiftDemo.delayedEcho("x", -1).then(function () {
+                fail("expected a rejection");
+                done();
+            }, function (error) {
+                expect(error.name).toBe("SwiftError");
+                expect(error.swiftType).toBe("SwiftDemo.ShapeError");
+                done();
+            });
+        });
+
+        it("resolves to wrapped Swift objects", function (done) {
+            SwiftDemo.makeTrackerLater(7).then(function (tracker) {
+                expect(tracker instanceof SwiftDemo.Tracker).toBe(true);
+                expect(tracker.id).toBe(7);
+                expect(tracker.same()).toBe(tracker);
+                done();
+            }, function (error) {
+                fail(error);
+                done();
+            });
+        });
+
+        it("awaits actor members from outside the actor", function (done) {
+            var counter = new SwiftDemo.Counter();
+            expect(counter.label()).toBe("counter");
+            counter.increment().then(function (value) {
+                expect(value).toBe(1);
+                return counter.value;
+            }).then(function (value) {
+                expect(value).toBe(1);
+                return counter.step;
+            }).then(function (step) {
+                expect(step).toBe(1);
+                done();
+            }, function (error) {
+                fail(error);
+                done();
+            });
+        });
+
+        it("runs main-actor members on the main thread", function (done) {
+            var palette = new SwiftDemo.Palette();
+            expect(palette.stroke()).toBe(1);
+            expect(palette.strokes).toBe(1);
+            palette.strokeLater().then(function (strokes) {
+                expect(strokes).toBe(2);
+                done();
+            }, function (error) {
+                fail(error);
+                done();
+            });
+        });
+
+        it("serves worker isolates their own objects", function (done) {
+            var worker = new Worker("./swiftInteropWorker.js");
+            worker.onmessage = function (event) {
+                expect(event.data.greeting).toBe("Hello, worker");
+                expect(event.data.palette).toMatch(/isolated to the main actor/);
+                expect(event.data.trackerId).toBe(5);
+                expect(event.data.echo).toBe("from worker");
+                worker.terminate();
+                done();
+            };
+            worker.onerror = function (event) {
+                worker.terminate();
+                fail("worker error: " + event.message);
+                done();
+            };
         });
     });
 

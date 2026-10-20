@@ -2,6 +2,7 @@
 
 #include <dlfcn.h>
 
+#include <atomic>
 #include <cmath>
 #include <memory>
 #include <mutex>
@@ -11,8 +12,11 @@
 
 #include "Caches.h"
 #include "DataWrapper.h"
+#include "EventLoop.h"
 #include "Helpers.h"
 #include "IsolateTracked.h"
+#include "IsolateWrapper.h"
+#include "NativeScriptPlatform.h"
 #include "robin_hood.h"
 
 using namespace v8;
@@ -305,11 +309,24 @@ void ApiReturnObject(NSSwiftCall* call, void* object, uint32_t typeIndex);
 void ApiThrowError(NSSwiftCall* call, const uint8_t* message, intptr_t messageLength,
                    const uint8_t* type, intptr_t typeLength);
 void ApiThrowTypeError(NSSwiftCall* call, const uint8_t* message, intptr_t length);
+void* ApiBeginAsync(NSSwiftCall* call);
+void ApiCompleteVoid(void* token);
+void ApiCompleteBool(void* token, uint8_t value);
+void ApiCompleteInt64(void* token, int64_t value);
+void ApiCompleteUInt64(void* token, uint64_t value);
+void ApiCompleteDouble(void* token, double value);
+void ApiCompleteString(void* token, const uint8_t* utf8, intptr_t length);
+void ApiCompleteNull(void* token);
+void ApiCompleteObject(void* token, void* object, uint32_t typeIndex);
+void ApiCompleteError(void* token, const uint8_t* message, intptr_t messageLength,
+                      const uint8_t* type, intptr_t typeLength);
 
 const NSSwiftAPI kAPI = {
-    ApiReturnVoid,     ApiReturnBool,   ApiReturnInt64,    ApiReturnUInt64, ApiReturnDouble,
-    ApiReturnString,   ApiReturnNull,   ApiReturnObject,   ApiThrowError,   ApiThrowTypeError,
-    ApiRegisterModule, ApiRegisterType, ApiRegisterMember,
+    ApiReturnVoid,     ApiReturnBool,     ApiReturnInt64,    ApiReturnUInt64,   ApiReturnDouble,
+    ApiReturnString,   ApiReturnNull,     ApiReturnObject,   ApiThrowError,     ApiThrowTypeError,
+    ApiRegisterModule, ApiRegisterType,   ApiRegisterMember, ApiBeginAsync,     ApiCompleteVoid,
+    ApiCompleteBool,   ApiCompleteInt64,  ApiCompleteUInt64, ApiCompleteDouble, ApiCompleteString,
+    ApiCompleteNull,   ApiCompleteObject, ApiCompleteError,
 };
 
 bool IsValidModuleName(const std::string& name) {
@@ -473,8 +490,18 @@ struct LoadedModule {
   std::vector<Global<FunctionTemplate>> templates;
 };
 
+// An async call's Promise, settled on the isolate's thread.
+struct PendingAsync {
+  Global<Promise::Resolver> resolver;
+  const MemberInfo* member;
+};
+
 struct IsolateState {
   robin_hood::unordered_map<std::string, std::unique_ptr<LoadedModule>> modules;
+  // Resolvers stay here, on the isolate's thread: a v8::Global must not be
+  // destroyed by the thread that completes the call.
+  robin_hood::unordered_map<uint64_t, std::unique_ptr<PendingAsync>> pending;
+  uint64_t nextAsyncId = 1;
   robin_hood::unordered_map<const ModuleInfo*, LoadedModule*> byInfo;
   // Swift object -> its JS wrapper, so a Swift object has one JS identity.
   robin_hood::unordered_map<void*, SwiftObjectWrapper*> identity;
@@ -602,11 +629,11 @@ void ApiReturnNull(NSSwiftCall* call) {
   Complete(context, v8::Null(context->isolate));
 }
 
-Local<Object> WrapObject(CallContext* context, void* object, uint32_t typeIndex) {
-  Isolate* isolate = context->isolate;
-  const ModuleInfo* module = context->module;
-  IsolateState* state = context->state;
-
+// The JS wrapper for `object`, taking over the +1 retain the thunk passed.
+// Adopts `*constructTarget` (the object `new` created) when it is set.
+Local<Object> WrapSwiftObject(Isolate* isolate, Local<Context> context, const ModuleInfo* module,
+                              LoadedModule* loaded, IsolateState* state, void* object,
+                              uint32_t typeIndex, Local<Object>* constructTarget) {
   auto existing = state->identity.find(object);
   if (existing != state->identity.end()) {
     Local<Object> wrapper = existing->second->JSObject();
@@ -618,17 +645,17 @@ Local<Object> WrapObject(CallContext* context, void* object, uint32_t typeIndex)
   }
 
   Local<Object> instance;
-  if (!context->constructTarget.IsEmpty()) {
-    instance = context->constructTarget;
-    context->constructTarget.Clear();
+  if (constructTarget && !constructTarget->IsEmpty()) {
+    instance = *constructTarget;
+    constructTarget->Clear();
   } else {
-    if (typeIndex >= context->loaded->templates.size() ||
-        context->loaded->templates[typeIndex].IsEmpty()) {
+    if (loaded == nullptr || typeIndex >= loaded->templates.size() ||
+        loaded->templates[typeIndex].IsEmpty()) {
       module->release(object);
       return Local<Object>();
     }
-    Local<FunctionTemplate> tmpl = context->loaded->templates[typeIndex].Get(isolate);
-    if (!tmpl->InstanceTemplate()->NewInstance(context->context).ToLocal(&instance)) {
+    Local<FunctionTemplate> tmpl = loaded->templates[typeIndex].Get(isolate);
+    if (!tmpl->InstanceTemplate()->NewInstance(context).ToLocal(&instance)) {
       module->release(object);
       return Local<Object>();
     }
@@ -639,6 +666,26 @@ Local<Object> WrapObject(CallContext* context, void* object, uint32_t typeIndex)
   wrapper->BindFinalizer(isolate, instance);
   state->identity[object] = wrapper;
   return instance;
+}
+
+Local<Object> WrapObject(CallContext* context, void* object, uint32_t typeIndex) {
+  return WrapSwiftObject(context->isolate, context->context, context->module, context->loaded,
+                         context->state, object, typeIndex, &context->constructTarget);
+}
+
+// A Swift error as a JS Error: name "SwiftError" and the error's type in
+// `swiftType` (a plain Error when there is no type).
+Local<Value> SwiftErrorValue(Isolate* isolate, Local<Context> context, const std::string& message,
+                             const std::string& typeName) {
+  Local<Value> error = Exception::Error(tns::ToV8String(isolate, message));
+  if (!typeName.empty() && error->IsObject()) {
+    Local<Object> object = error.As<Object>();
+    object->Set(context, tns::ToV8String(isolate, "name"), tns::ToV8String(isolate, "SwiftError"))
+        .Check();
+    object->Set(context, tns::ToV8String(isolate, "swiftType"), tns::ToV8String(isolate, typeName))
+        .Check();
+  }
+  return error;
 }
 
 void ApiReturnObject(NSSwiftCall* call, void* object, uint32_t typeIndex) {
@@ -662,24 +709,12 @@ void ApiReturnObject(NSSwiftCall* call, void* object, uint32_t typeIndex) {
 void ApiThrowError(NSSwiftCall* call, const uint8_t* message, intptr_t messageLength,
                    const uint8_t* type, intptr_t typeLength) {
   CallContext* context = ContextOf(call);
-  Isolate* isolate = context->isolate;
   context->completed = true;
   context->threw = true;
   std::string text(reinterpret_cast<const char*>(message), message ? messageLength : 0);
   std::string typeName(reinterpret_cast<const char*>(type), type ? typeLength : 0);
-  Local<Value> error = Exception::Error(tns::ToV8String(isolate, text));
-  if (!typeName.empty() && error->IsObject()) {
-    Local<Object> object = error.As<Object>();
-    object
-        ->Set(context->context, tns::ToV8String(isolate, "name"),
-              tns::ToV8String(isolate, "SwiftError"))
-        .Check();
-    object
-        ->Set(context->context, tns::ToV8String(isolate, "swiftType"),
-              tns::ToV8String(isolate, typeName))
-        .Check();
-  }
-  isolate->ThrowException(error);
+  context->isolate->ThrowException(
+      SwiftErrorValue(context->isolate, context->context, text, typeName));
 }
 
 void ApiThrowTypeError(NSSwiftCall* call, const uint8_t* message, intptr_t length) {
@@ -689,6 +724,219 @@ void ApiThrowTypeError(NSSwiftCall* call, const uint8_t* message, intptr_t lengt
   std::string text(reinterpret_cast<const char*>(message), message ? length : 0);
   context->isolate->ThrowException(Exception::TypeError(
       tns::ToV8String(context->isolate, context->member->swiftName + ": " + text)));
+}
+
+// --- Async calls -------------------------------------------------------------------
+//
+// beginAsync runs on the isolate's thread inside the call; complete* runs on
+// whatever thread the Swift task finishes on. Neither the token nor the
+// outcome holds V8 handles, so either may be destroyed on any thread.
+
+struct AsyncToken {
+  Isolate* isolate;
+  IsolateWrapper wrapper;
+  uint64_t id;
+  const ModuleInfo* module;
+};
+
+// What a Swift task produced, in a form that can cross threads.
+struct AsyncOutcome {
+  enum class Kind { Void, Bool, Int64, UInt64, Double, String, Null, Object, Error };
+  Kind kind = Kind::Void;
+  bool boolean = false;
+  int64_t int64 = 0;
+  uint64_t uint64 = 0;
+  double float64 = 0;
+  std::string text;
+  std::string errorType;
+  void* object = nullptr;
+  uint32_t typeIndex = 0;
+  const ModuleInfo* module = nullptr;
+
+  // An undelivered object (the isolate went away) still owns its retain.
+  ~AsyncOutcome() {
+    if (object != nullptr) {
+      module->release(object);
+    }
+  }
+};
+
+void SettleOnIsolate(Isolate* isolate, uint64_t id, AsyncOutcome& outcome) {
+  auto* state = Caches::StateFor<IsolateState>(isolate);
+  if (state == nullptr) {
+    return;
+  }
+  auto it = state->pending.find(id);
+  if (it == state->pending.end()) {
+    return;
+  }
+  std::unique_ptr<PendingAsync> pending = std::move(it->second);
+  state->pending.erase(it);
+
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Promise::Resolver> resolver = pending->resolver.Get(isolate);
+  const std::string& name = pending->member->swiftName;
+  auto rejectRange = [&](const std::string& value) {
+    resolver
+        ->Reject(context,
+                 Exception::RangeError(tns::ToV8String(
+                     isolate, value + " returned by " + name +
+                                  " is outside the range JavaScript numbers represent exactly")))
+        .Check();
+  };
+
+  Local<Value> value;
+  switch (outcome.kind) {
+    case AsyncOutcome::Kind::Void:
+      value = v8::Undefined(isolate);
+      break;
+    case AsyncOutcome::Kind::Bool:
+      value = v8::Boolean::New(isolate, outcome.boolean);
+      break;
+    case AsyncOutcome::Kind::Int64:
+      if (std::fabs(static_cast<double>(outcome.int64)) > kMaxSafeInteger) {
+        return rejectRange(std::to_string(outcome.int64));
+      }
+      value = v8::Number::New(isolate, static_cast<double>(outcome.int64));
+      break;
+    case AsyncOutcome::Kind::UInt64:
+      if (static_cast<double>(outcome.uint64) > kMaxSafeInteger) {
+        return rejectRange(std::to_string(outcome.uint64));
+      }
+      value = v8::Number::New(isolate, static_cast<double>(outcome.uint64));
+      break;
+    case AsyncOutcome::Kind::Double:
+      value = v8::Number::New(isolate, outcome.float64);
+      break;
+    case AsyncOutcome::Kind::String:
+      value = tns::ToV8String(isolate, outcome.text);
+      break;
+    case AsyncOutcome::Kind::Null:
+      value = v8::Null(isolate);
+      break;
+    case AsyncOutcome::Kind::Object: {
+      auto loaded = state->byInfo.find(outcome.module);
+      void* object = outcome.object;
+      // WrapSwiftObject takes over the retain.
+      outcome.object = nullptr;
+      Local<Object> wrapper =
+          WrapSwiftObject(isolate, context, outcome.module,
+                          loaded == state->byInfo.end() ? nullptr : loaded->second, state, object,
+                          outcome.typeIndex, nullptr);
+      if (wrapper.IsEmpty()) {
+        resolver
+            ->Reject(context, Exception::Error(tns::ToV8String(
+                                  isolate, "Swift returned an object JavaScript cannot wrap")))
+            .Check();
+        return;
+      }
+      value = wrapper;
+      break;
+    }
+    case AsyncOutcome::Kind::Error:
+      resolver->Reject(context, SwiftErrorValue(isolate, context, outcome.text, outcome.errorType))
+          .Check();
+      return;
+  }
+  resolver->Resolve(context, value).Check();
+}
+
+// Consumes `rawToken`. Safe on any thread.
+void Deliver(void* rawToken, std::shared_ptr<AsyncOutcome> outcome) {
+  std::unique_ptr<AsyncToken> token(static_cast<AsyncToken*>(rawToken));
+  outcome->module = token->module;
+  NativeScriptPlatform* platform = NativeScriptPlatform::Instance();
+  std::shared_ptr<EventLoop> loop =
+      platform ? platform->LookupEventLoop(token->isolate) : std::shared_ptr<EventLoop>();
+  if (!loop) {
+    return;
+  }
+  Isolate* isolate = token->isolate;
+  IsolateWrapper wrapper = token->wrapper;
+  uint64_t id = token->id;
+  // The event loop enters the isolate and drains microtasks around this; a
+  // dropped post releases the outcome (and its object) here.
+  loop->PostInternal([isolate, wrapper, id, outcome]() {
+    if (!wrapper.IsValid()) {
+      return;
+    }
+    SettleOnIsolate(isolate, id, *outcome);
+  });
+}
+
+std::shared_ptr<AsyncOutcome> Outcome(AsyncOutcome::Kind kind) {
+  auto outcome = std::make_shared<AsyncOutcome>();
+  outcome->kind = kind;
+  return outcome;
+}
+
+void* ApiBeginAsync(NSSwiftCall* call) {
+  CallContext* context = ContextOf(call);
+  Isolate* isolate = context->isolate;
+  uint64_t id = context->state->nextAsyncId++;
+  Local<Promise::Resolver> resolver;
+  if (Promise::Resolver::New(context->context).ToLocal(&resolver)) {
+    auto pending = std::make_unique<PendingAsync>();
+    pending->resolver.Reset(isolate, resolver);
+    pending->member = context->member;
+    context->state->pending.emplace(id, std::move(pending));
+    Complete(context, resolver->GetPromise());
+  } else {
+    // The token is still completed later; it then finds no pending entry.
+    context->completed = true;
+    context->threw = true;
+  }
+  return new AsyncToken{isolate, IsolateWrapper(isolate), id, context->module};
+}
+
+void ApiCompleteVoid(void* token) { Deliver(token, Outcome(AsyncOutcome::Kind::Void)); }
+
+void ApiCompleteBool(void* token, uint8_t value) {
+  auto outcome = Outcome(AsyncOutcome::Kind::Bool);
+  outcome->boolean = value != 0;
+  Deliver(token, outcome);
+}
+
+void ApiCompleteInt64(void* token, int64_t value) {
+  auto outcome = Outcome(AsyncOutcome::Kind::Int64);
+  outcome->int64 = value;
+  Deliver(token, outcome);
+}
+
+void ApiCompleteUInt64(void* token, uint64_t value) {
+  auto outcome = Outcome(AsyncOutcome::Kind::UInt64);
+  outcome->uint64 = value;
+  Deliver(token, outcome);
+}
+
+void ApiCompleteDouble(void* token, double value) {
+  auto outcome = Outcome(AsyncOutcome::Kind::Double);
+  outcome->float64 = value;
+  Deliver(token, outcome);
+}
+
+void ApiCompleteString(void* token, const uint8_t* utf8, intptr_t length) {
+  auto outcome = Outcome(AsyncOutcome::Kind::String);
+  outcome->text.assign(reinterpret_cast<const char*>(utf8), utf8 ? length : 0);
+  Deliver(token, outcome);
+}
+
+void ApiCompleteNull(void* token) { Deliver(token, Outcome(AsyncOutcome::Kind::Null)); }
+
+void ApiCompleteObject(void* token, void* object, uint32_t typeIndex) {
+  auto outcome = Outcome(AsyncOutcome::Kind::Object);
+  outcome->object = object;
+  outcome->typeIndex = typeIndex;
+  outcome->module = static_cast<AsyncToken*>(token)->module;
+  Deliver(token, outcome);
+}
+
+void ApiCompleteError(void* token, const uint8_t* message, intptr_t messageLength,
+                      const uint8_t* type, intptr_t typeLength) {
+  auto outcome = Outcome(AsyncOutcome::Kind::Error);
+  outcome->text.assign(reinterpret_cast<const char*>(message), message ? messageLength : 0);
+  outcome->errorType.assign(reinterpret_cast<const char*>(type), type ? typeLength : 0);
+  Deliver(token, outcome);
 }
 
 // --- Argument conversion -----------------------------------------------------------

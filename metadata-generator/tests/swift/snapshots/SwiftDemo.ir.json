@@ -36,7 +36,10 @@
     "s:9SwiftDemo10echoUInt64ys0D0VADF",
     "s:9SwiftDemo10largestIntSiyF",
     "s:9SwiftDemo5shoutySSSgACF",
-    "s:9SwiftDemo7TrackerC"
+    "s:9SwiftDemo7TrackerC",
+    "s:9SwiftDemo11delayedEcho_5afterS2S_SdtYaKF",
+    "s:9SwiftDemo16makeTrackerLater2idAA0D0CSi_tYaF",
+    "s:9SwiftDemo7PaletteC"
   ],
   "externalTypes": [
     {
@@ -345,7 +348,7 @@
           "s:Sd"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Shapes.swift:141:17",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:142:17",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -533,6 +536,45 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo11delayedEcho_5afterS2S_SdtYaKF",
+      "kind": "function",
+      "path": "delayedEcho(_:after:)",
+      "name": "delayedEcho(_:after:)",
+      "access": "public",
+      "declaration": "func delayedEcho(_ text: String, after seconds: Double) async throws -> String",
+      "parameters": [
+        {
+          "internalName": "text",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        },
+        {
+          "label": "after",
+          "internalName": "seconds",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:27:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo13PrecipitationO",
       "kind": "enum",
       "path": "Precipitation",
@@ -628,7 +670,7 @@
       },
       "settable": false,
       "let": true,
-      "location": "file://Sources/SwiftDemo/Shapes.swift:139:11",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:140:11",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -645,7 +687,7 @@
         ]
       },
       "settable": true,
-      "location": "file://Sources/SwiftDemo/Shapes.swift:140:11",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:141:11",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -661,7 +703,36 @@
           "s:9SwiftDemo5PointV"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Shapes.swift:138:12",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:139:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo16makeTrackerLater2idAA0D0CSi_tYaF",
+      "kind": "function",
+      "path": "makeTrackerLater(id:)",
+      "name": "makeTrackerLater(id:)",
+      "access": "public",
+      "declaration": "func makeTrackerLater(id: Int) async -> Tracker",
+      "parameters": [
+        {
+          "label": "id",
+          "internalName": "id",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Tracker",
+        "references": [
+          "s:9SwiftDemo7TrackerC"
+        ]
+      },
+      "async": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:33:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -1052,7 +1123,7 @@
       "modifiers": [
         "final"
       ],
-      "location": "file://Sources/SwiftDemo/Shapes.swift:106:19",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:107:19",
       "graph": "SwiftDemo.symbols.json",
       "members": [
         "s:9SwiftDemo6CanvasCACycfc",
@@ -1083,7 +1154,7 @@
           }
         }
       ],
-      "location": "file://Sources/SwiftDemo/Shapes.swift:108:16",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:109:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6CanvasC"
     },
@@ -1097,7 +1168,7 @@
       "attributes": [
         "@MainActor"
       ],
-      "location": "file://Sources/SwiftDemo/Shapes.swift:107:11",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:108:11",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6CanvasC"
     },
@@ -1207,7 +1278,7 @@
       "modifiers": [
         "final"
       ],
-      "location": "file://Sources/SwiftDemo/Shapes.swift:111:19",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:112:19",
       "graph": "SwiftDemo.symbols.json",
       "members": [
         "s:9SwiftDemo6LoaderCACycfc",
@@ -1238,7 +1309,7 @@
           "introduced": "16.0.0"
         }
       ],
-      "location": "file://Sources/SwiftDemo/Shapes.swift:129:16",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:130:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6LoaderC"
     },
@@ -1256,7 +1327,7 @@
           "unconditionallyDeprecated": true
         }
       ],
-      "location": "file://Sources/SwiftDemo/Shapes.swift:132:16",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:133:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6LoaderC"
     },
@@ -1284,7 +1355,7 @@
           ]
         }
       ],
-      "location": "file://Sources/SwiftDemo/Shapes.swift:121:16",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:122:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6LoaderC"
     },
@@ -1307,7 +1378,7 @@
           }
         }
       ],
-      "location": "file://Sources/SwiftDemo/Shapes.swift:122:16",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:123:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6LoaderC"
     },
@@ -1337,7 +1408,7 @@
         ]
       },
       "throws": true,
-      "location": "file://Sources/SwiftDemo/Shapes.swift:114:16",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:115:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6LoaderC"
     },
@@ -1361,7 +1432,7 @@
         }
       ],
       "async": true,
-      "location": "file://Sources/SwiftDemo/Shapes.swift:116:16",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:117:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6LoaderC"
     },
@@ -1392,7 +1463,7 @@
       },
       "async": true,
       "throws": true,
-      "location": "file://Sources/SwiftDemo/Shapes.swift:115:16",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:116:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6LoaderC"
     },
@@ -1425,7 +1496,7 @@
           "index": 0
         }
       ],
-      "location": "file://Sources/SwiftDemo/Shapes.swift:119:16",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:120:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6LoaderC"
     },
@@ -1465,7 +1536,7 @@
           "s:Si"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Shapes.swift:124:16",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:125:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6LoaderC"
     },
@@ -1488,7 +1559,7 @@
           "modifier": "inout"
         }
       ],
-      "location": "file://Sources/SwiftDemo/Shapes.swift:126:16",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:127:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6LoaderC"
     },
@@ -1507,7 +1578,7 @@
           "renamed": "fetch(url:)"
         }
       ],
-      "location": "file://Sources/SwiftDemo/Shapes.swift:135:16",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:136:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6LoaderC"
     },
@@ -1547,7 +1618,7 @@
           "rhsPrecise": "s:9SwiftDemo5ShapeP"
         }
       ],
-      "location": "file://Sources/SwiftDemo/Shapes.swift:118:16",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:119:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6LoaderC"
     },
@@ -1558,7 +1629,7 @@
       "name": "init()",
       "access": "public",
       "declaration": "init()",
-      "location": "file://Sources/SwiftDemo/Shapes.swift:112:11",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:113:11",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6LoaderC"
     },
@@ -1739,6 +1810,7 @@
       "graph": "SwiftDemo.symbols.json",
       "members": [
         "s:9SwiftDemo7CounterC5valueSivp",
+        "s:9SwiftDemo7CounterC4stepSivp",
         "s:9SwiftDemo7CounterCACycfc",
         "s:9SwiftDemo7CounterC9incrementSiyF",
         "s:9SwiftDemo7CounterC5labelSSyF",
@@ -1753,6 +1825,24 @@
         "s:s16SendableMetatypeP",
         "s:s8SendableP"
       ]
+    },
+    {
+      "id": "s:9SwiftDemo7CounterC4stepSivp",
+      "kind": "instanceProperty",
+      "path": "Counter.step",
+      "name": "step",
+      "access": "public",
+      "declaration": "var step: Int",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:97:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7CounterC"
     },
     {
       "id": "s:9SwiftDemo7CounterC5labelSSyF",
@@ -1770,7 +1860,7 @@
           "s:SS"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Shapes.swift:102:28",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:103:28",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7CounterC"
     },
@@ -1805,7 +1895,7 @@
           "s:Si"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Shapes.swift:98:16",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:99:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7CounterC"
     },
@@ -1816,7 +1906,7 @@
       "name": "init()",
       "access": "public",
       "declaration": "init()",
-      "location": "file://Sources/SwiftDemo/Shapes.swift:97:11",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:98:11",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7CounterC"
     },
@@ -1862,6 +1952,107 @@
       "location": "file://Sources/SwiftDemo/Demo.swift:1:9",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7GreeterP"
+    },
+    {
+      "id": "s:9SwiftDemo7PaletteC",
+      "kind": "class",
+      "path": "Palette",
+      "name": "Palette",
+      "access": "public",
+      "declaration": "@MainActor final class Palette",
+      "attributes": [
+        "@MainActor"
+      ],
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:39:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo7PaletteC7strokesSivp",
+        "s:9SwiftDemo7PaletteCACycfc",
+        "s:9SwiftDemo7PaletteC6strokeSiyF",
+        "s:9SwiftDemo7PaletteC11strokeLaterSiyYaF"
+      ],
+      "conformances": [
+        "s:s8SendableP"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo7PaletteC11strokeLaterSiyYaF",
+      "kind": "instanceMethod",
+      "path": "Palette.strokeLater()",
+      "name": "strokeLater()",
+      "access": "public",
+      "declaration": "@MainActor func strokeLater() async -> Int",
+      "attributes": [
+        "@MainActor"
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "async": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:46:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PaletteC"
+    },
+    {
+      "id": "s:9SwiftDemo7PaletteC6strokeSiyF",
+      "kind": "instanceMethod",
+      "path": "Palette.stroke()",
+      "name": "stroke()",
+      "access": "public",
+      "declaration": "@MainActor func stroke() -> Int",
+      "attributes": [
+        "@MainActor"
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:42:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PaletteC"
+    },
+    {
+      "id": "s:9SwiftDemo7PaletteC7strokesSivp",
+      "kind": "instanceProperty",
+      "path": "Palette.strokes",
+      "name": "strokes",
+      "access": "public",
+      "declaration": "@MainActor var strokes: Int { get }",
+      "attributes": [
+        "@MainActor"
+      ],
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Values.swift:40:28",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PaletteC"
+    },
+    {
+      "id": "s:9SwiftDemo7PaletteCACycfc",
+      "kind": "initializer",
+      "path": "Palette.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "@MainActor init()",
+      "attributes": [
+        "@MainActor"
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:41:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PaletteC"
     },
     {
       "id": "s:9SwiftDemo7PolygonC",

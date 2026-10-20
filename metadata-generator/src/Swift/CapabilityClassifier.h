@@ -62,8 +62,8 @@ struct Capability {
   //   objc-visible, not-public, unavailable, obsoleted, unknown-kind,
   //   deinitializer, macro, extension-block, protocol, protocol-requirement,
   //   type-alias, associated-type, generic, nested-type, noncopyable,
-  //   nonescapable, actor-isolated,
-  //   main-actor, async, operator, subscript, enum-associated-values,
+  //   nonescapable, async-initializer, operator, subscript,
+  //   enum-associated-values,
   //   external-type-extension, owner-not-bridged, missing-owner,
   //   js-name-conflict,
   //   inout-parameter, variadic-parameter, closure, tuple, collection,
@@ -75,6 +75,14 @@ struct Capability {
   // Another generated overload with the same JS name accepts the same JS
   // argument kinds, so JS-side dispatch must use the signature key.
   bool ambiguousOverload = false;
+  // The call completes asynchronously (an `async` declaration, or an actor
+  // member called from outside the actor): JS receives a Promise.
+  bool isAsync = false;
+  // Isolated to the main actor; synchronous calls must come from the main
+  // thread.
+  bool isMainActor = false;
+  // A property or variable JS can assign.
+  bool isSettable = false;
 
   // Bridges for SwiftGenerated callables: parameters in order, then the
   // result (or the property value type).

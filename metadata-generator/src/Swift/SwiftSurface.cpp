@@ -140,10 +140,14 @@ SwiftSurface describeSurface(const Module& module,
     member.kind = memberKind(symbol.kind);
     member.flags =
         (symbol.isThrowing ? SwiftSurface::kThrows : 0) |
-        (symbol.isSettable && member.kind != SwiftSurface::kEnumCase
+        (capability->isSettable && member.kind != SwiftSurface::kEnumCase
              ? SwiftSurface::kSettable
              : 0) |
-        (capability->ambiguousOverload ? SwiftSurface::kAmbiguous : 0);
+        (capability->ambiguousOverload ? SwiftSurface::kAmbiguous : 0) |
+        (capability->isAsync ? SwiftSurface::kAsync : 0) |
+        (capability->isMainActor && !capability->isAsync
+             ? SwiftSurface::kMainActor
+             : 0);
     member.result = capability->result;
     if (member.kind == SwiftSurface::kEnumCase) {
       member.result.bridge = Bridge::EnumCase;

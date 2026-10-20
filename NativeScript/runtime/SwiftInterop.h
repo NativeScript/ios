@@ -29,9 +29,10 @@
 // argument's tag and integer range against the member's signature, so a thunk
 // may rely on them; it still validates object types and enum case names
 // itself (throwTypeError). A thunk reports its outcome by calling exactly one
-// return* or throw* entry of call->api.
+// return* or throw* entry of call->api, or calls beginAsync and later
+// exactly one complete* entry with the token it returned (from any thread).
 
-#define NS_SWIFT_ABI_VERSION 1
+#define NS_SWIFT_ABI_VERSION 2
 
 #ifdef __cplusplus
 extern "C" {
@@ -103,6 +104,10 @@ enum {
   // Another overload with the same JS name accepts the same JS argument
   // kinds; JS can only reach it through its signature key.
   NSSwiftMemberAmbiguous = 1 << 2,
+  // The call settles a Promise (beginAsync).
+  NSSwiftMemberAsync = 1 << 3,
+  // Isolated to the main actor; the thunk rejects calls from other threads.
+  NSSwiftMemberMainActor = 1 << 4,
 };
 
 // Member signatures: comma-separated parameter codes, '>', result code.
@@ -153,6 +158,25 @@ struct NSSwiftAPI {
                                   const char* jsName, const char* swiftName,
                                   const char* signature, NSSwiftThunk thunk,
                                   NSSwiftThunk setter);
+
+  // Async calls. beginAsync makes the call's JS result a Promise and returns
+  // a token; exactly one complete* entry settles it. Those may be called from
+  // any thread: the outcome is delivered on the isolate's thread, and dropped
+  // (releasing any object) if the isolate is gone by then.
+  /* 13 */ void* (*beginAsync)(NSSwiftCall* call);
+  /* 14 */ void (*completeVoid)(void* token);
+  /* 15 */ void (*completeBool)(void* token, uint8_t value);
+  /* 16 */ void (*completeInt64)(void* token, int64_t value);
+  /* 17 */ void (*completeUInt64)(void* token, uint64_t value);
+  /* 18 */ void (*completeDouble)(void* token, double value);
+  /* 19 */ void (*completeString)(void* token, const uint8_t* utf8,
+                                  intptr_t length);
+  /* 20 */ void (*completeNull)(void* token);
+  /* 21 */ void (*completeObject)(void* token, void* object,
+                                  uint32_t typeIndex);
+  /* 22 */ void (*completeError)(void* token, const uint8_t* message,
+                                 intptr_t messageLength, const uint8_t* type,
+                                 intptr_t typeLength);
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);
