@@ -92,6 +92,9 @@ holds.
   Enum instance members are functions taking the case name first:
   `Flavor.description("vanilla")`.
 - Properties are accessors; read-only Swift properties have no setter.
+- Nested types hang off their parent: `Polygon.Style.dashed`,
+  `new Polygon.Metrics({ perimeter: 3 })`. When the parent itself is not
+  bridged, a frozen namespace object stands in for it.
 
 ## Async, actors and the main actor
 
@@ -129,9 +132,10 @@ each worker gets its own JS objects.
 Every declaration gets one tier — `objc-direct`, `swift-generated`,
 `swift-specialized`, `type-only`, `unsupported` or `not-applicable` — with
 machine-readable reasons (`metadata-generator/src/Swift/CapabilityClassifier.h`).
-`--swift-verify` type-checks a probe for every generated declaration with the
-Swift compiler, demotes whatever it rejects as `compiler-rejected:<message>`,
-and repeats until everything that remains compiles. Symbol graphs cannot
+`--swift-verify` type-checks a probe for every generated declaration, and the
+generated thunks themselves, with the Swift compiler, demotes whatever it
+rejects as `compiler-rejected:<message>`, and repeats until everything that
+remains compiles. Symbol graphs cannot
 express every fact a call depends on (`~Copyable` is often invisible), so
 verification is what makes the generated surface trustworthy at SDK scale.
 
@@ -139,7 +143,7 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 Closures and callbacks, async cancellation, `inout` parameters, generics,
 protocols as values, tuples, sets, optional collection elements, enums with
-associated values, nested types, subscripts and operators. Each appears in the coverage
+associated values, subscripts and operators. Each appears in the coverage
 report with its reason.
 
 ## Swift language mode

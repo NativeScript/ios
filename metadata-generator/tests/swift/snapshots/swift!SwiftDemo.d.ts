@@ -11,14 +11,23 @@ declare module "ns:swift/SwiftDemo" {
     static readonly version: string;
   }
 
+  export namespace Measurement {
+    export class Unit {
+      constructor(symbol: string);
+      constructor(args: { symbol: string });
+      symbol: string;
+    }
+
+  }
+
   export type Precipitation = "none" | "rain" | "snow";
-  export const Precipitation: {
-    readonly none: "none";
-    readonly rain: "rain";
-    readonly snow: "snow";
-    init(rawValue: string): Precipitation | null;
-    hashValue(value: Precipitation): number;
-  };
+  export namespace Precipitation {
+    export const none: "none";
+    export const rain: "rain";
+    export const snow: "snow";
+    export function init(rawValue: string): Precipitation | null;
+    export function hashValue(value: Precipitation): number;
+  }
 
   export class Ring {
     constructor(inner: Point, outer: Point);
@@ -42,13 +51,13 @@ declare module "ns:swift/SwiftDemo" {
   }
 
   export type Flavor = "vanilla" | "chocolate";
-  export const Flavor: {
-    description(value: Flavor): string;
-    readonly vanilla: "vanilla";
-    init(rawValue: number | bigint): Flavor | null;
-    readonly chocolate: "chocolate";
-    hashValue(value: Flavor): number;
-  };
+  export namespace Flavor {
+    export function description(value: Flavor): string;
+    export const vanilla: "vanilla";
+    export function init(rawValue: number | bigint): Flavor | null;
+    export const chocolate: "chocolate";
+    export function hashValue(value: Flavor): number;
+  }
 
   export class Loader {
     constructor();
@@ -110,8 +119,27 @@ declare module "ns:swift/SwiftDemo" {
     "scale(x:y:)"(x: number, y: number): void;
     "scale(by: Double)"(factor: number): void;
     "scale(by: Int)"(factor: number | bigint): void;
+    readonly style: Polygon.Style;
     static readonly shared: Polygon;
+    metrics(side: number): Polygon.Metrics;
     static describe(polygon: (Polygon) | null | undefined): string;
+  }
+
+  export namespace Polygon {
+    export type Style = "solid" | "dashed";
+    export namespace Style {
+      export const solid: "solid";
+      export const dashed: "dashed";
+      export function init(rawValue: string): Polygon.Style | null;
+      export function hashValue(value: Polygon.Style): number;
+    }
+
+    export class Metrics {
+      constructor(perimeter: number);
+      constructor(args: { perimeter: number });
+      perimeter: number;
+    }
+
   }
 
   export class Tracker {

@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 135,
+      "total": 147,
       "objc-direct": 0,
-      "swift-generated": 97,
+      "swift-generated": 110,
       "swift-specialized": 5,
       "type-only": 6,
-      "unsupported": 27,
+      "unsupported": 26,
       "not-applicable": 0
     },
     "callable": {
-      "total": 117,
+      "total": 127,
       "objc-direct": 0,
-      "swift-generated": 85,
+      "swift-generated": 95,
       "swift-specialized": 5,
       "type-only": 3,
       "unsupported": 24,
       "not-applicable": 0
     },
-    "effectiveCallable": 85,
+    "effectiveCallable": 95,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -44,18 +44,18 @@
       "not-applicable": 0
     },
     "enum": {
-      "total": 4,
+      "total": 5,
       "objc-direct": 0,
-      "swift-generated": 2,
+      "swift-generated": 3,
       "swift-specialized": 0,
       "type-only": 0,
       "unsupported": 2,
       "not-applicable": 0
     },
     "enumCase": {
-      "total": 11,
+      "total": 13,
       "objc-direct": 0,
-      "swift-generated": 5,
+      "swift-generated": 7,
       "swift-specialized": 0,
       "type-only": 0,
       "unsupported": 6,
@@ -71,30 +71,30 @@
       "not-applicable": 0
     },
     "initializer": {
-      "total": 14,
+      "total": 16,
       "objc-direct": 0,
-      "swift-generated": 13,
+      "swift-generated": 16,
       "swift-specialized": 0,
       "type-only": 0,
-      "unsupported": 1,
+      "unsupported": 0,
       "not-applicable": 0
     },
     "instanceMethod": {
-      "total": 35,
+      "total": 37,
       "objc-direct": 0,
-      "swift-generated": 20,
+      "swift-generated": 21,
       "swift-specialized": 5,
       "type-only": 1,
-      "unsupported": 9,
+      "unsupported": 10,
       "not-applicable": 0
     },
     "instanceProperty": {
-      "total": 22,
+      "total": 25,
       "objc-direct": 0,
-      "swift-generated": 17,
+      "swift-generated": 21,
       "swift-specialized": 0,
       "type-only": 1,
-      "unsupported": 4,
+      "unsupported": 3,
       "not-applicable": 0
     },
     "instanceSubscript": {
@@ -107,12 +107,12 @@
       "not-applicable": 0
     },
     "operator": {
-      "total": 3,
+      "total": 4,
       "objc-direct": 0,
       "swift-generated": 0,
       "swift-specialized": 0,
       "type-only": 0,
-      "unsupported": 3,
+      "unsupported": 4,
       "not-applicable": 0
     },
     "protocol": {
@@ -125,12 +125,12 @@
       "not-applicable": 0
     },
     "struct": {
-      "total": 3,
+      "total": 4,
       "objc-direct": 0,
-      "swift-generated": 2,
+      "swift-generated": 4,
       "swift-specialized": 0,
       "type-only": 0,
-      "unsupported": 1,
+      "unsupported": 0,
       "not-applicable": 0
     },
     "typeAlias": {
@@ -176,10 +176,9 @@
     "existential": 1,
     "external-type-extension": 2,
     "generic": 5,
-    "inout-parameter": 3,
-    "nested-type": 1,
-    "operator": 3,
-    "owner-not-bridged": 10,
+    "inout-parameter": 4,
+    "operator": 4,
+    "owner-not-bridged": 8,
     "subscript": 1,
     "unbridged-type": 2
   },
@@ -327,30 +326,23 @@
       "id": "s:9SwiftDemo11MeasurementO4UnitV",
       "path": "Measurement.Unit",
       "kind": "struct",
-      "tier": "unsupported",
-      "reasons": [
-        "nested-type"
-      ],
+      "tier": "swift-generated",
       "location": "file://Sources/SwiftDemo/Shapes.swift:66"
     },
     {
       "id": "s:9SwiftDemo11MeasurementO4UnitV6symbolAESS_tcfc",
       "path": "Measurement.Unit.init(symbol:)",
       "kind": "initializer",
-      "tier": "unsupported",
-      "reasons": [
-        "owner-not-bridged"
-      ],
+      "tier": "swift-generated",
+      "jsName": "constructor",
       "location": "file://Sources/SwiftDemo/Shapes.swift:68"
     },
     {
       "id": "s:9SwiftDemo11MeasurementO4UnitV6symbolSSvp",
       "path": "Measurement.Unit.symbol",
       "kind": "instanceProperty",
-      "tier": "unsupported",
-      "reasons": [
-        "owner-not-bridged"
-      ],
+      "tier": "swift-generated",
+      "jsName": "symbol",
       "location": "file://Sources/SwiftDemo/Shapes.swift:67"
     },
     {
@@ -1038,6 +1030,36 @@
       "location": "file://Sources/SwiftDemo/Shapes.swift:9"
     },
     {
+      "id": "s:9SwiftDemo7PolygonC5StyleO",
+      "path": "Polygon.Style",
+      "kind": "enum",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Extensions.swift:32"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC5StyleO5solidyA2EmF",
+      "path": "Polygon.Style.solid",
+      "kind": "enumCase",
+      "tier": "swift-generated",
+      "jsName": "solid",
+      "location": "file://Sources/SwiftDemo/Extensions.swift:32"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC5StyleO6dashedyA2EmF",
+      "path": "Polygon.Style.dashed",
+      "kind": "enumCase",
+      "tier": "swift-generated",
+      "jsName": "dashed",
+      "location": "file://Sources/SwiftDemo/Extensions.swift:32"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC5StyleO8rawValueAESgSS_tcfc",
+      "path": "Polygon.Style.init(rawValue:)",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor"
+    },
+    {
       "id": "s:9SwiftDemo7PolygonC5scale1x1yySd_SdtF",
       "path": "Polygon.scale(x:y:)",
       "kind": "instanceMethod",
@@ -1064,12 +1086,51 @@
       "location": "file://Sources/SwiftDemo/Shapes.swift:24"
     },
     {
+      "id": "s:9SwiftDemo7PolygonC5styleAC5StyleOvp",
+      "path": "Polygon.style",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "style",
+      "location": "file://Sources/SwiftDemo/Extensions.swift:39"
+    },
+    {
       "id": "s:9SwiftDemo7PolygonC6sharedACvpZ",
       "path": "Polygon.shared",
       "kind": "typeProperty",
       "tier": "swift-generated",
       "jsName": "shared",
       "location": "file://Sources/SwiftDemo/Shapes.swift:11"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC7MetricsV",
+      "path": "Polygon.Metrics",
+      "kind": "struct",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Extensions.swift:34"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC7MetricsV9perimeterAESd_tcfc",
+      "path": "Polygon.Metrics.init(perimeter:)",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Extensions.swift:36"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC7MetricsV9perimeterSdvp",
+      "path": "Polygon.Metrics.perimeter",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "perimeter",
+      "location": "file://Sources/SwiftDemo/Extensions.swift:35"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC7metrics4sideAC7MetricsVSd_tF",
+      "path": "Polygon.metrics(side:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "metrics",
+      "location": "file://Sources/SwiftDemo/Extensions.swift:40"
     },
     {
       "id": "s:9SwiftDemo7PolygonC8describeySSACSgFZ",
@@ -1211,6 +1272,15 @@
       ]
     },
     {
+      "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO",
+      "path": "Polygon.Style.!=(_:_:)",
+      "kind": "operator",
+      "tier": "unsupported",
+      "reasons": [
+        "operator"
+      ]
+    },
+    {
       "id": "s:SS9SwiftDemoE7shoutedSSvp",
       "path": "String.shouted",
       "kind": "instanceProperty",
@@ -1235,6 +1305,13 @@
       "jsName": "hashValue"
     },
     {
+      "id": "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO",
+      "path": "Polygon.Style.hashValue",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "hashValue"
+    },
+    {
       "id": "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF::SYNTHESIZED::s:9SwiftDemo13PrecipitationO",
       "path": "Precipitation.hash(into:)",
       "kind": "instanceMethod",
@@ -1246,6 +1323,15 @@
     {
       "id": "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF::SYNTHESIZED::s:9SwiftDemo6FlavorO",
       "path": "Flavor.hash(into:)",
+      "kind": "instanceMethod",
+      "tier": "unsupported",
+      "reasons": [
+        "inout-parameter"
+      ]
+    },
+    {
+      "id": "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO",
+      "path": "Polygon.Style.hash(into:)",
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [

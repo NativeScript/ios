@@ -186,8 +186,17 @@ class Classifier {
     if (!symbol.genericParameters.empty()) {
       return make(Tier::SwiftSpecialized, "generic");
     }
-    if (!symbol.parentId.empty()) {
-      return make(Tier::Unsupported, "nested-type");
+    // A nested type is reached through its parent's JS path; it is generic
+    // when any enclosing type is.
+    for (const Symbol* current = &symbol; !current->parentId.empty();) {
+      const Symbol* parent = _module.find(current->parentId);
+      if (!parent) {
+        return make(Tier::Unsupported, "external-type-extension");
+      }
+      if (!parent->genericParameters.empty()) {
+        return make(Tier::SwiftSpecialized, "generic");
+      }
+      current = parent;
     }
     // Graphs show suppressed conformances only when the declaration spells
     // them; other noncopyable types are caught by compiler verification.

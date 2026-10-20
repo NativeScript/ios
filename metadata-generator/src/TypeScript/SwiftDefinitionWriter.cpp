@@ -151,12 +151,9 @@ class Writer {
          << ": every declaration is backed by a generated thunk.\n\n"
          << "declare module \"ns:swift/" << _module.name << "\" {\n";
 
-    for (const auto& type : _surface.types) {
-      if (type.kind == SwiftSurface::kEnum) {
-        writeEnum(type);
-      } else {
-        writeClass(type);
-      }
+    buildTree();
+    for (const auto& path : _topLevel) {
+      writeNode(_nodes.at(path), "  ");
     }
     writeModuleMembers();
 
@@ -302,7 +299,9 @@ class Writer {
 
   std::string typeName(const BridgedType& type) const {
     int index = _surface.indexOf(type.symbolId);
-    return index >= 0 ? _surface.types[index].symbol->name : "unknown";
+    return index >= 0
+               ? llvm::join(_surface.types[index].symbol->pathComponents, ".")
+               : "unknown";
   }
 
   std::string inputType(const BridgedType& type) const {
@@ -495,12 +494,56 @@ class Writer {
     }
   }
 
-  void writeClass(const SwiftSurface::Type& type) {
+  // A type, or a namespace standing in for an unbridged parent, by JS path.
+  struct Node {
+    std::string name;
+    const SwiftSurface::Type* type = nullptr;
+    std::vector<std::string> children;
+  };
+
+  void buildTree() {
+    for (const auto& type : _surface.types) {
+      const auto& components = type.symbol->pathComponents;
+      std::string path;
+      for (size_t i = 0; i < components.size(); i++) {
+        std::string parent = path;
+        path += (i > 0 ? "." : "") + components[i];
+        auto inserted = _nodes.emplace(path, Node{components[i], nullptr, {}});
+        if (inserted.second) {
+          (parent.empty() ? _topLevel : _nodes.at(parent).children)
+              .push_back(path);
+        }
+      }
+      _nodes.at(path).type = &type;
+    }
+  }
+
+  void writeNode(const Node& node, const std::string& indent) {
+    if (node.type && node.type->kind == SwiftSurface::kEnum) {
+      writeEnum(*node.type, node, indent);
+      return;
+    }
+    if (node.type) {
+      writeClass(*node.type, indent);
+    }
+    if (!node.children.empty()) {
+      _out << indent << "export namespace " << node.name << " {\n";
+      for (const auto& child : node.children) {
+        writeNode(_nodes.at(child), indent + "  ");
+      }
+      _out << indent << "}\n\n";
+    }
+  }
+
+  void writeClass(const SwiftSurface::Type& type, const std::string& indent) {
     const Symbol& symbol = *type.symbol;
-    writeDoc(symbol, "  ");
-    _out << "  export class " << symbol.name;
+    std::string inner = indent + "  ";
+    writeDoc(symbol, indent);
+    _out << indent << "export class " << symbol.name;
     if (type.superIndex >= 0) {
-      _out << " extends " << _surface.types[type.superIndex].symbol->name;
+      _out << " extends "
+           << llvm::join(_surface.types[type.superIndex].symbol->pathComponents,
+                         ".");
     }
     _out << " {\n";
 
@@ -512,16 +555,16 @@ class Writer {
       }
       hasInitializer = true;
       for (const Member* member : group.overloads) {
-        writeDoc(*member->symbol, "    ");
-        _out << "    constructor(" << parameterList(*member) << ");\n";
+        writeDoc(*member->symbol, inner);
+        _out << inner << "constructor(" << parameterList(*member) << ");\n";
         std::string labeled = labeledParameters(*member);
         if (!labeled.empty()) {
-          _out << "    constructor(args: " << labeled << ");\n";
+          _out << inner << "constructor(args: " << labeled << ");\n";
         }
       }
     }
     if (!hasInitializer) {
-      _out << "    private constructor();\n";
+      _out << inner << "private constructor();\n";
     }
 
     for (const Group& group : _groups) {
@@ -532,80 +575,97 @@ class Writer {
       switch (group.kind) {
         case SwiftSurface::kInstanceProperty:
         case SwiftSurface::kStaticProperty:
-          writeDoc(*first.symbol, "    ");
-          _out << "    "
+          writeDoc(*first.symbol, inner);
+          _out << inner
                << (group.kind == SwiftSurface::kStaticProperty ? "static " : "")
                << ((first.flags & SwiftSurface::kSettable) ? "" : "readonly ")
                << propertyKey(group.jsName) << ": " << resultOf(first) << ";\n";
           break;
         case SwiftSurface::kInstanceMethod:
-          writeMethodGroup(group, "    ", "");
+          writeMethodGroup(group, inner, "");
           break;
         case SwiftSurface::kStaticMethod:
-          writeMethodGroup(group, "    ", "static ");
+          writeMethodGroup(group, inner, "static ");
           break;
         default:
           break;
       }
     }
-    _out << "  }\n\n";
+    _out << indent << "}\n\n";
   }
 
-  void writeEnum(const SwiftSurface::Type& type) {
+  // `type` (a union of case names) plus a namespace of the enum object's
+  // members, which can also hold nested types; TypeScript cannot merge a
+  // namespace with a const.
+  void writeEnum(const SwiftSurface::Type& type, const Node& node,
+                 const std::string& indent) {
     const Symbol& symbol = *type.symbol;
+    std::string self = llvm::join(symbol.pathComponents, ".");
+    std::string inner = indent + "  ";
     std::vector<std::string> cases;
     for (const Group& group : _groups) {
       if (group.owner == type.index && group.kind == SwiftSurface::kEnumCase) {
         cases.push_back("\"" + group.jsName + "\"");
       }
     }
-    writeDoc(symbol, "  ");
-    _out << "  export type " << symbol.name << " = "
+    writeDoc(symbol, indent);
+    _out << indent << "export type " << symbol.name << " = "
          << (cases.empty() ? std::string("never") : llvm::join(cases, " | "))
          << ";\n";
-    _out << "  export const " << symbol.name << ": {\n";
+    _out << indent << "export namespace " << symbol.name << " {\n";
     for (const Group& group : _groups) {
-      if (group.owner != type.index) {
+      if (group.owner != type.index || !isIdentifier(group.jsName) ||
+          isReserved(group.jsName)) {
         continue;
       }
       const Member& first = *group.overloads[0];
       switch (group.kind) {
         case SwiftSurface::kEnumCase:
-          _out << "    readonly " << propertyKey(group.jsName) << ": \""
+          _out << inner << "export const " << group.jsName << ": \""
                << group.jsName << "\";\n";
           break;
         case SwiftSurface::kInitializer:
           // Enum initializers are exposed as `init`; they produce a case name.
           for (const Member* member : group.overloads) {
-            writeDoc(*member->symbol, "    ");
-            _out << "    init(" << parameterList(*member)
+            writeDoc(*member->symbol, inner);
+            _out << inner << "export function init(" << parameterList(*member)
                  << "): " << resultOf(*member) << ";\n";
           }
           break;
         case SwiftSurface::kStaticProperty:
-          writeDoc(*first.symbol, "    ");
-          _out << "    "
-               << ((first.flags & SwiftSurface::kSettable) ? "" : "readonly ")
-               << propertyKey(group.jsName) << ": " << resultOf(first) << ";\n";
+          writeDoc(*first.symbol, inner);
+          _out << inner << "export "
+               << ((first.flags & SwiftSurface::kSettable) ? "let " : "const ")
+               << group.jsName << ": " << resultOf(first) << ";\n";
           break;
         case SwiftSurface::kInstanceProperty:
           // A case name has no properties; instance members take it first.
-          writeDoc(*first.symbol, "    ");
-          _out << "    " << propertyKey(group.jsName)
-               << "(value: " << symbol.name << "): " << resultOf(first)
-               << ";\n";
+          writeDoc(*first.symbol, inner);
+          _out << inner << "export function " << group.jsName
+               << "(value: " << self << "): " << resultOf(first) << ";\n";
           break;
         case SwiftSurface::kInstanceMethod:
-          writeMethodGroup(group, "    ", "", symbol.name);
-          break;
         case SwiftSurface::kStaticMethod:
-          writeMethodGroup(group, "    ", "");
+          for (const Member* member : group.overloads) {
+            if (ambiguousWithin(group, *member)) {
+              continue;
+            }
+            writeDoc(*member->symbol, inner);
+            _out << inner << "export function " << group.jsName << "("
+                 << parameterList(
+                        *member,
+                        group.kind == SwiftSurface::kInstanceMethod ? self : "")
+                 << "): " << resultOf(*member) << ";\n";
+          }
           break;
         default:
           break;
       }
     }
-    _out << "  };\n\n";
+    for (const auto& child : node.children) {
+      writeNode(_nodes.at(child), inner);
+    }
+    _out << indent << "}\n\n";
   }
 
   void writeModuleMembers() {
@@ -638,6 +698,8 @@ class Writer {
   const Module& _module;
   SwiftSurface _surface;
   std::vector<Group> _groups;
+  std::map<std::string, Node> _nodes;
+  std::vector<std::string> _topLevel;
   std::ostringstream _out;
 };
 

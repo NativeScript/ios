@@ -73,7 +73,7 @@ struct Capability {
   // ("unbridged-type:Foundation.URL"). Codes:
   //   objc-visible, not-public, unavailable, obsoleted, unknown-kind,
   //   deinitializer, macro, extension-block, protocol, protocol-requirement,
-  //   type-alias, associated-type, generic, nested-type, noncopyable,
+  //   type-alias, associated-type, generic, noncopyable,
   //   nonescapable, async-initializer, operator, subscript,
   //   enum-associated-values,
   //   external-type-extension, owner-not-bridged, missing-owner,

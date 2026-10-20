@@ -2,7 +2,7 @@
 // the generated swift!SwiftDemo.d.ts snapshot. Every @ts-expect-error line
 // must fail to compile: an unused directive is itself an error.
 import * as swift from "ns:swift";
-import { Demo, Point, Flavor, Polygon, Square, Tracker, Counter, Palette, shout, globalCounter, delayedEcho, makeTrackerLater } from "ns:swift/SwiftDemo";
+import { Demo, Point, Flavor, Polygon, Measurement, Square, Tracker, Counter, Palette, shout, globalCounter, delayedEcho, makeTrackerLater } from "ns:swift/SwiftDemo";
 
 const SwiftDemo = swift.module("SwiftDemo");
 const demo: Demo = new SwiftDemo.Demo();
@@ -19,6 +19,12 @@ const maybe: string | null = shout(null);
 const live: number = Tracker.liveCount;
 const counter: number = globalCounter;
 
+const style: Polygon.Style = new Polygon("p").style;
+const metrics: Polygon.Metrics = new Polygon.Metrics({ perimeter: 3 });
+const unit = new Measurement.Unit("m");
+const dashed: Polygon.Style = Polygon.Style.dashed;
+void [style, metrics.perimeter, unit.symbol, dashed];
+
 const echoed: Promise<string> = delayedEcho("x", 0.1);
 const later: Promise<Tracker> = makeTrackerLater(1);
 const counterValue: Promise<number> = new Counter().value;
@@ -33,6 +39,6 @@ point.description = "x";
 square.scale(2);
 // @ts-expect-error  Flavor is a union of case names
 const bad: Flavor = "mint";
-// @ts-expect-error  Measurement (an enum with associated values) is not bridged
-SwiftDemo.Measurement;
+// @ts-expect-error  ShapeError (an enum with associated values) is not bridged
+SwiftDemo.ShapeError;
 void [greeting, twice, x, text, maybe, live, counter, bad];

@@ -714,28 +714,66 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
       std::string attribute =
           availability.empty() ? "" : "@available(" + availability + ")\n";
       std::string index = std::to_string(type.index);
-      std::vector<std::string> cases;
+      // Cases newer than their enum are reached under #available.
+      struct Case {
+        std::string name;
+        std::string availability;
+      };
+      std::vector<Case> cases;
+      bool anyGated = false;
       for (const auto& id : symbol.memberIds) {
         const Symbol* member = _module.find(id);
-        if (member && member->kind == SymbolKind::EnumCase) {
-          cases.push_back(member->baseName);
+        const Capability* capability = _classification.find(id);
+        if (!member || member->kind != SymbolKind::EnumCase || !capability ||
+            capability->tier != Tier::SwiftGenerated) {
+          continue;
         }
+        std::string condition = availabilityCondition(_module, *member);
+        if (condition == availability) {
+          condition.clear();
+        }
+        anyGated |= !condition.empty();
+        cases.push_back(Case{member->baseName, condition});
       }
+
+      out += "// " + symbol.preciseId + "\n";
       out += attribute + "private func __nsEnum" + index +
              "(_ name: String) -> " + typeName + "? {\n  switch name {\n";
-      for (const auto& name : cases) {
+      for (const auto& entry : cases) {
         // Qualified: a case named `none` would otherwise mean Optional.none.
-        out += "  case " + quoted(name) + ": return " + typeName + "." +
-               swiftIdentifier(name) + "\n";
+        std::string value = typeName + "." + swiftIdentifier(entry.name);
+        out += "  case " + quoted(entry.name) + ": ";
+        out += entry.availability.empty()
+                   ? "return " + value + "\n"
+                   : "if #available(" + entry.availability + ") { return " +
+                         value + " } else { return nil }\n";
       }
       out += "  default: return nil\n  }\n}\n\n";
+
       out += attribute + "private func __nsEnumName" + index +
              "(_ value: " + typeName + ") -> String {\n  switch value {\n";
-      for (const auto& name : cases) {
-        out += "  case " + typeName + "." + swiftIdentifier(name) +
-               ": return " + quoted(name) + "\n";
+      for (const auto& entry : cases) {
+        if (entry.availability.empty()) {
+          out += "  case " + typeName + "." + swiftIdentifier(entry.name) +
+                 ": return " + quoted(entry.name) + "\n";
+        }
       }
-      out += "  @unknown default: return String(describing: value)\n  }\n}\n\n";
+      if (anyGated) {
+        // A case pattern cannot be guarded by #available.
+        out += "  default:\n";
+        for (const auto& entry : cases) {
+          if (!entry.availability.empty()) {
+            out += "    if #available(" + entry.availability +
+                   "), value == " + typeName + "." +
+                   swiftIdentifier(entry.name) + " { return " +
+                   quoted(entry.name) + " }\n";
+          }
+        }
+        out += "    return String(describing: value)\n  }\n}\n\n";
+      } else {
+        out +=
+            "  @unknown default: return String(describing: value)\n  }\n}\n\n";
+      }
     }
     return out;
   }
@@ -818,7 +856,8 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
       const Symbol& symbol = *type.symbol;
       int kind = type.kind;
       out += "  registerType(registrar, " + std::to_string(type.index) + ", " +
-             std::to_string(kind) + ", " + quoted(symbol.name) + ", " +
+             std::to_string(kind) + ", " +
+             quoted(llvm::join(symbol.pathComponents, ".")) + ", " +
              quoted(qualifiedTypeName(_module, symbol)) + ", " +
              std::to_string(type.superIndex) + ")\n";
     }

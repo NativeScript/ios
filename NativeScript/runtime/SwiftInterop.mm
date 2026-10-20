@@ -2,10 +2,12 @@
 
 #include <dlfcn.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstring>
 #include <deque>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -397,6 +399,12 @@ const NSSwiftAPI kAPI = {
     ApiReturnArrayEnd,       ApiReturnMapBegin,   ApiReturnMapEnd,         ApiCompleteArrayBegin,
     ApiCompleteContainerEnd, ApiCompleteMapBegin, ApiCompleteContainerEnd,
 };
+
+// "Polygon.Style" -> "Style".
+std::string LastComponent(const std::string& path) {
+  size_t dot = path.rfind('.');
+  return dot == std::string::npos ? path : path.substr(dot + 1);
+}
 
 bool IsValidModuleName(const std::string& name) {
   if (name.empty()) {
@@ -1930,7 +1938,7 @@ class Builder {
       }
       Local<FunctionTemplate> tmpl =
           FunctionTemplate::New(_isolate, ConstructorCallback, DataFor(_isolate, &type));
-      tmpl->SetClassName(tns::ToV8String(_isolate, type.jsName));
+      tmpl->SetClassName(tns::ToV8String(_isolate, LastComponent(type.jsName)));
       tmpl->InstanceTemplate()->SetInternalFieldCount(1);
       templates[type.index] = tmpl;
     }
@@ -1965,19 +1973,60 @@ class Builder {
       InstallOnTemplate(templates[group->owner], *group);
     }
 
+    std::vector<Local<Object>> values(_module.types.size());
     for (const TypeInfo& type : _module.types) {
-      Local<Value> value;
       if (type.kind == NSSwiftTypeEnum) {
-        value = enums[type.index];
-      } else {
-        Local<v8::Function> function;
-        if (!templates[type.index]->GetFunction(_context).ToLocal(&function)) {
-          return MaybeLocal<Object>();
-        }
-        _loaded.templates[type.index].Reset(_isolate, templates[type.index]);
-        value = function;
+        values[type.index] = enums[type.index];
+        continue;
       }
-      if (!exports->Set(_context, tns::ToV8String(_isolate, type.jsName), value).FromMaybe(false)) {
+      Local<v8::Function> function;
+      if (!templates[type.index]->GetFunction(_context).ToLocal(&function)) {
+        return MaybeLocal<Object>();
+      }
+      _loaded.templates[type.index].Reset(_isolate, templates[type.index]);
+      values[type.index] = function;
+    }
+
+    // Nested types hang off their parent by JS path ("Polygon.Style"); a
+    // parent that is not bridged gets a plain namespace object.
+    std::map<std::string, Local<Object>> containers;
+    for (const TypeInfo& type : _module.types) {
+      containers[type.jsName] = values[type.index];
+    }
+    std::vector<const TypeInfo*> byDepth;
+    for (const TypeInfo& type : _module.types) {
+      byDepth.push_back(&type);
+    }
+    std::stable_sort(byDepth.begin(), byDepth.end(), [](const TypeInfo* a, const TypeInfo* b) {
+      return std::count(a->jsName.begin(), a->jsName.end(), '.') <
+             std::count(b->jsName.begin(), b->jsName.end(), '.');
+    });
+    std::vector<Local<Object>> namespaces;
+    for (const TypeInfo* type : byDepth) {
+      Local<Object> container = exports;
+      std::string path;
+      size_t start = 0;
+      for (size_t dot = type->jsName.find('.'); dot != std::string::npos;
+           dot = type->jsName.find('.', start)) {
+        std::string component = type->jsName.substr(start, dot - start);
+        path += (path.empty() ? "" : ".") + component;
+        auto existing = containers.find(path);
+        if (existing == containers.end()) {
+          Local<Object> space = Object::New(_isolate);
+          if (!container->Set(_context, tns::ToV8String(_isolate, component), space)
+                   .FromMaybe(false)) {
+            return MaybeLocal<Object>();
+          }
+          existing = containers.emplace(path, space).first;
+          namespaces.push_back(space);
+        }
+        container = existing->second;
+        start = dot + 1;
+      }
+      if (!container
+               ->Set(_context, tns::ToV8String(_isolate, LastComponent(type->jsName)),
+                     values[type->index])
+               .FromMaybe(false)) {
         return MaybeLocal<Object>();
       }
     }
@@ -1996,6 +2045,9 @@ class Builder {
       if (!enumObject.IsEmpty()) {
         enumObject->SetIntegrityLevel(_context, IntegrityLevel::kFrozen).Check();
       }
+    }
+    for (Local<Object> space : namespaces) {
+      space->SetIntegrityLevel(_context, IntegrityLevel::kFrozen).Check();
     }
     exports->SetIntegrityLevel(_context, IntegrityLevel::kFrozen).Check();
     return exports;

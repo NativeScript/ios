@@ -54,7 +54,11 @@ TEST(ClassifyNominalTypes) {
   EXPECT_TIER("Greeter", Tier::TypeOnly, "protocol");
   EXPECT_TIER("Measurement", Tier::Unsupported, "enum-associated-values");
   EXPECT_TIER("ShapeError", Tier::Unsupported, "enum-associated-values");
-  EXPECT_TIER("Measurement.Unit", Tier::Unsupported, "nested-type");
+  EXPECT_TIER("Measurement.Unit", Tier::SwiftGenerated);
+  EXPECT_TIER("Polygon.Style", Tier::SwiftGenerated);
+  EXPECT_TIER("Polygon.Metrics", Tier::SwiftGenerated);
+  EXPECT_TIER("Polygon.Metrics.init(perimeter:)", Tier::SwiftGenerated);
+  EXPECT_TIER("Polygon.style", Tier::SwiftGenerated);
   EXPECT_TIER("Coordinates", Tier::TypeOnly, "type-alias");
 }
 
@@ -225,6 +229,36 @@ TEST(VerifierParsesDiagnostics) {
            std::string("value of type 'X' has no member 'y'"));
   REQUIRE(unmapped.size() == 1);
   CHECK_EQ(unmapped[0], std::string("99: outside probes"));
+}
+
+TEST(VerifierAttributesThunkErrors) {
+  const std::string greet = symbolAt(demo(), "Demo.greet(name:)")->preciseId;
+  const std::string flavor = symbolAt(demo(), "Flavor")->preciseId;
+  std::string source =
+      "import Foundation\n"  // 1
+      "// " +
+      greet +
+      "\n"                        // 2
+      "private func thunk() {\n"  // 3
+      "}\n"                       // 4
+      "// " +
+      greet +
+      " (setter)\n"  // 5
+      "// " +
+      flavor +
+      "\n"                           // 6
+      "private func helper() {}\n";  // 7
+  std::string log =
+      "/t.swift:3:1: error: in the thunk\n"
+      "/t.swift:7:1: error: in the enum helper\n"
+      "/t.swift:1:1: error: before any symbol\n";
+  std::vector<std::string> unmapped;
+  auto rejections =
+      rejectionsFromThunkLog(log, "/t.swift", source, demo(), unmapped);
+  CHECK_EQ(rejections.size(), size_t(2));
+  CHECK_EQ(rejections[greet], std::string("in the thunk"));
+  CHECK_EQ(rejections[flavor], std::string("in the enum helper"));
+  CHECK_EQ(unmapped.size(), size_t(1));
 }
 
 TEST(VerifierAcceptsFixture) {

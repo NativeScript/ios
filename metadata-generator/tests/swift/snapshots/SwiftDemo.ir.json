@@ -2259,6 +2259,10 @@
       "location": "file://Sources/SwiftDemo/Shapes.swift:7:11",
       "graph": "SwiftDemo.symbols.json",
       "members": [
+        "s:9SwiftDemo7PolygonC5StyleO",
+        "s:9SwiftDemo7PolygonC7MetricsV",
+        "s:9SwiftDemo7PolygonC5styleAC5StyleOvp",
+        "s:9SwiftDemo7PolygonC7metrics4sideAC7MetricsVSd_tF",
         "s:9SwiftDemo7PolygonC4nameSSvp",
         "s:9SwiftDemo7PolygonC11vertexCountSivp",
         "s:9SwiftDemo7PolygonC6sharedACvpZ",
@@ -2391,6 +2395,80 @@
       "parent": "s:9SwiftDemo7PolygonC"
     },
     {
+      "id": "s:9SwiftDemo7PolygonC5StyleO",
+      "kind": "enum",
+      "path": "Polygon.Style",
+      "name": "Style",
+      "access": "public",
+      "declaration": "enum Style",
+      "extension": {
+        "extendedModule": "SwiftDemo",
+        "typeKind": "swift.class"
+      },
+      "location": "file://Sources/SwiftDemo/Extensions.swift:31:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC",
+      "members": [
+        "s:9SwiftDemo7PolygonC5StyleO5solidyA2EmF",
+        "s:9SwiftDemo7PolygonC5StyleO6dashedyA2EmF",
+        "s:9SwiftDemo7PolygonC5StyleO8rawValueAESgSS_tcfc",
+        "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO",
+        "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO",
+        "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO"
+      ],
+      "conformances": [
+        "s:SH",
+        "s:SQ",
+        "s:SY"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC5StyleO5solidyA2EmF",
+      "kind": "enumCase",
+      "path": "Polygon.Style.solid",
+      "name": "solid",
+      "access": "public",
+      "declaration": "case solid",
+      "location": "file://Sources/SwiftDemo/Extensions.swift:31:37",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC5StyleO"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC5StyleO6dashedyA2EmF",
+      "kind": "enumCase",
+      "path": "Polygon.Style.dashed",
+      "name": "dashed",
+      "access": "public",
+      "declaration": "case dashed",
+      "location": "file://Sources/SwiftDemo/Extensions.swift:31:44",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC5StyleO"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC5StyleO8rawValueAESgSS_tcfc",
+      "kind": "initializer",
+      "path": "Polygon.Style.init(rawValue:)",
+      "name": "init(rawValue:)",
+      "access": "public",
+      "declaration": "init?(rawValue: String)",
+      "parameters": [
+        {
+          "label": "rawValue",
+          "internalName": "rawValue",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "failable": true,
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC5StyleO",
+      "sourceOrigin": "s:SY8rawValuexSg03RawB0Qz_tcfc"
+    },
+    {
       "id": "s:9SwiftDemo7PolygonC5scale1x1yySd_SdtF",
       "kind": "instanceMethod",
       "path": "Polygon.scale(x:y:)",
@@ -2470,6 +2548,28 @@
       "parent": "s:9SwiftDemo7PolygonC"
     },
     {
+      "id": "s:9SwiftDemo7PolygonC5styleAC5StyleOvp",
+      "kind": "instanceProperty",
+      "path": "Polygon.style",
+      "name": "style",
+      "access": "public",
+      "declaration": "var style: Style { get }",
+      "valueType": {
+        "spelling": "Style",
+        "references": [
+          "s:9SwiftDemo7PolygonC5StyleO"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "SwiftDemo",
+        "typeKind": "swift.class"
+      },
+      "location": "file://Sources/SwiftDemo/Extensions.swift:38:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC"
+    },
+    {
       "id": "s:9SwiftDemo7PolygonC6sharedACvpZ",
       "kind": "typeProperty",
       "path": "Polygon.shared",
@@ -2489,6 +2589,100 @@
       "settable": false,
       "let": true,
       "location": "file://Sources/SwiftDemo/Shapes.swift:10:22",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC7MetricsV",
+      "kind": "struct",
+      "path": "Polygon.Metrics",
+      "name": "Metrics",
+      "access": "public",
+      "declaration": "struct Metrics",
+      "extension": {
+        "extendedModule": "SwiftDemo",
+        "typeKind": "swift.class"
+      },
+      "location": "file://Sources/SwiftDemo/Extensions.swift:33:18",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC",
+      "members": [
+        "s:9SwiftDemo7PolygonC7MetricsV9perimeterSdvp",
+        "s:9SwiftDemo7PolygonC7MetricsV9perimeterAESd_tcfc"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC7MetricsV9perimeterAESd_tcfc",
+      "kind": "initializer",
+      "path": "Polygon.Metrics.init(perimeter:)",
+      "name": "init(perimeter:)",
+      "access": "public",
+      "declaration": "init(perimeter: Double)",
+      "parameters": [
+        {
+          "label": "perimeter",
+          "internalName": "perimeter",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Extensions.swift:35:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC7MetricsV"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC7MetricsV9perimeterSdvp",
+      "kind": "instanceProperty",
+      "path": "Polygon.Metrics.perimeter",
+      "name": "perimeter",
+      "access": "public",
+      "declaration": "var perimeter: Double",
+      "valueType": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Extensions.swift:34:19",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC7MetricsV"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC7metrics4sideAC7MetricsVSd_tF",
+      "kind": "instanceMethod",
+      "path": "Polygon.metrics(side:)",
+      "name": "metrics(side:)",
+      "access": "public",
+      "declaration": "func metrics(side: Double) -> Metrics",
+      "parameters": [
+        {
+          "label": "side",
+          "internalName": "side",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Polygon.Metrics",
+        "references": [
+          "s:9SwiftDemo7PolygonC",
+          "s:9SwiftDemo7PolygonC7MetricsV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftDemo",
+        "typeKind": "swift.class"
+      },
+      "location": "file://Sources/SwiftDemo/Extensions.swift:39:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7PolygonC"
     },
@@ -2974,6 +3168,48 @@
       "sourceOrigin": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ"
     },
     {
+      "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO",
+      "kind": "operator",
+      "path": "Polygon.Style.!=(_:_:)",
+      "name": "!=(_:_:)",
+      "access": "public",
+      "declaration": "static func != (lhs: borrowing Self, rhs: borrowing Self) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC5StyleO",
+      "sourceOrigin": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ"
+    },
+    {
       "id": "s:SS9SwiftDemoE7shoutedSSvp",
       "kind": "instanceProperty",
       "path": "String.shouted",
@@ -3067,6 +3303,43 @@
       },
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6FlavorO",
+      "sourceOrigin": "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp"
+    },
+    {
+      "id": "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO",
+      "kind": "instanceProperty",
+      "path": "Polygon.Style.hashValue",
+      "name": "hashValue",
+      "access": "public",
+      "declaration": "var hashValue: Int { get }",
+      "synthesized": true,
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self",
+            "rhs": "Hashable",
+            "rhsPrecise": "s:SH"
+          },
+          {
+            "kind": "conformance",
+            "lhs": "Self.RawValue",
+            "rhs": "Hashable",
+            "rhsPrecise": "s:SH"
+          }
+        ]
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC5StyleO",
       "sourceOrigin": "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp"
     },
     {
@@ -3181,6 +3454,63 @@
       },
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6FlavorO",
+      "sourceOrigin": "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF"
+    },
+    {
+      "id": "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO",
+      "kind": "instanceMethod",
+      "path": "Polygon.Style.hash(into:)",
+      "name": "hash(into:)",
+      "access": "public",
+      "declaration": "func hash(into hasher: inout Hasher)",
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "into",
+          "internalName": "hasher",
+          "type": {
+            "spelling": "Hasher",
+            "references": [
+              "s:s6HasherV"
+            ]
+          },
+          "modifier": "inout"
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "Self",
+          "rhs": "Hashable",
+          "rhsPrecise": "s:SH"
+        },
+        {
+          "kind": "conformance",
+          "lhs": "Self.RawValue",
+          "rhs": "Hashable",
+          "rhsPrecise": "s:SH"
+        }
+      ],
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self",
+            "rhs": "Hashable",
+            "rhsPrecise": "s:SH"
+          },
+          {
+            "kind": "conformance",
+            "lhs": "Self.RawValue",
+            "rhs": "Hashable",
+            "rhsPrecise": "s:SH"
+          }
+        ]
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC5StyleO",
       "sourceOrigin": "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF"
     },
     {

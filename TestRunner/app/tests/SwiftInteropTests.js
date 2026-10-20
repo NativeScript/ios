@@ -53,7 +53,7 @@ describe("ns:swift", function () {
             // Unsupported declarations (async, generic, closures, ...) are absent.
             expect(SwiftDemo.Loader.prototype.update).toBeUndefined();
             expect(SwiftDemo.Loader.prototype.transform).toBeUndefined();
-            expect(SwiftDemo.Measurement).toBeUndefined();
+            expect(SwiftDemo.ShapeError).toBeUndefined();
         });
     });
 
@@ -244,6 +244,30 @@ describe("ns:swift", function () {
                 expect(e.swiftType).toBe("SwiftDemo.ShapeError");
                 expect(e.message).toContain("invalidSide(-1.0)");
             }
+        });
+    });
+
+    describe("nested types", function () {
+        it("hangs nested types off their parent", function () {
+            expect(SwiftDemo.Polygon.Style.dashed).toBe("dashed");
+            expect(SwiftDemo.Polygon.Style.init("solid")).toBe("solid");
+            expect(new SwiftDemo.Polygon("tri").style).toBe("solid");
+            expect(new SwiftDemo.Polygon({ name: "quad", vertexCount: 4 }).style).toBe("dashed");
+
+            var metrics = new SwiftDemo.Polygon.Metrics({ perimeter: 3 });
+            expect(metrics instanceof SwiftDemo.Polygon.Metrics).toBe(true);
+            expect(metrics.perimeter).toBe(3);
+            var computed = new SwiftDemo.Polygon({ name: "tri", vertexCount: 3 }).metrics(2);
+            expect(computed instanceof SwiftDemo.Polygon.Metrics).toBe(true);
+            expect(computed.perimeter).toBe(6);
+        });
+
+        it("gives an unbridged parent a frozen namespace", function () {
+            // Measurement (an enum with associated values) is not bridged.
+            expect(typeof SwiftDemo.Measurement).toBe("object");
+            expect(Object.isFrozen(SwiftDemo.Measurement)).toBe(true);
+            expect(Object.keys(SwiftDemo.Measurement)).toEqual(["Unit"]);
+            expect(new SwiftDemo.Measurement.Unit("m").symbol).toBe("m");
         });
     });
 
