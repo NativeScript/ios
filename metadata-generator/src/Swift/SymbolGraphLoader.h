@@ -37,6 +37,9 @@ class SymbolGraphLoader {
   ModuleSet finish();
 
  private:
+  void insertSymbol(Module& module, Symbol symbol,
+                    const std::string& displayName);
+
   std::map<std::string, Module> _modules;
   std::vector<Diagnostic> _diagnostics;
 };

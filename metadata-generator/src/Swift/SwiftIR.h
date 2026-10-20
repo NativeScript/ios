@@ -137,7 +137,11 @@ struct Relationship {
 };
 
 struct Symbol {
+  // Canonical identifier: the USR, except for the `async` variant Swift
+  // imports for an Objective-C completion-handler method, which shares the
+  // method's USR and is keyed `<usr>#async`.
   std::string preciseId;
+  std::string usr;
   SymbolKind kind = SymbolKind::Unknown;
   std::string kindIdentifier;
   std::vector<std::string> pathComponents;
@@ -184,7 +188,8 @@ struct Symbol {
   std::vector<GenericConstraint> genericConstraints;
   std::optional<SwiftExtensionInfo> extension;
   std::vector<Availability> availability;
-  std::vector<std::string> docComment;
+  // Doc comment lines joined with '\n'.
+  std::string docComment;
   std::optional<SourceLocation> location;
   // Graph file the symbol was read from, relative to the scanned directory.
   std::string sourceGraph;
@@ -210,6 +215,8 @@ struct ExternalType {
   std::string extendedModule;
   std::string typeKind;
   std::vector<std::string> memberIds;
+  // Protocols this module makes the type conform to through extensions.
+  std::vector<std::string> conformances;
 };
 
 struct Platform {

@@ -87,13 +87,20 @@ std::string graphJSON(const std::string& symbols,
          symbols + R"(],"relationships":[)" + relationships + "]}";
 }
 
+// `owner` is the dot-separated path of the containing type, if any.
 std::string symbolJSON(const std::string& id, const std::string& kind,
-                       const std::string& path,
-                       const std::string& declaration) {
-  return R"({"kind":{"identifier":")" + kind +
-         R"("},"identifier":{"precise":")" + id + R"("},"pathComponents":[")" +
-         path +
-         R"("],"names":{"title":"x"},"accessLevel":"public","declarationFragments":[)" +
+                       const std::string& name, const std::string& declaration,
+                       const std::string& owner = "") {
+  std::string path;
+  for (llvm::StringRef rest = owner; !rest.empty();) {
+    auto split = rest.split('.');
+    path += "\"" + split.first.str() + "\",";
+    rest = split.second;
+  }
+  path += "\"" + name + "\"";
+  return R"({"kind":{"identifier":")" + kind + R"("},"identifier":{"precise":")" +
+         id + R"("},"pathComponents":[)" + path +
+         R"(],"names":{"title":"x"},"accessLevel":"public","declarationFragments":[)" +
          declaration + "]}";
 }
 
@@ -604,6 +611,131 @@ TEST(ConflictingDuplicateSymbolsAreReported) {
   ModuleSet identical = loadBuffers({{"a.symbols.json", graphJSON(first, "")},
                                      {"b.symbols.json", graphJSON(first, "")}});
   CHECK(identical.diagnostics.empty());
+}
+
+TEST(AsyncImportVariantsAreBothKept) {
+  // Swift imports an Objective-C completion-handler method twice under one
+  // USR: as written and as an `async` variant.
+  std::string usr = "c:objc(cs)Mini(im)loadWithCompletion:";
+  std::string type = symbolJSON(
+      "c:objc(cs)Mini", "swift.class", "Mini",
+      R"json({"kind":"keyword","spelling":"class"},{"kind":"text","spelling":" "},{"kind":"identifier","spelling":"Mini"})json");
+  std::string callback = symbolJSON(
+      usr, "swift.method", "load(completion:)",
+      R"json({"kind":"keyword","spelling":"func"},{"kind":"text","spelling":" "},{"kind":"identifier","spelling":"load"},{"kind":"text","spelling":"("},{"kind":"externalParam","spelling":"completion"},{"kind":"text","spelling":": "},{"kind":"attribute","spelling":"@escaping"},{"kind":"text","spelling":" () -> "},{"kind":"typeIdentifier","spelling":"Void"},{"kind":"text","spelling":")"})json",
+      "Mini");
+  std::string async = symbolJSON(
+      usr, "swift.method", "load()",
+      R"json({"kind":"keyword","spelling":"func"},{"kind":"text","spelling":" "},{"kind":"identifier","spelling":"load"},{"kind":"text","spelling":"() "},{"kind":"keyword","spelling":"async"})json",
+      "Mini");
+  std::string relationship = R"({"kind":"memberOf","source":")" + usr +
+                             R"(","target":"c:objc(cs)Mini"})";
+
+  for (bool asyncFirst : {false, true}) {
+    std::string symbols = type + "," + (asyncFirst ? async + "," + callback
+                                                   : callback + "," + async);
+    ModuleSet set = loadBuffers(
+        {{"mini.symbols.json", graphJSON(symbols, relationship)}});
+    CHECK_EQ(diagnosticCodes(set.diagnostics), std::string());
+    REQUIRE(set.modules.count("Mini"));
+    const Module& module = set.modules.at("Mini");
+    const Symbol* original = module.find(usr);
+    const Symbol* variant = module.find(usr + "#async");
+    REQUIRE(original && variant);
+    CHECK(!original->isAsync);
+    CHECK(variant->isAsync);
+    CHECK_EQ(variant->usr, usr);
+    CHECK_EQ(variant->name, std::string("load()"));
+    CHECK_EQ(memberNames(module, *module.find("c:objc(cs)Mini")).size(),
+             size_t(2));
+  }
+}
+
+TEST(SubclassRedeclarationsAreKeyedByOwner) {
+  // NSMutableArray redeclares NSArray's subscript (adding a setter) under the
+  // same USR.
+  std::string usr = "c:objc(cs)NSArray(im)objectAtIndexedSubscript:";
+  auto type = [](const std::string& name) {
+    return symbolJSON(
+        "c:objc(cs)" + name, "swift.class", name,
+        R"json({"kind":"keyword","spelling":"class"},{"kind":"text","spelling":" "},{"kind":"identifier","spelling":")json" +
+            name + R"json("})json");
+  };
+  auto subscript = [&](const std::string& owner, const std::string& accessors) {
+    return symbolJSON(
+        usr, "swift.subscript", "subscript(_:)",
+        R"json({"kind":"keyword","spelling":"subscript"},{"kind":"text","spelling":"("},{"kind":"internalParam","spelling":"idx"},{"kind":"text","spelling":": "},{"kind":"typeIdentifier","spelling":"Int"},{"kind":"text","spelling":") -> "},{"kind":"keyword","spelling":"Any"},{"kind":"text","spelling":" { "},)json" +
+            accessors + R"json({"kind":"text","spelling":" }"})json",
+        owner);
+  };
+  std::string base = subscript("NSArray", R"json({"kind":"keyword","spelling":"get"},)json");
+  std::string mutableVariant = subscript(
+      "NSMutableArray",
+      R"json({"kind":"keyword","spelling":"get"},{"kind":"text","spelling":" "},{"kind":"keyword","spelling":"set"},)json");
+  std::string relationships =
+      R"({"kind":"memberOf","source":")" + usr +
+      R"(","target":"c:objc(cs)NSArray"},{"kind":"memberOf","source":")" + usr +
+      R"(","target":"c:objc(cs)NSMutableArray"})";
+
+  for (bool mutableFirst : {false, true}) {
+    std::string symbols = type("NSArray") + "," + type("NSMutableArray") + "," +
+                          (mutableFirst ? mutableVariant + "," + base
+                                        : base + "," + mutableVariant);
+    ModuleSet set = loadBuffers(
+        {{"mini.symbols.json", graphJSON(symbols, relationships)}});
+    CHECK_EQ(diagnosticCodes(set.diagnostics), std::string());
+    REQUIRE(set.modules.count("Mini"));
+    const Module& module = set.modules.at("Mini");
+    const Symbol* plain = module.find(usr);
+    const Symbol* owned = module.find(usr + "#NSMutableArray");
+    REQUIRE(plain && owned);
+    CHECK(!plain->isSettable);
+    CHECK(owned->isSettable);
+    CHECK_EQ(plain->parentId, std::string("c:objc(cs)NSArray"));
+    CHECK_EQ(owned->parentId, std::string("c:objc(cs)NSMutableArray"));
+    CHECK_EQ(module.find("c:objc(cs)NSArray")->memberIds.size(), size_t(1));
+    CHECK_EQ(module.find("c:objc(cs)NSMutableArray")->memberIds.size(),
+             size_t(1));
+  }
+}
+
+TEST(ExternalConformancesAreRecorded) {
+  std::string relationship =
+      R"({"kind":"conformsTo","source":"s:Sa","target":"s:4Mini1PP"},)"
+      R"({"kind":"memberOf","source":"s:4Mini1fyyF","target":"s:Sa","targetFallback":"Swift.Array"})";
+  std::string member = symbolJSON(
+      "s:4Mini1fyyF", "swift.method", "f()",
+      R"json({"kind":"keyword","spelling":"func"},{"kind":"text","spelling":" "},{"kind":"identifier","spelling":"f"},{"kind":"text","spelling":"()"})json");
+  ModuleSet set =
+      loadBuffers({{"mini.symbols.json", graphJSON(member, relationship)}});
+  CHECK_EQ(diagnosticCodes(set.diagnostics), std::string());
+  REQUIRE(set.modules.count("Mini"));
+  const auto& externals = set.modules.at("Mini").externalTypes;
+  REQUIRE(externals.count("s:Sa"));
+  CHECK_EQ(externals.at("s:Sa").qualifiedName, std::string("Swift.Array"));
+  CHECK_EQ(llvm::join(externals.at("s:Sa").conformances, ","),
+           std::string("s:4Mini1PP"));
+}
+
+TEST(SkimmerHandlesStringsAndNesting) {
+  // Braces, brackets and escaped quotes inside strings must not affect the
+  // structural scan.
+  std::string symbol = symbolJSON(
+      "s:4Mini1fyyF", "swift.func", "f()",
+      R"json({"kind":"keyword","spelling":"func"},{"kind":"text","spelling":" "},{"kind":"identifier","spelling":"f"},{"kind":"text","spelling":"()"})json");
+  symbol.insert(symbol.size() - 1,
+                R"json(,"docComment":{"lines":[{"text":"a } ] { [ \"quoted\" \\"}]})json");
+  ModuleSet set = loadBuffers({{"mini.symbols.json", graphJSON(symbol, "")}});
+  CHECK_EQ(diagnosticCodes(set.diagnostics), std::string());
+  REQUIRE(set.modules.count("Mini"));
+  const Symbol* f = set.modules.at("Mini").find("s:4Mini1fyyF");
+  REQUIRE(f);
+  CHECK_EQ(f->docComment, std::string("a } ] { [ \"quoted\" \\"));
+
+  ModuleSet trailing =
+      loadBuffers({{"mini.symbols.json", graphJSON(symbol, "") + " {}"}});
+  CHECK(trailing.hasErrors());
+  CHECK_EQ(trailing.diagnostics[0].code, std::string("invalid-json"));
 }
 
 TEST(LabelMismatchesAreReported) {

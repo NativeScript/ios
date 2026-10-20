@@ -317,6 +317,7 @@ std::string dumpModuleJSON(const Module& module) {
           writeNonEmpty(out, "extendedModule", external.extendedModule);
           writeNonEmpty(out, "typeKind", external.typeKind);
           writeStringArray(out, "members", external.memberIds);
+          writeStringArray(out, "conformances", external.conformances);
         });
       }
     });

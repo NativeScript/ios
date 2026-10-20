@@ -1,5 +1,6 @@
 #include "SymbolGraphLoader.h"
 
+#include <llvm/ADT/STLFunctionalExtras.h>
 #include <llvm/ADT/StringExtras.h>
 #include <llvm/ADT/StringSwitch.h>
 #include <llvm/Support/FileSystem.h>
@@ -112,12 +113,20 @@ Tokens tokenize(const Fragments& fragments) {
     }
 
     llvm::StringRef text = fragment.spelling;
-    // Attributes with arguments (e.g. "@backDeployed(before: iOS 17.0)\n") are
-    // emitted as plain text rather than as attribute fragments.
+    // Some attributes arrive as plain text ("@backDeployed(before: iOS
+    // 17.0)\n", "@abi(func f(...))"). Only the name becomes the attribute
+    // token; its argument list is tokenized normally so consumeAttribute can
+    // match the parentheses, which may close in a later fragment.
     if (text.ltrim().startswith("@")) {
-      tokens.push_back(
-          Token{Token::Type::Fragment, "attribute", text.trim().str(), ""});
-      continue;
+      llvm::StringRef rest = text.ltrim();
+      size_t nameEnd = 1;
+      while (nameEnd < rest.size() &&
+             (llvm::isAlnum(rest[nameEnd]) || rest[nameEnd] == '_')) {
+        nameEnd++;
+      }
+      tokens.push_back(Token{Token::Type::Fragment, "attribute",
+                             rest.take_front(nameEnd).str(), ""});
+      text = rest.drop_front(nameEnd);
     }
 
     size_t i = 0;
@@ -296,6 +305,32 @@ class DeclarationParser {
     }
   }
 
+  // Returns the attribute at `index` together with an argument list that
+  // follows it directly (`@attached(peer, names: ...)`), advancing `index`
+  // past both.
+  std::string consumeAttribute(size_t& index, size_t end) const {
+    llvm::StringRef text = _tokens[index].text;
+    std::string attribute = text.trim().str();
+    index++;
+    // "@autoclosure " carries its separator inside the fragment; a following
+    // '(' then starts the attributed type, not an argument list.
+    bool abuts = !text.empty() && !llvm::isSpace(text.back());
+    if (abuts && index < end &&
+        (_tokens[index].isPunct('(') || _tokens[index].isPunct('<'))) {
+      int depth = 0;
+      while (index < end) {
+        const Token& token = _tokens[index++];
+        attribute += token.text;
+        if (opens(token)) {
+          depth++;
+        } else if (closes(token) && --depth == 0) {
+          break;
+        }
+      }
+    }
+    return attribute;
+  }
+
   void skipBalanced() {
     int depth = 0;
     while (!atEnd()) {
@@ -328,7 +363,8 @@ class DeclarationParser {
     while (!atEnd()) {
       const Token& token = _tokens[_pos];
       if (token.isFragment("attribute")) {
-        _symbol.attributes.push_back(llvm::StringRef(token.text).trim().str());
+        _symbol.attributes.push_back(consumeAttribute(_pos, _tokens.size()));
+        continue;
       } else if (isIntroKeyword(token)) {
         _intro = token.text;
         _pos++;
@@ -396,8 +432,18 @@ class DeclarationParser {
     }
 
     Parameter parameter;
+    // Parameter attributes (result builders, property wrappers) precede the
+    // argument label: `@ViewBuilder content: () -> Content`.
+    while (begin < end && (_tokens[begin].isFragment("attribute") ||
+                           _tokens[begin].type == Token::Type::Space)) {
+      if (_tokens[begin].type == Token::Type::Space) {
+        begin++;
+      } else {
+        parameter.attributes.push_back(consumeAttribute(begin, end));
+      }
+    }
     bool hasExternal = false;
-    if (_tokens[begin].isFragment("externalParam")) {
+    if (begin < end && _tokens[begin].isFragment("externalParam")) {
       hasExternal = true;
       parameter.label = _tokens[begin].text == "_" ? "" : _tokens[begin].text;
       parameter.internalName = parameter.label;
@@ -444,9 +490,7 @@ class DeclarationParser {
       if (token.type == Token::Type::Space) {
         begin++;
       } else if (token.isFragment("attribute")) {
-        parameter.attributes.push_back(
-            llvm::StringRef(token.text).trim().str());
-        begin++;
+        parameter.attributes.push_back(consumeAttribute(begin, typeEnd));
       } else if (token.isFragment("keyword") && modifiers.count(token.text)) {
         parameter.modifier = token.text;
         begin++;
@@ -508,8 +552,13 @@ class DeclarationParser {
       return;
     }
     while (!atEnd() && !_tokens[_pos].isPunct('}')) {
-      if (_tokens[_pos].isKeyword("set")) {
+      const Token& token = _tokens[_pos];
+      if (token.isKeyword("set")) {
         _symbol.isSettable = true;
+      } else if (token.isKeyword("async")) {
+        _symbol.isAsync = true;
+      } else if (token.isKeyword("throws")) {
+        _symbol.isThrowing = true;
       }
       _pos++;
     }
@@ -635,7 +684,8 @@ std::optional<Symbol> parseSymbol(const Object& object,
                                   const std::string& graphName,
                                   std::vector<Diagnostic>& diagnostics) {
   Symbol symbol;
-  symbol.preciseId = str(object.getObject("identifier"), "precise");
+  symbol.usr = str(object.getObject("identifier"), "precise");
+  symbol.preciseId = symbol.usr;
   if (symbol.preciseId.empty()) {
     report(diagnostics, Severity::Warning, "missing-field",
            "symbol without identifier.precise skipped", graphName);
@@ -696,7 +746,10 @@ std::optional<Symbol> parseSymbol(const Object& object,
   if (const Object* doc = object.getObject("docComment")) {
     if (const Array* lines = doc->getArray("lines")) {
       for (const auto& line : *lines) {
-        symbol.docComment.push_back(str(line.getAsObject(), "text"));
+        if (!symbol.docComment.empty()) {
+          symbol.docComment += '\n';
+        }
+        symbol.docComment += str(line.getAsObject(), "text");
       }
     }
   }
@@ -813,59 +866,94 @@ void resolve(Module& module, std::vector<Diagnostic>& diagnostics) {
   };
 
   for (const auto& relationship : module.relationships) {
-    auto sourceIt = module.symbols.find(relationship.source);
-    if (sourceIt == module.symbols.end()) {
+    const std::string& kind = relationship.kind;
+
+    // A relationship names a USR, which every variant keyed by it shares
+    // (see insertSymbol). Membership applies only to the variant declared
+    // in the target type.
+    std::vector<Symbol*> sources;
+    const Symbol* target = module.find(relationship.target);
+    bool isMembership = kind == "memberOf" || kind == "requirementOf" ||
+                        kind == "optionalRequirementOf";
+    for (auto it = module.symbols.lower_bound(relationship.source);
+         it != module.symbols.end() &&
+         llvm::StringRef(it->first).startswith(relationship.source);
+         ++it) {
+      Symbol& candidate = it->second;
+      if (candidate.usr != relationship.source) {
+        continue;
+      }
+      if (isMembership && target && !candidate.pathComponents.empty() &&
+          !std::equal(target->pathComponents.begin(),
+                      target->pathComponents.end(),
+                      candidate.pathComponents.begin(),
+                      candidate.pathComponents.end() - 1)) {
+        continue;
+      }
+      sources.push_back(&candidate);
+    }
+
+    if (sources.empty()) {
+      // Conformances this module's extensions add to external types
+      // (`extension Array: DataProtocol where Element == UInt8`).
+      if (kind == "conformsTo" || kind == "inheritsFrom") {
+        ExternalType& external = module.externalTypes[relationship.source];
+        external.preciseId = relationship.source;
+        external.conformances.push_back(relationship.target);
+        rememberExternal(relationship);
+        continue;
+      }
       report(diagnostics, Severity::Warning, "dangling-relationship",
-             relationship.kind + " relationship from unknown symbol '" +
+             kind + " relationship from unknown symbol '" +
                  relationship.source + "'",
              module.name, relationship.source);
       continue;
     }
-    Symbol& source = sourceIt->second;
-    const std::string& kind = relationship.kind;
 
-    if (kind == "memberOf" || kind == "requirementOf" ||
-        kind == "optionalRequirementOf") {
-      source.parentId = relationship.target;
-      if (!relationship.sourceOriginId.empty()) {
-        source.sourceOriginId = relationship.sourceOriginId;
-        source.sourceOriginName = relationship.sourceOriginName;
-      }
-      if (kind != "memberOf") {
-        source.isProtocolRequirement = true;
-        source.isOptionalRequirement = kind == "optionalRequirementOf";
-      }
+    for (Symbol* sourcePtr : sources) {
+      Symbol& source = *sourcePtr;
+      if (kind == "memberOf" || kind == "requirementOf" ||
+          kind == "optionalRequirementOf") {
+        source.parentId = relationship.target;
+        if (!relationship.sourceOriginId.empty()) {
+          source.sourceOriginId = relationship.sourceOriginId;
+          source.sourceOriginName = relationship.sourceOriginName;
+        }
+        if (kind != "memberOf") {
+          source.isProtocolRequirement = true;
+          source.isOptionalRequirement = kind == "optionalRequirementOf";
+        }
 
-      auto targetIt = module.symbols.find(relationship.target);
-      if (targetIt != module.symbols.end()) {
-        targetIt->second.memberIds.push_back(source.preciseId);
-        continue;
-      }
-      rememberExternal(relationship);
-      ExternalType& external = module.externalTypes[relationship.target];
-      external.preciseId = relationship.target;
-      external.qualifiedName = module.externalNames[relationship.target];
-      if (source.extension) {
-        external.extendedModule = source.extension->extendedModule;
-        external.typeKind = source.extension->typeKind;
-      }
-      external.memberIds.push_back(source.preciseId);
-    } else if (kind == "conformsTo") {
-      source.conformances.push_back(relationship.target);
-      rememberExternal(relationship);
-    } else if (kind == "inheritsFrom") {
-      if (source.kind == SymbolKind::Protocol) {
+        auto targetIt = module.symbols.find(relationship.target);
+        if (targetIt != module.symbols.end()) {
+          targetIt->second.memberIds.push_back(source.preciseId);
+          continue;
+        }
+        rememberExternal(relationship);
+        ExternalType& external = module.externalTypes[relationship.target];
+        external.preciseId = relationship.target;
+        if (source.extension) {
+          external.extendedModule = source.extension->extendedModule;
+          external.typeKind = source.extension->typeKind;
+        }
+        external.memberIds.push_back(source.preciseId);
+      } else if (kind == "conformsTo") {
         source.conformances.push_back(relationship.target);
-      } else {
-        source.superclassId = relationship.target;
+        rememberExternal(relationship);
+      } else if (kind == "inheritsFrom") {
+        if (source.kind == SymbolKind::Protocol) {
+          source.conformances.push_back(relationship.target);
+        } else {
+          source.superclassId = relationship.target;
+        }
+        rememberExternal(relationship);
+      } else if (kind == "overrides") {
+        source.overriddenId = relationship.target;
+        rememberExternal(relationship);
+      } else if (kind == "defaultImplementationOf") {
+        source.defaultImplementationOf.push_back(relationship.target);
+        rememberExternal(relationship);
       }
-      rememberExternal(relationship);
-    } else if (kind == "overrides") {
-      source.overriddenId = relationship.target;
-      rememberExternal(relationship);
-    } else if (kind == "defaultImplementationOf") {
-      source.defaultImplementationOf.push_back(relationship.target);
-      rememberExternal(relationship);
     }
   }
 
@@ -883,11 +971,161 @@ void resolve(Module& module, std::vector<Diagnostic>& diagnostics) {
     }
   }
   for (auto& entry : module.externalTypes) {
-    sortBySourceOrder(entry.second.memberIds, module);
+    ExternalType& external = entry.second;
+    sortBySourceOrder(external.memberIds, module);
+    std::sort(external.conformances.begin(), external.conformances.end());
+    external.conformances.erase(
+        std::unique(external.conformances.begin(), external.conformances.end()),
+        external.conformances.end());
+    // Graphs name a relationship's target, never its source; an extended
+    // type's name is only known when some relationship targets it.
+    auto name = module.externalNames.find(external.preciseId);
+    external.qualifiedName =
+        name != module.externalNames.end() ? name->second : external.preciseId;
   }
   sortBySourceOrder(module.topLevelIds, module);
   std::sort(module.graphFiles.begin(), module.graphFiles.end());
 }
+
+// Structural scan of JSON text that locates object members and array
+// elements without building a DOM. Whole SDK graphs run to hundreds of MB, and
+// an llvm::json DOM of one costs tens of GB, so the loader skims the top level
+// and parses each symbol and relationship on its own.
+namespace JsonSkimmer {
+
+size_t skipSpace(llvm::StringRef text, size_t i) {
+  while (i < text.size() && llvm::isSpace(text[i])) {
+    i++;
+  }
+  return i;
+}
+
+// Index one past the value starting at `i`, or npos.
+size_t skipValue(llvm::StringRef text, size_t i) {
+  if (i >= text.size()) {
+    return llvm::StringRef::npos;
+  }
+  char c = text[i];
+  if (c == '"') {
+    for (i++; i < text.size(); i++) {
+      if (text[i] == '\\') {
+        i++;
+      } else if (text[i] == '"') {
+        return i + 1;
+      }
+    }
+    return llvm::StringRef::npos;
+  }
+  if (c == '{' || c == '[') {
+    int depth = 0;
+    for (; i < text.size(); i++) {
+      char d = text[i];
+      if (d == '"') {
+        size_t end = skipValue(text, i);
+        if (end == llvm::StringRef::npos) {
+          return end;
+        }
+        i = end - 1;
+      } else if (d == '{' || d == '[') {
+        depth++;
+      } else if ((d == '}' || d == ']') && --depth == 0) {
+        return i + 1;
+      }
+    }
+    return llvm::StringRef::npos;
+  }
+  size_t start = i;
+  while (i < text.size() && !llvm::isSpace(text[i]) &&
+         !llvm::StringRef(",}]").contains(text[i])) {
+    i++;
+  }
+  return i == start ? llvm::StringRef::npos : i;
+}
+
+bool fail(std::string& error, const char* what, size_t offset) {
+  error = std::string(what) + " at offset " + std::to_string(offset);
+  return false;
+}
+
+bool objectMembers(
+    llvm::StringRef text,
+    std::vector<std::pair<llvm::StringRef, llvm::StringRef>>& members,
+    std::string& error) {
+  size_t i = skipSpace(text, 0);
+  if (i >= text.size() || text[i] != '{') {
+    return fail(error, "expected '{'", i);
+  }
+  i = skipSpace(text, i + 1);
+  if (i < text.size() && text[i] == '}') {
+    i++;
+  } else {
+    while (true) {
+      i = skipSpace(text, i);
+      size_t keyEnd = skipValue(text, i);
+      if (i >= text.size() || text[i] != '"' ||
+          keyEnd == llvm::StringRef::npos) {
+        return fail(error, "expected member name", i);
+      }
+      llvm::StringRef key = text.slice(i + 1, keyEnd - 1);
+      i = skipSpace(text, keyEnd);
+      if (i >= text.size() || text[i] != ':') {
+        return fail(error, "expected ':'", i);
+      }
+      i = skipSpace(text, i + 1);
+      size_t valueEnd = skipValue(text, i);
+      if (valueEnd == llvm::StringRef::npos) {
+        return fail(error, "malformed value", i);
+      }
+      members.emplace_back(key, text.slice(i, valueEnd));
+      i = skipSpace(text, valueEnd);
+      if (i < text.size() && text[i] == ',') {
+        i++;
+        continue;
+      }
+      if (i < text.size() && text[i] == '}') {
+        i++;
+        break;
+      }
+      return fail(error, "expected ',' or '}'", i);
+    }
+  }
+  if (skipSpace(text, i) != text.size()) {
+    return fail(error, "trailing content", i);
+  }
+  return true;
+}
+
+bool arrayElements(llvm::StringRef text,
+                   llvm::function_ref<void(llvm::StringRef)> visit,
+                   std::string& error) {
+  size_t i = skipSpace(text, 0);
+  if (i >= text.size() || text[i] != '[') {
+    return fail(error, "expected '['", i);
+  }
+  i = skipSpace(text, i + 1);
+  if (i < text.size() && text[i] == ']') {
+    return true;
+  }
+  while (true) {
+    i = skipSpace(text, i);
+    size_t end = skipValue(text, i);
+    if (end == llvm::StringRef::npos) {
+      return fail(error, "malformed element", i);
+    }
+    visit(text.slice(i, end));
+    i = skipSpace(text, end);
+    if (i < text.size() && text[i] == ',') {
+      i++;
+      continue;
+    }
+    if (i < text.size() && text[i] == ']') {
+      return true;
+    }
+    return fail(error, "expected ',' or ']'", i);
+  }
+}
+
+}  // namespace JsonSkimmer
 
 }  // namespace
 
@@ -931,20 +1169,44 @@ void SymbolGraphLoader::addFile(const std::string& filePath,
 
 void SymbolGraphLoader::addBuffer(llvm::StringRef json,
                                   const std::string& displayName) {
-  auto parsed = llvm::json::parse(json);
-  if (!parsed) {
-    report(_diagnostics, Severity::Error, "invalid-json",
-           llvm::toString(parsed.takeError()), displayName);
+  std::vector<std::pair<llvm::StringRef, llvm::StringRef>> members;
+  std::string error;
+  if (!JsonSkimmer::objectMembers(json, members, error)) {
+    report(_diagnostics, Severity::Error, "invalid-json", error, displayName);
     return;
   }
-  const Object* root = parsed->getAsObject();
-  if (!root) {
-    report(_diagnostics, Severity::Error, "invalid-json",
-           "symbol graph root is not an object", displayName);
-    return;
+  llvm::StringRef metadataText, moduleText, symbolsText, relationshipsText;
+  for (const auto& member : members) {
+    if (member.first == "metadata") {
+      metadataText = member.second;
+    } else if (member.first == "module") {
+      moduleText = member.second;
+    } else if (member.first == "symbols") {
+      symbolsText = member.second;
+    } else if (member.first == "relationships") {
+      relationshipsText = member.second;
+    }
   }
 
-  const Object* metadata = root->getObject("metadata");
+  auto parseSection =
+      [&](llvm::StringRef text,
+          llvm::StringRef name) -> std::optional<llvm::json::Value> {
+    if (text.empty()) {
+      return std::nullopt;
+    }
+    auto value = llvm::json::parse(text);
+    if (!value) {
+      report(_diagnostics, Severity::Error, "invalid-json",
+             name.str() + ": " + llvm::toString(value.takeError()),
+             displayName);
+      return std::nullopt;
+    }
+    return std::move(*value);
+  };
+
+  auto metadataValue = parseSection(metadataText, "metadata");
+  const Object* metadata =
+      metadataValue ? metadataValue->getAsObject() : nullptr;
   auto format =
       version(metadata ? metadata->getObject("formatVersion") : nullptr);
   if (!format) {
@@ -967,7 +1229,9 @@ void SymbolGraphLoader::addBuffer(llvm::StringRef json,
            displayName);
   }
 
-  const Object* moduleObject = root->getObject("module");
+  auto moduleValue = parseSection(moduleText, "module");
+  const Object* moduleObject =
+      moduleValue ? moduleValue->getAsObject() : nullptr;
   std::string moduleName = str(moduleObject, "name");
   if (moduleName.empty()) {
     report(_diagnostics, Severity::Error, "missing-field",
@@ -999,45 +1263,101 @@ void SymbolGraphLoader::addBuffer(llvm::StringRef json,
   }
   module.graphFiles.push_back(displayName);
 
-  if (const Array* symbols = root->getArray("symbols")) {
-    for (const auto& value : *symbols) {
-      const Object* object = value.getAsObject();
-      if (!object) {
-        continue;
-      }
-      auto symbol = parseSymbol(*object, displayName, _diagnostics);
-      if (!symbol) {
-        continue;
-      }
-      auto existing = module.symbols.find(symbol->preciseId);
-      if (existing != module.symbols.end()) {
-        if (existing->second.declarationText != symbol->declarationText) {
-          report(_diagnostics, Severity::Warning, "duplicate-symbol",
-                 "symbol declared differently in '" +
-                     existing->second.sourceGraph + "' and '" + displayName +
-                     "'; keeping the first",
-                 displayName, symbol->preciseId);
-        }
-        continue;
-      }
-      std::string id = symbol->preciseId;
-      module.symbols.emplace(std::move(id), std::move(*symbol));
+  // Elements are parsed one at a time; see JsonSkimmer.
+  auto forEachObject = [&](llvm::StringRef arrayText, llvm::StringRef name,
+                           llvm::function_ref<void(const Object&)> visit) {
+    if (arrayText.empty()) {
+      return;
     }
-  }
+    std::string arrayError;
+    bool ok = JsonSkimmer::arrayElements(
+        arrayText,
+        [&](llvm::StringRef element) {
+          auto value = llvm::json::parse(element);
+          if (!value) {
+            report(_diagnostics, Severity::Error, "invalid-json",
+                   name.str() + ": " + llvm::toString(value.takeError()),
+                   displayName);
+            return;
+          }
+          if (const Object* object = value->getAsObject()) {
+            visit(*object);
+          }
+        },
+        arrayError);
+    if (!ok) {
+      report(_diagnostics, Severity::Error, "invalid-json",
+             name.str() + ": " + arrayError, displayName);
+    }
+  };
 
-  if (const Array* relationships = root->getArray("relationships")) {
-    for (const auto& value : *relationships) {
-      const Object* object = value.getAsObject();
-      if (!object) {
-        continue;
-      }
-      const Object* origin = object->getObject("sourceOrigin");
-      module.relationships.push_back(
-          Relationship{str(object, "kind"), str(object, "source"),
-                       str(object, "target"), str(object, "targetFallback"),
-                       str(origin, "identifier"), str(origin, "displayName")});
+  forEachObject(symbolsText, "symbols", [&](const Object& object) {
+    auto symbol = parseSymbol(object, displayName, _diagnostics);
+    if (symbol) {
+      insertSymbol(module, std::move(*symbol), displayName);
     }
+  });
+
+  forEachObject(relationshipsText, "relationships", [&](const Object& object) {
+    const Object* origin = object.getObject("sourceOrigin");
+    module.relationships.push_back(
+        Relationship{str(&object, "kind"), str(&object, "source"),
+                     str(&object, "target"), str(&object, "targetFallback"),
+                     str(origin, "identifier"), str(origin, "displayName")});
+  });
+}
+
+void SymbolGraphLoader::insertSymbol(Module& module, Symbol symbol,
+                                     const std::string& displayName) {
+  auto existing = module.symbols.find(symbol.preciseId);
+  if (existing == module.symbols.end()) {
+    std::string id = symbol.preciseId;
+    module.symbols.emplace(std::move(id), std::move(symbol));
+    return;
   }
+  Symbol& other = existing->second;
+  if (other.declarationText == symbol.declarationText &&
+      other.pathComponents == symbol.pathComponents) {
+    return;
+  }
+  auto ownerOf = [](const Symbol& s) {
+    return std::vector<std::string>(s.pathComponents.begin(),
+                                    s.pathComponents.empty()
+                                        ? s.pathComponents.end()
+                                        : s.pathComponents.end() - 1);
+  };
+  if (ownerOf(other) != ownerOf(symbol)) {
+    // An Objective-C method redeclared by a subclass (NSMutableArray's
+    // settable subscript) keeps the superclass method's USR. The variant
+    // whose path sorts first keeps the plain USR; others are keyed by owner.
+    if (symbol.pathComponents < other.pathComponents) {
+      std::swap(other, symbol);
+    }
+    symbol.preciseId = symbol.usr + "#" + llvm::join(ownerOf(symbol), ".");
+    if (!module.symbols.count(symbol.preciseId)) {
+      std::string id = symbol.preciseId;
+      module.symbols.emplace(std::move(id), std::move(symbol));
+    }
+    return;
+  }
+  if (other.isAsync != symbol.isAsync) {
+    // Swift imports an Objective-C completion-handler method twice, as the
+    // original and as an `async` variant, under the same USR. Keep both; the
+    // original keeps the plain USR.
+    if (!symbol.isAsync) {
+      std::swap(other, symbol);
+    }
+    symbol.preciseId = symbol.usr + "#async";
+    if (!module.symbols.count(symbol.preciseId)) {
+      std::string id = symbol.preciseId;
+      module.symbols.emplace(std::move(id), std::move(symbol));
+    }
+    return;
+  }
+  report(_diagnostics, Severity::Warning, "duplicate-symbol",
+         "symbol declared differently in '" + other.sourceGraph + "' and '" +
+             displayName + "'; keeping the first",
+         displayName, symbol.preciseId);
 }
 
 ModuleSet SymbolGraphLoader::finish() {
