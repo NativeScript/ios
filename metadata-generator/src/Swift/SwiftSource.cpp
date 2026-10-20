@@ -6,6 +6,8 @@
 #include <set>
 #include <tuple>
 
+#include "SwiftSurface.h"
+
 namespace Swift {
 
 std::string declaringModuleName(const Module& module, const Symbol& symbol) {
@@ -220,6 +222,16 @@ std::string swiftImports(const Module& module,
     collectObjCClasses(capability->result, classes);
   }
   std::set<std::string> frameworks;
+  for (const auto& entry : module.symbols) {
+    const Capability* capability = classification.find(entry.first);
+    if (capability && capability->tier == Tier::SwiftGenerated &&
+        entry.second.kind == SymbolKind::Struct &&
+        isSwiftUIView(entry.second)) {
+      // hostingController() (SwiftSurface).
+      frameworks.insert("SwiftUI");
+      frameworks.insert("UIKit");
+    }
+  }
   for (const auto& name : classes) {
     const char* framework = frameworkOfObjCClass(name);
     if (framework && llvm::StringRef(framework) != "Foundation" &&

@@ -205,6 +205,24 @@ Protocols with associated types, `Self` requirements, static or `async`
 requirements, initializers, or more than one refined module protocol stay
 type-only.
 
+## SwiftUI views
+
+A bridged struct that conforms to SwiftUI's `View` gains
+`hostingController()`, which returns a `UIHostingController` showing a copy
+of the view, as an ordinary NativeScript `UIViewController` (main thread
+only):
+
+```ts
+const controller = new Badge("Inbox", 3).hostingController();
+```
+
+To place it in a NativeScript layout, return `controller.view` from a
+custom view's `createNativeView()` and add the controller as a child of the
+page's view controller (`addChildViewController`, then
+`didMoveToParentViewController`). The view is copied in: to change what it
+shows, create a new controller, or drive it from an `@Observable` model the
+view reads.
+
 ## Asynchronous sequences
 
 A function or property returning `AsyncStream<T>`, `AsyncThrowingStream<T, E>`

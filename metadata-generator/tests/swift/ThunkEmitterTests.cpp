@@ -56,6 +56,8 @@ TEST(ThunkRegistration) {
   CHECK(registers("\"firstSubview\", \"firstSubview(of:)\", \"@UIView>@UIView?\""));
   CHECK(registers("\"makeNote\", \"makeNote(_:)\", \"s>@SwiftDemo.Note\""));
   CHECK(thunks().source.find("#if canImport(UIKit)\nimport UIKit\n#endif") != std::string::npos);
+  // SwiftUI views are hosted on the main actor (flag 16).
+  CHECK(registers("\"hostingController\", \"hostingController()\", \">@UIViewController\""));
   // Protocol values; requirements carry the requirement flag (32).
   CHECK(registers("\"introduce\", \"introduce(_:to:)\", \"p"));
   CHECK(thunks().source.find("private final class __NSAdapter") != std::string::npos);

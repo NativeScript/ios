@@ -8,3 +8,6 @@ declare class UIView extends UIResponder {
 declare class UILabel extends UIView {
   text: string;
 }
+declare class UIViewController extends UIResponder {
+  view: UIView;
+}

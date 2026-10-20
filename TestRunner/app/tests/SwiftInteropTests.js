@@ -755,6 +755,21 @@ describe("ns:swift", function () {
         });
     });
 
+    describe("SwiftUI views", function () {
+        it("hosts a view in a UIHostingController", function () {
+            var badge = new SwiftDemo.Badge("Inbox", 3);
+            var controller = badge.hostingController();
+            expect(controller instanceof UIViewController).toBe(true);
+            expect(controller.view instanceof UIView).toBe(true);
+            var size = controller.view.sizeThatFits(CGSizeMake(1000, 1000));
+            expect(size.width).toBeGreaterThan(0);
+            expect(size.height).toBeGreaterThan(0);
+            // The struct is copied in: later changes do not reach the host.
+            badge.count = 4;
+            expect(badge.hostingController()).not.toBe(controller);
+        });
+    });
+
     describe("Objective-C objects", function () {
         it("passes NativeScript's Objective-C wrappers", function () {
             var view = UIView.new();

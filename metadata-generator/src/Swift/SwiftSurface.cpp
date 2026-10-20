@@ -1,5 +1,7 @@
 #include "SwiftSurface.h"
 
+#include <algorithm>
+
 namespace Swift {
 
 namespace {
@@ -41,6 +43,11 @@ SwiftSurface::MemberKind memberKind(SymbolKind kind) {
 }
 
 }  // namespace
+
+bool isSwiftUIView(const Symbol& symbol) {
+  return std::find(symbol.conformances.begin(), symbol.conformances.end(),
+                   "s:7SwiftUI4ViewP") != symbol.conformances.end();
+}
 
 int SwiftSurface::indexOf(const std::string& symbolId) const {
   auto it = typeIndex.find(symbolId);
@@ -231,6 +238,53 @@ SwiftSurface describeSurface(const Module& module,
                           signatureCode(surface, capability->parameters[i]);
     }
     member.signature += ">" + signatureCode(surface, member.result);
+    surface.members.push_back(std::move(member));
+  }
+
+  for (const auto& type : surface.types) {
+    const Symbol& view = *type.symbol;
+    if (type.kind != SwiftSurface::kStruct || !isSwiftUIView(view)) {
+      continue;
+    }
+    bool taken = false;
+    for (const auto& member : surface.members) {
+      taken |= member.owner == type.index &&
+               member.capability->jsName == "hostingController";
+    }
+    if (taken) {
+      continue;
+    }
+    Symbol symbol;
+    symbol.preciseId = view.preciseId;
+    symbol.kind = SymbolKind::InstanceMethod;
+    symbol.name = "hostingController()";
+    symbol.baseName = "hostingController";
+    symbol.pathComponents = view.pathComponents;
+    symbol.pathComponents.push_back(symbol.name);
+    symbol.parentId = view.preciseId;
+    symbol.module = view.module;
+    symbol.docComment =
+        "A UIHostingController showing this view (main thread only).";
+    surface.syntheticSymbols.push_back(std::move(symbol));
+
+    Capability capability;
+    capability.tier = Tier::SwiftGenerated;
+    capability.jsName = "hostingController";
+    capability.isMainActor = true;
+    capability.result.bridge = Bridge::ObjCObject;
+    capability.result.objcClass = "UIViewController";
+    surface.syntheticCapabilities.push_back(std::move(capability));
+
+    SwiftSurface::Member member;
+    member.symbol = &surface.syntheticSymbols.back();
+    member.capability = &surface.syntheticCapabilities.back();
+    member.owner = type.index;
+    member.module = type.module;
+    member.kind = SwiftSurface::kInstanceMethod;
+    member.flags = SwiftSurface::kMainActor;
+    member.result = member.capability->result;
+    member.signature = ">" + signatureCode(surface, member.result);
+    member.hostsView = true;
     surface.members.push_back(std::move(member));
   }
   return surface;

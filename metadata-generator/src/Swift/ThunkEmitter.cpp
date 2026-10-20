@@ -430,6 +430,9 @@ class Emitter {
     int flags = member.flags;
     const BridgedType& result = member.result;
 
+    if (member.hostsView) {
+      return emitHosting(member);
+    }
     if (member.kind == SwiftSurface::kEnumCase) {
       // Cases are values (names, or objects JS builds); nothing to call.
       addRegistration(member, "nil", "nil");
@@ -524,6 +527,31 @@ class Emitter {
 
     addRegistration(member, "__nsThunk" + std::to_string(getterIndex),
                     setterName);
+    return code;
+  }
+
+  // `view.hostingController()`: the boxed view in a UIHostingController,
+  // created on the main actor.
+  std::string emitHosting(const SwiftSurface::Member& member) {
+    const Symbol& view = *_module.find(member.symbol->parentId);
+    int index = _thunkCount++;
+    std::string code =
+        "// " + view.preciseId + " (hosting)\n" + thunkHeader(index);
+    std::string availability = availabilityCondition(_module, view);
+    if (!availability.empty()) {
+      code +=
+          "  guard #available(" + availability +
+          ") else { return rt.throwMessage(" +
+          quoted(view.name + " requires " +
+                 llvm::StringRef(availability).rsplit(',').first.trim().str()) +
+          ") }\n";
+    }
+    std::string receiver = bindReceiver(view, code);
+    code += onMainActor(
+        *member.symbol,
+        "  rt.returnObjC(UIHostingController(rootView: " + receiver + "))\n");
+    code += "}\n\n";
+    addRegistration(member, "__nsThunk" + std::to_string(index), "nil");
     return code;
   }
 

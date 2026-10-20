@@ -1,5 +1,6 @@
 #pragma once
 
+#include <deque>
 #include <map>
 #include <string>
 #include <vector>
@@ -67,6 +68,9 @@ struct SwiftSurface {
     // The value the member produces: the owner for initializers and enum
     // cases, the property type for properties.
     BridgedType result;
+    // `hostingController()`, added to SwiftUI views: a UIHostingController
+    // showing the view.
+    bool hostsView = false;
   };
 
   // A tagged enum's cases in registration order, which is the case index
@@ -83,7 +87,15 @@ struct SwiftSurface {
   int indexOf(const std::string& symbolId) const;
 
   std::map<std::string, int> typeIndex;
+
+  // Declarations of members the surface adds (hostsView), which Member
+  // points into.
+  std::deque<Symbol> syntheticSymbols;
+  std::deque<Capability> syntheticCapabilities;
 };
+
+// Whether `symbol` conforms to SwiftUI.View.
+bool isSwiftUIView(const Symbol& symbol);
 
 SwiftSurface describeSurface(const Module& module,
                              const Classification& classification);

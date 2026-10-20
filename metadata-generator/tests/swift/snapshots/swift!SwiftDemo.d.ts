@@ -121,6 +121,17 @@ declare module "ns:swift/SwiftDemo" {
     expand(delta: number): void;
   }
 
+  export class Badge {
+    constructor(title: string, count: number | bigint);
+    constructor(args: { title: string; count: number | bigint });
+    count: number;
+    title: string;
+    /**
+     * A UIHostingController showing this view (main thread only).
+     */
+    hostingController(): UIViewController;
+  }
+
   export class Point {
     constructor(x: number, y: number);
     constructor(args: { x: number; y: number });

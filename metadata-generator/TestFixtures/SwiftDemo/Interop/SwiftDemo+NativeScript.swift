@@ -6,6 +6,9 @@ import Observation
 #endif
 import SwiftDemo
 import SwiftDemoKit
+#if canImport(SwiftUI)
+import SwiftUI
+#endif
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -552,7 +555,7 @@ private func __nsEnumName14(_ value: SwiftDemo.Precipitation) -> String {
 }
 
 // s:9SwiftDemo6FlavorO
-private func __nsEnum23(_ name: String) -> SwiftDemo.Flavor? {
+private func __nsEnum24(_ name: String) -> SwiftDemo.Flavor? {
   switch name {
   case "vanilla": return SwiftDemo.Flavor.`vanilla`
   case "chocolate": return SwiftDemo.Flavor.`chocolate`
@@ -560,7 +563,7 @@ private func __nsEnum23(_ name: String) -> SwiftDemo.Flavor? {
   }
 }
 
-private func __nsEnumName23(_ value: SwiftDemo.Flavor) -> String {
+private func __nsEnumName24(_ value: SwiftDemo.Flavor) -> String {
   switch value {
   case SwiftDemo.Flavor.`vanilla`: return "vanilla"
   case SwiftDemo.Flavor.`chocolate`: return "chocolate"
@@ -569,15 +572,15 @@ private func __nsEnumName23(_ value: SwiftDemo.Flavor) -> String {
 }
 
 // s:9SwiftDemo7FormulaO
-private func __nsReadCase28(_ slots: __NSSlots, _ i: Int) -> SwiftDemo.Formula? {
+private func __nsReadCase29(_ slots: __NSSlots, _ i: Int) -> SwiftDemo.Formula? {
   let (s, _) = slots.elements(i)
   switch s.int64(0) {
   case 0:
-    guard let e0 = __nsReadCase28(s, 1) else { return nil }
-    guard let e1 = __nsReadCase28(s, 2) else { return nil }
+    guard let e0 = __nsReadCase29(s, 1) else { return nil }
+    guard let e1 = __nsReadCase29(s, 2) else { return nil }
     return SwiftDemo.Formula.`sum`(e0, e1)
   case 1:
-    guard let e0 = __nsReadCase28(s, 1) else { return nil }
+    guard let e0 = __nsReadCase29(s, 1) else { return nil }
     return SwiftDemo.Formula.`negate`(e0)
   case 2:
     let e0 = s.double(1)
@@ -586,17 +589,17 @@ private func __nsReadCase28(_ slots: __NSSlots, _ i: Int) -> SwiftDemo.Formula? 
   }
 }
 
-private func __nsReportCase28<R: __NSReporter>(_ r: R, _ value: SwiftDemo.Formula) {
+private func __nsReportCase29<R: __NSReporter>(_ r: R, _ value: SwiftDemo.Formula) {
   switch value {
-  case let SwiftDemo.Formula.`sum`(p0, p1): r.returnCase(0) { __nsReportCase28(r, p0); __nsReportCase28(r, p1) }
-  case let SwiftDemo.Formula.`negate`(p0): r.returnCase(1) { __nsReportCase28(r, p0) }
+  case let SwiftDemo.Formula.`sum`(p0, p1): r.returnCase(0) { __nsReportCase29(r, p0); __nsReportCase29(r, p1) }
+  case let SwiftDemo.Formula.`negate`(p0): r.returnCase(1) { __nsReportCase29(r, p0) }
   case let SwiftDemo.Formula.`number`(p0): r.returnCase(2) { r.returnDouble(Double(p0)) }
   @unknown default: r.returnNull()
   }
 }
 
 // s:9SwiftDemo7PayloadO
-private func __nsReadCase31(_ slots: __NSSlots, _ i: Int) -> SwiftDemo.Payload? {
+private func __nsReadCase32(_ slots: __NSSlots, _ i: Int) -> SwiftDemo.Payload? {
   let (s, _) = slots.elements(i)
   switch s.int64(0) {
   case 0:
@@ -609,7 +612,7 @@ private func __nsReadCase31(_ slots: __NSSlots, _ i: Int) -> SwiftDemo.Payload? 
     guard let e0 = (s.object(1) as? __NSBox<SwiftDemo.Point>)?.value else { return nil }
     return SwiftDemo.Payload.`point`(e0)
   case 3:
-    guard let e0 = __nsEnum23(s.string(1)) else { return nil }
+    guard let e0 = __nsEnum24(s.string(1)) else { return nil }
     return SwiftDemo.Payload.`flavor`(e0)
   case 4:
     guard let e0 = s.object(1) as? SwiftDemo.Tracker else { return nil }
@@ -618,19 +621,19 @@ private func __nsReadCase31(_ slots: __NSSlots, _ i: Int) -> SwiftDemo.Payload? 
   }
 }
 
-private func __nsReportCase31<R: __NSReporter>(_ r: R, _ value: SwiftDemo.Payload) {
+private func __nsReportCase32<R: __NSReporter>(_ r: R, _ value: SwiftDemo.Payload) {
   switch value {
   case let SwiftDemo.Payload.`maybe`(p0): r.returnCase(0) { if let p0 { r.returnInt64(Int64(p0)) } else { r.returnNull() } }
   case let SwiftDemo.Payload.`names`(p0): r.returnCase(1) { r.returnArray(p0) { element in r.returnString(element) } }
-  case let SwiftDemo.Payload.`point`(p0): r.returnCase(2) { r.returnObject(__NSBox(p0), 21) }
-  case let SwiftDemo.Payload.`flavor`(p0): r.returnCase(3) { r.returnString(__nsEnumName23(p0)) }
-  case let SwiftDemo.Payload.`tracker`(p0): r.returnCase(4) { r.returnObject(p0, __nsTypeIndex(p0, 35)) }
+  case let SwiftDemo.Payload.`point`(p0): r.returnCase(2) { r.returnObject(__NSBox(p0), 22) }
+  case let SwiftDemo.Payload.`flavor`(p0): r.returnCase(3) { r.returnString(__nsEnumName24(p0)) }
+  case let SwiftDemo.Payload.`tracker`(p0): r.returnCase(4) { r.returnObject(p0, __nsTypeIndex(p0, 36)) }
   @unknown default: r.returnNull()
   }
 }
 
 // s:9SwiftDemo7PolygonC5StyleO
-private func __nsEnum33(_ name: String) -> SwiftDemo.Polygon.Style? {
+private func __nsEnum34(_ name: String) -> SwiftDemo.Polygon.Style? {
   switch name {
   case "solid": return SwiftDemo.Polygon.Style.`solid`
   case "dashed": return SwiftDemo.Polygon.Style.`dashed`
@@ -638,7 +641,7 @@ private func __nsEnum33(_ name: String) -> SwiftDemo.Polygon.Style? {
   }
 }
 
-private func __nsEnumName33(_ value: SwiftDemo.Polygon.Style) -> String {
+private func __nsEnumName34(_ value: SwiftDemo.Polygon.Style) -> String {
   switch value {
   case SwiftDemo.Polygon.Style.`solid`: return "solid"
   case SwiftDemo.Polygon.Style.`dashed`: return "dashed"
@@ -679,7 +682,7 @@ private func __nsReportProtocol13<R: __NSReporter>(_ r: R, _ value: any SwiftDem
 }
 
 // s:9SwiftDemo6ScorerP
-private final class __NSAdapter25: SwiftDemo.Scorer, @unchecked Sendable {
+private final class __NSAdapter26: SwiftDemo.Scorer, @unchecked Sendable {
   let object: __NSJSObject
   init(_ object: __NSJSObject) { self.object = object }
   func `score`(_ p0: Int) throws -> Int {
@@ -689,23 +692,23 @@ private final class __NSAdapter25: SwiftDemo.Scorer, @unchecked Sendable {
   }
 }
 
-private func __nsProtocol25(_ slots: __NSSlots, _ i: Int) -> (any SwiftDemo.Scorer)? {
+private func __nsProtocol26(_ slots: __NSSlots, _ i: Int) -> (any SwiftDemo.Scorer)? {
   if slots.tag(i) == 12 {
-    return __NSAdapter25(__NSJSObject(api: slots.api, handle: slots.callback(i)))
+    return __NSAdapter26(__NSJSObject(api: slots.api, handle: slots.callback(i)))
   }
   let object = slots.object(i)
   if let box = object as? __NSAnyBox { return box.anyValue as? any SwiftDemo.Scorer }
   return object as? any SwiftDemo.Scorer
 }
 
-private func __nsReportProtocol25<R: __NSReporter>(_ r: R, _ value: any SwiftDemo.Scorer) {
-  if let adapter = value as? __NSAdapter25 { return r.returnJSObject(adapter.object) }
+private func __nsReportProtocol26<R: __NSReporter>(_ r: R, _ value: any SwiftDemo.Scorer) {
+  if let adapter = value as? __NSAdapter26 { return r.returnJSObject(adapter.object) }
   if let v = value as? SwiftDemo.DoublingScorer { return r.returnObject(__NSBox(v), 16) }
-  r.returnObject(__NSBox<any SwiftDemo.Scorer>(value), 25)
+  r.returnObject(__NSBox<any SwiftDemo.Scorer>(value), 26)
 }
 
 // s:9SwiftDemo7GreeterP
-private final class __NSAdapter29: SwiftDemo.Greeter, @unchecked Sendable {
+private final class __NSAdapter30: SwiftDemo.Greeter, @unchecked Sendable {
   let object: __NSJSObject
   init(_ object: __NSJSObject) { self.object = object }
   func `greet`(`name` p0: String) -> String {
@@ -715,24 +718,24 @@ private final class __NSAdapter29: SwiftDemo.Greeter, @unchecked Sendable {
   }
 }
 
-private func __nsProtocol29(_ slots: __NSSlots, _ i: Int) -> (any SwiftDemo.Greeter)? {
+private func __nsProtocol30(_ slots: __NSSlots, _ i: Int) -> (any SwiftDemo.Greeter)? {
   if slots.tag(i) == 12 {
-    return __NSAdapter29(__NSJSObject(api: slots.api, handle: slots.callback(i)))
+    return __NSAdapter30(__NSJSObject(api: slots.api, handle: slots.callback(i)))
   }
   let object = slots.object(i)
   if let box = object as? __NSAnyBox { return box.anyValue as? any SwiftDemo.Greeter }
   return object as? any SwiftDemo.Greeter
 }
 
-private func __nsReportProtocol29<R: __NSReporter>(_ r: R, _ value: any SwiftDemo.Greeter) {
-  if let adapter = value as? __NSAdapter29 { return r.returnJSObject(adapter.object) }
-  if let v = value as? SwiftDemo.Square { return r.returnObject(v, __nsTypeIndex(v, 26)) }
+private func __nsReportProtocol30<R: __NSReporter>(_ r: R, _ value: any SwiftDemo.Greeter) {
+  if let adapter = value as? __NSAdapter30 { return r.returnJSObject(adapter.object) }
+  if let v = value as? SwiftDemo.Square { return r.returnObject(v, __nsTypeIndex(v, 27)) }
   if let v = value as? SwiftDemo.Demo { return r.returnObject(v, __nsTypeIndex(v, 8)) }
-  r.returnObject(__NSBox<any SwiftDemo.Greeter>(value), 29)
+  r.returnObject(__NSBox<any SwiftDemo.Greeter>(value), 30)
 }
 
 // s:9SwiftDemo8GreetingP
-private final class __NSAdapter36: SwiftDemo.Greeting, @unchecked Sendable {
+private final class __NSAdapter37: SwiftDemo.Greeting, @unchecked Sendable {
   let object: __NSJSObject
   init(_ object: __NSJSObject) { self.object = object }
   var `punctuation`: String {
@@ -762,23 +765,23 @@ private final class __NSAdapter36: SwiftDemo.Greeting, @unchecked Sendable {
   }
 }
 
-private func __nsProtocol36(_ slots: __NSSlots, _ i: Int) -> (any SwiftDemo.Greeting)? {
+private func __nsProtocol37(_ slots: __NSSlots, _ i: Int) -> (any SwiftDemo.Greeting)? {
   if slots.tag(i) == 12 {
-    return __NSAdapter36(__NSJSObject(api: slots.api, handle: slots.callback(i)))
+    return __NSAdapter37(__NSJSObject(api: slots.api, handle: slots.callback(i)))
   }
   let object = slots.object(i)
   if let box = object as? __NSAnyBox { return box.anyValue as? any SwiftDemo.Greeting }
   return object as? any SwiftDemo.Greeting
 }
 
-private func __nsReportProtocol36<R: __NSReporter>(_ r: R, _ value: any SwiftDemo.Greeting) {
-  if let adapter = value as? __NSAdapter36 { return r.returnJSObject(adapter.object) }
+private func __nsReportProtocol37<R: __NSReporter>(_ r: R, _ value: any SwiftDemo.Greeting) {
+  if let adapter = value as? __NSAdapter37 { return r.returnJSObject(adapter.object) }
   if let v = value as? SwiftDemo.FormalGreeting { return r.returnObject(v, __nsTypeIndex(v, 17)) }
-  r.returnObject(__NSBox<any SwiftDemo.Greeting>(value), 36)
+  r.returnObject(__NSBox<any SwiftDemo.Greeting>(value), 37)
 }
 
 private func __nsTypeIndex(_ object: AnyObject, _ declared: UInt32) -> UInt32 {
-  if object is SwiftDemo.Square { return 26 }
+  if object is SwiftDemo.Square { return 27 }
   return declared
 }
 
@@ -1172,7 +1175,7 @@ private func __nsThunk44(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoint
 private func __nsThunk45(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let result: [SwiftDemo.Flavor] = SwiftDemo.`allFlavors`()
-  rt.returnArray(result) { element in rt.returnString(__nsEnumName23(element)) }
+  rt.returnArray(result) { element in rt.returnString(__nsEnumName24(element)) }
 }
 
 // s:9SwiftDemo10echoUInt64ys0D0VADF
@@ -1203,7 +1206,7 @@ private func __nsThunk48(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoint
 private func __nsThunk49(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let result: any SwiftDemo.Scorer = SwiftDemo.`makeScorer`()
-  __nsReportProtocol25(rt, result)
+  __nsReportProtocol26(rt, result)
 }
 
 // s:9SwiftDemo10namesLaterySaySSGSiYaF
@@ -1319,7 +1322,7 @@ private func __nsThunk60(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoint
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.string(0)
   let result: any SwiftDemo.Greeting = SwiftDemo.`makeGreeting`(a0)
-  __nsReportProtocol36(rt, result)
+  __nsReportProtocol37(rt, result)
 }
 
 // s:9SwiftDemo12measureLateryAA11MeasurementOSdYaF
@@ -1350,8 +1353,8 @@ private func __nsThunk63(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoint
   guard let v1 = rt.slots.object(1) as? SwiftDemo.Tracker else { return rt.throwTypeError("argument 2 must be SwiftDemo.Tracker") }
   var a1 = v1
   let _: Void = SwiftDemo.`swapTrackers`(&a0, &a1)
-  rt.writeBack(0) { rt.returnObject(a0, __nsTypeIndex(a0, 35)) }
-  rt.writeBack(1) { rt.returnObject(a1, __nsTypeIndex(a1, 35)) }
+  rt.writeBack(0) { rt.returnObject(a0, __nsTypeIndex(a0, 36)) }
+  rt.writeBack(1) { rt.returnObject(a1, __nsTypeIndex(a1, 36)) }
   rt.returnVoid()
 }
 
@@ -1371,7 +1374,7 @@ private func __nsThunk64(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoint
 private func __nsThunk65(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let result: SwiftDemo.Flavor = SwiftDemo.`defaultFlavor`
-  rt.returnString(__nsEnumName23(result))
+  rt.returnString(__nsEnumName24(result))
 }
 
 // s:9SwiftDemo13globalCounterSivp
@@ -1482,7 +1485,7 @@ private func __nsThunk78(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoint
   guard let receiver = rt.object(0) as? SwiftDemo.GreetingHolder else { return rt.throwTypeError("receiver must be SwiftDemo.GreetingHolder") }
   let result: (any SwiftDemo.Greeting)? = receiver.`greeting`
   if let result {
-    __nsReportProtocol36(rt, result)
+    __nsReportProtocol37(rt, result)
   } else {
     rt.returnNull()
   }
@@ -1494,7 +1497,7 @@ private func __nsThunk79(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoint
   guard let receiver = rt.object(0) as? SwiftDemo.GreetingHolder else { return rt.throwTypeError("receiver must be SwiftDemo.GreetingHolder") }
   var newValue: SwiftDemo.Greeting? = nil
   if !rt.slots.isNull(1) {
-    guard let value = __nsProtocol36(rt.slots, 1) else { return rt.throwTypeError("value must be a SwiftDemo.Greeting (a Swift value or JS implementation)") }
+    guard let value = __nsProtocol37(rt.slots, 1) else { return rt.throwTypeError("value must be a SwiftDemo.Greeting (a Swift value or JS implementation)") }
     newValue = value
   }
   receiver.`greeting` = newValue
@@ -1512,7 +1515,7 @@ private func __nsThunk80(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoint
 private func __nsThunk81(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let result: SwiftDemo.Point = SwiftDemo.`makeDefaultPoint`()
-  rt.returnObject(__NSBox(result), 21)
+  rt.returnObject(__NSBox(result), 22)
 }
 
 // s:9SwiftDemo16makeTrackerLater2idAA0D0CSi_tYaF
@@ -1524,14 +1527,14 @@ private func __nsThunk82(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoint
   Task {
     let a0 = captured.value
     let result: SwiftDemo.Tracker = await SwiftDemo.`makeTrackerLater`(id: a0)
-    completion.returnObject(result, __nsTypeIndex(result, 35))
+    completion.returnObject(result, __nsTypeIndex(result, 36))
   }
 }
 
 // s:9SwiftDemo17greetInBackgroundySSAA8Greeting_pYaF
 private func __nsThunk83(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let a0 = __nsProtocol36(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a SwiftDemo.Greeting (a Swift value or JS implementation)") }
+  guard let a0 = __nsProtocol37(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a SwiftDemo.Greeting (a Swift value or JS implementation)") }
   let completion = rt.beginAsync()
   let captured = __NSUnchecked(a0)
   Task {
@@ -1588,7 +1591,7 @@ private func __nsThunk89(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoint
   let rt = __NSCall(call: call, args: args)
   guard let box = rt.object(0) as? __NSBox<SwiftDemo.Ring> else { return rt.throwTypeError("receiver must be SwiftDemo.Ring") }
   let result: SwiftDemo.Point = box.value.`inner`
-  rt.returnObject(__NSBox(result), 21)
+  rt.returnObject(__NSBox(result), 22)
 }
 
 // s:9SwiftDemo4RingV5innerAA5PointVvp (setter)
@@ -1605,7 +1608,7 @@ private func __nsThunk91(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoint
   let rt = __NSCall(call: call, args: args)
   guard let box = rt.object(0) as? __NSBox<SwiftDemo.Ring> else { return rt.throwTypeError("receiver must be SwiftDemo.Ring") }
   let result: SwiftDemo.Point = box.value.`outer`
-  rt.returnObject(__NSBox(result), 21)
+  rt.returnObject(__NSBox(result), 22)
 }
 
 // s:9SwiftDemo4RingV5outerAA5PointVvp (setter)
@@ -1647,9 +1650,9 @@ private func __nsThunk95(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoint
 // s:9SwiftDemo4echoyAA7PayloadOADF
 private func __nsThunk96(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let a0 = __nsReadCase31(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a case of SwiftDemo.Payload") }
+  guard let a0 = __nsReadCase32(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a case of SwiftDemo.Payload") }
   let result: SwiftDemo.Payload = SwiftDemo.`echo`(a0)
-  __nsReportCase31(rt, result)
+  __nsReportCase32(rt, result)
 }
 
 // s:9SwiftDemo4flipy0aB3Kit4CoinOAEF
@@ -1683,9 +1686,9 @@ private func __nsThunk99(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoint
 // s:9SwiftDemo4sameyAA8Greeting_pAaC_pF
 private func __nsThunk100(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let a0 = __nsProtocol36(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a SwiftDemo.Greeting (a Swift value or JS implementation)") }
+  guard let a0 = __nsProtocol37(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a SwiftDemo.Greeting (a Swift value or JS implementation)") }
   let result: any SwiftDemo.Greeting = SwiftDemo.`same`(a0)
-  __nsReportProtocol36(rt, result)
+  __nsReportProtocol37(rt, result)
 }
 
 // s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF
@@ -1704,8 +1707,66 @@ private func __nsThunk102(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
   rt.returnString(result)
 }
 
-// s:9SwiftDemo5PointV11descriptionSSvp
+// s:9SwiftDemo5BadgeV5countSivp
 private func __nsThunk103(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+  let rt = __NSCall(call: call, args: args)
+  guard let box = rt.object(0) as? __NSBox<SwiftDemo.Badge> else { return rt.throwTypeError("receiver must be SwiftDemo.Badge") }
+  guard Thread.isMainThread else { return rt.throwMessage("count is isolated to the main actor; call it on the main thread") }
+  MainActor.assumeIsolated {
+    let result: Int = box.value.`count`
+    rt.returnInt64(Int64(result))
+  }
+}
+
+// s:9SwiftDemo5BadgeV5countSivp (setter)
+private func __nsThunk104(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+  let rt = __NSCall(call: call, args: args)
+  guard let box = rt.object(0) as? __NSBox<SwiftDemo.Badge> else { return rt.throwTypeError("receiver must be SwiftDemo.Badge") }
+  let newValue = Int(truncatingIfNeeded: rt.slots.int64(1))
+  guard Thread.isMainThread else { return rt.throwMessage("count is isolated to the main actor; call it on the main thread") }
+  MainActor.assumeIsolated {
+    box.value.`count` = newValue
+    rt.returnVoid()
+  }
+}
+
+// s:9SwiftDemo5BadgeV5title5countACSS_Sitcfc
+private func __nsThunk105(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+  let rt = __NSCall(call: call, args: args)
+  let a0 = rt.slots.string(0)
+  let a1 = Int(truncatingIfNeeded: rt.slots.int64(1))
+  guard Thread.isMainThread else { return rt.throwMessage("init(title:count:) is isolated to the main actor; call it on the main thread") }
+  MainActor.assumeIsolated {
+    let result: SwiftDemo.Badge = SwiftDemo.Badge(title: a0, count: a1)
+    rt.returnObject(__NSBox(result), 21)
+  }
+}
+
+// s:9SwiftDemo5BadgeV5titleSSvp
+private func __nsThunk106(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+  let rt = __NSCall(call: call, args: args)
+  guard let box = rt.object(0) as? __NSBox<SwiftDemo.Badge> else { return rt.throwTypeError("receiver must be SwiftDemo.Badge") }
+  guard Thread.isMainThread else { return rt.throwMessage("title is isolated to the main actor; call it on the main thread") }
+  MainActor.assumeIsolated {
+    let result: String = box.value.`title`
+    rt.returnString(result)
+  }
+}
+
+// s:9SwiftDemo5BadgeV5titleSSvp (setter)
+private func __nsThunk107(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+  let rt = __NSCall(call: call, args: args)
+  guard let box = rt.object(0) as? __NSBox<SwiftDemo.Badge> else { return rt.throwTypeError("receiver must be SwiftDemo.Badge") }
+  let newValue = rt.slots.string(1)
+  guard Thread.isMainThread else { return rt.throwMessage("title is isolated to the main actor; call it on the main thread") }
+  MainActor.assumeIsolated {
+    box.value.`title` = newValue
+    rt.returnVoid()
+  }
+}
+
+// s:9SwiftDemo5PointV11descriptionSSvp
+private func __nsThunk108(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let box = rt.object(0) as? __NSBox<SwiftDemo.Point> else { return rt.throwTypeError("receiver must be SwiftDemo.Point") }
   let result: String = box.value.`description`
@@ -1713,16 +1774,16 @@ private func __nsThunk103(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo5PointV1x1yACSd_Sdtcfc
-private func __nsThunk104(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk109(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.double(0)
   let a1 = rt.slots.double(1)
   let result: SwiftDemo.Point = SwiftDemo.Point(x: a0, y: a1)
-  rt.returnObject(__NSBox(result), 21)
+  rt.returnObject(__NSBox(result), 22)
 }
 
 // s:9SwiftDemo5PointV1xSdvp
-private func __nsThunk105(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk110(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let box = rt.object(0) as? __NSBox<SwiftDemo.Point> else { return rt.throwTypeError("receiver must be SwiftDemo.Point") }
   let result: Double = box.value.`x`
@@ -1730,7 +1791,7 @@ private func __nsThunk105(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo5PointV1xSdvp (setter)
-private func __nsThunk106(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk111(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let box = rt.object(0) as? __NSBox<SwiftDemo.Point> else { return rt.throwTypeError("receiver must be SwiftDemo.Point") }
   let newValue = rt.slots.double(1)
@@ -1739,7 +1800,7 @@ private func __nsThunk106(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo5PointV1ySdvp
-private func __nsThunk107(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk112(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let box = rt.object(0) as? __NSBox<SwiftDemo.Point> else { return rt.throwTypeError("receiver must be SwiftDemo.Point") }
   let result: Double = box.value.`y`
@@ -1747,7 +1808,7 @@ private func __nsThunk107(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo5PointV1ySdvp (setter)
-private func __nsThunk108(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk113(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let box = rt.object(0) as? __NSBox<SwiftDemo.Point> else { return rt.throwTypeError("receiver must be SwiftDemo.Point") }
   let newValue = rt.slots.double(1)
@@ -1756,7 +1817,7 @@ private func __nsThunk108(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo5PointV6lengthSdvp
-private func __nsThunk109(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk114(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let box = rt.object(0) as? __NSBox<SwiftDemo.Point> else { return rt.throwTypeError("receiver must be SwiftDemo.Point") }
   let result: Double = box.value.`length`
@@ -1764,7 +1825,7 @@ private func __nsThunk109(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo5boxedy0aB3Kit3BoxCyAC5MoneyVGAGF
-private func __nsThunk110(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk115(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let a0 = (rt.slots.object(0) as? __NSBox<SwiftDemoKit.Money>)?.value else { return rt.throwTypeError("argument 1 must be SwiftDemoKit.Money") }
   let result: SwiftDemoKit.Box<SwiftDemoKit.Money> = SwiftDemo.`boxed`(a0)
@@ -1772,7 +1833,7 @@ private func __nsThunk110(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo5clearyySSSgzF
-private func __nsThunk111(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk116(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let v0 = rt.slots.isNull(0) ? nil : rt.slots.string(0)
   var a0 = v0
@@ -1782,7 +1843,7 @@ private func __nsThunk111(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo5halveyySizKF
-private func __nsThunk112(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk117(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let v0 = Int(truncatingIfNeeded: rt.slots.int64(0))
   var a0 = v0
@@ -1796,7 +1857,7 @@ private func __nsThunk112(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo5namesySaySSGSiF
-private func __nsThunk113(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk118(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = Int(truncatingIfNeeded: rt.slots.int64(0))
   let result: [String] = SwiftDemo.`names`(a0)
@@ -1804,7 +1865,7 @@ private func __nsThunk113(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo5pagesyScSySaySSGGSiF
-private func __nsThunk114(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk119(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = Int(truncatingIfNeeded: rt.slots.int64(0))
   let result: AsyncStream<[String]> = SwiftDemo.`pages`(a0)
@@ -1812,7 +1873,7 @@ private func __nsThunk114(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo5shoutySSSgACF
-private func __nsThunk115(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk120(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.isNull(0) ? nil : rt.slots.string(0)
   let result: String? = SwiftDemo.`shout`(a0)
@@ -1824,7 +1885,7 @@ private func __nsThunk115(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo5totalySdSaySdGF
-private func __nsThunk116(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk121(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let a0 = __nsReadArray(rt.slots, 0, { (s: __NSSlots, j: Int) -> Double? in s.double(j) }) else { return rt.throwTypeError("argument 1 must be an array of Double") }
   let result: Double = SwiftDemo.`total`(a0)
@@ -1832,37 +1893,37 @@ private func __nsThunk116(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6CanvasCACycfc
-private func __nsThunk117(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk122(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard Thread.isMainThread else { return rt.throwMessage("init() is isolated to the main actor; call it on the main thread") }
   MainActor.assumeIsolated {
     let result: SwiftDemo.Canvas = SwiftDemo.Canvas()
-    rt.returnObject(result, __nsTypeIndex(result, 22))
+    rt.returnObject(result, __nsTypeIndex(result, 23))
   }
 }
 
 // s:9SwiftDemo6FlavorO11descriptionSSvp
-private func __nsThunk118(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk123(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let receiver = __nsEnum23(rt.string(0)) else { return rt.throwTypeError("receiver must be SwiftDemo.Flavor") }
+  guard let receiver = __nsEnum24(rt.string(0)) else { return rt.throwTypeError("receiver must be SwiftDemo.Flavor") }
   let result: String = receiver.`description`
   rt.returnString(result)
 }
 
 // s:9SwiftDemo6FlavorO8rawValueACSgSi_tcfc
-private func __nsThunk119(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk124(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = Int(truncatingIfNeeded: rt.slots.int64(0))
   let result: SwiftDemo.Flavor? = SwiftDemo.Flavor(rawValue: a0)
   if let result {
-    rt.returnString(__nsEnumName23(result))
+    rt.returnString(__nsEnumName24(result))
   } else {
     rt.returnNull()
   }
 }
 
 // s:9SwiftDemo6LoaderC10modernOnlyyyF
-private func __nsThunk120(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk125(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard #available(iOS 16.0, *) else { return rt.throwMessage("modernOnly() requires iOS 16.0") }
   guard let receiver = rt.object(0) as? SwiftDemo.Loader else { return rt.throwTypeError("receiver must be SwiftDemo.Loader") }
@@ -1871,7 +1932,7 @@ private func __nsThunk120(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6LoaderC11legacyFetchyyF
-private func __nsThunk121(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk126(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Loader else { return rt.throwTypeError("receiver must be SwiftDemo.Loader") }
   let _: Void = receiver.`legacyFetch`()
@@ -1879,7 +1940,7 @@ private func __nsThunk121(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6LoaderC4eachyyySiXEF
-private func __nsThunk122(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk127(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Loader else { return rt.throwTypeError("receiver must be SwiftDemo.Loader") }
   let a0 = { () -> (Int) -> Void in let callback = __NSCallback(api: rt.api, handle: rt.slots.callback(1)); return { (p0: Int) in callback.invoke { r in r.returnInt64(Int64(p0)) } } }()
@@ -1888,7 +1949,7 @@ private func __nsThunk122(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6LoaderC4load4path10Foundation4DataVSS_tKF
-private func __nsThunk123(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk128(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Loader else { return rt.throwTypeError("receiver must be SwiftDemo.Loader") }
   let a0 = rt.slots.string(1)
@@ -1901,7 +1962,7 @@ private func __nsThunk123(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6LoaderC4wait7secondsySd_tYaF
-private func __nsThunk124(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk129(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Loader else { return rt.throwTypeError("receiver must be SwiftDemo.Loader") }
   let a0 = rt.slots.double(1)
@@ -1915,7 +1976,7 @@ private func __nsThunk124(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6LoaderC5fetch3urlSS10Foundation3URLV_tYaKF
-private func __nsThunk125(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk130(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Loader else { return rt.throwTypeError("receiver must be SwiftDemo.Loader") }
   guard let a0 = URL(string: rt.slots.string(1)) else { return rt.throwTypeError("argument 1 must be a valid URL") }
@@ -1933,7 +1994,7 @@ private func __nsThunk125(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6LoaderC6lookup5table3keySiSgSDySSSiG_SStF
-private func __nsThunk126(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk131(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Loader else { return rt.throwTypeError("receiver must be SwiftDemo.Loader") }
   guard let a0 = __nsReadMap(rt.slots, 1, { (s: __NSSlots, j: Int) -> Int? in Int(truncatingIfNeeded: s.int64(j)) }) else { return rt.throwTypeError("argument 1 must be an object whose values are Int") }
@@ -1947,18 +2008,18 @@ private func __nsThunk126(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6LoaderC6updateyyAA5PointVzF
-private func __nsThunk127(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk132(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Loader else { return rt.throwTypeError("receiver must be SwiftDemo.Loader") }
   guard let v0 = (rt.slots.object(1) as? __NSBox<SwiftDemo.Point>)?.value else { return rt.throwTypeError("argument 1 must be SwiftDemo.Point") }
   var a0 = v0
   let _: Void = receiver.`update`(&a0)
-  rt.writeBack(0) { rt.returnObject(__NSBox(a0), 21) }
+  rt.writeBack(0) { rt.returnObject(__NSBox(a0), 22) }
   rt.returnVoid()
 }
 
 // s:9SwiftDemo6LoaderC8oldFetchyyF
-private func __nsThunk128(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk133(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Loader else { return rt.throwTypeError("receiver must be SwiftDemo.Loader") }
   let _: Void = receiver.`oldFetch`()
@@ -1966,16 +2027,16 @@ private func __nsThunk128(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6LoaderCACycfc
-private func __nsThunk129(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk134(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let result: SwiftDemo.Loader = SwiftDemo.Loader()
-  rt.returnObject(result, __nsTypeIndex(result, 24))
+  rt.returnObject(result, __nsTypeIndex(result, 25))
 }
 
 // s:9SwiftDemo6ScorerP5scoreyS2iKF
-private func __nsThunk130(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk135(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let receiver = __nsProtocol25(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Scorer") }
+  guard let receiver = __nsProtocol26(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Scorer") }
   let a0 = Int(truncatingIfNeeded: rt.slots.int64(1))
   do {
     let result: Int = try receiver.`score`(a0)
@@ -1986,7 +2047,7 @@ private func __nsThunk130(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6SquareC4areaSdvp
-private func __nsThunk131(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk136(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Square else { return rt.throwTypeError("receiver must be SwiftDemo.Square") }
   let result: Double = receiver.`area`
@@ -1994,15 +2055,15 @@ private func __nsThunk131(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6SquareC4sideACSd_tcfc
-private func __nsThunk132(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk137(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.double(0)
   let result: SwiftDemo.Square = SwiftDemo.Square(side: a0)
-  rt.returnObject(result, __nsTypeIndex(result, 26))
+  rt.returnObject(result, __nsTypeIndex(result, 27))
 }
 
 // s:9SwiftDemo6SquareC4sideSdvp
-private func __nsThunk133(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk138(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Square else { return rt.throwTypeError("receiver must be SwiftDemo.Square") }
   let result: Double = receiver.`side`
@@ -2010,7 +2071,7 @@ private func __nsThunk133(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6SquareC4sideSdvp (setter)
-private func __nsThunk134(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk139(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Square else { return rt.throwTypeError("receiver must be SwiftDemo.Square") }
   let newValue = rt.slots.double(1)
@@ -2019,7 +2080,7 @@ private func __nsThunk134(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6SquareC5greet4nameS2S_tF
-private func __nsThunk135(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk140(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Square else { return rt.throwTypeError("receiver must be SwiftDemo.Square") }
   let a0 = rt.slots.string(1)
@@ -2028,7 +2089,7 @@ private func __nsThunk135(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6SquareC5scale2byySd_tF
-private func __nsThunk136(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk141(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Square else { return rt.throwTypeError("receiver must be SwiftDemo.Square") }
   let a0 = rt.slots.double(1)
@@ -2037,14 +2098,14 @@ private func __nsThunk136(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6SquareC5sidesSivpZ
-private func __nsThunk137(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk142(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let result: Int = SwiftDemo.Square.`sides`
   rt.returnInt64(Int64(result))
 }
 
 // s:9SwiftDemo6append_2toySS_SaySSGztF
-private func __nsThunk138(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk143(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.string(0)
   guard let v1 = __nsReadArray(rt.slots, 1, { (s: __NSSlots, j: Int) -> String? in s.string(j) }) else { return rt.throwTypeError("argument 2 must be an array of String") }
@@ -2055,15 +2116,15 @@ private func __nsThunk138(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo6exciteyyAA8Greeting_pF
-private func __nsThunk139(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk144(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let a0 = __nsProtocol36(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a SwiftDemo.Greeting (a Swift value or JS implementation)") }
+  guard let a0 = __nsProtocol37(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a SwiftDemo.Greeting (a Swift value or JS implementation)") }
   let _: Void = SwiftDemo.`excite`(a0)
   rt.returnVoid()
 }
 
 // s:9SwiftDemo6settley0aB3Kit7OutcomeOySiGSiF
-private func __nsThunk140(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk145(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = Int(truncatingIfNeeded: rt.slots.int64(0))
   let result: SwiftDemoKit.Outcome<Int> = SwiftDemo.`settle`(a0)
@@ -2071,7 +2132,7 @@ private func __nsThunk140(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7CounterC4stepSivp
-private func __nsThunk141(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk146(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Counter else { return rt.throwTypeError("receiver must be SwiftDemo.Counter") }
   let completion = rt.beginAsync()
@@ -2084,7 +2145,7 @@ private func __nsThunk141(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7CounterC5labelSSyF
-private func __nsThunk142(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk147(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Counter else { return rt.throwTypeError("receiver must be SwiftDemo.Counter") }
   let result: String = receiver.`label`()
@@ -2092,7 +2153,7 @@ private func __nsThunk142(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7CounterC5valueSivp
-private func __nsThunk143(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk148(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Counter else { return rt.throwTypeError("receiver must be SwiftDemo.Counter") }
   let completion = rt.beginAsync()
@@ -2105,7 +2166,7 @@ private func __nsThunk143(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7CounterC9incrementSiyF
-private func __nsThunk144(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk149(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Counter else { return rt.throwTypeError("receiver must be SwiftDemo.Counter") }
   let completion = rt.beginAsync()
@@ -2118,31 +2179,31 @@ private func __nsThunk144(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7CounterCACycfc
-private func __nsThunk145(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk150(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let result: SwiftDemo.Counter = SwiftDemo.Counter()
-  rt.returnObject(result, __nsTypeIndex(result, 27))
+  rt.returnObject(result, __nsTypeIndex(result, 28))
 }
 
 // s:9SwiftDemo7FormulaO5valueSdvp
-private func __nsThunk146(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk151(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let receiver = __nsReadCase28(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Formula") }
+  guard let receiver = __nsReadCase29(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Formula") }
   let result: Double = receiver.`value`
   rt.returnDouble(Double(result))
 }
 
 // s:9SwiftDemo7GreeterP5greet4nameS2S_tF
-private func __nsThunk147(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk152(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let receiver = __nsProtocol29(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Greeter") }
+  guard let receiver = __nsProtocol30(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Greeter") }
   let a0 = rt.slots.string(1)
   let result: String = receiver.`greet`(name: a0)
   rt.returnString(result)
 }
 
 // s:9SwiftDemo7PaletteC11strokeLaterSiyYaF
-private func __nsThunk148(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk153(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Palette else { return rt.throwTypeError("receiver must be SwiftDemo.Palette") }
   let completion = rt.beginAsync()
@@ -2155,7 +2216,7 @@ private func __nsThunk148(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7PaletteC6strokeSiyF
-private func __nsThunk149(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk154(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Palette else { return rt.throwTypeError("receiver must be SwiftDemo.Palette") }
   guard Thread.isMainThread else { return rt.throwMessage("stroke() is isolated to the main actor; call it on the main thread") }
@@ -2166,7 +2227,7 @@ private func __nsThunk149(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7PaletteC7strokesSivp
-private func __nsThunk150(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk155(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Palette else { return rt.throwTypeError("receiver must be SwiftDemo.Palette") }
   guard Thread.isMainThread else { return rt.throwMessage("strokes is isolated to the main actor; call it on the main thread") }
@@ -2177,17 +2238,17 @@ private func __nsThunk150(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7PaletteCACycfc
-private func __nsThunk151(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk156(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard Thread.isMainThread else { return rt.throwMessage("init() is isolated to the main actor; call it on the main thread") }
   MainActor.assumeIsolated {
     let result: SwiftDemo.Palette = SwiftDemo.Palette()
-    rt.returnObject(result, __nsTypeIndex(result, 30))
+    rt.returnObject(result, __nsTypeIndex(result, 31))
   }
 }
 
 // s:9SwiftDemo7PolygonC11vertexCountSivp
-private func __nsThunk152(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk157(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Polygon else { return rt.throwTypeError("receiver must be SwiftDemo.Polygon") }
   let result: Int = receiver.`vertexCount`
@@ -2195,35 +2256,35 @@ private func __nsThunk152(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7PolygonC4makeACyFZ
-private func __nsThunk153(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk158(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let result: SwiftDemo.Polygon = SwiftDemo.Polygon.`make`()
-  rt.returnObject(result, __nsTypeIndex(result, 32))
+  rt.returnObject(result, __nsTypeIndex(result, 33))
 }
 
 // s:9SwiftDemo7PolygonC4name11vertexCountACSS_Sitcfc
-private func __nsThunk154(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk159(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.string(0)
   let a1 = Int(truncatingIfNeeded: rt.slots.int64(1))
   let result: SwiftDemo.Polygon = SwiftDemo.Polygon(name: a0, vertexCount: a1)
-  rt.returnObject(result, __nsTypeIndex(result, 32))
+  rt.returnObject(result, __nsTypeIndex(result, 33))
 }
 
 // s:9SwiftDemo7PolygonC4nameACSgSS_tcfc
-private func __nsThunk155(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk160(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.string(0)
   let result: SwiftDemo.Polygon? = SwiftDemo.Polygon(name: a0)
   if let result {
-    rt.returnObject(result, __nsTypeIndex(result, 32))
+    rt.returnObject(result, __nsTypeIndex(result, 33))
   } else {
     rt.returnNull()
   }
 }
 
 // s:9SwiftDemo7PolygonC4nameSSvp
-private func __nsThunk156(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk161(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Polygon else { return rt.throwTypeError("receiver must be SwiftDemo.Polygon") }
   let result: String = receiver.`name`
@@ -2231,19 +2292,19 @@ private func __nsThunk156(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7PolygonC5StyleO8rawValueAESgSS_tcfc
-private func __nsThunk157(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk162(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.string(0)
   let result: SwiftDemo.Polygon.Style? = SwiftDemo.Polygon.Style(rawValue: a0)
   if let result {
-    rt.returnString(__nsEnumName33(result))
+    rt.returnString(__nsEnumName34(result))
   } else {
     rt.returnNull()
   }
 }
 
 // s:9SwiftDemo7PolygonC5scale1x1yySd_SdtF
-private func __nsThunk158(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk163(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Polygon else { return rt.throwTypeError("receiver must be SwiftDemo.Polygon") }
   let a0 = rt.slots.double(1)
@@ -2253,7 +2314,7 @@ private func __nsThunk158(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7PolygonC5scale2byySd_tF
-private func __nsThunk159(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk164(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Polygon else { return rt.throwTypeError("receiver must be SwiftDemo.Polygon") }
   let a0 = rt.slots.double(1)
@@ -2262,7 +2323,7 @@ private func __nsThunk159(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7PolygonC5scale2byySi_tF
-private func __nsThunk160(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk165(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Polygon else { return rt.throwTypeError("receiver must be SwiftDemo.Polygon") }
   let a0 = Int(truncatingIfNeeded: rt.slots.int64(1))
@@ -2271,30 +2332,30 @@ private func __nsThunk160(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7PolygonC5styleAC5StyleOvp
-private func __nsThunk161(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk166(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Polygon else { return rt.throwTypeError("receiver must be SwiftDemo.Polygon") }
   let result: SwiftDemo.Polygon.Style = receiver.`style`
-  rt.returnString(__nsEnumName33(result))
+  rt.returnString(__nsEnumName34(result))
 }
 
 // s:9SwiftDemo7PolygonC6sharedACvpZ
-private func __nsThunk162(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk167(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let result: SwiftDemo.Polygon = SwiftDemo.Polygon.`shared`
-  rt.returnObject(result, __nsTypeIndex(result, 32))
+  rt.returnObject(result, __nsTypeIndex(result, 33))
 }
 
 // s:9SwiftDemo7PolygonC7MetricsV9perimeterAESd_tcfc
-private func __nsThunk163(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk168(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.double(0)
   let result: SwiftDemo.Polygon.Metrics = SwiftDemo.Polygon.Metrics(perimeter: a0)
-  rt.returnObject(__NSBox(result), 34)
+  rt.returnObject(__NSBox(result), 35)
 }
 
 // s:9SwiftDemo7PolygonC7MetricsV9perimeterSdvp
-private func __nsThunk164(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk169(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let box = rt.object(0) as? __NSBox<SwiftDemo.Polygon.Metrics> else { return rt.throwTypeError("receiver must be SwiftDemo.Polygon.Metrics") }
   let result: Double = box.value.`perimeter`
@@ -2302,7 +2363,7 @@ private func __nsThunk164(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7PolygonC7MetricsV9perimeterSdvp (setter)
-private func __nsThunk165(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk170(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let box = rt.object(0) as? __NSBox<SwiftDemo.Polygon.Metrics> else { return rt.throwTypeError("receiver must be SwiftDemo.Polygon.Metrics") }
   let newValue = rt.slots.double(1)
@@ -2311,16 +2372,16 @@ private func __nsThunk165(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7PolygonC7metrics4sideAC7MetricsVSd_tF
-private func __nsThunk166(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk171(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Polygon else { return rt.throwTypeError("receiver must be SwiftDemo.Polygon") }
   let a0 = rt.slots.double(1)
   let result: SwiftDemo.Polygon.Metrics = receiver.`metrics`(side: a0)
-  rt.returnObject(__NSBox(result), 34)
+  rt.returnObject(__NSBox(result), 35)
 }
 
 // s:9SwiftDemo7PolygonC8describeySSACSgFZ
-private func __nsThunk167(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk172(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   var a0: SwiftDemo.Polygon? = nil
   if !rt.slots.isNull(0) {
@@ -2332,15 +2393,15 @@ private func __nsThunk167(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7TrackerC2idACSi_tcfc
-private func __nsThunk168(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk173(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = Int(truncatingIfNeeded: rt.slots.int64(0))
   let result: SwiftDemo.Tracker = SwiftDemo.Tracker(id: a0)
-  rt.returnObject(result, __nsTypeIndex(result, 35))
+  rt.returnObject(result, __nsTypeIndex(result, 36))
 }
 
 // s:9SwiftDemo7TrackerC2idSivp
-private func __nsThunk169(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk174(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Tracker else { return rt.throwTypeError("receiver must be SwiftDemo.Tracker") }
   let result: Int = receiver.`id`
@@ -2348,22 +2409,22 @@ private func __nsThunk169(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7TrackerC4sameACyF
-private func __nsThunk170(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk175(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Tracker else { return rt.throwTypeError("receiver must be SwiftDemo.Tracker") }
   let result: SwiftDemo.Tracker = receiver.`same`()
-  rt.returnObject(result, __nsTypeIndex(result, 35))
+  rt.returnObject(result, __nsTypeIndex(result, 36))
 }
 
 // s:9SwiftDemo7TrackerC9liveCountSivpZ
-private func __nsThunk171(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk176(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let result: Int = SwiftDemo.Tracker.`liveCount`
   rt.returnInt64(Int64(result))
 }
 
 // s:9SwiftDemo7countUp2toScSySiGSi_tF
-private func __nsThunk172(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk177(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = Int(truncatingIfNeeded: rt.slots.int64(0))
   let result: AsyncStream<Int> = SwiftDemo.`countUp`(to: a0)
@@ -2371,7 +2432,7 @@ private func __nsThunk172(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7explainySSAA10ShapeErrorOF
-private func __nsThunk173(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk178(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let a0 = __nsReadCase9(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a case of SwiftDemo.ShapeError") }
   let result: String = SwiftDemo.`explain`(a0)
@@ -2379,7 +2440,7 @@ private func __nsThunk173(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7lengthsySDySSSiGSDyS2SGF
-private func __nsThunk174(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk179(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let a0 = __nsReadMap(rt.slots, 0, { (s: __NSSlots, j: Int) -> String? in s.string(j) }) else { return rt.throwTypeError("argument 1 must be an object whose values are String") }
   let result: [String: Int] = SwiftDemo.`lengths`(a0)
@@ -2387,7 +2448,7 @@ private func __nsThunk174(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7letters2ofQrSS_tF
-private func __nsThunk175(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk180(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard #available(iOS 18.0, *) else { return rt.throwMessage("letters(of:) requires iOS 18.0") }
   let a0 = rt.slots.string(0)
@@ -2396,7 +2457,7 @@ private func __nsThunk175(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7measure_2byAA11MeasurementOSd_SdSgtF
-private func __nsThunk176(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk181(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.double(0)
   let a1 = rt.slots.isNull(1) ? nil : rt.slots.double(1)
@@ -2405,7 +2466,7 @@ private func __nsThunk176(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7nextDay5after10Foundation4DateVAF_tF
-private func __nsThunk177(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk182(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = Date(timeIntervalSince1970: rt.slots.double(0) / 1000)
   let result: Date = SwiftDemo.`nextDay`(after: a0)
@@ -2413,7 +2474,7 @@ private func __nsThunk177(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7resolve_7against10Foundation3URLVSS_AFtF
-private func __nsThunk178(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk183(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.string(0)
   guard let a1 = URL(string: rt.slots.string(1)) else { return rt.throwTypeError("argument 2 must be a valid URL") }
@@ -2422,7 +2483,7 @@ private func __nsThunk178(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo7topRankySSAA12RankedScorer_pKF
-private func __nsThunk179(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk184(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let a0 = __nsProtocol13(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a SwiftDemo.RankedScorer (a Swift value or JS implementation)") }
   do {
@@ -2434,58 +2495,58 @@ private func __nsThunk179(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo8GreetingP11punctuationSSvp
-private func __nsThunk180(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk185(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let receiver = __nsProtocol36(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Greeting") }
+  guard let receiver = __nsProtocol37(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Greeting") }
   let result: String = receiver.`punctuation`
   rt.returnString(result)
 }
 
 // s:9SwiftDemo8GreetingP11punctuationSSvp (setter)
-private func __nsThunk181(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk186(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let receiver = __nsProtocol36(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Greeting") }
+  guard let receiver = __nsProtocol37(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Greeting") }
   let newValue = rt.slots.string(1)
   receiver.`punctuation` = newValue
   rt.returnVoid()
 }
 
 // s:9SwiftDemo8GreetingP4nameSSvp
-private func __nsThunk182(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk187(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let receiver = __nsProtocol36(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Greeting") }
+  guard let receiver = __nsProtocol37(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Greeting") }
   let result: String = receiver.`name`
   rt.returnString(result)
 }
 
 // s:9SwiftDemo8GreetingP5greetyS2SF
-private func __nsThunk183(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk188(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let receiver = __nsProtocol36(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Greeting") }
+  guard let receiver = __nsProtocol37(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Greeting") }
   let a0 = rt.slots.string(1)
   let result: String = receiver.`greet`(a0)
   rt.returnString(result)
 }
 
 // s:9SwiftDemo8GreetingP5resetyyF
-private func __nsThunk184(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk189(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let receiver = __nsProtocol36(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Greeting") }
+  guard let receiver = __nsProtocol37(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Greeting") }
   let _: Void = receiver.`reset`()
   rt.returnVoid()
 }
 
 // s:9SwiftDemo8GreetingPAAE5shoutyS2SF
-private func __nsThunk185(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk190(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let receiver = __nsProtocol36(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Greeting") }
+  guard let receiver = __nsProtocol37(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.Greeting") }
   let a0 = rt.slots.string(1)
   let result: String = receiver.`shout`(a0)
   rt.returnString(result)
 }
 
 // s:9SwiftDemo8GreetingPAAE5shoutyS2SF::SYNTHESIZED::s:9SwiftDemo14FormalGreetingC
-private func __nsThunk186(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk191(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.FormalGreeting else { return rt.throwTypeError("receiver must be SwiftDemo.FormalGreeting") }
   let a0 = rt.slots.string(1)
@@ -2494,7 +2555,7 @@ private func __nsThunk186(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo8NotifierC12publishLateryySSF
-private func __nsThunk187(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk192(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Notifier else { return rt.throwTypeError("receiver must be SwiftDemo.Notifier") }
   let a0 = rt.slots.string(1)
@@ -2503,7 +2564,7 @@ private func __nsThunk187(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo8NotifierC5clearyyF
-private func __nsThunk188(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk193(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Notifier else { return rt.throwTypeError("receiver must be SwiftDemo.Notifier") }
   let _: Void = receiver.`clear`()
@@ -2511,7 +2572,7 @@ private func __nsThunk188(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo8NotifierC5countSivp
-private func __nsThunk189(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk194(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Notifier else { return rt.throwTypeError("receiver must be SwiftDemo.Notifier") }
   let result: Int = receiver.`count`
@@ -2519,7 +2580,7 @@ private func __nsThunk189(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo8NotifierC7publishyySSF
-private func __nsThunk190(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk195(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Notifier else { return rt.throwTypeError("receiver must be SwiftDemo.Notifier") }
   let a0 = rt.slots.string(1)
@@ -2528,7 +2589,7 @@ private func __nsThunk190(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo8NotifierC9subscribeyyySSYbcF
-private func __nsThunk191(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk196(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = rt.object(0) as? SwiftDemo.Notifier else { return rt.throwTypeError("receiver must be SwiftDemo.Notifier") }
   let a0 = { () -> @Sendable (String) -> Void in let callback = __NSCallback(api: rt.api, handle: rt.slots.callback(1)); return { (p0: String) in callback.invoke { r in r.returnString(p0) } } }()
@@ -2537,22 +2598,22 @@ private func __nsThunk191(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo8NotifierCACycfc
-private func __nsThunk192(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk197(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let result: SwiftDemo.Notifier = SwiftDemo.Notifier()
-  rt.returnObject(result, __nsTypeIndex(result, 37))
+  rt.returnObject(result, __nsTypeIndex(result, 38))
 }
 
 // s:9SwiftDemo8centroid2ofAA5PointVSayAEG_tF
-private func __nsThunk193(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk198(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let a0 = __nsReadArray(rt.slots, 0, { (s: __NSSlots, j: Int) -> SwiftDemo.Point? in (s.object(j) as? __NSBox<SwiftDemo.Point>)?.value }) else { return rt.throwTypeError("argument 1 must be an array of SwiftDemo.Point") }
   let result: SwiftDemo.Point = SwiftDemo.`centroid`(of: a0)
-  rt.returnObject(__NSBox(result), 21)
+  rt.returnObject(__NSBox(result), 22)
 }
 
 // s:9SwiftDemo8checksumySi10Foundation4DataVF
-private func __nsThunk194(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk199(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.bytes(0)
   let result: Int = SwiftDemo.`checksum`(a0)
@@ -2560,7 +2621,7 @@ private func __nsThunk194(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo8countBoxy0aB3Kit0D0CySiGSiF
-private func __nsThunk195(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk200(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = Int(truncatingIfNeeded: rt.slots.int64(0))
   let result: SwiftDemoKit.Box<Int> = SwiftDemo.`countBox`(a0)
@@ -2568,7 +2629,7 @@ private func __nsThunk195(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo8describeySS0aB3Kit4PairVySiSSGF
-private func __nsThunk196(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk201(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let a0 = (rt.slots.object(0) as? __NSBox<SwiftDemoKit.Pair<Int, String>>)?.value else { return rt.throwTypeError("argument 1 must be SwiftDemoKit.Pair<Int, String>") }
   let result: String = SwiftDemo.`describe`(a0)
@@ -2576,7 +2637,7 @@ private func __nsThunk196(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo8describeySSSo6UIViewCF
-private func __nsThunk197(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk202(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let a0 = rt.slots.object(0) as? UIView else { return rt.throwTypeError("argument 1 must be a UIView") }
   let result: String = SwiftDemo.`describe`(a0)
@@ -2584,7 +2645,7 @@ private func __nsThunk197(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo8echoInt8ys0D0VADF
-private func __nsThunk198(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk203(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = Int8(truncatingIfNeeded: rt.slots.int64(0))
   let result: Int8 = SwiftDemo.`echoInt8`(a0)
@@ -2592,7 +2653,7 @@ private func __nsThunk198(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo8makeNoteyAA0D0CSSF
-private func __nsThunk199(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk204(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.string(0)
   let result: SwiftDemo.Note = SwiftDemo.`makeNote`(a0)
@@ -2600,7 +2661,7 @@ private func __nsThunk199(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo8mirroredySaySaySiGGADF
-private func __nsThunk200(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk205(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let a0 = __nsReadArray(rt.slots, 0, { (s: __NSSlots, j: Int) -> [Int]? in __nsReadArray(s, j, { (s: __NSSlots, j: Int) -> Int? in Int(truncatingIfNeeded: s.int64(j)) }) }) else { return rt.throwTypeError("argument 1 must be an array of an array of Int") }
   let result: [[Int]] = SwiftDemo.`mirrored`(a0)
@@ -2608,9 +2669,9 @@ private func __nsThunk200(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo8scoreAllySaySiGAA6Scorer_p_ACtKF
-private func __nsThunk201(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk206(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let a0 = __nsProtocol25(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a SwiftDemo.Scorer (a Swift value or JS implementation)") }
+  guard let a0 = __nsProtocol26(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a SwiftDemo.Scorer (a Swift value or JS implementation)") }
   guard let a1 = __nsReadArray(rt.slots, 1, { (s: __NSSlots, j: Int) -> Int? in Int(truncatingIfNeeded: s.int64(j)) }) else { return rt.throwTypeError("argument 2 must be an array of Int") }
   do {
     let result: [Int] = try SwiftDemo.`scoreAll`(a0, a1)
@@ -2621,23 +2682,23 @@ private func __nsThunk201(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo8simplifyyAA7FormulaOADF
-private func __nsThunk202(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk207(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let a0 = __nsReadCase28(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a case of SwiftDemo.Formula") }
+  guard let a0 = __nsReadCase29(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a case of SwiftDemo.Formula") }
   let result: SwiftDemo.Formula = SwiftDemo.`simplify`(a0)
-  __nsReportCase28(rt, result)
+  __nsReportCase29(rt, result)
 }
 
 // s:9SwiftDemo8trackersySayAA7TrackerCGSaySiGF
-private func __nsThunk203(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk208(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let a0 = __nsReadArray(rt.slots, 0, { (s: __NSSlots, j: Int) -> Int? in Int(truncatingIfNeeded: s.int64(j)) }) else { return rt.throwTypeError("argument 1 must be an array of Int") }
   let result: [SwiftDemo.Tracker] = SwiftDemo.`trackers`(a0)
-  rt.returnArray(result) { element in rt.returnObject(element, __nsTypeIndex(element, 35)) }
+  rt.returnArray(result) { element in rt.returnObject(element, __nsTypeIndex(element, 36)) }
 }
 
 // s:9SwiftDemo9countDown4from9failingAtScsySis5Error_pGSi_SiSgtF
-private func __nsThunk204(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk209(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = Int(truncatingIfNeeded: rt.slots.int64(0))
   let a1 = rt.slots.isNull(1) ? nil : Int(truncatingIfNeeded: rt.slots.int64(1))
@@ -2646,7 +2707,7 @@ private func __nsThunk204(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo9countdown4from_ySi_ySi_SbtXEtF
-private func __nsThunk205(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk210(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = Int(truncatingIfNeeded: rt.slots.int64(0))
   let a1 = { () -> (Int, Bool) -> Void in let callback = __NSCallback(api: rt.api, handle: rt.slots.callback(1)); return { (p0: Int, p1: Bool) in callback.invoke { r in r.returnInt64(Int64(p0)); r.returnBool(p1) } } }()
@@ -2655,16 +2716,16 @@ private func __nsThunk205(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo9introduce_2toSSAA8Greeting_p_SStF
-private func __nsThunk206(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk211(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let a0 = __nsProtocol36(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a SwiftDemo.Greeting (a Swift value or JS implementation)") }
+  guard let a0 = __nsProtocol37(rt.slots, 0) else { return rt.throwTypeError("argument 1 must be a SwiftDemo.Greeting (a Swift value or JS implementation)") }
   let a1 = rt.slots.string(1)
   let result: String = SwiftDemo.`introduce`(a0, to: a1)
   rt.returnString(result)
 }
 
 // s:9SwiftDemo9makeLabelySo7UILabelCSSF
-private func __nsThunk207(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk212(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.string(0)
   guard Thread.isMainThread else { return rt.throwMessage("makeLabel(_:) is isolated to the main actor; call it on the main thread") }
@@ -2675,7 +2736,7 @@ private func __nsThunk207(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo9makeScorey0aB3Kit4PairVySSSiGSS_SitF
-private func __nsThunk208(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk213(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.string(0)
   let a1 = Int(truncatingIfNeeded: rt.slots.int64(1))
@@ -2684,7 +2745,7 @@ private func __nsThunk208(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo9noteLateryAA4NoteCSSYaF
-private func __nsThunk209(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk214(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = rt.slots.string(0)
   let completion = rt.beginAsync()
@@ -2697,7 +2758,7 @@ private func __nsThunk209(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:9SwiftDemo9onMeasureyyyAA11MeasurementOXEF
-private func __nsThunk210(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk215(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   let a0 = { () -> (SwiftDemo.Measurement) -> Void in let callback = __NSCallback(api: rt.api, handle: rt.slots.callback(0)); return { (p0: SwiftDemo.Measurement) in callback.invoke { r in __nsReportCase11(r, p0) } } }()
   let _: Void = SwiftDemo.`onMeasure`(a0)
@@ -2705,7 +2766,7 @@ private func __nsThunk210(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo13PrecipitationO
-private func __nsThunk211(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk216(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = __nsEnum14(rt.string(0)) else { return rt.throwTypeError("receiver must be SwiftDemo.Precipitation") }
   let result: Int = receiver.`hashValue`
@@ -2713,23 +2774,23 @@ private func __nsThunk211(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo6FlavorO
-private func __nsThunk212(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk217(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let receiver = __nsEnum23(rt.string(0)) else { return rt.throwTypeError("receiver must be SwiftDemo.Flavor") }
+  guard let receiver = __nsEnum24(rt.string(0)) else { return rt.throwTypeError("receiver must be SwiftDemo.Flavor") }
   let result: Int = receiver.`hashValue`
   rt.returnInt64(Int64(result))
 }
 
 // s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO
-private func __nsThunk213(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk218(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
-  guard let receiver = __nsEnum33(rt.string(0)) else { return rt.throwTypeError("receiver must be SwiftDemo.Polygon.Style") }
+  guard let receiver = __nsEnum34(rt.string(0)) else { return rt.throwTypeError("receiver must be SwiftDemo.Polygon.Style") }
   let result: Int = receiver.`hashValue`
   rt.returnInt64(Int64(result))
 }
 
 // s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo10ShapeErrorO
-private func __nsThunk214(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk219(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let receiver = __nsReadCase9(rt.slots, 0) else { return rt.throwTypeError("receiver must be SwiftDemo.ShapeError") }
   let result: String = receiver.`localizedDescription`
@@ -2737,11 +2798,21 @@ private func __nsThunk214(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPoin
 }
 
 // s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo14CountdownErrorV
-private func __nsThunk215(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+private func __nsThunk220(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
   let rt = __NSCall(call: call, args: args)
   guard let box = rt.object(0) as? __NSBox<SwiftDemo.CountdownError> else { return rt.throwTypeError("receiver must be SwiftDemo.CountdownError") }
   let result: String = box.value.`localizedDescription`
   rt.returnString(result)
+}
+
+// s:9SwiftDemo5BadgeV (hosting)
+private func __nsThunk221(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+  let rt = __NSCall(call: call, args: args)
+  guard let box = rt.object(0) as? __NSBox<SwiftDemo.Badge> else { return rt.throwTypeError("receiver must be SwiftDemo.Badge") }
+  guard Thread.isMainThread else { return rt.throwMessage("hostingController() is isolated to the main actor; call it on the main thread") }
+  MainActor.assumeIsolated {
+    rt.returnObjC(UIHostingController(rootView: box.value))
+  }
 }
 
 private func __nsRegister(_ registrar: UnsafeMutableRawPointer) {
@@ -2752,7 +2823,7 @@ private func __nsRegister(_ registrar: UnsafeMutableRawPointer) {
   let registerUnitModule = api.load(fromByteOffset: 336, as: (@convention(c) (UnsafeMutableRawPointer, UnsafePointer<CChar>) -> Void).self)
   let registerTracker = api.load(fromByteOffset: 384, as: (@convention(c) (UnsafeMutableRawPointer, __NSTracker) -> Void).self)
 
-  registerModule(registrar, 11, "SwiftDemo", "1f9cf8cbde7f8720", __nsRelease)
+  registerModule(registrar, 11, "SwiftDemo", "a60c3a8a74bf58ea", __nsRelease)
   registerUnitModule(registrar, "SwiftDemo")
   registerUnitModule(registrar, "SwiftDemoKit")
   registerTracker(registrar, __nsTrack)
@@ -2769,7 +2840,7 @@ private func __nsRegister(_ registrar: UnsafeMutableRawPointer) {
   registerType(registrar, 10, 0, "SwiftDemo", "Thermostat", "SwiftDemo.Thermostat", -1)
   registerType(registrar, 11, 4, "SwiftDemo", "Measurement", "SwiftDemo.Measurement", -1)
   registerType(registrar, 12, 2, "SwiftDemo", "Measurement.Unit", "SwiftDemo.Measurement.Unit", -1)
-  registerType(registrar, 13, 5, "SwiftDemo", "RankedScorer", "SwiftDemo.RankedScorer", 25)
+  registerType(registrar, 13, 5, "SwiftDemo", "RankedScorer", "SwiftDemo.RankedScorer", 26)
   registerType(registrar, 14, 3, "SwiftDemo", "Precipitation", "SwiftDemo.Precipitation", -1)
   registerType(registrar, 15, 2, "SwiftDemo", "CountdownError", "SwiftDemo.CountdownError", -1)
   registerType(registrar, 16, 2, "SwiftDemo", "DoublingScorer", "SwiftDemo.DoublingScorer", -1)
@@ -2777,23 +2848,24 @@ private func __nsRegister(_ registrar: UnsafeMutableRawPointer) {
   registerType(registrar, 18, 0, "SwiftDemo", "GreetingHolder", "SwiftDemo.GreetingHolder", -1)
   registerType(registrar, 19, 2, "SwiftDemo", "Job.Ticket", "SwiftDemo.Job.Ticket", -1)
   registerType(registrar, 20, 2, "SwiftDemo", "Ring", "SwiftDemo.Ring", -1)
-  registerType(registrar, 21, 2, "SwiftDemo", "Point", "SwiftDemo.Point", -1)
-  registerType(registrar, 22, 0, "SwiftDemo", "Canvas", "SwiftDemo.Canvas", -1)
-  registerType(registrar, 23, 3, "SwiftDemo", "Flavor", "SwiftDemo.Flavor", -1)
-  registerType(registrar, 24, 0, "SwiftDemo", "Loader", "SwiftDemo.Loader", -1)
-  registerType(registrar, 25, 5, "SwiftDemo", "Scorer", "SwiftDemo.Scorer", -1)
-  registerType(registrar, 26, 0, "SwiftDemo", "Square", "SwiftDemo.Square", 32)
-  registerType(registrar, 27, 1, "SwiftDemo", "Counter", "SwiftDemo.Counter", -1)
-  registerType(registrar, 28, 4, "SwiftDemo", "Formula", "SwiftDemo.Formula", -1)
-  registerType(registrar, 29, 5, "SwiftDemo", "Greeter", "SwiftDemo.Greeter", -1)
-  registerType(registrar, 30, 0, "SwiftDemo", "Palette", "SwiftDemo.Palette", -1)
-  registerType(registrar, 31, 4, "SwiftDemo", "Payload", "SwiftDemo.Payload", -1)
-  registerType(registrar, 32, 0, "SwiftDemo", "Polygon", "SwiftDemo.Polygon", -1)
-  registerType(registrar, 33, 3, "SwiftDemo", "Polygon.Style", "SwiftDemo.Polygon.Style", -1)
-  registerType(registrar, 34, 2, "SwiftDemo", "Polygon.Metrics", "SwiftDemo.Polygon.Metrics", -1)
-  registerType(registrar, 35, 0, "SwiftDemo", "Tracker", "SwiftDemo.Tracker", -1)
-  registerType(registrar, 36, 5, "SwiftDemo", "Greeting", "SwiftDemo.Greeting", -1)
-  registerType(registrar, 37, 0, "SwiftDemo", "Notifier", "SwiftDemo.Notifier", -1)
+  registerType(registrar, 21, 2, "SwiftDemo", "Badge", "SwiftDemo.Badge", -1)
+  registerType(registrar, 22, 2, "SwiftDemo", "Point", "SwiftDemo.Point", -1)
+  registerType(registrar, 23, 0, "SwiftDemo", "Canvas", "SwiftDemo.Canvas", -1)
+  registerType(registrar, 24, 3, "SwiftDemo", "Flavor", "SwiftDemo.Flavor", -1)
+  registerType(registrar, 25, 0, "SwiftDemo", "Loader", "SwiftDemo.Loader", -1)
+  registerType(registrar, 26, 5, "SwiftDemo", "Scorer", "SwiftDemo.Scorer", -1)
+  registerType(registrar, 27, 0, "SwiftDemo", "Square", "SwiftDemo.Square", 33)
+  registerType(registrar, 28, 1, "SwiftDemo", "Counter", "SwiftDemo.Counter", -1)
+  registerType(registrar, 29, 4, "SwiftDemo", "Formula", "SwiftDemo.Formula", -1)
+  registerType(registrar, 30, 5, "SwiftDemo", "Greeter", "SwiftDemo.Greeter", -1)
+  registerType(registrar, 31, 0, "SwiftDemo", "Palette", "SwiftDemo.Palette", -1)
+  registerType(registrar, 32, 4, "SwiftDemo", "Payload", "SwiftDemo.Payload", -1)
+  registerType(registrar, 33, 0, "SwiftDemo", "Polygon", "SwiftDemo.Polygon", -1)
+  registerType(registrar, 34, 3, "SwiftDemo", "Polygon.Style", "SwiftDemo.Polygon.Style", -1)
+  registerType(registrar, 35, 2, "SwiftDemo", "Polygon.Metrics", "SwiftDemo.Polygon.Metrics", -1)
+  registerType(registrar, 36, 0, "SwiftDemo", "Tracker", "SwiftDemo.Tracker", -1)
+  registerType(registrar, 37, 5, "SwiftDemo", "Greeting", "SwiftDemo.Greeting", -1)
+  registerType(registrar, 38, 0, "SwiftDemo", "Notifier", "SwiftDemo.Notifier", -1)
   registerMember(registrar, 0, 3, 2, "SwiftDemoKit", "value", "value", ">o5", __nsThunk0, __nsThunk1)
   registerMember(registrar, 1, 3, 2, "SwiftDemoKit", "value", "value", ">i64", __nsThunk2, __nsThunk3)
   registerMember(registrar, 0, 1, 0, "SwiftDemoKit", "replaced", "replaced(with:)", "o5>o0", __nsThunk4, nil)
@@ -2836,11 +2908,11 @@ private func __nsRegister(_ registrar: UnsafeMutableRawPointer) {
   registerMember(registrar, 10, 3, 2, "SwiftDemo", "celsius", "celsius", ">f64", __nsThunk41, __nsThunk42)
   registerMember(registrar, 10, 1, 0, "SwiftDemo", "warmLater", "warmLater(by:)", "f64>v", __nsThunk43, nil)
   registerMember(registrar, 10, 0, 0, "SwiftDemo", "constructor", "init()", ">o10", __nsThunk44, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "allFlavors", "allFlavors()", ">[e23]", __nsThunk45, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "allFlavors", "allFlavors()", ">[e24]", __nsThunk45, nil)
   registerMember(registrar, -1, 5, 0, "SwiftDemo", "echoUInt64", "echoUInt64(_:)", "u64>u64", __nsThunk46, nil)
   registerMember(registrar, -1, 5, 0, "SwiftDemo", "greetLater", "greetLater(_:completion:)", "s?,(s?)>v", __nsThunk47, nil)
   registerMember(registrar, -1, 5, 0, "SwiftDemo", "largestInt", "largestInt()", ">i64", __nsThunk48, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "makeScorer", "makeScorer()", ">p25", __nsThunk49, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "makeScorer", "makeScorer()", ">p26", __nsThunk49, nil)
   registerMember(registrar, -1, 5, 8, "SwiftDemo", "namesLater", "namesLater(_:)", "i64>[s]", __nsThunk50, nil)
   registerMember(registrar, -1, 5, 0, "SwiftDemo", "wordCounts", "wordCounts(_:)", "[s]>{i64}", __nsThunk51, nil)
   registerMember(registrar, 12, 0, 0, "SwiftDemo", "constructor", "init(symbol:)", "s>o12", __nsThunk52, nil)
@@ -2853,15 +2925,15 @@ private func __nsRegister(_ registrar: UnsafeMutableRawPointer) {
   registerMember(registrar, -1, 5, 9, "SwiftDemo", "delayedEcho", "delayedEcho(_:after:)", "s,f64>s", __nsThunk57, nil)
   registerMember(registrar, 13, 3, 32, "SwiftDemo", "rank", "rank", ">i64?", __nsThunk58, nil)
   registerMember(registrar, -1, 5, 0, "SwiftDemo", "firstSubview", "firstSubview(of:)", "@UIView>@UIView?", __nsThunk59, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "makeGreeting", "makeGreeting(_:)", "s>p36", __nsThunk60, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "makeGreeting", "makeGreeting(_:)", "s>p37", __nsThunk60, nil)
   registerMember(registrar, -1, 5, 8, "SwiftDemo", "measureLater", "measureLater(_:)", "f64>t11", __nsThunk61, nil)
   registerMember(registrar, -1, 5, 0, "SwiftDemo", "measurements", "measurements()", ">[t11]", __nsThunk62, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "swapTrackers", "swapTrackers(_:_:)", "&o35,&o35>v", __nsThunk63, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "swapTrackers", "swapTrackers(_:_:)", "&o36,&o36>v", __nsThunk63, nil)
   registerMember(registrar, 14, 7, 0, "SwiftDemo", "none", "none", ">e14", nil, nil)
   registerMember(registrar, 14, 7, 0, "SwiftDemo", "rain", "rain", ">e14", nil, nil)
   registerMember(registrar, 14, 7, 0, "SwiftDemo", "snow", "snow", ">e14", nil, nil)
   registerMember(registrar, 14, 0, 0, "SwiftDemo", "constructor", "init(rawValue:)", "s>e14?", __nsThunk64, nil)
-  registerMember(registrar, -1, 6, 0, "SwiftDemo", "defaultFlavor", "defaultFlavor", ">e23", __nsThunk65, nil)
+  registerMember(registrar, -1, 6, 0, "SwiftDemo", "defaultFlavor", "defaultFlavor", ">e24", __nsThunk65, nil)
   registerMember(registrar, -1, 6, 2, "SwiftDemo", "globalCounter", "globalCounter", ">i64", __nsThunk66, __nsThunk67)
   registerMember(registrar, -1, 5, 0, "SwiftDemo", "starterWallet", "starterWallet(for:)", "s>o6", __nsThunk68, nil)
   registerMember(registrar, 16, 1, 0, "SwiftDemo", "score", "score(_:)", "i64>i64", __nsThunk69, nil)
@@ -2872,147 +2944,151 @@ private func __nsRegister(_ registrar: UnsafeMutableRawPointer) {
   registerMember(registrar, 17, 1, 0, "SwiftDemo", "greet", "greet(_:)", "s>s", __nsThunk75, nil)
   registerMember(registrar, 17, 1, 0, "SwiftDemo", "reset", "reset()", ">v", __nsThunk76, nil)
   registerMember(registrar, 18, 1, 0, "SwiftDemo", "greet", "greet(_:)", "s>s?", __nsThunk77, nil)
-  registerMember(registrar, 18, 3, 2, "SwiftDemo", "greeting", "greeting", ">p36?", __nsThunk78, __nsThunk79)
+  registerMember(registrar, 18, 3, 2, "SwiftDemo", "greeting", "greeting", ">p37?", __nsThunk78, __nsThunk79)
   registerMember(registrar, 18, 0, 0, "SwiftDemo", "constructor", "init()", ">o18", __nsThunk80, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "makeDefaultPoint", "makeDefaultPoint()", ">o21", __nsThunk81, nil)
-  registerMember(registrar, -1, 5, 8, "SwiftDemo", "makeTrackerLater", "makeTrackerLater(id:)", "i64>o35", __nsThunk82, nil)
-  registerMember(registrar, -1, 5, 8, "SwiftDemo", "greetInBackground", "greetInBackground(_:)", "p36>s", __nsThunk83, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "makeDefaultPoint", "makeDefaultPoint()", ">o22", __nsThunk81, nil)
+  registerMember(registrar, -1, 5, 8, "SwiftDemo", "makeTrackerLater", "makeTrackerLater(id:)", "i64>o36", __nsThunk82, nil)
+  registerMember(registrar, -1, 5, 8, "SwiftDemo", "greetInBackground", "greetInBackground(_:)", "p37>s", __nsThunk83, nil)
   registerMember(registrar, 19, 0, 0, "SwiftDemo", "constructor", "init(id:)", "i64>o19", __nsThunk84, nil)
   registerMember(registrar, 19, 3, 2, "SwiftDemo", "id", "id", ">i64", __nsThunk85, __nsThunk86)
   registerMember(registrar, -1, 5, 0, "SwiftDemo", "sum", "sum(of:)", "[o5]>o5", __nsThunk87, nil)
-  registerMember(registrar, 20, 0, 0, "SwiftDemo", "constructor", "init(inner:outer:)", "o21,o21>o20", __nsThunk88, nil)
-  registerMember(registrar, 20, 3, 2, "SwiftDemo", "inner", "inner", ">o21", __nsThunk89, __nsThunk90)
-  registerMember(registrar, 20, 3, 2, "SwiftDemo", "outer", "outer", ">o21", __nsThunk91, __nsThunk92)
+  registerMember(registrar, 20, 0, 0, "SwiftDemo", "constructor", "init(inner:outer:)", "o22,o22>o20", __nsThunk88, nil)
+  registerMember(registrar, 20, 3, 2, "SwiftDemo", "inner", "inner", ">o22", __nsThunk89, __nsThunk90)
+  registerMember(registrar, 20, 3, 2, "SwiftDemo", "outer", "outer", ">o22", __nsThunk91, __nsThunk92)
   registerMember(registrar, 20, 1, 0, "SwiftDemo", "expand", "expand(by:)", "f64>v", __nsThunk93, nil)
   registerMember(registrar, -1, 5, 0, "SwiftDemo", "area", "area(of:)", "t11>f64", __nsThunk94, nil)
   registerMember(registrar, -1, 5, 0, "SwiftDemo", "bump", "bump(_:)", "&i64>v", __nsThunk95, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "echo", "echo(_:)", "t31>t31", __nsThunk96, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "echo", "echo(_:)", "t32>t32", __nsThunk96, nil)
   registerMember(registrar, -1, 5, 0, "SwiftDemo", "flip", "flip(_:)", "e2>e2", __nsThunk97, nil)
   registerMember(registrar, -1, 5, 0, "SwiftDemo", "host", "host(of:)", "U>s?", __nsThunk98, nil)
   registerMember(registrar, -1, 5, 0, "SwiftDemo", "ramp", "ramp(_:)", "i64>B", __nsThunk99, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "same", "same(_:)", "p36>p36", __nsThunk100, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "same", "same(_:)", "p37>p37", __nsThunk100, nil)
   registerMember(registrar, -1, 5, 0, "SwiftDemo", "tags", "tags(_:)", "[@UIView]>[i64]", __nsThunk101, nil)
   registerMember(registrar, -1, 5, 0, "SwiftDemo", "text", "text(of:)", "@SwiftDemo.Note>s", __nsThunk102, nil)
-  registerMember(registrar, 21, 3, 0, "SwiftDemo", "description", "description", ">s", __nsThunk103, nil)
-  registerMember(registrar, 21, 0, 0, "SwiftDemo", "constructor", "init(x:y:)", "f64,f64>o21", __nsThunk104, nil)
-  registerMember(registrar, 21, 3, 2, "SwiftDemo", "x", "x", ">f64", __nsThunk105, __nsThunk106)
-  registerMember(registrar, 21, 3, 2, "SwiftDemo", "y", "y", ">f64", __nsThunk107, __nsThunk108)
-  registerMember(registrar, 21, 3, 0, "SwiftDemo", "length", "length", ">f64", __nsThunk109, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "boxed", "boxed(_:)", "o5>o0", __nsThunk110, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "clear", "clear(_:)", "&s?>v", __nsThunk111, nil)
-  registerMember(registrar, -1, 5, 1, "SwiftDemo", "halve", "halve(_:)", "&i64>v", __nsThunk112, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "names", "names(_:)", "i64>[s]", __nsThunk113, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "pages", "pages(_:)", "i64>~[s]", __nsThunk114, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "shout", "shout(_:)", "s?>s?", __nsThunk115, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "total", "total(_:)", "[f64]>f64", __nsThunk116, nil)
-  registerMember(registrar, 22, 0, 16, "SwiftDemo", "constructor", "init()", ">o22", __nsThunk117, nil)
-  registerMember(registrar, 23, 3, 0, "SwiftDemo", "description", "description", ">s", __nsThunk118, nil)
-  registerMember(registrar, 23, 7, 0, "SwiftDemo", "vanilla", "vanilla", ">e23", nil, nil)
-  registerMember(registrar, 23, 0, 0, "SwiftDemo", "constructor", "init(rawValue:)", "i64>e23?", __nsThunk119, nil)
-  registerMember(registrar, 23, 7, 0, "SwiftDemo", "chocolate", "chocolate", ">e23", nil, nil)
-  registerMember(registrar, 24, 1, 0, "SwiftDemo", "modernOnly", "modernOnly()", ">v", __nsThunk120, nil)
-  registerMember(registrar, 24, 1, 0, "SwiftDemo", "legacyFetch", "legacyFetch()", ">v", __nsThunk121, nil)
-  registerMember(registrar, 24, 1, 0, "SwiftDemo", "each", "each(_:)", "(i64)>v", __nsThunk122, nil)
-  registerMember(registrar, 24, 1, 1, "SwiftDemo", "load", "load(path:)", "s>B", __nsThunk123, nil)
-  registerMember(registrar, 24, 1, 8, "SwiftDemo", "wait", "wait(seconds:)", "f64>v", __nsThunk124, nil)
-  registerMember(registrar, 24, 1, 9, "SwiftDemo", "fetch", "fetch(url:)", "U>s", __nsThunk125, nil)
-  registerMember(registrar, 24, 1, 0, "SwiftDemo", "lookup", "lookup(table:key:)", "{i64},s>i64?", __nsThunk126, nil)
-  registerMember(registrar, 24, 1, 0, "SwiftDemo", "update", "update(_:)", "&o21>v", __nsThunk127, nil)
-  registerMember(registrar, 24, 1, 0, "SwiftDemo", "oldFetch", "oldFetch()", ">v", __nsThunk128, nil)
-  registerMember(registrar, 24, 0, 0, "SwiftDemo", "constructor", "init()", ">o24", __nsThunk129, nil)
-  registerMember(registrar, 25, 1, 33, "SwiftDemo", "score", "score(_:)", "i64>i64", __nsThunk130, nil)
-  registerMember(registrar, 26, 3, 0, "SwiftDemo", "area", "area", ">f64", __nsThunk131, nil)
-  registerMember(registrar, 26, 0, 0, "SwiftDemo", "constructor", "init(side:)", "f64>o26", __nsThunk132, nil)
-  registerMember(registrar, 26, 3, 2, "SwiftDemo", "side", "side", ">f64", __nsThunk133, __nsThunk134)
-  registerMember(registrar, 26, 1, 0, "SwiftDemo", "greet", "greet(name:)", "s>s", __nsThunk135, nil)
-  registerMember(registrar, 26, 1, 0, "SwiftDemo", "scale", "scale(by:)", "f64>v", __nsThunk136, nil)
-  registerMember(registrar, 26, 4, 0, "SwiftDemo", "sides", "sides", ">i64", __nsThunk137, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "append", "append(_:to:)", "s,&[s]>v", __nsThunk138, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "excite", "excite(_:)", "p36>v", __nsThunk139, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "settle", "settle(_:)", "i64>t7", __nsThunk140, nil)
-  registerMember(registrar, 27, 3, 8, "SwiftDemo", "step", "step", ">i64", __nsThunk141, nil)
-  registerMember(registrar, 27, 1, 0, "SwiftDemo", "label", "label()", ">s", __nsThunk142, nil)
-  registerMember(registrar, 27, 3, 8, "SwiftDemo", "value", "value", ">i64", __nsThunk143, nil)
-  registerMember(registrar, 27, 1, 8, "SwiftDemo", "increment", "increment()", ">i64", __nsThunk144, nil)
-  registerMember(registrar, 27, 0, 0, "SwiftDemo", "constructor", "init()", ">o27", __nsThunk145, nil)
-  registerMember(registrar, 28, 7, 0, "SwiftDemo", "sum", "sum(_:_:)", "t28,t28>t28", nil, nil)
-  registerMember(registrar, 28, 3, 0, "SwiftDemo", "value", "value", ">f64", __nsThunk146, nil)
-  registerMember(registrar, 28, 7, 0, "SwiftDemo", "negate", "negate(_:)", "t28>t28", nil, nil)
-  registerMember(registrar, 28, 7, 0, "SwiftDemo", "number", "number(_:)", "f64>t28", nil, nil)
-  registerMember(registrar, 29, 1, 32, "SwiftDemo", "greet", "greet(name:)", "s>s", __nsThunk147, nil)
-  registerMember(registrar, 30, 1, 8, "SwiftDemo", "strokeLater", "strokeLater()", ">i64", __nsThunk148, nil)
-  registerMember(registrar, 30, 1, 16, "SwiftDemo", "stroke", "stroke()", ">i64", __nsThunk149, nil)
-  registerMember(registrar, 30, 3, 16, "SwiftDemo", "strokes", "strokes", ">i64", __nsThunk150, nil)
-  registerMember(registrar, 30, 0, 16, "SwiftDemo", "constructor", "init()", ">o30", __nsThunk151, nil)
-  registerMember(registrar, 31, 7, 0, "SwiftDemo", "maybe", "maybe(_:)", "i64?>t31", nil, nil)
-  registerMember(registrar, 31, 7, 0, "SwiftDemo", "names", "names(_:)", "[s]>t31", nil, nil)
-  registerMember(registrar, 31, 7, 0, "SwiftDemo", "point", "point(_:)", "o21>t31", nil, nil)
-  registerMember(registrar, 31, 7, 0, "SwiftDemo", "flavor", "flavor(_:)", "e23>t31", nil, nil)
-  registerMember(registrar, 31, 7, 0, "SwiftDemo", "tracker", "tracker(_:)", "o35>t31", nil, nil)
-  registerMember(registrar, 32, 3, 0, "SwiftDemo", "vertexCount", "vertexCount", ">i64", __nsThunk152, nil)
-  registerMember(registrar, 32, 2, 0, "SwiftDemo", "make", "make()", ">o32", __nsThunk153, nil)
-  registerMember(registrar, 32, 0, 0, "SwiftDemo", "constructor", "init(name:vertexCount:)", "s,i64>o32", __nsThunk154, nil)
-  registerMember(registrar, 32, 0, 0, "SwiftDemo", "constructor", "init(name:)", "s>o32?", __nsThunk155, nil)
-  registerMember(registrar, 32, 3, 0, "SwiftDemo", "name", "name", ">s", __nsThunk156, nil)
-  registerMember(registrar, 33, 7, 0, "SwiftDemo", "solid", "solid", ">e33", nil, nil)
-  registerMember(registrar, 33, 7, 0, "SwiftDemo", "dashed", "dashed", ">e33", nil, nil)
-  registerMember(registrar, 33, 0, 0, "SwiftDemo", "constructor", "init(rawValue:)", "s>e33?", __nsThunk157, nil)
-  registerMember(registrar, 32, 1, 0, "SwiftDemo", "scale", "scale(x:y:)", "f64,f64>v", __nsThunk158, nil)
-  registerMember(registrar, 32, 1, 4, "SwiftDemo", "scale", "scale(by:)", "f64>v", __nsThunk159, nil)
-  registerMember(registrar, 32, 1, 4, "SwiftDemo", "scale", "scale(by:)", "i64>v", __nsThunk160, nil)
-  registerMember(registrar, 32, 3, 0, "SwiftDemo", "style", "style", ">e33", __nsThunk161, nil)
-  registerMember(registrar, 32, 4, 0, "SwiftDemo", "shared", "shared", ">o32", __nsThunk162, nil)
-  registerMember(registrar, 34, 0, 0, "SwiftDemo", "constructor", "init(perimeter:)", "f64>o34", __nsThunk163, nil)
-  registerMember(registrar, 34, 3, 2, "SwiftDemo", "perimeter", "perimeter", ">f64", __nsThunk164, __nsThunk165)
-  registerMember(registrar, 32, 1, 0, "SwiftDemo", "metrics", "metrics(side:)", "f64>o34", __nsThunk166, nil)
-  registerMember(registrar, 32, 2, 0, "SwiftDemo", "describe", "describe(_:)", "o32?>s", __nsThunk167, nil)
-  registerMember(registrar, 35, 0, 0, "SwiftDemo", "constructor", "init(id:)", "i64>o35", __nsThunk168, nil)
-  registerMember(registrar, 35, 3, 0, "SwiftDemo", "id", "id", ">i64", __nsThunk169, nil)
-  registerMember(registrar, 35, 1, 0, "SwiftDemo", "same", "same()", ">o35", __nsThunk170, nil)
-  registerMember(registrar, 35, 4, 0, "SwiftDemo", "liveCount", "liveCount", ">i64", __nsThunk171, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "countUp", "countUp(to:)", "i64>~i64", __nsThunk172, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "explain", "explain(_:)", "t9>s", __nsThunk173, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "lengths", "lengths(_:)", "{s}>{i64}", __nsThunk174, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "letters", "letters(of:)", "s>~s", __nsThunk175, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "measure", "measure(_:by:)", "f64,f64?>t11", __nsThunk176, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "nextDay", "nextDay(after:)", "D>D", __nsThunk177, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "resolve", "resolve(_:against:)", "s,U>U", __nsThunk178, nil)
-  registerMember(registrar, -1, 5, 1, "SwiftDemo", "topRank", "topRank(_:)", "p13>s", __nsThunk179, nil)
-  registerMember(registrar, 36, 3, 34, "SwiftDemo", "punctuation", "punctuation", ">s", __nsThunk180, __nsThunk181)
-  registerMember(registrar, 36, 3, 32, "SwiftDemo", "name", "name", ">s", __nsThunk182, nil)
-  registerMember(registrar, 36, 1, 32, "SwiftDemo", "greet", "greet(_:)", "s>s", __nsThunk183, nil)
-  registerMember(registrar, 36, 1, 32, "SwiftDemo", "reset", "reset()", ">v", __nsThunk184, nil)
-  registerMember(registrar, 36, 1, 0, "SwiftDemo", "shout", "shout(_:)", "s>s", __nsThunk185, nil)
-  registerMember(registrar, 17, 1, 0, "SwiftDemo", "shout", "shout(_:)", "s>s", __nsThunk186, nil)
-  registerMember(registrar, 37, 1, 0, "SwiftDemo", "publishLater", "publishLater(_:)", "s>v", __nsThunk187, nil)
-  registerMember(registrar, 37, 1, 0, "SwiftDemo", "clear", "clear()", ">v", __nsThunk188, nil)
-  registerMember(registrar, 37, 3, 0, "SwiftDemo", "count", "count", ">i64", __nsThunk189, nil)
-  registerMember(registrar, 37, 1, 0, "SwiftDemo", "publish", "publish(_:)", "s>v", __nsThunk190, nil)
-  registerMember(registrar, 37, 1, 0, "SwiftDemo", "subscribe", "subscribe(_:)", "(s)>v", __nsThunk191, nil)
-  registerMember(registrar, 37, 0, 0, "SwiftDemo", "constructor", "init()", ">o37", __nsThunk192, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "centroid", "centroid(of:)", "[o21]>o21", __nsThunk193, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "checksum", "checksum(_:)", "B>i64", __nsThunk194, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "countBox", "countBox(_:)", "i64>o1", __nsThunk195, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "describe", "describe(_:)", "o4>s", __nsThunk196, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "describe", "describe(_:)", "@UIView>s", __nsThunk197, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "echoInt8", "echoInt8(_:)", "i8>i8", __nsThunk198, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "makeNote", "makeNote(_:)", "s>@SwiftDemo.Note", __nsThunk199, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "mirrored", "mirrored(_:)", "[[i64]]>[[i64]]", __nsThunk200, nil)
-  registerMember(registrar, -1, 5, 1, "SwiftDemo", "scoreAll", "scoreAll(_:_:)", "p25,[i64]>[i64]", __nsThunk201, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "simplify", "simplify(_:)", "t28>t28", __nsThunk202, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "trackers", "trackers(_:)", "[i64]>[o35]", __nsThunk203, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "countDown", "countDown(from:failingAt:)", "i64,i64?>~i64", __nsThunk204, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "countdown", "countdown(from:_:)", "i64,(i64,b)>v", __nsThunk205, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "introduce", "introduce(_:to:)", "p36,s>s", __nsThunk206, nil)
-  registerMember(registrar, -1, 5, 16, "SwiftDemo", "makeLabel", "makeLabel(_:)", "s>@UILabel", __nsThunk207, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "makeScore", "makeScore(_:_:)", "s,i64>o3", __nsThunk208, nil)
-  registerMember(registrar, -1, 5, 8, "SwiftDemo", "noteLater", "noteLater(_:)", "s>@SwiftDemo.Note", __nsThunk209, nil)
-  registerMember(registrar, -1, 5, 0, "SwiftDemo", "onMeasure", "onMeasure(_:)", "(t11)>v", __nsThunk210, nil)
-  registerMember(registrar, 14, 3, 0, "SwiftDemo", "hashValue", "hashValue", ">i64", __nsThunk211, nil)
-  registerMember(registrar, 23, 3, 0, "SwiftDemo", "hashValue", "hashValue", ">i64", __nsThunk212, nil)
-  registerMember(registrar, 33, 3, 0, "SwiftDemo", "hashValue", "hashValue", ">i64", __nsThunk213, nil)
-  registerMember(registrar, 9, 3, 0, "SwiftDemo", "localizedDescription", "localizedDescription", ">s", __nsThunk214, nil)
-  registerMember(registrar, 15, 3, 0, "SwiftDemo", "localizedDescription", "localizedDescription", ">s", __nsThunk215, nil)
+  registerMember(registrar, 21, 3, 18, "SwiftDemo", "count", "count", ">i64", __nsThunk103, __nsThunk104)
+  registerMember(registrar, 21, 0, 16, "SwiftDemo", "constructor", "init(title:count:)", "s,i64>o21", __nsThunk105, nil)
+  registerMember(registrar, 21, 3, 18, "SwiftDemo", "title", "title", ">s", __nsThunk106, __nsThunk107)
+  registerMember(registrar, 22, 3, 0, "SwiftDemo", "description", "description", ">s", __nsThunk108, nil)
+  registerMember(registrar, 22, 0, 0, "SwiftDemo", "constructor", "init(x:y:)", "f64,f64>o22", __nsThunk109, nil)
+  registerMember(registrar, 22, 3, 2, "SwiftDemo", "x", "x", ">f64", __nsThunk110, __nsThunk111)
+  registerMember(registrar, 22, 3, 2, "SwiftDemo", "y", "y", ">f64", __nsThunk112, __nsThunk113)
+  registerMember(registrar, 22, 3, 0, "SwiftDemo", "length", "length", ">f64", __nsThunk114, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "boxed", "boxed(_:)", "o5>o0", __nsThunk115, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "clear", "clear(_:)", "&s?>v", __nsThunk116, nil)
+  registerMember(registrar, -1, 5, 1, "SwiftDemo", "halve", "halve(_:)", "&i64>v", __nsThunk117, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "names", "names(_:)", "i64>[s]", __nsThunk118, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "pages", "pages(_:)", "i64>~[s]", __nsThunk119, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "shout", "shout(_:)", "s?>s?", __nsThunk120, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "total", "total(_:)", "[f64]>f64", __nsThunk121, nil)
+  registerMember(registrar, 23, 0, 16, "SwiftDemo", "constructor", "init()", ">o23", __nsThunk122, nil)
+  registerMember(registrar, 24, 3, 0, "SwiftDemo", "description", "description", ">s", __nsThunk123, nil)
+  registerMember(registrar, 24, 7, 0, "SwiftDemo", "vanilla", "vanilla", ">e24", nil, nil)
+  registerMember(registrar, 24, 0, 0, "SwiftDemo", "constructor", "init(rawValue:)", "i64>e24?", __nsThunk124, nil)
+  registerMember(registrar, 24, 7, 0, "SwiftDemo", "chocolate", "chocolate", ">e24", nil, nil)
+  registerMember(registrar, 25, 1, 0, "SwiftDemo", "modernOnly", "modernOnly()", ">v", __nsThunk125, nil)
+  registerMember(registrar, 25, 1, 0, "SwiftDemo", "legacyFetch", "legacyFetch()", ">v", __nsThunk126, nil)
+  registerMember(registrar, 25, 1, 0, "SwiftDemo", "each", "each(_:)", "(i64)>v", __nsThunk127, nil)
+  registerMember(registrar, 25, 1, 1, "SwiftDemo", "load", "load(path:)", "s>B", __nsThunk128, nil)
+  registerMember(registrar, 25, 1, 8, "SwiftDemo", "wait", "wait(seconds:)", "f64>v", __nsThunk129, nil)
+  registerMember(registrar, 25, 1, 9, "SwiftDemo", "fetch", "fetch(url:)", "U>s", __nsThunk130, nil)
+  registerMember(registrar, 25, 1, 0, "SwiftDemo", "lookup", "lookup(table:key:)", "{i64},s>i64?", __nsThunk131, nil)
+  registerMember(registrar, 25, 1, 0, "SwiftDemo", "update", "update(_:)", "&o22>v", __nsThunk132, nil)
+  registerMember(registrar, 25, 1, 0, "SwiftDemo", "oldFetch", "oldFetch()", ">v", __nsThunk133, nil)
+  registerMember(registrar, 25, 0, 0, "SwiftDemo", "constructor", "init()", ">o25", __nsThunk134, nil)
+  registerMember(registrar, 26, 1, 33, "SwiftDemo", "score", "score(_:)", "i64>i64", __nsThunk135, nil)
+  registerMember(registrar, 27, 3, 0, "SwiftDemo", "area", "area", ">f64", __nsThunk136, nil)
+  registerMember(registrar, 27, 0, 0, "SwiftDemo", "constructor", "init(side:)", "f64>o27", __nsThunk137, nil)
+  registerMember(registrar, 27, 3, 2, "SwiftDemo", "side", "side", ">f64", __nsThunk138, __nsThunk139)
+  registerMember(registrar, 27, 1, 0, "SwiftDemo", "greet", "greet(name:)", "s>s", __nsThunk140, nil)
+  registerMember(registrar, 27, 1, 0, "SwiftDemo", "scale", "scale(by:)", "f64>v", __nsThunk141, nil)
+  registerMember(registrar, 27, 4, 0, "SwiftDemo", "sides", "sides", ">i64", __nsThunk142, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "append", "append(_:to:)", "s,&[s]>v", __nsThunk143, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "excite", "excite(_:)", "p37>v", __nsThunk144, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "settle", "settle(_:)", "i64>t7", __nsThunk145, nil)
+  registerMember(registrar, 28, 3, 8, "SwiftDemo", "step", "step", ">i64", __nsThunk146, nil)
+  registerMember(registrar, 28, 1, 0, "SwiftDemo", "label", "label()", ">s", __nsThunk147, nil)
+  registerMember(registrar, 28, 3, 8, "SwiftDemo", "value", "value", ">i64", __nsThunk148, nil)
+  registerMember(registrar, 28, 1, 8, "SwiftDemo", "increment", "increment()", ">i64", __nsThunk149, nil)
+  registerMember(registrar, 28, 0, 0, "SwiftDemo", "constructor", "init()", ">o28", __nsThunk150, nil)
+  registerMember(registrar, 29, 7, 0, "SwiftDemo", "sum", "sum(_:_:)", "t29,t29>t29", nil, nil)
+  registerMember(registrar, 29, 3, 0, "SwiftDemo", "value", "value", ">f64", __nsThunk151, nil)
+  registerMember(registrar, 29, 7, 0, "SwiftDemo", "negate", "negate(_:)", "t29>t29", nil, nil)
+  registerMember(registrar, 29, 7, 0, "SwiftDemo", "number", "number(_:)", "f64>t29", nil, nil)
+  registerMember(registrar, 30, 1, 32, "SwiftDemo", "greet", "greet(name:)", "s>s", __nsThunk152, nil)
+  registerMember(registrar, 31, 1, 8, "SwiftDemo", "strokeLater", "strokeLater()", ">i64", __nsThunk153, nil)
+  registerMember(registrar, 31, 1, 16, "SwiftDemo", "stroke", "stroke()", ">i64", __nsThunk154, nil)
+  registerMember(registrar, 31, 3, 16, "SwiftDemo", "strokes", "strokes", ">i64", __nsThunk155, nil)
+  registerMember(registrar, 31, 0, 16, "SwiftDemo", "constructor", "init()", ">o31", __nsThunk156, nil)
+  registerMember(registrar, 32, 7, 0, "SwiftDemo", "maybe", "maybe(_:)", "i64?>t32", nil, nil)
+  registerMember(registrar, 32, 7, 0, "SwiftDemo", "names", "names(_:)", "[s]>t32", nil, nil)
+  registerMember(registrar, 32, 7, 0, "SwiftDemo", "point", "point(_:)", "o22>t32", nil, nil)
+  registerMember(registrar, 32, 7, 0, "SwiftDemo", "flavor", "flavor(_:)", "e24>t32", nil, nil)
+  registerMember(registrar, 32, 7, 0, "SwiftDemo", "tracker", "tracker(_:)", "o36>t32", nil, nil)
+  registerMember(registrar, 33, 3, 0, "SwiftDemo", "vertexCount", "vertexCount", ">i64", __nsThunk157, nil)
+  registerMember(registrar, 33, 2, 0, "SwiftDemo", "make", "make()", ">o33", __nsThunk158, nil)
+  registerMember(registrar, 33, 0, 0, "SwiftDemo", "constructor", "init(name:vertexCount:)", "s,i64>o33", __nsThunk159, nil)
+  registerMember(registrar, 33, 0, 0, "SwiftDemo", "constructor", "init(name:)", "s>o33?", __nsThunk160, nil)
+  registerMember(registrar, 33, 3, 0, "SwiftDemo", "name", "name", ">s", __nsThunk161, nil)
+  registerMember(registrar, 34, 7, 0, "SwiftDemo", "solid", "solid", ">e34", nil, nil)
+  registerMember(registrar, 34, 7, 0, "SwiftDemo", "dashed", "dashed", ">e34", nil, nil)
+  registerMember(registrar, 34, 0, 0, "SwiftDemo", "constructor", "init(rawValue:)", "s>e34?", __nsThunk162, nil)
+  registerMember(registrar, 33, 1, 0, "SwiftDemo", "scale", "scale(x:y:)", "f64,f64>v", __nsThunk163, nil)
+  registerMember(registrar, 33, 1, 4, "SwiftDemo", "scale", "scale(by:)", "f64>v", __nsThunk164, nil)
+  registerMember(registrar, 33, 1, 4, "SwiftDemo", "scale", "scale(by:)", "i64>v", __nsThunk165, nil)
+  registerMember(registrar, 33, 3, 0, "SwiftDemo", "style", "style", ">e34", __nsThunk166, nil)
+  registerMember(registrar, 33, 4, 0, "SwiftDemo", "shared", "shared", ">o33", __nsThunk167, nil)
+  registerMember(registrar, 35, 0, 0, "SwiftDemo", "constructor", "init(perimeter:)", "f64>o35", __nsThunk168, nil)
+  registerMember(registrar, 35, 3, 2, "SwiftDemo", "perimeter", "perimeter", ">f64", __nsThunk169, __nsThunk170)
+  registerMember(registrar, 33, 1, 0, "SwiftDemo", "metrics", "metrics(side:)", "f64>o35", __nsThunk171, nil)
+  registerMember(registrar, 33, 2, 0, "SwiftDemo", "describe", "describe(_:)", "o33?>s", __nsThunk172, nil)
+  registerMember(registrar, 36, 0, 0, "SwiftDemo", "constructor", "init(id:)", "i64>o36", __nsThunk173, nil)
+  registerMember(registrar, 36, 3, 0, "SwiftDemo", "id", "id", ">i64", __nsThunk174, nil)
+  registerMember(registrar, 36, 1, 0, "SwiftDemo", "same", "same()", ">o36", __nsThunk175, nil)
+  registerMember(registrar, 36, 4, 0, "SwiftDemo", "liveCount", "liveCount", ">i64", __nsThunk176, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "countUp", "countUp(to:)", "i64>~i64", __nsThunk177, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "explain", "explain(_:)", "t9>s", __nsThunk178, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "lengths", "lengths(_:)", "{s}>{i64}", __nsThunk179, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "letters", "letters(of:)", "s>~s", __nsThunk180, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "measure", "measure(_:by:)", "f64,f64?>t11", __nsThunk181, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "nextDay", "nextDay(after:)", "D>D", __nsThunk182, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "resolve", "resolve(_:against:)", "s,U>U", __nsThunk183, nil)
+  registerMember(registrar, -1, 5, 1, "SwiftDemo", "topRank", "topRank(_:)", "p13>s", __nsThunk184, nil)
+  registerMember(registrar, 37, 3, 34, "SwiftDemo", "punctuation", "punctuation", ">s", __nsThunk185, __nsThunk186)
+  registerMember(registrar, 37, 3, 32, "SwiftDemo", "name", "name", ">s", __nsThunk187, nil)
+  registerMember(registrar, 37, 1, 32, "SwiftDemo", "greet", "greet(_:)", "s>s", __nsThunk188, nil)
+  registerMember(registrar, 37, 1, 32, "SwiftDemo", "reset", "reset()", ">v", __nsThunk189, nil)
+  registerMember(registrar, 37, 1, 0, "SwiftDemo", "shout", "shout(_:)", "s>s", __nsThunk190, nil)
+  registerMember(registrar, 17, 1, 0, "SwiftDemo", "shout", "shout(_:)", "s>s", __nsThunk191, nil)
+  registerMember(registrar, 38, 1, 0, "SwiftDemo", "publishLater", "publishLater(_:)", "s>v", __nsThunk192, nil)
+  registerMember(registrar, 38, 1, 0, "SwiftDemo", "clear", "clear()", ">v", __nsThunk193, nil)
+  registerMember(registrar, 38, 3, 0, "SwiftDemo", "count", "count", ">i64", __nsThunk194, nil)
+  registerMember(registrar, 38, 1, 0, "SwiftDemo", "publish", "publish(_:)", "s>v", __nsThunk195, nil)
+  registerMember(registrar, 38, 1, 0, "SwiftDemo", "subscribe", "subscribe(_:)", "(s)>v", __nsThunk196, nil)
+  registerMember(registrar, 38, 0, 0, "SwiftDemo", "constructor", "init()", ">o38", __nsThunk197, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "centroid", "centroid(of:)", "[o22]>o22", __nsThunk198, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "checksum", "checksum(_:)", "B>i64", __nsThunk199, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "countBox", "countBox(_:)", "i64>o1", __nsThunk200, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "describe", "describe(_:)", "o4>s", __nsThunk201, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "describe", "describe(_:)", "@UIView>s", __nsThunk202, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "echoInt8", "echoInt8(_:)", "i8>i8", __nsThunk203, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "makeNote", "makeNote(_:)", "s>@SwiftDemo.Note", __nsThunk204, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "mirrored", "mirrored(_:)", "[[i64]]>[[i64]]", __nsThunk205, nil)
+  registerMember(registrar, -1, 5, 1, "SwiftDemo", "scoreAll", "scoreAll(_:_:)", "p26,[i64]>[i64]", __nsThunk206, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "simplify", "simplify(_:)", "t29>t29", __nsThunk207, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "trackers", "trackers(_:)", "[i64]>[o36]", __nsThunk208, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "countDown", "countDown(from:failingAt:)", "i64,i64?>~i64", __nsThunk209, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "countdown", "countdown(from:_:)", "i64,(i64,b)>v", __nsThunk210, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "introduce", "introduce(_:to:)", "p37,s>s", __nsThunk211, nil)
+  registerMember(registrar, -1, 5, 16, "SwiftDemo", "makeLabel", "makeLabel(_:)", "s>@UILabel", __nsThunk212, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "makeScore", "makeScore(_:_:)", "s,i64>o3", __nsThunk213, nil)
+  registerMember(registrar, -1, 5, 8, "SwiftDemo", "noteLater", "noteLater(_:)", "s>@SwiftDemo.Note", __nsThunk214, nil)
+  registerMember(registrar, -1, 5, 0, "SwiftDemo", "onMeasure", "onMeasure(_:)", "(t11)>v", __nsThunk215, nil)
+  registerMember(registrar, 14, 3, 0, "SwiftDemo", "hashValue", "hashValue", ">i64", __nsThunk216, nil)
+  registerMember(registrar, 24, 3, 0, "SwiftDemo", "hashValue", "hashValue", ">i64", __nsThunk217, nil)
+  registerMember(registrar, 34, 3, 0, "SwiftDemo", "hashValue", "hashValue", ">i64", __nsThunk218, nil)
+  registerMember(registrar, 9, 3, 0, "SwiftDemo", "localizedDescription", "localizedDescription", ">s", __nsThunk219, nil)
+  registerMember(registrar, 15, 3, 0, "SwiftDemo", "localizedDescription", "localizedDescription", ">s", __nsThunk220, nil)
+  registerMember(registrar, 21, 1, 16, "SwiftDemo", "hostingController", "hostingController()", ">@UIViewController", __nsThunk221, nil)
 }
 
 #if hasAttribute(c)

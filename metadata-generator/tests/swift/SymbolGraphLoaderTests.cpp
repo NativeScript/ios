@@ -75,7 +75,8 @@ TEST(TopLevelDeclarationsInSourceOrder) {
   for (const auto& id : demo().topLevelIds) {
     names.push_back(demo().find(id)->name);
   }
-  std::vector<std::string> expected = {"Greeter",
+  std::vector<std::string> expected = {"Badge",
+                                       "Greeter",
                                        "Demo",
                                        "Point",
                                        "Flavor",
