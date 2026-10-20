@@ -67,7 +67,8 @@ ProbeSource emitProbes(const Module& module,
     if (isNominalType(symbol.kind)) {
       // Bridged types are copied in and out of boxes and handles, which
       // requires Copyable (not visible in symbol graphs).
-      std::string type = qualifiedTypeName(module, symbol);
+      std::string type = (symbol.kind == SymbolKind::Protocol ? "any " : "") +
+                         qualifiedTypeName(module, symbol);
       std::string availability = availabilityCondition(module, symbol);
       out.begin(symbol.preciseId);
       out.line("// " + symbol.preciseId);

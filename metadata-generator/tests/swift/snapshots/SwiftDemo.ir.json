@@ -19,6 +19,20 @@
     "s:9SwiftDemo0B0C",
     "s:9SwiftDemo5PointV",
     "s:9SwiftDemo6FlavorO",
+    "s:9SwiftDemo8GreetingP",
+    "s:9SwiftDemo6ScorerP",
+    "s:9SwiftDemo12RankedScorerP",
+    "s:9SwiftDemo14FormalGreetingC",
+    "s:9SwiftDemo14DoublingScorerV",
+    "s:9SwiftDemo9introduce_2toSSAA8Greeting_p_SStF",
+    "s:9SwiftDemo12makeGreetingyAA0D0_pSSF",
+    "s:9SwiftDemo4sameyAA8Greeting_pAaC_pF",
+    "s:9SwiftDemo6exciteyyAA8Greeting_pF",
+    "s:9SwiftDemo8scoreAllySaySiGAA6Scorer_p_ACtKF",
+    "s:9SwiftDemo10makeScorerAA0D0_pyF",
+    "s:9SwiftDemo7topRankySSAA12RankedScorer_pKF",
+    "s:9SwiftDemo17greetInBackgroundySSAA8Greeting_pYaF",
+    "s:9SwiftDemo14GreetingHolderC",
     "s:9SwiftDemo13starterWallet3for0aB3Kit0D0CSS_tF",
     "s:9SwiftDemo3sum2of0aB3Kit5MoneyVSayAFG_tF",
     "s:9SwiftDemo4flipy0aB3Kit4CoinOAEF",
@@ -1572,6 +1586,22 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo10makeScorerAA0D0_pyF",
+      "kind": "function",
+      "path": "makeScorer()",
+      "name": "makeScorer()",
+      "access": "public",
+      "declaration": "func makeScorer() -> any Scorer",
+      "returns": {
+        "spelling": "any Scorer",
+        "references": [
+          "s:9SwiftDemo6ScorerP"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Protocols.swift:45:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo10namesLaterySaySSGSiYaF",
       "kind": "function",
       "path": "namesLater(_:)",
@@ -1868,6 +1898,41 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo12RankedScorerP",
+      "kind": "protocol",
+      "path": "RankedScorer",
+      "name": "RankedScorer",
+      "access": "public",
+      "declaration": "protocol RankedScorer : Scorer",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:14:16",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo12RankedScorerP4rankSiSgvp"
+      ],
+      "conformances": [
+        "s:9SwiftDemo6ScorerP"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo12RankedScorerP4rankSiSgvp",
+      "kind": "instanceProperty",
+      "path": "RankedScorer.rank",
+      "name": "rank",
+      "access": "public",
+      "declaration": "var rank: Int? { get }",
+      "protocolRequirement": true,
+      "valueType": {
+        "spelling": "Int?",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Protocols.swift:15:8",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo12RankedScorerP"
+    },
+    {
       "id": "s:9SwiftDemo12firstSubview2ofSo6UIViewCSgAE_tF",
       "kind": "function",
       "path": "firstSubview(of:)",
@@ -1893,6 +1958,33 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Views.swift:15:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo12makeGreetingyAA0D0_pSSF",
+      "kind": "function",
+      "path": "makeGreeting(_:)",
+      "name": "makeGreeting(_:)",
+      "access": "public",
+      "declaration": "func makeGreeting(_ name: String) -> any Greeting",
+      "parameters": [
+        {
+          "internalName": "name",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "any Greeting",
+        "references": [
+          "s:9SwiftDemo8GreetingP"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Protocols.swift:39:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -2118,6 +2210,265 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo14DoublingScorerV",
+      "kind": "struct",
+      "path": "DoublingScorer",
+      "name": "DoublingScorer",
+      "access": "public",
+      "declaration": "struct DoublingScorer",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:30:14",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo14DoublingScorerVACycfc",
+        "s:9SwiftDemo14DoublingScorerV5scoreyS2iF"
+      ],
+      "conformances": [
+        "s:9SwiftDemo6ScorerP"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo14DoublingScorerV5scoreyS2iF",
+      "kind": "instanceMethod",
+      "path": "DoublingScorer.score(_:)",
+      "name": "score(_:)",
+      "access": "public",
+      "declaration": "func score(_ value: Int) -> Int",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Protocols.swift:32:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo14DoublingScorerV",
+      "sourceOrigin": "s:9SwiftDemo6ScorerP5scoreyS2iKF"
+    },
+    {
+      "id": "s:9SwiftDemo14DoublingScorerVACycfc",
+      "kind": "initializer",
+      "path": "DoublingScorer.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:31:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo14DoublingScorerV"
+    },
+    {
+      "id": "s:9SwiftDemo14FormalGreetingC",
+      "kind": "class",
+      "path": "FormalGreeting",
+      "name": "FormalGreeting",
+      "access": "public",
+      "declaration": "final class FormalGreeting",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Protocols.swift:22:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo8GreetingPAAE5shoutyS2SF::SYNTHESIZED::s:9SwiftDemo14FormalGreetingC",
+        "s:9SwiftDemo14FormalGreetingC4nameSSvp",
+        "s:9SwiftDemo14FormalGreetingC11punctuationSSvp",
+        "s:9SwiftDemo14FormalGreetingC4nameACSS_tcfc",
+        "s:9SwiftDemo14FormalGreetingC5greetyS2SF",
+        "s:9SwiftDemo14FormalGreetingC5resetyyF"
+      ],
+      "conformances": [
+        "s:9SwiftDemo8GreetingP"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo14FormalGreetingC11punctuationSSvp",
+      "kind": "instanceProperty",
+      "path": "FormalGreeting.punctuation",
+      "name": "punctuation",
+      "access": "public",
+      "declaration": "var punctuation: String",
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Protocols.swift:24:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo14FormalGreetingC",
+      "sourceOrigin": "s:9SwiftDemo8GreetingP11punctuationSSvp"
+    },
+    {
+      "id": "s:9SwiftDemo14FormalGreetingC4nameACSS_tcfc",
+      "kind": "initializer",
+      "path": "FormalGreeting.init(name:)",
+      "name": "init(name:)",
+      "access": "public",
+      "declaration": "init(name: String)",
+      "parameters": [
+        {
+          "label": "name",
+          "internalName": "name",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Protocols.swift:25:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo14FormalGreetingC"
+    },
+    {
+      "id": "s:9SwiftDemo14FormalGreetingC4nameSSvp",
+      "kind": "instanceProperty",
+      "path": "FormalGreeting.name",
+      "name": "name",
+      "access": "public",
+      "declaration": "let name: String",
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "let": true,
+      "location": "file://Sources/SwiftDemo/Protocols.swift:23:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo14FormalGreetingC",
+      "sourceOrigin": "s:9SwiftDemo8GreetingP4nameSSvp"
+    },
+    {
+      "id": "s:9SwiftDemo14FormalGreetingC5greetyS2SF",
+      "kind": "instanceMethod",
+      "path": "FormalGreeting.greet(_:)",
+      "name": "greet(_:)",
+      "access": "public",
+      "declaration": "func greet(_ other: String) -> String",
+      "parameters": [
+        {
+          "internalName": "other",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Protocols.swift:26:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo14FormalGreetingC",
+      "sourceOrigin": "s:9SwiftDemo8GreetingP5greetyS2SF"
+    },
+    {
+      "id": "s:9SwiftDemo14FormalGreetingC5resetyyF",
+      "kind": "instanceMethod",
+      "path": "FormalGreeting.reset()",
+      "name": "reset()",
+      "access": "public",
+      "declaration": "func reset()",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:27:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo14FormalGreetingC",
+      "sourceOrigin": "s:9SwiftDemo8GreetingP5resetyyF"
+    },
+    {
+      "id": "s:9SwiftDemo14GreetingHolderC",
+      "kind": "class",
+      "path": "GreetingHolder",
+      "name": "GreetingHolder",
+      "access": "public",
+      "declaration": "final class GreetingHolder",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Protocols.swift:60:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo14GreetingHolderC8greetingAA0C0_pSgvp",
+        "s:9SwiftDemo14GreetingHolderCACycfc",
+        "s:9SwiftDemo14GreetingHolderC5greetySSSgSSF"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo14GreetingHolderC5greetySSSgSSF",
+      "kind": "instanceMethod",
+      "path": "GreetingHolder.greet(_:)",
+      "name": "greet(_:)",
+      "access": "public",
+      "declaration": "func greet(_ other: String) -> String?",
+      "parameters": [
+        {
+          "internalName": "other",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String?",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Protocols.swift:63:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo14GreetingHolderC"
+    },
+    {
+      "id": "s:9SwiftDemo14GreetingHolderC8greetingAA0C0_pSgvp",
+      "kind": "instanceProperty",
+      "path": "GreetingHolder.greeting",
+      "name": "greeting",
+      "access": "public",
+      "declaration": "var greeting: (any Greeting)?",
+      "valueType": {
+        "spelling": "(any Greeting)?",
+        "references": [
+          "s:9SwiftDemo8GreetingP"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Protocols.swift:61:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo14GreetingHolderC"
+    },
+    {
+      "id": "s:9SwiftDemo14GreetingHolderCACycfc",
+      "kind": "initializer",
+      "path": "GreetingHolder.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:62:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo14GreetingHolderC"
+    },
+    {
       "id": "s:9SwiftDemo16makeDefaultPointAA0E0VyF",
       "kind": "function",
       "path": "makeDefaultPoint()",
@@ -2160,6 +2511,34 @@
       },
       "async": true,
       "location": "file://Sources/SwiftDemo/Values.swift:35:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo17greetInBackgroundySSAA8Greeting_pYaF",
+      "kind": "function",
+      "path": "greetInBackground(_:)",
+      "name": "greetInBackground(_:)",
+      "access": "public",
+      "declaration": "func greetInBackground(_ greeting: any Greeting) async -> String",
+      "parameters": [
+        {
+          "internalName": "greeting",
+          "type": {
+            "spelling": "any Greeting",
+            "references": [
+              "s:9SwiftDemo8GreetingP"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "async": true,
+      "location": "file://Sources/SwiftDemo/Protocols.swift:55:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -2645,6 +3024,33 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:68:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo4sameyAA8Greeting_pAaC_pF",
+      "kind": "function",
+      "path": "same(_:)",
+      "name": "same(_:)",
+      "access": "public",
+      "declaration": "func same(_ greeting: any Greeting) -> any Greeting",
+      "parameters": [
+        {
+          "internalName": "greeting",
+          "type": {
+            "spelling": "any Greeting",
+            "references": [
+              "s:9SwiftDemo8GreetingP"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "any Greeting",
+        "references": [
+          "s:9SwiftDemo8GreetingP"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Protocols.swift:40:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -3595,6 +4001,49 @@
       "parent": "s:9SwiftDemo6LoaderC"
     },
     {
+      "id": "s:9SwiftDemo6ScorerP",
+      "kind": "protocol",
+      "path": "Scorer",
+      "name": "Scorer",
+      "access": "public",
+      "declaration": "protocol Scorer",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:9:16",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo6ScorerP5scoreyS2iKF"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo6ScorerP5scoreyS2iKF",
+      "kind": "instanceMethod",
+      "path": "Scorer.score(_:)",
+      "name": "score(_:)",
+      "access": "public",
+      "declaration": "func score(_ value: Int) throws -> Int",
+      "protocolRequirement": true,
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "throws": true,
+      "location": "file://Sources/SwiftDemo/Protocols.swift:10:9",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6ScorerP"
+    },
+    {
       "id": "s:9SwiftDemo6SquareC",
       "kind": "class",
       "path": "Square",
@@ -3790,6 +4239,27 @@
         }
       ],
       "location": "file://Sources/SwiftDemo/Values.swift:166:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo6exciteyyAA8Greeting_pF",
+      "kind": "function",
+      "path": "excite(_:)",
+      "name": "excite(_:)",
+      "access": "public",
+      "declaration": "func excite(_ greeting: any Greeting)",
+      "parameters": [
+        {
+          "internalName": "greeting",
+          "type": {
+            "spelling": "any Greeting",
+            "references": [
+              "s:9SwiftDemo8GreetingP"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Protocols.swift:41:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -5070,6 +5540,196 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo7topRankySSAA12RankedScorer_pKF",
+      "kind": "function",
+      "path": "topRank(_:)",
+      "name": "topRank(_:)",
+      "access": "public",
+      "declaration": "func topRank(_ scorer: any RankedScorer) throws -> String",
+      "parameters": [
+        {
+          "internalName": "scorer",
+          "type": {
+            "spelling": "any RankedScorer",
+            "references": [
+              "s:9SwiftDemo12RankedScorerP"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "throws": true,
+      "location": "file://Sources/SwiftDemo/Protocols.swift:46:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8GreetingP",
+      "kind": "protocol",
+      "path": "Greeting",
+      "name": "Greeting",
+      "access": "public",
+      "declaration": "protocol Greeting : AnyObject",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:2:16",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo8GreetingP4nameSSvp",
+        "s:9SwiftDemo8GreetingP11punctuationSSvp",
+        "s:9SwiftDemo8GreetingP5greetyS2SF",
+        "s:9SwiftDemo8GreetingP5resetyyF",
+        "s:9SwiftDemo8GreetingPAAE5shoutyS2SF"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo8GreetingP11punctuationSSvp",
+      "kind": "instanceProperty",
+      "path": "Greeting.punctuation",
+      "name": "punctuation",
+      "access": "public",
+      "declaration": "var punctuation: String { get set }",
+      "protocolRequirement": true,
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Protocols.swift:4:8",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo8GreetingP"
+    },
+    {
+      "id": "s:9SwiftDemo8GreetingP4nameSSvp",
+      "kind": "instanceProperty",
+      "path": "Greeting.name",
+      "name": "name",
+      "access": "public",
+      "declaration": "var name: String { get }",
+      "protocolRequirement": true,
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Protocols.swift:3:8",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo8GreetingP"
+    },
+    {
+      "id": "s:9SwiftDemo8GreetingP5greetyS2SF",
+      "kind": "instanceMethod",
+      "path": "Greeting.greet(_:)",
+      "name": "greet(_:)",
+      "access": "public",
+      "declaration": "func greet(_ other: String) -> String",
+      "protocolRequirement": true,
+      "parameters": [
+        {
+          "internalName": "other",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Protocols.swift:5:9",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo8GreetingP"
+    },
+    {
+      "id": "s:9SwiftDemo8GreetingP5resetyyF",
+      "kind": "instanceMethod",
+      "path": "Greeting.reset()",
+      "name": "reset()",
+      "access": "public",
+      "declaration": "func reset()",
+      "protocolRequirement": true,
+      "location": "file://Sources/SwiftDemo/Protocols.swift:6:9",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo8GreetingP"
+    },
+    {
+      "id": "s:9SwiftDemo8GreetingPAAE5shoutyS2SF",
+      "kind": "instanceMethod",
+      "path": "Greeting.shout(_:)",
+      "name": "shout(_:)",
+      "access": "public",
+      "declaration": "func shout(_ other: String) -> String",
+      "parameters": [
+        {
+          "internalName": "other",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftDemo",
+        "typeKind": "swift.protocol"
+      },
+      "location": "file://Sources/SwiftDemo/Protocols.swift:19:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo8GreetingP"
+    },
+    {
+      "id": "s:9SwiftDemo8GreetingPAAE5shoutyS2SF::SYNTHESIZED::s:9SwiftDemo14FormalGreetingC",
+      "kind": "instanceMethod",
+      "path": "FormalGreeting.shout(_:)",
+      "name": "shout(_:)",
+      "access": "public",
+      "declaration": "func shout(_ other: String) -> String",
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "other",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftDemo",
+        "typeKind": "swift.protocol"
+      },
+      "location": "file://Sources/SwiftDemo/Protocols.swift:19:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo14FormalGreetingC",
+      "sourceOrigin": "s:9SwiftDemo8GreetingPAAE5shoutyS2SF"
+    },
+    {
       "id": "s:9SwiftDemo8NotifierC",
       "kind": "class",
       "path": "Notifier",
@@ -5426,6 +6086,43 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo8scoreAllySaySiGAA6Scorer_p_ACtKF",
+      "kind": "function",
+      "path": "scoreAll(_:_:)",
+      "name": "scoreAll(_:_:)",
+      "access": "public",
+      "declaration": "func scoreAll(_ scorer: any Scorer, _ values: [Int]) throws -> [Int]",
+      "parameters": [
+        {
+          "internalName": "scorer",
+          "type": {
+            "spelling": "any Scorer",
+            "references": [
+              "s:9SwiftDemo6ScorerP"
+            ]
+          }
+        },
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "[Int]",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[Int]",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "throws": true,
+      "location": "file://Sources/SwiftDemo/Protocols.swift:42:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo8simplifyyAA7FormulaOADF",
       "kind": "function",
       "path": "simplify(_:)",
@@ -5510,6 +6207,43 @@
         }
       ],
       "location": "file://Sources/SwiftDemo/Values.swift:74:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo9introduce_2toSSAA8Greeting_p_SStF",
+      "kind": "function",
+      "path": "introduce(_:to:)",
+      "name": "introduce(_:to:)",
+      "access": "public",
+      "declaration": "func introduce(_ greeting: any Greeting, to other: String) -> String",
+      "parameters": [
+        {
+          "internalName": "greeting",
+          "type": {
+            "spelling": "any Greeting",
+            "references": [
+              "s:9SwiftDemo8GreetingP"
+            ]
+          }
+        },
+        {
+          "label": "to",
+          "internalName": "other",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Protocols.swift:35:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {

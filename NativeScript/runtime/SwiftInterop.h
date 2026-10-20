@@ -40,7 +40,7 @@
 // calls it by reporting the arguments as an array: callbackBegin, each
 // argument through the complete* entries, then completeArrayEnd.
 
-#define NS_SWIFT_ABI_VERSION 8
+#define NS_SWIFT_ABI_VERSION 9
 
 #ifdef __cplusplus
 extern "C" {
@@ -83,6 +83,9 @@ enum {
   NSSwiftTagCase = 10,
   // An Objective-C object borrowed (+0) for the duration of the call.
   NSSwiftTagObjC = 11,
+  // A JS object implementing a protocol: payload.object is a handle,
+  // borrowed for the call like a callback handle.
+  NSSwiftTagJSObject = 12,
 };
 
 typedef struct NSSwiftAPI NSSwiftAPI;
@@ -107,6 +110,10 @@ enum {
   NSSwiftTypeEnum = 3,
   // An enum with associated values.
   NSSwiftTypeTaggedEnum = 4,
+  // A protocol JS objects can implement; `superIndex` names the protocol it
+  // refines. Its members are its requirements (NSSwiftMemberRequirement)
+  // and extension members, called on boxed values of the protocol.
+  NSSwiftTypeProtocol = 5,
 };
 
 enum {
@@ -130,6 +137,10 @@ enum {
   NSSwiftMemberAsync = 1 << 3,
   // Isolated to the main actor; the thunk rejects calls from other threads.
   NSSwiftMemberMainActor = 1 << 4,
+  // A protocol requirement. A protocol's requirement table is its refined
+  // protocol's, then its own requirements in registration order; adapters
+  // call entry k as 2k (2k + 1 for a property setter).
+  NSSwiftMemberRequirement = 1 << 5,
 };
 
 // Member signatures: comma-separated parameter codes, '>', result code.
@@ -152,6 +163,8 @@ enum {
 //   (<code>,...)
 //               closure returning Void, of the listed parameters
 //               (NSSwiftTagFunction) <- JS function; parameters only
+//   p<n>        value of protocol type index n: a Swift object (tag Object)
+//               or a JS object implementing it (NSSwiftTagJSObject)
 //   @<Name>     instance of Objective-C class <Name> (its runtime name)
 //               (NSSwiftTagObjC) <-> NativeScript's Objective-C wrapper
 //   <code>?     optional: JS null/undefined <-> NSSwiftTagNull
@@ -266,6 +279,19 @@ struct NSSwiftAPI {
   // A Swift module of the unit, registered before its types and members.
   /* 42 */ void (*registerUnitModule)(NSSwiftRegistrar* registrar,
                                       const char* name);
+
+  // Calls requirement `index` of a JS object handle: Begin, the arguments
+  // through the complete* entries, then End, which runs the JS member on the
+  // isolate's thread (waiting for it from any other thread) and returns its
+  // result as one slot, or null when it threw or returned a value that does
+  // not convert. A non-null result is released with objectResultRelease.
+  // Handles are retained and released with callbackRetain/Release.
+  /* 43 */ void* (*objectCallBegin)(void* object, intptr_t index);
+  /* 44 */ const NSSwiftValue* (*objectCallEnd)(void* token);
+  /* 45 */ void (*objectResultRelease)(const NSSwiftValue* result);
+  // A JS object handle, as the JS object itself.
+  /* 46 */ void (*returnJSObject)(NSSwiftCall* call, void* object);
+  /* 47 */ void (*completeJSObject)(void* token, void* object);
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);

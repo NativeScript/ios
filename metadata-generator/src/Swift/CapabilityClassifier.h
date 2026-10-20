@@ -67,6 +67,10 @@ enum class Bridge {
   // A generic parameter, in a generic type's declarations for TypeScript
   // only (Classification::templates); never generated.
   TypeParameter,
+  // An adoptable module protocol as a value (`any P`): a JS object
+  // implementing it (through a generated adapter), or a Swift value that
+  // conforms to it.
+  Protocol,
 };
 
 struct BridgedType {
@@ -98,7 +102,7 @@ struct Capability {
   // ("unbridged-type:Foundation.URL"). Codes:
   //   objc-visible, not-public, unavailable, obsoleted, unknown-kind,
   //   deinitializer, macro, extension-block, protocol, protocol-requirement,
-  //   type-alias, associated-type, generic, noncopyable,
+  //   type-alias, associated-type, generic, noncopyable, protocol-static,
   //   nonescapable, async-initializer, operator, subscript,
   //   enum-associated-values,
   //   external-type-extension, owner-not-bridged, missing-owner,
@@ -120,6 +124,8 @@ struct Capability {
   bool isMainActor = false;
   // A property or variable JS can assign.
   bool isSettable = false;
+  // A requirement of an adoptable protocol, which JS implementations provide.
+  bool isRequirement = false;
 
   // Bridges for SwiftGenerated callables: parameters in order, then the
   // result (or the property value type).

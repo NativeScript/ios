@@ -350,6 +350,7 @@
 		EF918E4F1A6F3E39721F8C44 /* Shapes.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA98D6B239608C28AFB14F15 /* Shapes.swift */; };
 		1A9C83B48771CCA1BBEA3F77 /* Values.swift in Sources */ = {isa = PBXBuildFile; fileRef = D76F7C886215EB9DB96CA88E /* Values.swift */; };
 		2B7A41C09E3F4D21A6C0B001 /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7A41C09E3F4D21A6C0B002 /* Views.swift */; };
+		5D0E5ED00000000000000015 /* Protocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5ED00000000000000014 /* Protocols.swift */; };
 		5D0E5ED00000000000000004 /* Purse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5ED00000000000000003 /* Purse.swift */; };
 		5D0E5ED00000000000000002 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5ED00000000000000001 /* Money.swift */; };
 		F84875BB70573F18E4D9BA12 /* SwiftDemo+NativeScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9283D493244254925F2F5D4D /* SwiftDemo+NativeScript.swift */; };
@@ -911,6 +912,7 @@
 		CA98D6B239608C28AFB14F15 /* Shapes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Shapes.swift"; sourceTree = "<group>"; };
 		D76F7C886215EB9DB96CA88E /* Values.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Values.swift"; sourceTree = "<group>"; };
 		2B7A41C09E3F4D21A6C0B002 /* Views.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Views.swift"; sourceTree = "<group>"; };
+		5D0E5ED00000000000000014 /* Protocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Protocols.swift"; sourceTree = "<group>"; };
 		5D0E5ED00000000000000003 /* Purse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Purse.swift"; sourceTree = "<group>"; };
 		5D0E5ED00000000000000001 /* Money.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemoKit/Money.swift"; sourceTree = "<group>"; };
 		9283D493244254925F2F5D4D /* SwiftDemo+NativeScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Interop/SwiftDemo+NativeScript.swift"; sourceTree = "<group>"; };
@@ -1710,6 +1712,7 @@
 				CA98D6B239608C28AFB14F15 /* Shapes.swift */,
 				D76F7C886215EB9DB96CA88E /* Values.swift */,
 				2B7A41C09E3F4D21A6C0B002 /* Views.swift */,
+				5D0E5ED00000000000000014 /* Protocols.swift */,
 				5D0E5ED00000000000000003 /* Purse.swift */,
 				5D0E5ED00000000000000001 /* Money.swift */,
 				9283D493244254925F2F5D4D /* SwiftDemo+NativeScript.swift */,
@@ -2528,6 +2531,7 @@
 				EF918E4F1A6F3E39721F8C44 /* Shapes.swift in Sources */,
 				1A9C83B48771CCA1BBEA3F77 /* Values.swift in Sources */,
 				2B7A41C09E3F4D21A6C0B001 /* Views.swift in Sources */,
+				5D0E5ED00000000000000015 /* Protocols.swift in Sources */,
 				5D0E5ED00000000000000004 /* Purse.swift in Sources */,
 				F84875BB70573F18E4D9BA12 /* SwiftDemo+NativeScript.swift in Sources */,
 			);

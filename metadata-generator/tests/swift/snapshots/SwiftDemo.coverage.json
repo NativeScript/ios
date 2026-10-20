@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 262,
+      "total": 294,
       "objc-direct": 1,
-      "swift-generated": 211,
+      "swift-generated": 245,
       "swift-specialized": 17,
-      "type-only": 7,
+      "type-only": 5,
       "unsupported": 26,
       "not-applicable": 0
     },
     "callable": {
-      "total": 224,
+      "total": 250,
       "objc-direct": 0,
-      "swift-generated": 182,
+      "swift-generated": 209,
       "swift-specialized": 14,
-      "type-only": 3,
+      "type-only": 2,
       "unsupported": 25,
       "not-applicable": 0
     },
-    "effectiveCallable": 182,
+    "effectiveCallable": 209,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -35,9 +35,9 @@
       "not-applicable": 0
     },
     "class": {
-      "total": 13,
+      "total": 15,
       "objc-direct": 1,
-      "swift-generated": 11,
+      "swift-generated": 13,
       "swift-specialized": 1,
       "type-only": 0,
       "unsupported": 0,
@@ -62,36 +62,36 @@
       "not-applicable": 0
     },
     "function": {
-      "total": 53,
+      "total": 61,
       "objc-direct": 0,
-      "swift-generated": 53,
+      "swift-generated": 61,
       "swift-specialized": 0,
       "type-only": 0,
       "unsupported": 0,
       "not-applicable": 0
     },
     "initializer": {
-      "total": 27,
+      "total": 30,
       "objc-direct": 0,
-      "swift-generated": 24,
+      "swift-generated": 27,
       "swift-specialized": 2,
       "type-only": 0,
       "unsupported": 1,
       "not-applicable": 0
     },
     "instanceMethod": {
-      "total": 51,
+      "total": 60,
       "objc-direct": 0,
-      "swift-generated": 35,
+      "swift-generated": 45,
       "swift-specialized": 7,
-      "type-only": 1,
+      "type-only": 0,
       "unsupported": 8,
       "not-applicable": 0
     },
     "instanceProperty": {
-      "total": 46,
+      "total": 52,
       "objc-direct": 0,
-      "swift-generated": 37,
+      "swift-generated": 43,
       "swift-specialized": 3,
       "type-only": 1,
       "unsupported": 5,
@@ -116,18 +116,18 @@
       "not-applicable": 0
     },
     "protocol": {
-      "total": 2,
+      "total": 5,
       "objc-direct": 0,
-      "swift-generated": 0,
+      "swift-generated": 4,
       "swift-specialized": 0,
-      "type-only": 2,
+      "type-only": 1,
       "unsupported": 0,
       "not-applicable": 0
     },
     "struct": {
-      "total": 9,
+      "total": 10,
       "objc-direct": 0,
-      "swift-generated": 8,
+      "swift-generated": 9,
       "swift-specialized": 1,
       "type-only": 0,
       "unsupported": 0,
@@ -711,6 +711,14 @@
       "location": "file://Sources/SwiftDemo/Values.swift:13"
     },
     {
+      "id": "s:9SwiftDemo10makeScorerAA0D0_pyF",
+      "path": "makeScorer()",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "makeScorer",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:46"
+    },
+    {
       "id": "s:9SwiftDemo10namesLaterySaySSGSiYaF",
       "path": "namesLater(_:)",
       "kind": "function",
@@ -815,12 +823,35 @@
       "location": "file://Sources/SwiftDemo/Values.swift:30"
     },
     {
+      "id": "s:9SwiftDemo12RankedScorerP",
+      "path": "RankedScorer",
+      "kind": "protocol",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:15"
+    },
+    {
+      "id": "s:9SwiftDemo12RankedScorerP4rankSiSgvp",
+      "path": "RankedScorer.rank",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "rank",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:16"
+    },
+    {
       "id": "s:9SwiftDemo12firstSubview2ofSo6UIViewCSgAE_tF",
       "path": "firstSubview(of:)",
       "kind": "function",
       "tier": "swift-generated",
       "jsName": "firstSubview",
       "location": "file://Sources/SwiftDemo/Views.swift:16"
+    },
+    {
+      "id": "s:9SwiftDemo12makeGreetingyAA0D0_pSSF",
+      "path": "makeGreeting(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "makeGreeting",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:40"
     },
     {
       "id": "s:9SwiftDemo12measureLateryAA11MeasurementOSdYaF",
@@ -909,6 +940,107 @@
       "location": "file://Sources/SwiftDemo/Purse.swift:5"
     },
     {
+      "id": "s:9SwiftDemo14DoublingScorerV",
+      "path": "DoublingScorer",
+      "kind": "struct",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:31"
+    },
+    {
+      "id": "s:9SwiftDemo14DoublingScorerV5scoreyS2iF",
+      "path": "DoublingScorer.score(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "score",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:33"
+    },
+    {
+      "id": "s:9SwiftDemo14DoublingScorerVACycfc",
+      "path": "DoublingScorer.init()",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:32"
+    },
+    {
+      "id": "s:9SwiftDemo14FormalGreetingC",
+      "path": "FormalGreeting",
+      "kind": "class",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:23"
+    },
+    {
+      "id": "s:9SwiftDemo14FormalGreetingC11punctuationSSvp",
+      "path": "FormalGreeting.punctuation",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "punctuation",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:25"
+    },
+    {
+      "id": "s:9SwiftDemo14FormalGreetingC4nameACSS_tcfc",
+      "path": "FormalGreeting.init(name:)",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:26"
+    },
+    {
+      "id": "s:9SwiftDemo14FormalGreetingC4nameSSvp",
+      "path": "FormalGreeting.name",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "name",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:24"
+    },
+    {
+      "id": "s:9SwiftDemo14FormalGreetingC5greetyS2SF",
+      "path": "FormalGreeting.greet(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "greet",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:27"
+    },
+    {
+      "id": "s:9SwiftDemo14FormalGreetingC5resetyyF",
+      "path": "FormalGreeting.reset()",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "reset",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:28"
+    },
+    {
+      "id": "s:9SwiftDemo14GreetingHolderC",
+      "path": "GreetingHolder",
+      "kind": "class",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:61"
+    },
+    {
+      "id": "s:9SwiftDemo14GreetingHolderC5greetySSSgSSF",
+      "path": "GreetingHolder.greet(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "greet",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:64"
+    },
+    {
+      "id": "s:9SwiftDemo14GreetingHolderC8greetingAA0C0_pSgvp",
+      "path": "GreetingHolder.greeting",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "greeting",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:62"
+    },
+    {
+      "id": "s:9SwiftDemo14GreetingHolderCACycfc",
+      "path": "GreetingHolder.init()",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:63"
+    },
+    {
       "id": "s:9SwiftDemo16makeDefaultPointAA0E0VyF",
       "path": "makeDefaultPoint()",
       "kind": "function",
@@ -923,6 +1055,14 @@
       "tier": "swift-generated",
       "jsName": "makeTrackerLater",
       "location": "file://Sources/SwiftDemo/Values.swift:36"
+    },
+    {
+      "id": "s:9SwiftDemo17greetInBackgroundySSAA8Greeting_pYaF",
+      "path": "greetInBackground(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "greetInBackground",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:56"
     },
     {
       "id": "s:9SwiftDemo3JobO",
@@ -1102,6 +1242,14 @@
       "tier": "swift-generated",
       "jsName": "ramp",
       "location": "file://Sources/SwiftDemo/Values.swift:69"
+    },
+    {
+      "id": "s:9SwiftDemo4sameyAA8Greeting_pAaC_pF",
+      "path": "same(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "same",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:41"
     },
     {
       "id": "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
@@ -1435,6 +1583,21 @@
       "location": "file://Sources/SwiftDemo/Shapes.swift:114"
     },
     {
+      "id": "s:9SwiftDemo6ScorerP",
+      "path": "Scorer",
+      "kind": "protocol",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:10"
+    },
+    {
+      "id": "s:9SwiftDemo6ScorerP5scoreyS2iKF",
+      "path": "Scorer.score(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "score",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:11"
+    },
+    {
       "id": "s:9SwiftDemo6SquareC",
       "path": "Square",
       "kind": "class",
@@ -1496,6 +1659,14 @@
       "tier": "swift-generated",
       "jsName": "append",
       "location": "file://Sources/SwiftDemo/Values.swift:167"
+    },
+    {
+      "id": "s:9SwiftDemo6exciteyyAA8Greeting_pF",
+      "path": "excite(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "excite",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:42"
     },
     {
       "id": "s:9SwiftDemo6settley0aB3Kit7OutcomeOySiGSiF",
@@ -1595,20 +1766,15 @@
       "id": "s:9SwiftDemo7GreeterP",
       "path": "Greeter",
       "kind": "protocol",
-      "tier": "type-only",
-      "reasons": [
-        "protocol"
-      ],
+      "tier": "swift-generated",
       "location": "file://Sources/SwiftDemo/Demo.swift:1"
     },
     {
       "id": "s:9SwiftDemo7GreeterP5greet4nameS2S_tF",
       "path": "Greeter.greet(name:)",
       "kind": "instanceMethod",
-      "tier": "type-only",
-      "reasons": [
-        "protocol-requirement"
-      ],
+      "tier": "swift-generated",
+      "jsName": "greet",
       "location": "file://Sources/SwiftDemo/Demo.swift:2"
     },
     {
@@ -1945,6 +2111,69 @@
       "location": "file://Sources/SwiftDemo/Values.swift:67"
     },
     {
+      "id": "s:9SwiftDemo7topRankySSAA12RankedScorer_pKF",
+      "path": "topRank(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "topRank",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:47"
+    },
+    {
+      "id": "s:9SwiftDemo8GreetingP",
+      "path": "Greeting",
+      "kind": "protocol",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:3"
+    },
+    {
+      "id": "s:9SwiftDemo8GreetingP11punctuationSSvp",
+      "path": "Greeting.punctuation",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "punctuation",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:5"
+    },
+    {
+      "id": "s:9SwiftDemo8GreetingP4nameSSvp",
+      "path": "Greeting.name",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "name",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:4"
+    },
+    {
+      "id": "s:9SwiftDemo8GreetingP5greetyS2SF",
+      "path": "Greeting.greet(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "greet",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:6"
+    },
+    {
+      "id": "s:9SwiftDemo8GreetingP5resetyyF",
+      "path": "Greeting.reset()",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "reset",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:7"
+    },
+    {
+      "id": "s:9SwiftDemo8GreetingPAAE5shoutyS2SF",
+      "path": "Greeting.shout(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "shout",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:20"
+    },
+    {
+      "id": "s:9SwiftDemo8GreetingPAAE5shoutyS2SF::SYNTHESIZED::s:9SwiftDemo14FormalGreetingC",
+      "path": "FormalGreeting.shout(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "shout",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:20"
+    },
+    {
       "id": "s:9SwiftDemo8NotifierC",
       "path": "Notifier",
       "kind": "class",
@@ -2064,6 +2293,14 @@
       "location": "file://Sources/SwiftDemo/Values.swift:58"
     },
     {
+      "id": "s:9SwiftDemo8scoreAllySaySiGAA6Scorer_p_ACtKF",
+      "path": "scoreAll(_:_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "scoreAll",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:43"
+    },
+    {
       "id": "s:9SwiftDemo8simplifyyAA7FormulaOADF",
       "path": "simplify(_:)",
       "kind": "function",
@@ -2086,6 +2323,14 @@
       "tier": "swift-generated",
       "jsName": "countdown",
       "location": "file://Sources/SwiftDemo/Values.swift:75"
+    },
+    {
+      "id": "s:9SwiftDemo9introduce_2toSSAA8Greeting_p_SStF",
+      "path": "introduce(_:to:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "introduce",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:36"
     },
     {
       "id": "s:9SwiftDemo9makeLabelySo7UILabelCSSF",

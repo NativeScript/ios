@@ -70,7 +70,8 @@ TypeNode qualify(const TypeNode& node, const Module& module) {
 }
 
 std::string ownerTypeText(const Module& module, const Symbol& owner) {
-  return qualifiedTypeName(module, owner);
+  return (owner.kind == SymbolKind::Protocol ? "any " : "") +
+         qualifiedTypeName(module, owner);
 }
 
 std::string typeText(const BridgedType& bridged, const Module& module) {

@@ -47,6 +47,20 @@ int SwiftSurface::indexOf(const std::string& symbolId) const {
   return it == typeIndex.end() ? -1 : it->second;
 }
 
+std::vector<const SwiftSurface::Member*> SwiftSurface::requirementsOf(
+    int typeIndex) const {
+  std::vector<const Member*> requirements;
+  if (types[typeIndex].superIndex >= 0) {
+    requirements = requirementsOf(types[typeIndex].superIndex);
+  }
+  for (const auto& member : members) {
+    if ((member.flags & kRequirement) && member.owner == typeIndex) {
+      requirements.push_back(&member);
+    }
+  }
+  return requirements;
+}
+
 std::vector<const SwiftSurface::Member*> SwiftSurface::casesOf(
     int typeIndex) const {
   std::vector<const Member*> cases;
@@ -110,6 +124,9 @@ std::string signatureCode(const SwiftSurface& surface,
     case Bridge::ObjCObject:
       code = "@" + type.objcClass;
       break;
+    case Bridge::Protocol:
+      code = "p" + std::to_string(surface.indexOf(type.symbolId));
+      break;
     case Bridge::Date:
       code = "D";
       break;
@@ -148,11 +165,12 @@ SwiftSurface describeSurface(const Module& module,
     const Symbol& symbol = entry.second;
     const Capability* capability = classification.find(entry.first);
     if (!capability || capability->tier != Tier::SwiftGenerated ||
-        !isNominalType(symbol.kind) || symbol.kind == SymbolKind::Protocol) {
+        !isNominalType(symbol.kind)) {
       continue;
     }
     SwiftSurface::TypeKind kind =
-        symbol.kind == SymbolKind::Struct ? SwiftSurface::kStruct
+        symbol.kind == SymbolKind::Protocol ? SwiftSurface::kProtocol
+        : symbol.kind == SymbolKind::Struct ? SwiftSurface::kStruct
         : symbol.kind == SymbolKind::Enum
             ? (hasAssociatedValues(module, symbol) ? SwiftSurface::kTaggedEnum
                                                    : SwiftSurface::kEnum)
@@ -166,6 +184,13 @@ SwiftSurface describeSurface(const Module& module,
   }
   for (auto& type : surface.types) {
     type.superIndex = surface.indexOf(type.symbol->superclassId);
+    if (type.kind == SwiftSurface::kProtocol) {
+      for (const auto& id : type.symbol->conformances) {
+        if (surface.indexOf(id) >= 0) {
+          type.superIndex = surface.indexOf(id);
+        }
+      }
+    }
   }
 
   for (const auto& entry : module.symbols) {
@@ -195,7 +220,8 @@ SwiftSurface describeSurface(const Module& module,
         (capability->isAsync ? SwiftSurface::kAsync : 0) |
         (capability->isMainActor && !capability->isAsync
              ? SwiftSurface::kMainActor
-             : 0);
+             : 0) |
+        (capability->isRequirement ? SwiftSurface::kRequirement : 0);
     member.result = capability->result;
     for (size_t i = 0; i < capability->parameters.size(); i++) {
       member.signature += (i > 0 ? "," : "") +

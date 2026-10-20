@@ -51,7 +51,10 @@ TEST(ClassifyNominalTypes) {
   EXPECT_TIER("Flavor", Tier::SwiftGenerated);
   EXPECT_TIER("Counter", Tier::SwiftGenerated);
   EXPECT_TIER("Canvas", Tier::SwiftGenerated);
-  EXPECT_TIER("Greeter", Tier::TypeOnly, "protocol");
+  EXPECT_TIER("Greeter", Tier::SwiftGenerated);
+  EXPECT_TIER("RankedScorer", Tier::SwiftGenerated);
+  // A static requirement needs a conforming type.
+  EXPECT_TIER("Shape", Tier::TypeOnly, "protocol");
   EXPECT_TIER("Measurement", Tier::SwiftGenerated);
   EXPECT_TIER("ShapeError", Tier::SwiftGenerated);
   EXPECT_TIER("Formula", Tier::SwiftGenerated);
@@ -92,7 +95,9 @@ TEST(ClassifyCallables) {
 }
 
 TEST(ClassifyRejections) {
-  EXPECT_TIER("Greeter.greet(name:)", Tier::TypeOnly, "protocol-requirement");
+  EXPECT_TIER("Greeter.greet(name:)", Tier::SwiftGenerated);
+  EXPECT_TIER("Shape.area", Tier::TypeOnly, "protocol-requirement");
+  EXPECT_TIER("Greeting.shout(_:)", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.fetch(url:)", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.transform(_:)", Tier::SwiftSpecialized, "generic");
   EXPECT_TIER("Loader.first(of:)", Tier::SwiftSpecialized, "generic");

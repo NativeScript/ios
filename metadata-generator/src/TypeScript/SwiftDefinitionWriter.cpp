@@ -99,7 +99,8 @@ std::string codeDisplayName(const SwiftSurface& surface,
     case Bridge::ClassHandle:
     case Bridge::StructBox:
     case Bridge::EnumCase:
-    case Bridge::TaggedEnum: {
+    case Bridge::TaggedEnum:
+    case Bridge::Protocol: {
       int index = surface.indexOf(type.symbolId);
       name = index >= 0 ? surface.types[index].symbol->name : "?";
       break;
@@ -455,6 +456,7 @@ class Writer {
       case Bridge::StructBox:
       case Bridge::EnumCase:
       case Bridge::TaggedEnum:
+      case Bridge::Protocol:
         ts = typeName(type);
         break;
       case Bridge::ObjCObject:
@@ -514,6 +516,7 @@ class Writer {
       case Bridge::StructBox:
       case Bridge::EnumCase:
       case Bridge::TaggedEnum:
+      case Bridge::Protocol:
         ts = typeName(type);
         break;
       case Bridge::ObjCObject:
@@ -687,7 +690,9 @@ class Writer {
       writeEnum(*node.type, node, indent);
       return;
     }
-    if (node.type) {
+    if (node.type && node.type->kind == SwiftSurface::kProtocol) {
+      writeInterface(*node.type, indent);
+    } else if (node.type) {
       writeClass(*node.type, indent);
     }
     if (!node.children.empty()) {
@@ -697,6 +702,35 @@ class Writer {
       }
       _out << indent << "}\n\n";
     }
+  }
+
+  // What a JS object implementing the protocol provides: its requirements.
+  void writeInterface(const SwiftSurface::Type& type,
+                      const std::string& indent) {
+    const Symbol& symbol = *type.symbol;
+    std::string inner = indent + "  ";
+    writeDoc(symbol, indent);
+    _out << indent << "export interface " << symbol.name;
+    if (type.superIndex >= 0) {
+      _out << " extends " << typePath(_surface.types[type.superIndex]);
+    }
+    _out << " {\n";
+    for (const Member* member : _surface.requirementsOf(type.index)) {
+      if (member->owner != type.index) {
+        continue;
+      }
+      writeDoc(*member->symbol, inner);
+      if (member->kind == SwiftSurface::kInstanceProperty) {
+        _out << inner << (member->symbol->isSettable ? "" : "readonly ")
+             << propertyKey(member->capability->jsName) << ": "
+             << outputType(member->result) << ";\n";
+      } else {
+        _out << inner << propertyKey(member->capability->jsName) << "("
+             << parameterList(*member) << "): " << outputType(member->result)
+             << ";\n";
+      }
+    }
+    _out << indent << "}\n\n";
   }
 
   void writeClass(const SwiftSurface::Type& type, const std::string& indent) {

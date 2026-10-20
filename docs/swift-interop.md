@@ -171,6 +171,40 @@ as Swift holds the closure, and drops it when Swift releases the closure.
   parameters, closures with `inout` parameters, and closures returned from
   Swift are not bridged yet.
 
+## Protocols
+
+A parameter typed by a protocol (`any Greeting`) accepts a Swift value that
+conforms to it, or a JS object implementing it:
+
+```js
+SwiftDemo.introduce({
+    name: "js",
+    punctuation: "?",
+    greet(other) { return "hey " + other; },
+    reset() {},
+}, "ada");
+```
+
+The object must provide every requirement (the call throws `TypeError`
+naming the missing ones), including those of a protocol it refines; TypeScript
+declares the protocol as an interface. Swift calls it through a generated
+adapter: on the JS thread the member runs before the call returns, and from
+any other thread the call waits while it runs on the JS thread, so a Swift
+thread must not hold up the JS thread while waiting on such a call. When the
+member throws, a throwing requirement throws a Swift error (and a call in
+progress from JS rethrows the JS exception); any other requirement returns
+its type's zero value (`0`, `""`, `nil`, an empty collection), or traps when
+the type has none.
+
+A protocol value returned to JS is the JS object it came from, a Swift
+object of its own registered class, or else a boxed value of the protocol.
+Swift holds the adapter, and through it the JS object, as long as it keeps
+the value; a `weak` reference does not keep it.
+
+Protocols with associated types, `Self` requirements, static or `async`
+requirements, initializers, or more than one refined module protocol stay
+type-only.
+
 ## Async, actors and the main actor
 
 - `async` functions return a Promise. The call reads its arguments
@@ -217,7 +251,8 @@ verification is what makes the generated surface trustworthy at SDK scale.
 ## Not yet supported
 
 Closures that return values, async cancellation, generic functions,
-`Result` and other standard library generics, protocols as values, tuples, sets, optional collection
+`Result` and other standard library generics, protocols with associated
+types, tuples, sets, optional collection
 elements, subscripts and operators. Each appears in the coverage report with
 its reason.
 

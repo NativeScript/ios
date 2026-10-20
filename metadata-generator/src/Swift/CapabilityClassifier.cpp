@@ -150,6 +150,7 @@ class Classifier {
       }
     }
     rejectUnbridgedPayloads();
+    rejectUnadoptableProtocols();
     for (const auto& entry : _module.symbols) {
       if (!isNominalType(entry.second.kind)) {
         _result.bySymbol[entry.first] = classifyOther(entry.second);
@@ -208,7 +209,7 @@ class Classifier {
       return capability;
     }
     if (symbol.kind == SymbolKind::Protocol) {
-      return make(Tier::TypeOnly, "protocol");
+      return classifyProtocol(symbol);
     }
     if (!symbol.genericParameters.empty()) {
       return make(Tier::SwiftSpecialized, "generic");
@@ -234,6 +235,114 @@ class Classifier {
       return make(Tier::Unsupported, "nonescapable");
     }
     return make(Tier::SwiftGenerated);
+  }
+
+  // A protocol JS objects can implement: every requirement is an instance
+  // method or property, and the protocols it refines are such protocols or
+  // markers. Requirement types are checked by rejectUnadoptableProtocols.
+  Capability classifyProtocol(const Symbol& symbol) const {
+    static const std::set<std::string> markers = {
+        "s:s8SendableP", "s:s16SendableMetatypeP", "s:s8CopyableP",
+        "s:s9EscapableP"};
+    int refinedModuleProtocols = 0;
+    for (const auto& id : symbol.conformances) {
+      const Symbol* refined = _module.find(id);
+      if (!markers.count(id) &&
+          (!refined || refined->kind != SymbolKind::Protocol)) {
+        return make(Tier::TypeOnly, "protocol");
+      }
+      refinedModuleProtocols += refined != nullptr;
+    }
+    // Adapters number requirements along a single refinement chain.
+    if (refinedModuleProtocols > 1) {
+      return make(Tier::TypeOnly, "protocol");
+    }
+    if (hasAttribute(symbol, "@MainActor")) {
+      return make(Tier::TypeOnly, "protocol");
+    }
+    for (const auto& id : symbol.memberIds) {
+      const Symbol* member = _module.find(id);
+      if (!member || !member->isProtocolRequirement) {
+        continue;
+      }
+      if (member->kind == SymbolKind::AssociatedType) {
+        return make(Tier::TypeOnly, "associated-type");
+      }
+      bool callable =
+          (member->kind == SymbolKind::InstanceMethod ||
+           member->kind == SymbolKind::InstanceProperty) &&
+          !member->isAsync && member->genericParameters.empty() &&
+          !hasAttribute(*member, "@MainActor") &&
+          !llvm::StringRef(member->declarationText).contains("Self");
+      if (!callable) {
+        return make(Tier::TypeOnly, "protocol");
+      }
+    }
+    return make(Tier::SwiftGenerated);
+  }
+
+  // Adoptable protocols whose requirements do not bridge (or that refine one
+  // that is not adoptable) are not; repeated until nothing changes.
+  void rejectUnadoptableProtocols() {
+    bool changed = true;
+    while (changed) {
+      changed = false;
+      for (const auto& entry : _module.symbols) {
+        const Symbol& symbol = entry.second;
+        Capability& capability = _result.bySymbol[entry.first];
+        if (symbol.kind != SymbolKind::Protocol ||
+            capability.tier != Tier::SwiftGenerated) {
+          continue;
+        }
+        std::vector<std::string> reasons;
+        for (const auto& id : symbol.conformances) {
+          const Capability* refined = _result.find(id);
+          if (_module.find(id) &&
+              (!refined || refined->tier != Tier::SwiftGenerated)) {
+            reasons.push_back("protocol");
+          }
+        }
+        for (const auto& id : symbol.memberIds) {
+          const Symbol* member = _module.find(id);
+          if (!member || !member->isProtocolRequirement) {
+            continue;
+          }
+          if (_rejections.count(member->preciseId)) {
+            reasons.push_back("compiler-rejected:" +
+                              _rejections.at(member->preciseId));
+          }
+          std::set<std::string> generics =
+              genericNamesInScope(_module, *member);
+          generics.insert("Self");
+          _substitutions.clear();
+          for (const auto& parameter : member->parameters) {
+            BridgedType bridged = bridge(parameter.type, generics, reasons);
+            if (parameter.modifier == "inout" ||
+                bridged.bridge == Bridge::Closure) {
+              reasons.push_back("protocol");
+            }
+          }
+          if (member->returnType) {
+            bridge(*member->returnType, generics, reasons);
+          }
+          if (member->valueType) {
+            bridge(*member->valueType, generics, reasons);
+          }
+        }
+        if (!reasons.empty()) {
+          std::sort(reasons.begin(), reasons.end());
+          reasons.erase(std::unique(reasons.begin(), reasons.end()),
+                        reasons.end());
+          capability = make(Tier::TypeOnly, "protocol");
+          for (const auto& reason : reasons) {
+            if (reason != "protocol") {
+              capability.reasons.push_back(reason);
+            }
+          }
+          changed = true;
+        }
+      }
+    }
   }
 
   // An enum with associated values crosses whole, so every case JS may see
@@ -347,7 +456,15 @@ class Classifier {
         return make(Tier::Unsupported, "external-type-extension");
       }
       if (owner->kind == SymbolKind::Protocol) {
-        return make(Tier::TypeOnly, "protocol-requirement");
+        const Capability* protocol = _result.find(owner->preciseId);
+        if (!protocol || protocol->tier != Tier::SwiftGenerated) {
+          return make(Tier::TypeOnly, "protocol-requirement");
+        }
+        // Static members need a conforming type, which a value of the
+        // protocol does not name.
+        if (symbol.isStatic || symbol.kind == SymbolKind::Initializer) {
+          return make(Tier::Unsupported, "protocol-static");
+        }
       }
       const Capability* ownerCapability = _result.find(owner->preciseId);
       if (!ownerCapability || ownerCapability->tier != Tier::SwiftGenerated) {
@@ -477,6 +594,14 @@ class Classifier {
     capability.jsName = symbol.kind == SymbolKind::Initializer
                             ? "constructor"
                             : symbol.baseName;
+    if (owner && owner->kind == SymbolKind::Protocol) {
+      capability.isRequirement = symbol.isProtocolRequirement;
+      // Assigning through a value of a protocol that is not class-bound
+      // would change a copy.
+      if (!llvm::StringRef(owner->declarationText).contains("AnyObject")) {
+        capability.isSettable = false;
+      }
+    }
     return capability;
   }
 
@@ -605,7 +730,22 @@ class Classifier {
         bridged.bridge = Bridge::Dictionary;
         return bridgeElement(node.children[1], bridged);
       }
-      case TypeNode::Kind::Existential:
+      case TypeNode::Kind::Existential: {
+        const TypeNode* inner =
+            node.children.empty() ? nullptr : &node.children[0];
+        const Symbol* protocol = inner && inner->kind == TypeNode::Kind::Nominal
+                                     ? _module.find(inner->usr())
+                                     : nullptr;
+        const Capability* capability =
+            protocol ? _result.find(protocol->preciseId) : nullptr;
+        if (protocol && protocol->kind == SymbolKind::Protocol && capability &&
+            capability->tier == Tier::SwiftGenerated) {
+          bridged.bridge = Bridge::Protocol;
+          bridged.symbolId = protocol->preciseId;
+          return "";
+        }
+        return "existential";
+      }
       case TypeNode::Kind::Composition:
         return "existential";
       case TypeNode::Kind::Opaque:
@@ -706,7 +846,16 @@ class Classifier {
     if (target) {
       const Capability* capability = _result.find(target->preciseId);
       if (capability && capability->tier == Tier::SwiftGenerated &&
-          target->kind != SymbolKind::Protocol) {
+          target->kind == SymbolKind::Protocol) {
+        // A bare protocol name is an existential.
+        bridged.bridge = Bridge::Protocol;
+        bridged.symbolId = target->preciseId;
+        return "";
+      }
+      if (target->kind == SymbolKind::Protocol) {
+        return "existential";
+      }
+      if (capability && capability->tier == Tier::SwiftGenerated) {
         bridged.bridge = bridgeOwner(*target).bridge;
         bridged.symbolId = target->preciseId;
         return "";
@@ -846,6 +995,9 @@ class Classifier {
         break;
       case Bridge::ObjCObject:
         kind = "objc";
+        break;
+      case Bridge::Protocol:
+        kind = "object:" + type.symbolId;
         break;
       default:
         kind = "other";

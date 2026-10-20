@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module"]);
-            expect(swift.abiVersion).toBe(8);
+            expect(swift.abiVersion).toBe(9);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(8);
+            expect(info.abiVersion).toBe(9);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -563,6 +563,90 @@ describe("ns:swift", function () {
         it("bridges generic enums with associated values", function () {
             expect(SwiftDemo.settle(3)).toEqual({ case: "done", value: 3 });
             expect(SwiftDemo.settle(-1)).toEqual({ case: "failed", reason: "negative" });
+        });
+    });
+
+    describe("protocols", function () {
+        function jsGreeting(name) {
+            return {
+                name: name,
+                punctuation: "?",
+                greet: function (other) { return "hey " + other + " from " + this.name; },
+                reset: function () { this.punctuation = "."; },
+            };
+        }
+
+        it("passes JS objects implementing a protocol", function () {
+            expect(SwiftDemo.introduce(jsGreeting("js"), "ada")).toBe("hey ada from js?");
+        });
+
+        it("assigns properties through the implementation", function () {
+            var greeting = jsGreeting("js");
+            SwiftDemo.excite(greeting);
+            expect(greeting.punctuation).toBe("!");
+        });
+
+        it("returns a JS implementation as the object it was given", function () {
+            var greeting = jsGreeting("js");
+            expect(SwiftDemo.same(greeting)).toBe(greeting);
+        });
+
+        it("passes Swift conformers as their own class", function () {
+            var formal = SwiftDemo.makeGreeting("ada");
+            expect(formal instanceof SwiftDemo.FormalGreeting).toBe(true);
+            expect(SwiftDemo.introduce(formal, "bo")).toBe("Good day, bo, from ada.");
+            expect(SwiftDemo.same(formal)).toBe(formal);
+            var scorer = SwiftDemo.makeScorer();
+            expect(scorer instanceof SwiftDemo.DoublingScorer).toBe(true);
+            expect(SwiftDemo.scoreAll(scorer, [1, 2])).toEqual([2, 4]);
+        });
+
+        it("throws a JS implementation's exception from the call", function () {
+            var scorer = {
+                score: function (value) {
+                    if (value > 1) {
+                        throw new Error("too big");
+                    }
+                    return value;
+                },
+            };
+            expect(SwiftDemo.scoreAll(scorer, [1])).toEqual([1]);
+            expect(function () { SwiftDemo.scoreAll(scorer, [1, 2]); }).toThrowError("too big");
+        });
+
+        it("implements refined protocols' requirements too", function () {
+            var scorer = { rank: 3, score: function (value) { return value + 10; } };
+            expect(SwiftDemo.topRank(scorer)).toBe("3:11");
+            scorer.rank = null;
+            expect(SwiftDemo.topRank(scorer)).toBe("-1:11");
+        });
+
+        it("refuses incomplete implementations", function () {
+            expect(function () {
+                SwiftDemo.introduce({ name: "x", greet: function () { return ""; } }, "y");
+            }).toThrowError(TypeError, /missing .*punctuation.*reset|missing .*reset.*punctuation/);
+        });
+
+        it("keeps implementations Swift holds", function () {
+            var holder = new SwiftDemo.GreetingHolder();
+            holder.greeting = jsGreeting("held");
+            gc();
+            expect(holder.greet("you")).toBe("hey you from held");
+            expect(holder.greeting.name).toBe("held");
+            holder.greeting = null;
+            expect(holder.greet("you")).toBeNull();
+        });
+
+        it("runs requirements called from other threads on the JS thread", function (done) {
+            var greeting = jsGreeting("js");
+            greeting.greet = function (other) { return other + ":" + NSThread.isMainThread; };
+            SwiftDemo.greetInBackground(greeting).then(function (text) {
+                expect(text).toBe("background:true");
+                done();
+            }, function (error) {
+                fail(error);
+                done();
+            });
         });
     });
 

@@ -59,6 +59,15 @@ const score: SwiftDemoTypes.Score = SwiftDemo.makeScore("ada", 3);
 const settled = SwiftDemo.settle(1);
 const settledValue: number = settled.case === "done" ? settled.value : 0;
 void [swappedPair, score, settledValue, SwiftDemo.describe(pair)];
+const jsGreeting: SwiftDemoTypes.Greeting = {
+  name: "js",
+  punctuation: "?",
+  greet: (other) => "hi " + other,
+  reset() {},
+};
+void [SwiftDemo.introduce(jsGreeting, "you"), SwiftDemo.makeGreeting("swift").greet("x")];
+// @ts-expect-error  an implementation provides every requirement
+SwiftDemo.introduce({ name: "js", greet: (other: string) => other }, "you");
 // @ts-expect-error  an instantiation's arguments are typed
 SwiftDemo.describe(new Kit.Pair("one", 1));
 // @ts-expect-error  inout parameters take a reference object

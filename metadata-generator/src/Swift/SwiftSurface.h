@@ -20,6 +20,7 @@ struct SwiftSurface {
     kStruct = 2,
     kEnum = 3,
     kTaggedEnum = 4,
+    kProtocol = 5,
   };
   enum MemberKind {
     kInitializer = 0,
@@ -37,13 +38,17 @@ struct SwiftSurface {
     kAmbiguous = 1 << 2,
     kAsync = 1 << 3,
     kMainActor = 1 << 4,
+    // A protocol requirement; its position among the protocol's
+    // requirements is the index adapters call it by.
+    kRequirement = 1 << 5,
   };
 
   struct Type {
     const Symbol* symbol;
     int index;
     TypeKind kind;
-    // Type index of the registered superclass, or -1.
+    // Type index of the registered superclass (for a protocol, the protocol
+    // it refines), or -1.
     int superIndex;
     // The Swift module whose JS namespace exposes the type.
     std::string module;
@@ -67,6 +72,9 @@ struct SwiftSurface {
   // A tagged enum's cases in registration order, which is the case index
   // the runtime and the thunks share.
   std::vector<const Member*> casesOf(int typeIndex) const;
+  // A protocol's requirements, those of the protocol it refines first, then
+  // its own in registration order: the index adapters call them by.
+  std::vector<const Member*> requirementsOf(int typeIndex) const;
 
   std::vector<Type> types;
   std::vector<Member> members;
