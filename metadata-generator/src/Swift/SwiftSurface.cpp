@@ -47,6 +47,17 @@ int SwiftSurface::indexOf(const std::string& symbolId) const {
   return it == typeIndex.end() ? -1 : it->second;
 }
 
+std::vector<const SwiftSurface::Member*> SwiftSurface::casesOf(
+    int typeIndex) const {
+  std::vector<const Member*> cases;
+  for (const auto& member : members) {
+    if (member.kind == kEnumCase && member.owner == typeIndex) {
+      cases.push_back(&member);
+    }
+  }
+  return cases;
+}
+
 const TypeNode& unwrappedNode(const BridgedType& type) {
   const TypeNode& node = type.node;
   if (type.optional && !node.children.empty() &&
@@ -93,6 +104,9 @@ std::string signatureCode(const SwiftSurface& surface,
     case Bridge::EnumCase:
       code = "e" + std::to_string(surface.indexOf(type.symbolId));
       break;
+    case Bridge::TaggedEnum:
+      code = "t" + std::to_string(surface.indexOf(type.symbolId));
+      break;
     case Bridge::Date:
       code = "D";
       break;
@@ -134,8 +148,10 @@ SwiftSurface describeSurface(const Module& module,
       continue;
     }
     SwiftSurface::TypeKind kind =
-        symbol.kind == SymbolKind::Struct  ? SwiftSurface::kStruct
-        : symbol.kind == SymbolKind::Enum  ? SwiftSurface::kEnum
+        symbol.kind == SymbolKind::Struct ? SwiftSurface::kStruct
+        : symbol.kind == SymbolKind::Enum
+            ? (hasAssociatedValues(module, symbol) ? SwiftSurface::kTaggedEnum
+                                                   : SwiftSurface::kEnum)
         : symbol.kind == SymbolKind::Actor ? SwiftSurface::kActor
                                            : SwiftSurface::kClass;
     int index = static_cast<int>(surface.types.size());
@@ -172,11 +188,6 @@ SwiftSurface describeSurface(const Module& module,
              ? SwiftSurface::kMainActor
              : 0);
     member.result = capability->result;
-    if (member.kind == SwiftSurface::kEnumCase) {
-      member.result.bridge = Bridge::EnumCase;
-      member.result.symbolId = owner ? owner->preciseId : "";
-      member.result.optional = false;
-    }
     for (size_t i = 0; i < capability->parameters.size(); i++) {
       member.signature += (i > 0 ? "," : "") +
                           signatureCode(surface, capability->parameters[i]);

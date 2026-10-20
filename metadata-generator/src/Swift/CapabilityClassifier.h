@@ -45,6 +45,9 @@ enum class Bridge {
   StructBox,
   // Module enum without payloads: its case name as a JS string.
   EnumCase,
+  // Module enum with associated values: a plain JS object copy naming its
+  // case, `{ case: "area", width: 3, height: 4 }` (see caseKeys).
+  TaggedEnum,
   // Foundation.Date: a JS Date.
   Date,
   // Foundation.URL: a JS URL (a string is accepted as input).
@@ -66,7 +69,8 @@ struct BridgedType {
   // Nominal bridges: the module symbol the type refers to.
   std::string symbolId;
   TypeNode node;
-  // Array and Dictionary: the element (value) type.
+  // Array and Dictionary: the element (value) type. Closure: its
+  // parameters.
   std::vector<BridgedType> elements;
   // Closure parameters declared @escaping (valid only in parameter
   // position, so kept out of `node`).
@@ -122,6 +126,13 @@ Classification classify(
 
 // Whether `kind` is something JavaScript can call or read.
 bool isCallableKind(SymbolKind kind);
+
+// Whether enum `symbol` has a case with associated values.
+bool hasAssociatedValues(const Module& module, const Symbol& symbol);
+
+// The JS keys of an enum case's associated values: the label, or "value"
+// for a lone unlabeled value, or the position.
+std::vector<std::string> caseKeys(const Symbol& enumCase);
 
 // The availability entries that apply to `module`'s platform.
 std::vector<const Availability*> applicableAvailability(const Module& module,

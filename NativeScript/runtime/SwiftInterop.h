@@ -37,7 +37,7 @@
 // calls it by reporting the arguments as an array: callbackBegin, each
 // argument through the complete* entries, then completeArrayEnd.
 
-#define NS_SWIFT_ABI_VERSION 4
+#define NS_SWIFT_ABI_VERSION 5
 
 #ifdef __cplusplus
 extern "C" {
@@ -75,6 +75,9 @@ enum {
   NSSwiftTagMap = 8,
   // payload.object is a callback handle.
   NSSwiftTagFunction = 9,
+  // An enum with associated values: payload.object points at `length`
+  // slots, the case index (NSSwiftTagInt64) then the case's values.
+  NSSwiftTagCase = 10,
 };
 
 typedef struct NSSwiftAPI NSSwiftAPI;
@@ -97,6 +100,8 @@ enum {
   NSSwiftTypeActor = 1,
   NSSwiftTypeStruct = 2,
   NSSwiftTypeEnum = 3,
+  // An enum with associated values.
+  NSSwiftTypeTaggedEnum = 4,
 };
 
 enum {
@@ -131,6 +136,9 @@ enum {
 //   s           String
 //   o<n>        object of type index n (class instance, or boxed struct)
 //   e<n>        payload-less enum of type index n, as its case name
+//   t<n>        enum with associated values of type index n
+//               (NSSwiftTagCase) <-> plain JS object copy naming its case,
+//               { case: "area", width: 3, height: 4 }
 //   D           Date: a double of milliseconds since 1970 <-> JS Date
 //   U           URL: its string <-> JS URL (strings accepted as input)
 //   B           Data: bytes (NSSwiftTagString) <-> Uint8Array copy
@@ -142,6 +150,12 @@ enum {
 //   <code>?     optional: JS null/undefined <-> NSSwiftTagNull
 // e.g. "s,i64>s" is (String, Int) -> String; ">o2?" returns an optional
 // instance of type 2.
+//
+// A tagged enum's cases register as its NSSwiftMemberEnumCase members with
+// their associated values as parameters ("f64,f64>t2" for
+// `area(width:height:)`); a case's index is its position among them. JS keys
+// a value by its label, by "value" when it is a case's only, unlabeled value,
+// and by its position otherwise.
 
 // Function pointer table. Slot n is at byte offset n * 8; slots are only
 // ever appended.
@@ -218,6 +232,13 @@ struct NSSwiftAPI {
   /* 31 */ void* (*callbackBegin)(void* callback);
   /* 32 */ void (*callbackRetain)(void* callback);
   /* 33 */ void (*callbackRelease)(void* callback);
+
+  // Tagged enum values are reported like collections: Begin with the case
+  // index, the case's values through the return*/complete* entries, End.
+  /* 34 */ void (*returnCaseBegin)(NSSwiftCall* call, intptr_t caseIndex);
+  /* 35 */ void (*completeCaseBegin)(void* token, intptr_t caseIndex);
+  /* 36 */ void (*returnCaseEnd)(NSSwiftCall* call);
+  /* 37 */ void (*completeCaseEnd)(void* token);
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);

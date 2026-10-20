@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module"]);
-            expect(swift.abiVersion).toBe(4);
+            expect(swift.abiVersion).toBe(5);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(4);
+            expect(info.abiVersion).toBe(5);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -53,7 +53,7 @@ describe("ns:swift", function () {
             // Unsupported declarations (async, generic, closures, ...) are absent.
             expect(SwiftDemo.Loader.prototype.update).toBeUndefined();
             expect(SwiftDemo.Loader.prototype.transform).toBeUndefined();
-            expect(SwiftDemo.ShapeError).toBeUndefined();
+            expect(SwiftDemo.Loader.prototype.withCompletion).toBeUndefined();
         });
     });
 
@@ -263,10 +263,11 @@ describe("ns:swift", function () {
         });
 
         it("gives an unbridged parent a frozen namespace", function () {
-            // Measurement (an enum with associated values) is not bridged.
-            expect(typeof SwiftDemo.Measurement).toBe("object");
-            expect(Object.isFrozen(SwiftDemo.Measurement)).toBe(true);
-            expect(Object.keys(SwiftDemo.Measurement)).toEqual(["Unit"]);
+            // Job (whose case carries a closure) is not bridged.
+            expect(typeof SwiftDemo.Job).toBe("object");
+            expect(Object.isFrozen(SwiftDemo.Job)).toBe(true);
+            expect(Object.keys(SwiftDemo.Job)).toEqual(["Ticket"]);
+            expect(new SwiftDemo.Job.Ticket(4).id).toBe(4);
             expect(new SwiftDemo.Measurement.Unit("m").symbol).toBe("m");
         });
     });
@@ -423,6 +424,74 @@ describe("ns:swift", function () {
                 fail("worker error: " + event.message);
                 done();
             };
+        });
+    });
+
+    describe("enums with associated values", function () {
+        it("returns cases as objects naming the case", function () {
+            expect(SwiftDemo.measure(2, 3)).toEqual({ case: "area", width: 2, height: 3 });
+            expect(SwiftDemo.measure(2, null)).toEqual({ case: "length", value: 2 });
+            expect(SwiftDemo.measure(0, null)).toEqual({ case: "none" });
+            expect(SwiftDemo.measurements()).toEqual([
+                { case: "length", value: 1 },
+                { case: "area", width: 2, height: 3 },
+                { case: "none" },
+            ]);
+        });
+
+        it("accepts case objects", function () {
+            expect(SwiftDemo.area({ case: "area", width: 2, height: 4 })).toBe(8);
+            expect(SwiftDemo.area({ case: "none" })).toBe(0);
+            expect(SwiftDemo.explain({ case: "tooManySides", count: 5, limit: 4 })).toBe("5 > 4");
+            expect(SwiftDemo.explain({ case: "invalidSide", value: 1.5 })).toBe("invalid side 1.5");
+            expect(SwiftDemo.Measurement.isNone({ case: "none" })).toBe(true);
+            expect(SwiftDemo.Measurement.isNone({ case: "length", value: 1 })).toBe(false);
+        });
+
+        it("refuses unknown cases and mistyped values", function () {
+            expect(function () { SwiftDemo.area({ case: "circle" }); })
+                .toThrowError(TypeError, /case of Measurement/);
+            expect(function () { SwiftDemo.area({ case: "area", width: "2", height: 1 }); })
+                .toThrowError(TypeError);
+            expect(function () { SwiftDemo.area("area"); }).toThrowError(TypeError);
+        });
+
+        it("round-trips recursive enums", function () {
+            var formula = {
+                case: "sum",
+                0: { case: "number", value: 1 },
+                1: { case: "negate", value: { case: "number", value: 4 } },
+            };
+            expect(SwiftDemo.Formula.value(formula)).toBe(-3);
+            expect(SwiftDemo.simplify(formula)).toEqual({ case: "number", value: -3 });
+        });
+
+        it("carries objects, structs, enums, optionals and arrays", function () {
+            var tracker = new SwiftDemo.Tracker(3);
+            expect(SwiftDemo.echo({ case: "tracker", value: tracker }).value).toBe(tracker);
+            var point = SwiftDemo.echo({ case: "point", value: new SwiftDemo.Point({ x: 1, y: 2 }) }).value;
+            expect(point instanceof SwiftDemo.Point).toBe(true);
+            expect(point.x).toBe(1);
+            expect(SwiftDemo.echo({ case: "flavor", value: "chocolate" }))
+                .toEqual({ case: "flavor", value: "chocolate" });
+            expect(SwiftDemo.echo({ case: "maybe", value: null })).toEqual({ case: "maybe", value: null });
+            expect(SwiftDemo.echo({ case: "maybe" })).toEqual({ case: "maybe", value: null });
+            expect(SwiftDemo.echo({ case: "maybe", value: 7 })).toEqual({ case: "maybe", value: 7 });
+            expect(SwiftDemo.echo({ case: "names", value: ["a", "b"] }))
+                .toEqual({ case: "names", value: ["a", "b"] });
+        });
+
+        it("resolves async results and passes cases to closures", function (done) {
+            var received;
+            SwiftDemo.onMeasure(function (measurement) { received = measurement; });
+            expect(received).toEqual({ case: "area", width: 1, height: 2 });
+            SwiftDemo.measureLater(5).then(function (measurement) {
+                expect(measurement).toEqual({ case: "length", value: 5 });
+                done();
+            }, function (error) {
+                fail(error);
+                done();
+            });
         });
     });
 

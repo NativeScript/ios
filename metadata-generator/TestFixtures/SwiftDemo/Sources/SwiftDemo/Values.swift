@@ -96,3 +96,69 @@ public final class Notifier: @unchecked Sendable {
     }
     public func clear() { handlers.removeAll() }
 }
+
+public func area(of measurement: Measurement) -> Double {
+    switch measurement {
+    case let .area(width, height): return width * height
+    case .length, .none: return 0
+    }
+}
+
+public func measure(_ width: Double, by height: Double?) -> Measurement {
+    guard let height else { return width == 0 ? .none : .length(width) }
+    return .area(width: width, height: height)
+}
+
+public func measurements() -> [Measurement] { [.length(1), .area(width: 2, height: 3), .none] }
+
+public func measureLater(_ width: Double) async -> Measurement {
+    await Task.yield()
+    return .length(width)
+}
+
+public func onMeasure(_ body: (Measurement) -> Void) { body(.area(width: 1, height: 2)) }
+
+public func explain(_ error: ShapeError) -> String {
+    switch error {
+    case let .invalidSide(side): return "invalid side \(side)"
+    case let .tooManySides(count, limit): return "\(count) > \(limit)"
+    case .unknown: return "unknown"
+    }
+}
+
+public indirect enum Formula {
+    case number(Double)
+    case sum(Formula, Formula)
+    case negate(Formula)
+
+    public var value: Double {
+        switch self {
+        case let .number(value): return value
+        case let .sum(a, b): return a.value + b.value
+        case let .negate(formula): return -formula.value
+        }
+    }
+}
+
+public func simplify(_ formula: Formula) -> Formula { .number(formula.value) }
+
+public enum Payload {
+    case tracker(Tracker)
+    case point(Point)
+    case flavor(Flavor)
+    case maybe(Int?)
+    case names([String])
+}
+
+public func echo(_ payload: Payload) -> Payload { payload }
+
+// Not bridged: a closure cannot be copied into a JS value.
+public enum Job {
+    case run(() -> Void)
+    case idle
+
+    public struct Ticket {
+        public var id: Int
+        public init(id: Int) { self.id = id }
+    }
+}

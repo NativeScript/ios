@@ -95,7 +95,8 @@ std::string codeDisplayName(const SwiftSurface& surface,
       break;
     case Bridge::ClassHandle:
     case Bridge::StructBox:
-    case Bridge::EnumCase: {
+    case Bridge::EnumCase:
+    case Bridge::TaggedEnum: {
       int index = surface.indexOf(type.symbolId);
       name = index >= 0 ? surface.types[index].symbol->name : "?";
       break;
@@ -241,10 +242,15 @@ class Writer {
       return bridge == Bridge::String || bridge == Bridge::EnumCase ||
              bridge == Bridge::URL;
     };
+    auto record = [](Bridge bridge) {
+      return bridge == Bridge::Dictionary || bridge == Bridge::TaggedEnum;
+    };
     if (a.bridge == b.bridge &&
         (a.bridge == Bridge::Date || a.bridge == Bridge::Data ||
-         a.bridge == Bridge::Array || a.bridge == Bridge::Dictionary ||
-         a.bridge == Bridge::Closure)) {
+         a.bridge == Bridge::Array || a.bridge == Bridge::Closure)) {
+      return true;
+    }
+    if (record(a.bridge) && record(b.bridge)) {
       return true;
     }
     if (numeric(a.bridge) && numeric(b.bridge)) {
@@ -331,6 +337,7 @@ class Writer {
       case Bridge::ClassHandle:
       case Bridge::StructBox:
       case Bridge::EnumCase:
+      case Bridge::TaggedEnum:
         ts = typeName(type);
         break;
       case Bridge::Date:
@@ -383,6 +390,7 @@ class Writer {
       case Bridge::ClassHandle:
       case Bridge::StructBox:
       case Bridge::EnumCase:
+      case Bridge::TaggedEnum:
         ts = typeName(type);
         break;
       case Bridge::Date:
@@ -541,7 +549,8 @@ class Writer {
   }
 
   void writeNode(const Node& node, const std::string& indent) {
-    if (node.type && node.type->kind == SwiftSurface::kEnum) {
+    if (node.type && (node.type->kind == SwiftSurface::kEnum ||
+                      node.type->kind == SwiftSurface::kTaggedEnum)) {
       writeEnum(*node.type, node, indent);
       return;
     }
@@ -616,24 +625,42 @@ class Writer {
     _out << indent << "}\n\n";
   }
 
-  // `type` (a union of case names) plus a namespace of the enum object's
-  // members, which can also hold nested types; TypeScript cannot merge a
-  // namespace with a const.
+  // `type` (a union of case names, or of case objects when cases carry
+  // values) plus a namespace of the enum object's members, which can also
+  // hold nested types; TypeScript cannot merge a namespace with a const.
   void writeEnum(const SwiftSurface::Type& type, const Node& node,
                  const std::string& indent) {
     const Symbol& symbol = *type.symbol;
     std::string self = llvm::join(symbol.pathComponents, ".");
     std::string inner = indent + "  ";
+    bool tagged = type.kind == SwiftSurface::kTaggedEnum;
     std::vector<std::string> cases;
-    for (const Group& group : _groups) {
-      if (group.owner == type.index && group.kind == SwiftSurface::kEnumCase) {
-        cases.push_back("\"" + group.jsName + "\"");
+    for (const Member* member : _surface.casesOf(type.index)) {
+      const std::string& name = member->capability->jsName;
+      if (!tagged) {
+        cases.push_back("\"" + name + "\"");
+        continue;
       }
+      std::string shape = "{ case: \"" + name + "\"";
+      std::vector<std::string> keys = caseKeys(*member->symbol);
+      const auto& elements = member->capability->parameters;
+      for (size_t i = 0; i < elements.size() && i < keys.size(); i++) {
+        shape += "; " + propertyKey(keys[i]) + ": " + outputType(elements[i]);
+      }
+      cases.push_back(shape + " }");
     }
     writeDoc(symbol, indent);
-    _out << indent << "export type " << symbol.name << " = "
-         << (cases.empty() ? std::string("never") : llvm::join(cases, " | "))
-         << ";\n";
+    _out << indent << "export type " << symbol.name << " =";
+    if (cases.empty()) {
+      _out << " never";
+    } else if (tagged) {
+      for (const auto& shape : cases) {
+        _out << "\n" << inner << "| " << shape;
+      }
+    } else {
+      _out << " " << llvm::join(cases, " | ");
+    }
+    _out << ";\n";
     _out << indent << "export namespace " << symbol.name << " {\n";
     for (const Group& group : _groups) {
       if (group.owner != type.index || !isIdentifier(group.jsName) ||
@@ -643,11 +670,14 @@ class Writer {
       const Member& first = *group.overloads[0];
       switch (group.kind) {
         case SwiftSurface::kEnumCase:
-          _out << inner << "export const " << group.jsName << ": \""
-               << group.jsName << "\";\n";
+          if (!tagged) {
+            _out << inner << "export const " << group.jsName << ": \""
+                 << group.jsName << "\";\n";
+          }
           break;
         case SwiftSurface::kInitializer:
-          // Enum initializers are exposed as `init`; they produce a case name.
+          // Enum initializers are exposed as `init`: `new` cannot produce a
+          // case.
           for (const Member* member : group.overloads) {
             writeDoc(*member->symbol, inner);
             _out << inner << "export function init(" << parameterList(*member)
@@ -661,7 +691,7 @@ class Writer {
                << group.jsName << ": " << resultOf(first) << ";\n";
           break;
         case SwiftSurface::kInstanceProperty:
-          // A case name has no properties; instance members take it first.
+          // A case value has no members; instance members take it first.
           writeDoc(*first.symbol, inner);
           _out << inner << "export function " << group.jsName
                << "(value: " << self << "): " << resultOf(first) << ";\n";

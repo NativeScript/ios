@@ -117,6 +117,10 @@ class Emitter {
         return {"__nsEnum" + std::to_string(typeIndexOf(type.symbolId)) + "(" +
                     read("string") + ")",
                 true};
+      case Bridge::TaggedEnum:
+        return {"__nsReadCase" + std::to_string(typeIndexOf(type.symbolId)) +
+                    "(" + slots + ", " + index + ")",
+                true};
       case Bridge::Array:
       case Bridge::Dictionary: {
         const BridgedType& element = type.elements.at(0);
@@ -193,6 +197,7 @@ class Emitter {
   std::string describe(const BridgedType& type) const {
     switch (type.bridge) {
       case Bridge::EnumCase:
+      case Bridge::TaggedEnum:
         return "a case of " + typeName(type.symbolId);
       case Bridge::URL:
         return "a valid URL";
@@ -243,6 +248,9 @@ class Emitter {
       case Bridge::EnumCase:
         return reporter + ".returnString(__nsEnumName" +
                std::to_string(typeIndexOf(type.symbolId)) + "(" + value + "))";
+      case Bridge::TaggedEnum:
+        return "__nsReportCase" + std::to_string(typeIndexOf(type.symbolId)) +
+               "(" + reporter + ", " + value + ")";
       case Bridge::Date:
         return reporter + ".returnDouble(" + value +
                ".timeIntervalSince1970 * 1000)";
@@ -287,9 +295,12 @@ class Emitter {
       return "box.value";
     }
     if (owner.kind == SymbolKind::Enum) {
-      body += "  guard let receiver = __nsEnum" +
-              std::to_string(typeIndexOf(owner.preciseId)) +
-              "(rt.string(0)) else { " + failure + " }\n";
+      std::string index = std::to_string(typeIndexOf(owner.preciseId));
+      body += hasAssociatedValues(_module, owner)
+                  ? "  guard let receiver = __nsReadCase" + index +
+                        "(rt.slots, 0) else { " + failure + " }\n"
+                  : "  guard let receiver = __nsEnum" + index +
+                        "(rt.string(0)) else { " + failure + " }\n";
       return "receiver";
     }
     body += "  guard let receiver = rt.object(0) as? " + type + " else { " +
@@ -500,6 +511,23 @@ private final class __NSBox<Value> {
   init(_ value: Value) { self.value = value }
 }
 
+// The result entries calls and completions share, so value reporting code
+// serves both.
+private protocol __NSReporter {
+  func returnVoid()
+  func returnBool(_ value: Bool)
+  func returnInt64(_ value: Int64)
+  func returnUInt64(_ value: UInt64)
+  func returnDouble(_ value: Double)
+  func returnString(_ value: String)
+  func returnNull()
+  func returnBytes(_ value: Data)
+  func returnArray<Elements: Collection>(_ values: Elements, _ each: (Elements.Element) -> Void)
+  func returnMap<Value>(_ values: [String: Value], _ each: (String, Value) -> Void)
+  func returnObject(_ object: AnyObject, _ typeIndex: UInt32)
+  func returnCase(_ index: Int, _ values: () -> Void)
+}
+
 // Reads arguments (24-byte slots) and reports results through the runtime's
 // API table, whose address is the first word of the call context.
 // 24-byte argument slots: tag at 0, payload at 8, length at 16. Arrays and
@@ -557,7 +585,7 @@ private func __nsReadMap<Value>(_ slots: __NSSlots, _ i: Int,
   return result
 }
 
-private struct __NSCall {
+private struct __NSCall: __NSReporter {
   let call: UnsafeMutableRawPointer
   let slots: __NSSlots
 
@@ -622,6 +650,12 @@ private struct __NSCall {
     for (key, value) in values { each(key, value) }
     slot(26, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(call)
   }
+  // `values` reports the case's associated values in order.
+  func returnCase(_ index: Int, _ values: () -> Void) {
+    slot(34, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(call, index)
+    values()
+    slot(36, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(call)
+  }
   func returnObject(_ object: AnyObject, _ typeIndex: UInt32) {
     slot(7, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer, UInt32) -> Void).self)(
       call, Unmanaged.passRetained(object).toOpaque(), typeIndex)
@@ -661,7 +695,7 @@ private final class __NSUnchecked<Value>: @unchecked Sendable {
 
 // Settles an async call's Promise from any thread; the first report consumes
 // the token.
-private struct __NSCompletion: @unchecked Sendable {
+private struct __NSCompletion: @unchecked Sendable, __NSReporter {
   let api: UnsafeRawPointer
   let token: UnsafeMutableRawPointer
 
@@ -709,6 +743,11 @@ private struct __NSCompletion: @unchecked Sendable {
     slot(29, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(token, values.count)
     for (key, value) in values { each(key, value) }
     slot(30, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(token)
+  }
+  func returnCase(_ index: Int, _ values: () -> Void) {
+    slot(35, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(token, index)
+    values()
+    slot(37, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(token)
   }
   func returnObject(_ object: AnyObject, _ typeIndex: UInt32) {
     slot(21, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer, UInt32) -> Void).self)(
@@ -764,6 +803,10 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
     std::string out;
     for (const auto& type : _surface.types) {
       const Symbol& symbol = *type.symbol;
+      if (type.kind == SwiftSurface::kTaggedEnum) {
+        out += taggedEnumHelpers(type);
+        continue;
+      }
       if (symbol.kind != SymbolKind::Enum) {
         continue;
       }
@@ -834,6 +877,113 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
       }
     }
     return out;
+  }
+
+  // __nsReadCase<n> builds the enum from a case slot (NSSwiftTagCase: the
+  // case index, then its associated values) and __nsReportCase<n> reports
+  // one, both by the case's registration index.
+  std::string taggedEnumHelpers(const SwiftSurface::Type& type) const {
+    const Symbol& symbol = *type.symbol;
+    std::string typeName = qualifiedTypeName(_module, symbol);
+    std::string availability = availabilityCondition(_module, symbol);
+    std::string attribute =
+        availability.empty() ? "" : "@available(" + availability + ")\n";
+    std::string index = std::to_string(type.index);
+    std::vector<const SwiftSurface::Member*> cases =
+        _surface.casesOf(type.index);
+
+    std::string read = "// " + symbol.preciseId + "\n" + attribute +
+                       "private func __nsReadCase" + index +
+                       "(_ slots: __NSSlots, _ i: Int) -> " + typeName +
+                       "? {\n  let (s, _) = slots.elements(i)\n"
+                       "  switch s.int64(0) {\n";
+    std::string report = attribute + "private func __nsReportCase" + index +
+                         "<R: __NSReporter>(_ r: R, _ value: " + typeName +
+                         ") {\n  switch value {\n";
+    std::string gatedReports;
+    for (size_t k = 0; k < cases.size(); k++) {
+      const Symbol& member = *cases[k]->symbol;
+      const auto& elements = cases[k]->capability->parameters;
+      std::string condition = availabilityCondition(_module, member);
+      if (condition == availability) {
+        condition.clear();
+      }
+      std::string value = typeName + "." + swiftIdentifier(member.baseName);
+
+      read += "  case " + std::to_string(k) + ":\n";
+      if (!condition.empty()) {
+        read += "    guard #available(" + condition + ") else { return nil }\n";
+      }
+      std::vector<std::string> arguments;
+      std::vector<std::string> bindings;
+      std::vector<std::string> reports;
+      for (size_t e = 0; e < elements.size(); e++) {
+        std::string name = "e" + std::to_string(e);
+        read += readCaseElement(elements[e], e + 1, name);
+        const std::string& label =
+            e < member.parameters.size() ? member.parameters[e].label : "";
+        arguments.push_back(label.empty() ? name : label + ": " + name);
+        std::string bound = "p" + std::to_string(e);
+        bindings.push_back(bound);
+        std::string statement = returnValue(elements[e], "r", bound);
+        reports.push_back(elements[e].optional
+                              ? "if let " + bound + " { " + statement +
+                                    " } else { r.returnNull() }"
+                              : statement);
+      }
+      read +=
+          "    return " + value +
+          (arguments.empty() ? "" : "(" + llvm::join(arguments, ", ") + ")") +
+          "\n";
+
+      std::string pattern =
+          value +
+          (bindings.empty() ? "" : "(" + llvm::join(bindings, ", ") + ")");
+      std::string body = "r.returnCase(" + std::to_string(k) + ") { " +
+                         llvm::join(reports, "; ") + " }";
+      if (condition.empty()) {
+        report += "  case " + std::string(bindings.empty() ? "" : "let ") +
+                  pattern + ": " + body + "\n";
+      } else {
+        // A case pattern cannot be guarded by #available.
+        gatedReports += "    if #available(" + condition + "), case " +
+                        (bindings.empty() ? "" : "let ") + pattern +
+                        " = value { " + body + "; return }\n";
+      }
+    }
+    read += "  default: return nil\n  }\n}\n\n";
+    size_t declared = 0;
+    for (const auto& id : symbol.memberIds) {
+      const Symbol* member = _module.find(id);
+      declared += member && member->kind == SymbolKind::EnumCase;
+    }
+    // Cases JS never sees (unavailable ones) report null.
+    report += gatedReports.empty() && declared == cases.size()
+                  ? "  @unknown default: r.returnNull()\n"
+                  : "  default:\n" + gatedReports + "    r.returnNull()\n";
+    report += "  }\n}\n\n";
+    return read + report;
+  }
+
+  // Lines binding `name` to associated value slot `slot` of `s`, returning
+  // nil when it does not convert.
+  std::string readCaseElement(const BridgedType& type, size_t slot,
+                              const std::string& name) const {
+    std::string index = std::to_string(slot);
+    ValueExpression value = valueExpression(type, "s", index);
+    std::string typeText = valueTypeName(type);
+    if (!type.optional) {
+      return value.failable ? "    guard let " + name + " = " + value.code +
+                                  " else { return nil }\n"
+                            : "    let " + name + " = " + value.code + "\n";
+    }
+    if (!value.failable) {
+      return "    let " + name + ": " + typeText + "? = s.isNull(" + index +
+             ") ? nil : " + value.code + "\n";
+    }
+    return "    var " + name + ": " + typeText + "? = nil\n    if !s.isNull(" +
+           index + ") {\n      guard let value = " + value.code +
+           " else { return nil }\n      " + name + " = value\n    }\n";
   }
 
   // Dynamic type index of a returned object: most derived classes first.

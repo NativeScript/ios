@@ -52,6 +52,7 @@ struct ValueCode {
     Array,
     Map,
     Function,
+    Tagged,
   };
   Kind kind = Kind::Void;
   int bits = 64;
@@ -164,6 +165,9 @@ bool ParseCode(std::string text, ValueCode& code) {
     case 'e':
       code.kind = ValueCode::Kind::Enum;
       return number(text.substr(1), code.typeIndex);
+    case 't':
+      code.kind = ValueCode::Kind::Tagged;
+      return number(text.substr(1), code.typeIndex);
     default:
       return false;
   }
@@ -254,6 +258,13 @@ struct MemberGroup {
   std::vector<const MemberInfo*> overloads;
 };
 
+// One case of a tagged enum: its JS keys and value codes, by position.
+struct CaseInfo {
+  std::string name;
+  std::vector<std::string> keys;
+  std::vector<ValueCode> codes;
+};
+
 struct TypeInfo {
   uint32_t index = 0;
   uint32_t kind = 0;
@@ -263,7 +274,11 @@ struct TypeInfo {
   const ModuleInfo* module = nullptr;
   // Initializers (`new Type(...)`), or null when the type has none.
   const MemberGroup* initializers = nullptr;
+  // NSSwiftTypeTaggedEnum: the cases, by case index.
+  std::vector<CaseInfo> cases;
 };
+
+bool IsEnumKind(uint32_t kind) { return kind == NSSwiftTypeEnum || kind == NSSwiftTypeTaggedEnum; }
 
 struct ModuleInfo {
   std::string name;
@@ -328,6 +343,7 @@ std::string TypeDisplayName(const ModuleInfo& module, const ValueCode& code) {
       break;
     case ValueCode::Kind::Object:
     case ValueCode::Kind::Enum:
+    case ValueCode::Kind::Tagged:
       name = code.typeIndex >= 0 && code.typeIndex < static_cast<int>(module.types.size())
                  ? module.types[code.typeIndex].jsName
                  : "?";
@@ -406,6 +422,29 @@ void ApiRegisterMember(NSSwiftRegistrar* registrar, int32_t owner, uint32_t kind
     module->error = "invalid signature '" + member.signatureText + "' for " + member.swiftName;
     return;
   }
+  if (kind == NSSwiftMemberEnumCase && owner >= 0 &&
+      owner < static_cast<int32_t>(module->types.size()) &&
+      module->types[owner].kind == NSSwiftTypeTaggedEnum) {
+    const auto& codes = member.signature.parameters;
+    if (member.labels.size() != codes.size()) {
+      module->error = "case " + member.swiftName + " does not match its signature";
+      return;
+    }
+    CaseInfo info;
+    info.name = member.jsName;
+    info.codes = codes;
+    for (size_t i = 0; i < codes.size(); i++) {
+      std::string key = !member.labels[i].empty() ? member.labels[i]
+                        : codes.size() == 1       ? "value"
+                                                  : std::to_string(i);
+      if (key == "case") {
+        module->error = "case " + member.swiftName + " has a value keyed 'case'";
+        return;
+      }
+      info.keys.push_back(key);
+    }
+    module->types[owner].cases.push_back(std::move(info));
+  }
   module->members.push_back(std::move(member));
 }
 
@@ -442,17 +481,23 @@ void ApiCompleteContainerEnd(void* token);
 void* ApiCallbackBegin(void* callback);
 void ApiCallbackRetain(void* callback);
 void ApiCallbackRelease(void* callback);
+void ApiReturnCaseBegin(NSSwiftCall* call, intptr_t caseIndex);
+void ApiCompleteCaseBegin(void* token, intptr_t caseIndex);
 
 const NSSwiftAPI kAPI = {
-    ApiReturnVoid,           ApiReturnBool,       ApiReturnInt64,          ApiReturnUInt64,
-    ApiReturnDouble,         ApiReturnString,     ApiReturnNull,           ApiReturnObject,
-    ApiThrowError,           ApiThrowTypeError,   ApiRegisterModule,       ApiRegisterType,
-    ApiRegisterMember,       ApiBeginAsync,       ApiCompleteVoid,         ApiCompleteBool,
-    ApiCompleteInt64,        ApiCompleteUInt64,   ApiCompleteDouble,       ApiCompleteString,
-    ApiCompleteNull,         ApiCompleteObject,   ApiCompleteError,        ApiReturnArrayBegin,
-    ApiReturnArrayEnd,       ApiReturnMapBegin,   ApiReturnMapEnd,         ApiCompleteArrayBegin,
-    ApiCompleteContainerEnd, ApiCompleteMapBegin, ApiCompleteContainerEnd, ApiCallbackBegin,
-    ApiCallbackRetain,       ApiCallbackRelease,
+    ApiReturnVoid,           ApiReturnBool,           ApiReturnInt64,
+    ApiReturnUInt64,         ApiReturnDouble,         ApiReturnString,
+    ApiReturnNull,           ApiReturnObject,         ApiThrowError,
+    ApiThrowTypeError,       ApiRegisterModule,       ApiRegisterType,
+    ApiRegisterMember,       ApiBeginAsync,           ApiCompleteVoid,
+    ApiCompleteBool,         ApiCompleteInt64,        ApiCompleteUInt64,
+    ApiCompleteDouble,       ApiCompleteString,       ApiCompleteNull,
+    ApiCompleteObject,       ApiCompleteError,        ApiReturnArrayBegin,
+    ApiReturnArrayEnd,       ApiReturnMapBegin,       ApiReturnMapEnd,
+    ApiCompleteArrayBegin,   ApiCompleteContainerEnd, ApiCompleteMapBegin,
+    ApiCompleteContainerEnd, ApiCallbackBegin,        ApiCallbackRetain,
+    ApiCallbackRelease,      ApiReturnCaseBegin,      ApiCompleteCaseBegin,
+    ApiReturnArrayEnd,       ApiCompleteContainerEnd,
 };
 
 // "Polygon.Style" -> "Style".
@@ -562,6 +607,11 @@ std::string Validate(const ModuleInfo& module) {
       if ((code->kind == ValueCode::Kind::Object || code->kind == ValueCode::Kind::Enum) &&
           !validType(code->typeIndex)) {
         return member.swiftName + " references an unknown type";
+      }
+      if (code->kind == ValueCode::Kind::Tagged &&
+          (!validType(code->typeIndex) ||
+           module.types[code->typeIndex].kind != NSSwiftTypeTaggedEnum)) {
+        return member.swiftName + " references an unknown enum";
       }
       for (const auto& element : code->element) {
         codes.push_back(&element);
@@ -689,7 +739,7 @@ SwiftObjectWrapper* SwiftWrapperOf(Isolate* isolate, Local<Value> value) {
 
 // --- Calls -----------------------------------------------------------------------
 
-// An array or map a thunk is reporting element by element.
+// An array, map or tagged enum case a thunk is reporting value by value.
 struct ResultFrame {
   bool isMap = false;
   Local<Object> target;
@@ -698,6 +748,8 @@ struct ResultFrame {
   bool expectKey = true;
   Local<Value> key;
   const ValueCode* element = nullptr;
+  // Set for a case: its values' keys and codes.
+  const CaseInfo* tagged = nullptr;
 };
 
 struct CallContext : NSSwiftCall {
@@ -728,6 +780,9 @@ const ValueCode* CurrentCode(CallContext* context) {
     return context->resultCode;
   }
   const ResultFrame& frame = context->frames.back();
+  if (frame.tagged != nullptr) {
+    return frame.next < frame.tagged->codes.size() ? &frame.tagged->codes[frame.next] : nullptr;
+  }
   return frame.isMap && frame.expectKey ? &KeyCode() : frame.element;
 }
 
@@ -744,7 +799,13 @@ void Complete(CallContext* context, Local<Value> value) {
   }
   ResultFrame& frame = context->frames.back();
   bool stored = true;
-  if (!frame.isMap) {
+  if (frame.tagged != nullptr) {
+    stored = frame.next < frame.tagged->keys.size() &&
+             frame.target
+                 ->Set(context->context,
+                       tns::ToV8String(context->isolate, frame.tagged->keys[frame.next++]), value)
+                 .FromMaybe(false);
+  } else if (!frame.isMap) {
     stored = frame.target->Set(context->context, frame.next++, value).FromMaybe(false);
   } else if (frame.expectKey) {
     frame.key = value;
@@ -902,6 +963,42 @@ void ApiReturnMapBegin(NSSwiftCall* call, intptr_t count) {
 
 void ApiReturnMapEnd(NSSwiftCall* call) { EndContainer(ContextOf(call)); }
 
+// `{ case: name }`, filled in by the case's values.
+MaybeLocal<Object> NewCaseObject(Isolate* isolate, Local<Context> context, const CaseInfo& info) {
+  Local<Object> object = Object::New(isolate);
+  if (!object->Set(context, tns::ToV8String(isolate, "case"), tns::ToV8String(isolate, info.name))
+           .FromMaybe(false)) {
+    return MaybeLocal<Object>();
+  }
+  return object;
+}
+
+// The case `caseIndex` of the tagged enum `code` names, or null.
+const CaseInfo* CaseOf(const ModuleInfo& module, const ValueCode* code, intptr_t caseIndex) {
+  if (code == nullptr || code->kind != ValueCode::Kind::Tagged || code->typeIndex < 0 ||
+      code->typeIndex >= static_cast<int>(module.types.size())) {
+    return nullptr;
+  }
+  const auto& cases = module.types[code->typeIndex].cases;
+  return caseIndex >= 0 && caseIndex < static_cast<intptr_t>(cases.size()) ? &cases[caseIndex]
+                                                                           : nullptr;
+}
+
+void ApiReturnCaseBegin(NSSwiftCall* call, intptr_t caseIndex) {
+  CallContext* context = ContextOf(call);
+  const CaseInfo* info = CaseOf(*context->module, CurrentCode(context), caseIndex);
+  ResultFrame frame;
+  if (info == nullptr ||
+      !NewCaseObject(context->isolate, context->context, *info).ToLocal(&frame.target)) {
+    Fail(context);
+    context->isolate->ThrowException(Exception::Error(tns::ToV8String(
+        context->isolate, context->member->swiftName + " reported an unexpected enum case")));
+    return;
+  }
+  frame.tagged = info;
+  context->frames.push_back(frame);
+}
+
 // The JS wrapper for `object`, taking over the +1 retain the thunk passed.
 // Adopts `*constructTarget` (the object `new` created) when it is set.
 Local<Object> WrapSwiftObject(Isolate* isolate, Local<Context> context, const ModuleInfo* module,
@@ -1006,9 +1103,23 @@ void ApiThrowTypeError(NSSwiftCall* call, const uint8_t* message, intptr_t lengt
 // outcome holds V8 handles, so either may be destroyed on any thread.
 
 // What a Swift task produced, in a form that can cross threads. Arrays and
-// maps hold their elements (a map's alternate key and value) as children.
+// maps hold their elements (a map's alternate key and value) as children, a
+// tagged enum case its values (with its case index in `int64`).
 struct AsyncOutcome {
-  enum class Kind { Void, Bool, Int64, UInt64, Double, String, Null, Object, Error, Array, Map };
+  enum class Kind {
+    Void,
+    Bool,
+    Int64,
+    UInt64,
+    Double,
+    String,
+    Null,
+    Object,
+    Error,
+    Array,
+    Map,
+    Case,
+  };
   Kind kind = Kind::Void;
   bool boolean = false;
   int64_t int64 = 0;
@@ -1139,6 +1250,25 @@ bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
             !OutcomeToJS(isolate, context, state, name, *node.children[i + 1], code.element[0],
                          value, rejection) ||
             !object->Set(context, key, value).FromMaybe(false)) {
+          return false;
+        }
+      }
+      out = object;
+      return true;
+    }
+    case AsyncOutcome::Kind::Case: {
+      const CaseInfo* info = CaseOf(*node.module, &code, node.int64);
+      Local<Object> object;
+      if (info == nullptr || node.children.size() != info->codes.size() ||
+          !NewCaseObject(isolate, context, *info).ToLocal(&object)) {
+        return failed("returned an unexpected enum case");
+      }
+      for (size_t i = 0; i < node.children.size(); i++) {
+        Local<Value> value;
+        if (!OutcomeToJS(isolate, context, state, name, *node.children[i], info->codes[i], value,
+                         rejection) ||
+            !object->Set(context, tns::ToV8String(isolate, info->keys[i]), value)
+                 .FromMaybe(false)) {
           return false;
         }
       }
@@ -1326,7 +1456,8 @@ void Deliver(AsyncToken* rawToken) {
 void Emit(void* rawToken, std::shared_ptr<AsyncOutcome> node) {
   auto* token = static_cast<AsyncToken*>(rawToken);
   node->module = token->module;
-  bool opens = node->kind == AsyncOutcome::Kind::Array || node->kind == AsyncOutcome::Kind::Map;
+  bool opens = node->kind == AsyncOutcome::Kind::Array || node->kind == AsyncOutcome::Kind::Map ||
+               node->kind == AsyncOutcome::Kind::Case;
   AsyncOutcome* raw = node.get();
   if (token->open.empty()) {
     token->root = std::move(node);
@@ -1442,6 +1573,12 @@ void ApiCompleteMapBegin(void* token, intptr_t /*count*/) {
   Emit(token, Outcome(AsyncOutcome::Kind::Map));
 }
 
+void ApiCompleteCaseBegin(void* token, intptr_t caseIndex) {
+  auto outcome = Outcome(AsyncOutcome::Kind::Case);
+  outcome->int64 = caseIndex;
+  Emit(token, outcome);
+}
+
 void ApiCompleteContainerEnd(void* rawToken) {
   auto* token = static_cast<AsyncToken*>(rawToken);
   if (!token->open.empty()) {
@@ -1457,6 +1594,12 @@ void ApiCompleteContainerEnd(void* rawToken) {
 bool IsPlainObject(Isolate* isolate, Local<Value> value) {
   return value->IsObject() && !value->IsArray() && !value->IsFunction() &&
          SwiftWrapperOf(isolate, value) == nullptr;
+}
+
+// An object JS code builds as a record: maps and tagged enum cases.
+bool IsRecord(Isolate* isolate, Local<Value> value) {
+  return IsPlainObject(isolate, value) && !value->IsDate() && !value->IsArrayBuffer() &&
+         !value->IsArrayBufferView();
 }
 
 // Whether `value` can be passed as `code` (overload resolution; no throws, no
@@ -1494,8 +1637,8 @@ bool Accepts(Isolate* isolate, const ModuleInfo& module, const ValueCode& code,
     case ValueCode::Kind::Array:
       return value->IsArray();
     case ValueCode::Kind::Map:
-      return IsPlainObject(isolate, value) && !value->IsDate() && !value->IsArrayBuffer() &&
-             !value->IsArrayBufferView();
+    case ValueCode::Kind::Tagged:
+      return IsRecord(isolate, value);
     case ValueCode::Kind::Object: {
       SwiftObjectWrapper* wrapper = SwiftWrapperOf(isolate, value);
       return wrapper && wrapper->Module() == &module &&
@@ -1761,6 +1904,45 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
       return true;
     }
 
+    case ValueCode::Kind::Tagged: {
+      const TypeInfo& type = module.types[code.typeIndex];
+      std::string expected = "must be a case of " + type.jsName + " ({ case: \"...\" })";
+      if (!IsRecord(isolate, value)) {
+        return ThrowArgument(isolate, member, index, expected);
+      }
+      Local<Value> name;
+      if (!value.As<Object>()->Get(context, tns::ToV8String(isolate, "case")).ToLocal(&name)) {
+        return false;
+      }
+      std::string caseName = name->IsString() ? tns::ToString(isolate, name) : "";
+      size_t caseIndex = 0;
+      while (caseIndex < type.cases.size() && type.cases[caseIndex].name != caseName) {
+        caseIndex++;
+      }
+      if (caseIndex == type.cases.size()) {
+        return ThrowArgument(isolate, member, index, expected);
+      }
+      const CaseInfo& info = type.cases[caseIndex];
+      arena.slots.emplace_back(1 + info.codes.size());
+      std::vector<NSSwiftValue>& values = arena.slots.back();
+      values[0].tag = NSSwiftTagInt64;
+      values[0].payload.int64 = static_cast<int64_t>(caseIndex);
+      for (size_t i = 0; i < info.codes.size(); i++) {
+        Local<Value> entry;
+        if (!value.As<Object>()
+                 ->Get(context, tns::ToV8String(isolate, info.keys[i]))
+                 .ToLocal(&entry) ||
+            !Convert(isolate, context, module, member, index, info.codes[i], entry, values[1 + i],
+                     arena)) {
+          return false;
+        }
+      }
+      slot.tag = NSSwiftTagCase;
+      slot.payload.object = values.data();
+      slot.length = values.size();
+      return true;
+    }
+
     case ValueCode::Kind::Function: {
       if (!value->IsFunction()) {
         return ThrowArgument(isolate, member, index, "must be a function");
@@ -1893,9 +2075,9 @@ MaybeLocal<Value> Invoke(Isolate* isolate, const MemberGroup& group, const Membe
   if (!receiver.IsEmpty()) {
     NSSwiftValue slot{};
     const TypeInfo& owner = module.types[member.owner];
-    if (owner.kind == NSSwiftTypeEnum) {
+    if (IsEnumKind(owner.kind)) {
       ValueCode code;
-      code.kind = ValueCode::Kind::Enum;
+      code.kind = owner.kind == NSSwiftTypeEnum ? ValueCode::Kind::Enum : ValueCode::Kind::Tagged;
       code.typeIndex = member.owner;
       if (!Convert(isolate, context, module, member, 0, code, receiver, slot, arena)) {
         return MaybeLocal<Value>();
@@ -1978,7 +2160,7 @@ std::vector<Local<Value>> ArgumentsOf(const FunctionCallbackInfo<Value>& info, i
 
 bool ReceiverIsEnumArgument(const MemberGroup& group) {
   return IsInstanceKind(group.kind) && group.owner >= 0 &&
-         group.module->types[group.owner].kind == NSSwiftTypeEnum;
+         IsEnumKind(group.module->types[group.owner].kind);
 }
 
 // Methods, functions, and enum instance members (whose receiver, a case
@@ -2168,7 +2350,7 @@ class Builder {
     _loaded.templates.resize(_module.types.size());
     std::vector<Local<FunctionTemplate>> templates(_module.types.size());
     for (const TypeInfo& type : _module.types) {
-      if (type.kind == NSSwiftTypeEnum) {
+      if (IsEnumKind(type.kind)) {
         continue;
       }
       Local<FunctionTemplate> tmpl =
@@ -2186,7 +2368,7 @@ class Builder {
 
     std::vector<Local<Object>> enums(_module.types.size());
     for (const TypeInfo& type : _module.types) {
-      if (type.kind == NSSwiftTypeEnum) {
+      if (IsEnumKind(type.kind)) {
         enums[type.index] = Object::New(_isolate);
       }
     }
@@ -2201,7 +2383,7 @@ class Builder {
         continue;
       }
       const TypeInfo& owner = _module.types[group->owner];
-      if (owner.kind == NSSwiftTypeEnum) {
+      if (IsEnumKind(owner.kind)) {
         enumGroups.push_back(group.get());
         continue;
       }
@@ -2210,7 +2392,7 @@ class Builder {
 
     std::vector<Local<Object>> values(_module.types.size());
     for (const TypeInfo& type : _module.types) {
-      if (type.kind == NSSwiftTypeEnum) {
+      if (IsEnumKind(type.kind)) {
         values[type.index] = enums[type.index];
         continue;
       }
@@ -2349,6 +2531,10 @@ class Builder {
     Local<v8::String> name = tns::ToV8String(_isolate, group.jsName);
     switch (group.kind) {
       case NSSwiftMemberEnumCase:
+        if (group.module->types[group.owner].kind == NSSwiftTypeTaggedEnum) {
+          // Case values are objects JS builds itself.
+          return true;
+        }
         // A case's JS value is its name.
         return target
             ->DefineOwnProperty(_context, name, name,

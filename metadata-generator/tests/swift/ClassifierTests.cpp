@@ -52,8 +52,11 @@ TEST(ClassifyNominalTypes) {
   EXPECT_TIER("Counter", Tier::SwiftGenerated);
   EXPECT_TIER("Canvas", Tier::SwiftGenerated);
   EXPECT_TIER("Greeter", Tier::TypeOnly, "protocol");
-  EXPECT_TIER("Measurement", Tier::Unsupported, "enum-associated-values");
-  EXPECT_TIER("ShapeError", Tier::Unsupported, "enum-associated-values");
+  EXPECT_TIER("Measurement", Tier::SwiftGenerated);
+  EXPECT_TIER("ShapeError", Tier::SwiftGenerated);
+  EXPECT_TIER("Formula", Tier::SwiftGenerated);
+  EXPECT_TIER("Payload", Tier::SwiftGenerated);
+  EXPECT_TIER("Job", Tier::Unsupported, "enum-associated-values,closure");
   EXPECT_TIER("Measurement.Unit", Tier::SwiftGenerated);
   EXPECT_TIER("Polygon.Style", Tier::SwiftGenerated);
   EXPECT_TIER("Polygon.Metrics", Tier::SwiftGenerated);
@@ -104,7 +107,8 @@ TEST(ClassifyRejections) {
   EXPECT_TIER("Ring.+(_:_:)", Tier::Unsupported, "operator");
   EXPECT_TIER("Polygon.subscript(_:)", Tier::Unsupported, "subscript");
   EXPECT_TIER("String.shouted", Tier::Unsupported, "external-type-extension");
-  EXPECT_TIER("Measurement.isNone", Tier::Unsupported, "owner-not-bridged");
+  EXPECT_TIER("Measurement.isNone", Tier::SwiftGenerated);
+  EXPECT_TIER("Job.idle", Tier::Unsupported, "owner-not-bridged");
   EXPECT_TIER("Flavor.hash(into:)", Tier::Unsupported, "inout-parameter");
 }
 

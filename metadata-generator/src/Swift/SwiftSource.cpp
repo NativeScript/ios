@@ -221,8 +221,11 @@ std::string invocationExpression(const Invocation& invocation,
       break;
     case Invocation::Form::StaticProperty:
     case Invocation::Form::Variable:
-    case Invocation::Form::EnumCase:
       expression = invocation.owner + "." + member;
+      break;
+    case Invocation::Form::EnumCase:
+      expression = invocation.owner + "." + member +
+                   (arguments.empty() ? "" : "(" + argumentList + ")");
       break;
   }
   std::string effects = std::string(invocation.isThrowing ? "try " : "") +

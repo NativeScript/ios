@@ -50,6 +50,31 @@ bool isCallableKind(SymbolKind kind) {
   }
 }
 
+bool hasAssociatedValues(const Module& module, const Symbol& symbol) {
+  if (symbol.kind != SymbolKind::Enum) {
+    return false;
+  }
+  for (const auto& id : symbol.memberIds) {
+    const Symbol* member = module.find(id);
+    if (member && member->kind == SymbolKind::EnumCase &&
+        !member->parameters.empty()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+std::vector<std::string> caseKeys(const Symbol& enumCase) {
+  std::vector<std::string> keys;
+  const auto& parameters = enumCase.parameters;
+  for (size_t i = 0; i < parameters.size(); i++) {
+    keys.push_back(!parameters[i].label.empty() ? parameters[i].label
+                   : parameters.size() == 1     ? "value"
+                                                : std::to_string(i));
+  }
+  return keys;
+}
+
 namespace {
 
 std::string availabilityDomain(const Platform& platform) {
@@ -124,6 +149,7 @@ class Classifier {
         _result.bySymbol[entry.first] = classifyType(entry.second);
       }
     }
+    rejectUnbridgedPayloads();
     for (const auto& entry : _module.symbols) {
       if (!isNominalType(entry.second.kind)) {
         _result.bySymbol[entry.first] = classifyOther(entry.second);
@@ -206,16 +232,68 @@ class Classifier {
     if (llvm::StringRef(symbol.declarationText).contains("~Escapable")) {
       return make(Tier::Unsupported, "nonescapable");
     }
-    if (symbol.kind == SymbolKind::Enum) {
-      for (const auto& id : symbol.memberIds) {
-        const Symbol* member = _module.find(id);
-        if (member && member->kind == SymbolKind::EnumCase &&
-            !member->parameters.empty()) {
-          return make(Tier::Unsupported, "enum-associated-values");
+    return make(Tier::SwiftGenerated);
+  }
+
+  // An enum with associated values crosses whole, so every case JS may see
+  // must bridge. Payloads can name other such enums: demote until nothing
+  // changes.
+  void rejectUnbridgedPayloads() {
+    bool changed = true;
+    while (changed) {
+      changed = false;
+      for (const auto& entry : _module.symbols) {
+        const Symbol& symbol = entry.second;
+        Capability& capability = _result.bySymbol[entry.first];
+        if (capability.tier != Tier::SwiftGenerated ||
+            !hasAssociatedValues(_module, symbol)) {
+          continue;
+        }
+        std::vector<std::string> reasons;
+        for (const auto& id : symbol.memberIds) {
+          const Symbol* member = _module.find(id);
+          if (!member || member->kind != SymbolKind::EnumCase ||
+              isUnavailable(*member)) {
+            continue;
+          }
+          auto rejected = _rejections.find(member->preciseId);
+          if (rejected != _rejections.end()) {
+            reasons.push_back("compiler-rejected:" + rejected->second);
+          }
+          for (const auto& key : caseKeys(*member)) {
+            if (key == "case") {
+              reasons.push_back("js-name-conflict");
+            }
+          }
+          std::set<std::string> generics;
+          for (const auto& parameter : member->parameters) {
+            BridgedType bridged = bridge(parameter.type, generics, reasons);
+            if (bridged.bridge == Bridge::Closure) {
+              reasons.push_back("closure");
+            }
+          }
+        }
+        if (!reasons.empty()) {
+          std::sort(reasons.begin(), reasons.end());
+          reasons.erase(std::unique(reasons.begin(), reasons.end()),
+                        reasons.end());
+          capability = make(Tier::Unsupported, "enum-associated-values");
+          capability.reasons.insert(capability.reasons.end(), reasons.begin(),
+                                    reasons.end());
+          changed = true;
         }
       }
     }
-    return make(Tier::SwiftGenerated);
+  }
+
+  bool isUnavailable(const Symbol& symbol) const {
+    for (const Availability* availability :
+         applicableAvailability(_module, symbol)) {
+      if (availability->isUnconditionallyUnavailable) {
+        return true;
+      }
+    }
+    return false;
   }
 
   Capability classifyOther(const Symbol& symbol) const {
@@ -275,9 +353,16 @@ class Classifier {
       return make(Tier::Unsupported, "subscript");
     }
     if (symbol.kind == SymbolKind::EnumCase) {
-      // Only payload-less enums are bridged (see classifyType).
+      // The owner bridged, so its payloads do (rejectUnbridgedPayloads).
       capability = make(Tier::SwiftGenerated);
       capability.jsName = symbol.baseName;
+      std::set<std::string> generics;
+      std::vector<std::string> reasons;
+      for (const auto& parameter : symbol.parameters) {
+        capability.parameters.push_back(
+            bridge(parameter.type, generics, reasons));
+      }
+      capability.result = bridgeOwner(*owner);
       return capability;
     }
 
@@ -377,9 +462,10 @@ class Classifier {
   BridgedType bridgeOwner(const Symbol& owner) const {
     BridgedType bridged;
     bridged.symbolId = owner.preciseId;
-    bridged.bridge = owner.kind == SymbolKind::Struct ? Bridge::StructBox
-                     : owner.kind == SymbolKind::Enum ? Bridge::EnumCase
-                                                      : Bridge::ClassHandle;
+    bridged.bridge = owner.kind == SymbolKind::Struct      ? Bridge::StructBox
+                     : owner.kind != SymbolKind::Enum      ? Bridge::ClassHandle
+                     : hasAssociatedValues(_module, owner) ? Bridge::TaggedEnum
+                                                           : Bridge::EnumCase;
     TypeNode::Component component;
     component.name = owner.name;
     component.usr = owner.preciseId;
@@ -632,6 +718,7 @@ class Classifier {
         kind = "array";
         break;
       case Bridge::Dictionary:
+      case Bridge::TaggedEnum:
         kind = "record";
         break;
       case Bridge::Closure:

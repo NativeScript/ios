@@ -14,7 +14,13 @@ namespace Swift {
 // (SwiftDefinitionWriter), so the two cannot disagree. Kinds, flags and
 // signature codes are those of NativeScript/runtime/SwiftInterop.h.
 struct SwiftSurface {
-  enum TypeKind { kClass = 0, kActor = 1, kStruct = 2, kEnum = 3 };
+  enum TypeKind {
+    kClass = 0,
+    kActor = 1,
+    kStruct = 2,
+    kEnum = 3,
+    kTaggedEnum = 4,
+  };
   enum MemberKind {
     kInitializer = 0,
     kInstanceMethod = 1,
@@ -54,6 +60,10 @@ struct SwiftSurface {
     BridgedType result;
   };
 
+  // A tagged enum's cases in registration order, which is the case index
+  // the runtime and the thunks share.
+  std::vector<const Member*> casesOf(int typeIndex) const;
+
   std::vector<Type> types;
   std::vector<Member> members;
 
@@ -66,7 +76,8 @@ struct SwiftSurface {
 SwiftSurface describeSurface(const Module& module,
                              const Classification& classification);
 
-// Signature code of one value ("i64", "o3?", "[s]", "{f64}", "(i64,s)"...).
+// Signature code of one value ("i64", "o3?", "t2", "[s]", "{f64}",
+// "(i64,s)"...).
 std::string signatureCode(const SwiftSurface& surface, const BridgedType& type);
 
 // Signed/unsigned integer width of an Integer bridge: {code, Swift type,

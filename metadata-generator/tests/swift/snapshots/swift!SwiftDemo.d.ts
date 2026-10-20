@@ -11,7 +11,23 @@ declare module "ns:swift/SwiftDemo" {
     static readonly version: string;
   }
 
+  export type ShapeError =
+    | { case: "invalidSide"; value: number }
+    | { case: "tooManySides"; count: number; limit: number }
+    | { case: "unknown" };
+  export namespace ShapeError {
+    /**
+     * Retrieve the localized description for this error.
+     */
+    export function localizedDescription(value: ShapeError): string;
+  }
+
+  export type Measurement =
+    | { case: "area"; width: number; height: number }
+    | { case: "none" }
+    | { case: "length"; value: number };
   export namespace Measurement {
+    export function isNone(value: Measurement): boolean;
     export class Unit {
       constructor(symbol: string);
       constructor(args: { symbol: string });
@@ -27,6 +43,15 @@ declare module "ns:swift/SwiftDemo" {
     export const snow: "snow";
     export function init(rawValue: string): Precipitation | null;
     export function hashValue(value: Precipitation): number;
+  }
+
+  export namespace Job {
+    export class Ticket {
+      constructor(id: number | bigint);
+      constructor(args: { id: number | bigint });
+      id: number;
+    }
+
   }
 
   export class Ring {
@@ -101,11 +126,28 @@ declare module "ns:swift/SwiftDemo" {
     increment(): Promise<number>;
   }
 
+  export type Formula =
+    | { case: "sum"; "0": Formula; "1": Formula }
+    | { case: "negate"; value: Formula }
+    | { case: "number"; value: number };
+  export namespace Formula {
+    export function value(value: Formula): number;
+  }
+
   export class Palette {
     constructor();
     strokeLater(): Promise<number>;
     stroke(): number;
     readonly strokes: number;
+  }
+
+  export type Payload =
+    | { case: "maybe"; value: number | null }
+    | { case: "names"; value: (string)[] }
+    | { case: "point"; value: Point }
+    | { case: "flavor"; value: Flavor }
+    | { case: "tracker"; value: Tracker };
+  export namespace Payload {
   }
 
   export class Polygon {
@@ -168,24 +210,32 @@ declare module "ns:swift/SwiftDemo" {
   export function wordCounts(words: readonly (string)[]): Record<string, number>;
   export function checkedSide(side: number): number;
   export function delayedEcho(text: string, seconds: number): Promise<string>;
+  export function measureLater(width: number): Promise<Measurement>;
+  export function measurements(): (Measurement)[];
   export const defaultFlavor: Flavor;
   export let globalCounter: number;
   export function makeDefaultPoint(): Point;
   export function makeTrackerLater(id: number | bigint): Promise<Tracker>;
+  export function area(measurement: Measurement): number;
+  export function echo(payload: Payload): Payload;
   export function host(url: string | URL): string | null;
   export function ramp(count: number | bigint): Uint8Array;
   export function names(count: number | bigint): (string)[];
   export function shout(name: (string) | null | undefined): string | null;
   export function total(values: readonly (number)[]): number;
+  export function explain(error: ShapeError): string;
   export function lengths(table: Readonly<Record<string, string>>): Record<string, number>;
+  export function measure(width: number, height: (number) | null | undefined): Measurement;
   export function nextDay(date: Date): Date;
   export function resolve(path: string, base: string | URL): URL;
   export function centroid(points: readonly (Point)[]): Point;
   export function checksum(data: ArrayBuffer | ArrayBufferView): number;
   export function echoInt8(value: number | bigint): number;
   export function mirrored(grid: readonly (readonly (number | bigint)[])[]): ((number)[])[];
+  export function simplify(formula: Formula): Formula;
   export function trackers(ids: readonly (number | bigint)[]): (Tracker)[];
   export function countdown(start: number | bigint, tick: (arg0: number, arg1: boolean) => void): void;
+  export function onMeasure(body: (arg0: Measurement) => void): void;
 }
 
 declare module "ns:swift" {

@@ -117,7 +117,18 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "namesLater(_:)",
                                        "countdown(from:_:)",
                                        "greetLater(_:completion:)",
-                                       "Notifier"};
+                                       "Notifier",
+                                       "area(of:)",
+                                       "measure(_:by:)",
+                                       "measurements()",
+                                       "measureLater(_:)",
+                                       "onMeasure(_:)",
+                                       "explain(_:)",
+                                       "Formula",
+                                       "simplify(_:)",
+                                       "Payload",
+                                       "echo(_:)",
+                                       "Job"};
   CHECK_EQ(llvm::join(names, ","), llvm::join(expected, ","));
 }
 

@@ -58,6 +58,7 @@ fixture's `Package.swift` builds the same files as two SwiftPM modules.
 | class, actor | an instance of the generated JS class; one JS object per Swift object |
 | struct | an instance of the generated JS class holding its own copy |
 | enum without associated values | the case name as a string; the enum's namespace object (`Flavor.vanilla`) lists them |
+| enum with associated values | a plain object copy naming its case: `{ case: "area", width: 3, height: 4 }` |
 | `Date` | `Date` |
 | `URL` | `URL` (inputs also accept a string) |
 | `Data` | `Uint8Array` copy (inputs accept any `ArrayBuffer` or view) |
@@ -68,6 +69,13 @@ fixture's `Package.swift` builds the same files as two SwiftPM modules.
 Collections are copied in both directions; their elements follow the same
 table (optional elements are not supported yet), and dictionary keys must be
 `String`.
+
+An enum with associated values keys each value by its label; a case's only,
+unlabeled value is `value` (`{ case: "length", value: 2 }`), and other
+unlabeled values are keyed by position (`{ case: "sum", 0: a, 1: b }`).
+TypeScript declares the enum as a union of its cases, so `switch (m.case)`
+narrows. An enum is bridged only when every case's values are; recursive
+(`indirect`) enums are.
 
 Structs have value semantics: reading a struct-typed property, passing a struct
 argument, or returning one copies it, so a JS object never aliases another
@@ -89,9 +97,9 @@ holds.
   returns `nil` throws.
 - Subclass instances accept inherited overloads; JS classes follow the Swift
   class hierarchy (`instanceof` works).
-- Enum initializers are `Enum.init(...)`, returning a case name or `null`.
-  Enum instance members are functions taking the case name first:
-  `Flavor.description("vanilla")`.
+- Enum initializers are `Enum.init(...)`, returning a case or `null`. Enum
+  instance members are functions taking the case first:
+  `Flavor.description("vanilla")`, `Measurement.isNone({ case: "none" })`.
 - Properties are accessors; read-only Swift properties have no setter.
 - Nested types hang off their parent: `Polygon.Style.dashed`,
   `new Polygon.Metrics({ perimeter: 3 })`. When the parent itself is not
@@ -160,10 +168,10 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 ## Not yet supported
 
-Closures that return values, async cancellation, `inout` parameters, generics,
-protocols as values, tuples, sets, optional collection elements, enums with
-associated values, subscripts and operators. Each appears in the coverage
-report with its reason.
+Closures that return values, async cancellation, `inout` parameters, generics
+(including `Result`), protocols as values, tuples, sets, optional collection
+elements, subscripts and operators. Each appears in the coverage report with
+its reason.
 
 ## Swift language mode
 
