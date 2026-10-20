@@ -27,6 +27,7 @@
 
 /// <reference path="./ns-module.d.ts" />
 /// <reference path="./ns-runtime.d.ts" />
+/// <reference path="./ns-swift.d.ts" />
 /// <reference path="./ns-url.d.ts" />
 /// <reference path="./ns-util.d.ts" />
 /// <reference path="./ns-worker-threads.d.ts" />

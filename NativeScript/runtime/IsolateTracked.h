@@ -41,6 +41,12 @@ class IsolateTracked {
     }
   }
 
+ protected:
+  // The bound object while it is alive; empty once collected.
+  v8::Local<v8::Object> TrackedObject(v8::Isolate* isolate) const {
+    return weakHandle_.Get(isolate);
+  }
+
  private:
   static void Finalizer(const v8::WeakCallbackInfo<IsolateTracked>& data) {
     IsolateTracked* self = data.GetParameter();

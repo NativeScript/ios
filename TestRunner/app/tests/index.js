@@ -192,6 +192,7 @@ require("./PerformanceTests");
 
 // The ns:/node: builtin modules
 require("./NsUtilTests");
+require("./SwiftInteropTests");
 
 // Node-API addon surface
 require("./NapiTests");

@@ -10,6 +10,7 @@
 #include "ModuleInternalCallbacks.h"
 #include "Runtime.h"
 #include "StructuredSerialization.h"
+#include "SwiftInterop.h"
 #include "TextEncoding.h"
 #include "URLImpl.h"
 #include "URLSearchParamsImpl.h"
@@ -50,6 +51,7 @@ struct Registration {
 constexpr Registration kRegistry[] = {
     {"ns:module", BuiltinId::kNsModule, NsModuleBinding},
     {"ns:runtime", BuiltinId::kNsRuntime, NsRuntimeBinding},
+    {"ns:swift", BuiltinId::kNsSwift, SwiftInterop::CreateBinding},
     {"ns:url", BuiltinId::kNsUrl, NsUrlBinding},
     {"ns:util", BuiltinId::kNsUtil, NsUtilBinding},
     {"ns:worker_threads", BuiltinId::kNsWorkerThreads, NsWorkerThreadsBinding},
@@ -176,6 +178,18 @@ const Registration* Find(const std::string& specifier) {
 
 bool HasPrefix(const std::string& specifier, const char* prefix) {
   return specifier.rfind(prefix, 0) == 0;
+}
+
+// `ns:swift/<Module>`: a Swift module's exports (SwiftInterop.h); the module
+// name, not the registry, decides whether it exists.
+constexpr const char* kSwiftModulePrefix = "ns:swift/";
+
+bool SwiftModuleName(const std::string& specifier, std::string& name) {
+  if (!HasPrefix(specifier, kSwiftModulePrefix)) {
+    return false;
+  }
+  name = specifier.substr(std::char_traits<char>::length(kSwiftModulePrefix));
+  return !name.empty();
 }
 
 MaybeLocal<Object> NsModuleBinding(Local<Context> context) {
@@ -361,6 +375,10 @@ bool NsBuiltinModules::IsNsScheme(const std::string& specifier) {
 
 bool NsBuiltinModules::IsRegistered(const std::string& specifier,
                                     bool includeInternal) {
+  std::string swiftModule;
+  if (SwiftModuleName(specifier, swiftModule)) {
+    return true;
+  }
   const Registration* registration = Find(specifier);
   return registration != nullptr &&
          (includeInternal || !registration->internalOnly);
@@ -372,6 +390,10 @@ std::string NsBuiltinModules::NotFoundMessage(const std::string& specifier) {
 
 MaybeLocal<Object> NsBuiltinModules::GetExports(Local<Context> context,
                                                 const std::string& specifier) {
+  std::string swiftModule;
+  if (SwiftModuleName(specifier, swiftModule)) {
+    return SwiftInterop::LoadModule(context, swiftModule);
+  }
   const Registration* registration = Find(specifier);
   if (registration == nullptr) {
     return MaybeLocal<Object>();
@@ -413,8 +435,10 @@ MaybeLocal<Module> NsBuiltinModules::GetModule(Local<Context> context,
                                                const std::string& specifier) {
   // The module system is the app-facing entry point; the internal tier only
   // exists behind the require builtins receive.
+  std::string swiftModule;
   const Registration* registration = Find(specifier);
-  if (registration == nullptr || registration->internalOnly) {
+  if (!SwiftModuleName(specifier, swiftModule) &&
+      (registration == nullptr || registration->internalOnly)) {
     return MaybeLocal<Module>();
   }
 
