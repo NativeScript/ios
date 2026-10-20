@@ -387,6 +387,23 @@ class Classifier {
     return bridged;
   }
 
+  // Bridges a collection's element (value) type into `container.elements`.
+  std::string bridgeElement(const TypeNode& node,
+                            BridgedType& container) const {
+    BridgedType element;
+    element.node = node;
+    if (node.kind == TypeNode::Kind::Optional ||
+        node.kind == TypeNode::Kind::ImplicitlyUnwrappedOptional) {
+      return "optional-element";
+    }
+    std::string reason = bridgeNonOptional(node, element);
+    if (reason.empty() && element.bridge == Bridge::Void) {
+      reason = "unbridged-type:Void";
+    }
+    container.elements.push_back(std::move(element));
+    return reason;
+  }
+
   // Returns the rejection reason, or "" with `bridged` filled in.
   std::string bridgeNonOptional(const TypeNode& node,
                                 BridgedType& bridged) const {
@@ -401,8 +418,17 @@ class Classifier {
       case TypeNode::Kind::Tuple:
         return "tuple";
       case TypeNode::Kind::Array:
-      case TypeNode::Kind::Dictionary:
-        return "collection";
+        bridged.bridge = Bridge::Array;
+        return bridgeElement(node.children[0], bridged);
+      case TypeNode::Kind::Dictionary: {
+        const TypeNode& key = node.children[0];
+        if (key.kind != TypeNode::Kind::Nominal ||
+            key.usr() != KnownTypes::kString) {
+          return "dictionary-key";
+        }
+        bridged.bridge = Bridge::Dictionary;
+        return bridgeElement(node.children[1], bridged);
+      }
       case TypeNode::Kind::Existential:
       case TypeNode::Kind::Composition:
         return "existential";
@@ -424,13 +450,25 @@ class Classifier {
         isPrimitive(usr, bridged.bridge)) {
       return "";
     }
+    if (usr == KnownTypes::kDate) {
+      bridged.bridge = Bridge::Date;
+      return "";
+    }
+    if (usr == KnownTypes::kURL) {
+      bridged.bridge = Bridge::URL;
+      return "";
+    }
+    if (usr == KnownTypes::kData) {
+      bridged.bridge = Bridge::Data;
+      return "";
+    }
     const Symbol* target = usr.empty() ? nullptr : _module.find(usr);
     if (target) {
       const Capability* capability = _result.find(target->preciseId);
       if (capability && capability->tier == Tier::SwiftGenerated &&
           target->kind != SymbolKind::Protocol) {
-        bridged = BridgedType{bridgeOwner(*target).bridge, bridged.optional,
-                              target->preciseId, bridged.node};
+        bridged.bridge = bridgeOwner(*target).bridge;
+        bridged.symbolId = target->preciseId;
         return "";
       }
       return "unbridged-type:" + llvm::join(target->pathComponents, ".");
@@ -517,6 +555,22 @@ class Classifier {
       case Bridge::ClassHandle:
       case Bridge::StructBox:
         kind = "object:" + type.symbolId;
+        break;
+      case Bridge::URL:
+        // A URL parameter also accepts a string.
+        kind = "string";
+        break;
+      case Bridge::Date:
+        kind = "date";
+        break;
+      case Bridge::Data:
+        kind = "bytes";
+        break;
+      case Bridge::Array:
+        kind = "array";
+        break;
+      case Bridge::Dictionary:
+        kind = "record";
         break;
       default:
         kind = "other";

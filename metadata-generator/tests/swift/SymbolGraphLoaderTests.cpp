@@ -100,7 +100,21 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "Tracker",
                                        "delayedEcho(_:after:)",
                                        "makeTrackerLater(id:)",
-                                       "Palette"};
+                                       "Palette",
+                                       "names(_:)",
+                                       "total(_:)",
+                                       "centroid(of:)",
+                                       "mirrored(_:)",
+                                       "wordCounts(_:)",
+                                       "lengths(_:)",
+                                       "trackers(_:)",
+                                       "allFlavors()",
+                                       "nextDay(after:)",
+                                       "host(of:)",
+                                       "resolve(_:against:)",
+                                       "checksum(_:)",
+                                       "ramp(_:)",
+                                       "namesLater(_:)"};
   CHECK_EQ(llvm::join(names, ","), llvm::join(expected, ","));
 }
 

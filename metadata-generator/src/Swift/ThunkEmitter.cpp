@@ -60,40 +60,81 @@ class Emitter {
     return symbol ? qualifiedTypeName(_module, *symbol) : "";
   }
 
-  // Swift expression reading slot `slot` as the non-optional value of
-  // `type`, for conversions that cannot fail.
-  std::string primitiveRead(const BridgedType& type, int slot) const {
-    std::string index = std::to_string(slot);
+  struct ValueExpression {
+    std::string code;
+    // The expression is optional: nil means the JS value did not convert.
+    bool failable;
+  };
+
+  // Swift expression reading slot `index` of `slots` as the non-optional
+  // value of `type`. Collections recurse through element closures.
+  ValueExpression valueExpression(const BridgedType& type,
+                                  const std::string& slots,
+                                  const std::string& index) const {
+    auto read = [&](const std::string& reader) {
+      return slots + "." + reader + "(" + index + ")";
+    };
     switch (type.bridge) {
       case Bridge::Bool:
-        return "rt.bool(" + index + ")";
+        return {read("bool"), false};
       case Bridge::Integer: {
         const IntegerWidth* info = integerWidth(type);
         std::string swiftType = info ? info->swiftType : "Int";
         bool isSigned = !info || info->isSigned;
-        std::string raw =
-            isSigned ? "rt.int64(" + index + ")" : "rt.uint64(" + index + ")";
+        std::string raw = read(isSigned ? "int64" : "uint64");
         if (swiftType == "Int64" || swiftType == "UInt64") {
-          return raw;
+          return {raw, false};
         }
         // The runtime has range-checked the value against the width.
-        return swiftType + "(truncatingIfNeeded: " + raw + ")";
+        return {swiftType + "(truncatingIfNeeded: " + raw + ")", false};
       }
       case Bridge::Floating: {
         const std::string& usr = unwrappedNode(type).usr();
         if (usr == KnownTypes::kFloat) {
-          return "Float(rt.double(" + index + "))";
+          return {"Float(" + read("double") + ")", false};
         }
         if (usr == KnownTypes::kCGFloat) {
-          return "CGFloat(rt.double(" + index + "))";
+          return {"CGFloat(" + read("double") + ")", false};
         }
-        return "rt.double(" + index + ")";
+        return {read("double"), false};
       }
       case Bridge::String:
-        return "rt.string(" + index + ")";
-      default:
-        return "";
+        return {read("string"), false};
+      case Bridge::Date:
+        return {"Date(timeIntervalSince1970: " + read("double") + " / 1000)",
+                false};
+      case Bridge::URL:
+        return {"URL(string: " + read("string") + ")", true};
+      case Bridge::Data:
+        return {read("bytes"), false};
+      case Bridge::ClassHandle:
+        return {read("object") + " as? " + typeName(type.symbolId), true};
+      case Bridge::StructBox:
+        return {"(" + read("object") + " as? __NSBox<" +
+                    typeName(type.symbolId) + ">)?.value",
+                true};
+      case Bridge::EnumCase:
+        return {"__nsEnum" + std::to_string(typeIndexOf(type.symbolId)) + "(" +
+                    read("string") + ")",
+                true};
+      case Bridge::Array:
+      case Bridge::Dictionary: {
+        const BridgedType& element = type.elements.at(0);
+        ValueExpression inner = valueExpression(element, "s", "j");
+        std::string reader =
+            type.bridge == Bridge::Array ? "__nsReadArray" : "__nsReadMap";
+        // An explicit closure argument: trailing closures cannot appear in
+        // guard conditions.
+        return {reader + "(" + slots + ", " + index +
+                    ", { (s: __NSSlots, j: Int) -> " + valueTypeName(element) +
+                    "? in " + inner.code + " })",
+                true};
+      }
+      case Bridge::Void:
+      case Bridge::None:
+        break;
     }
+    return {"nil", true};
   }
 
   // Lines binding `name` to argument `slot`; `label` describes it in errors.
@@ -101,42 +142,43 @@ class Emitter {
                            const std::string& name,
                            const std::string& label) const {
     std::string index = std::to_string(slot);
-    std::string cast;
-    std::string expected;
-    switch (type.bridge) {
-      case Bridge::ClassHandle:
-        cast = "rt.object(" + index + ") as? " + typeName(type.symbolId);
-        expected = typeName(type.symbolId);
-        break;
-      case Bridge::StructBox:
-        cast = "(rt.object(" + index + ") as? __NSBox<" +
-               typeName(type.symbolId) + ">)?.value";
-        expected = typeName(type.symbolId);
-        break;
-      case Bridge::EnumCase:
-        cast = "__nsEnum" + std::to_string(typeIndexOf(type.symbolId)) +
-               "(rt.string(" + index + "))";
-        expected = "a case of " + typeName(type.symbolId);
-        break;
-      default: {
-        std::string read = primitiveRead(type, slot);
-        if (type.optional) {
-          return "  let " + name + " = rt.isNull(" + index +
-                 ") ? nil : " + read + "\n";
-        }
-        return "  let " + name + " = " + read + "\n";
+    ValueExpression value = valueExpression(type, "rt.slots", index);
+    if (!value.failable) {
+      if (type.optional) {
+        return "  let " + name + " = rt.slots.isNull(" + index +
+               ") ? nil : " + value.code + "\n";
       }
+      return "  let " + name + " = " + value.code + "\n";
     }
     std::string failure = "return rt.throwTypeError(" +
-                          quoted(label + " must be " + expected) + ")";
+                          quoted(label + " must be " + describe(type)) + ")";
     if (!type.optional) {
-      return "  guard let " + name + " = " + cast + " else { " + failure +
+      return "  guard let " + name + " = " + value.code + " else { " + failure +
              " }\n";
     }
     return "  var " + name + ": " + valueTypeName(type) + "? = nil\n" +
-           "  if !rt.isNull(" + index + ") {\n" +
-           "    guard let value = " + cast + " else { " + failure + " }\n" +
-           "    " + name + " = value\n" + "  }\n";
+           "  if !rt.slots.isNull(" + index + ") {\n" +
+           "    guard let value = " + value.code + " else { " + failure +
+           " }\n" + "    " + name + " = value\n" + "  }\n";
+  }
+
+  // How errors describe what a value must be.
+  std::string describe(const BridgedType& type) const {
+    switch (type.bridge) {
+      case Bridge::EnumCase:
+        return "a case of " + typeName(type.symbolId);
+      case Bridge::URL:
+        return "a valid URL";
+      case Bridge::Array:
+        return "an array of " + describe(type.elements.at(0));
+      case Bridge::Dictionary:
+        return "an object whose values are " + describe(type.elements.at(0));
+      case Bridge::ClassHandle:
+      case Bridge::StructBox:
+        return typeName(type.symbolId);
+      default:
+        return valueTypeName(type);
+    }
   }
 
   std::string valueTypeName(const BridgedType& type) const {
@@ -174,6 +216,20 @@ class Emitter {
       case Bridge::EnumCase:
         return reporter + ".returnString(__nsEnumName" +
                std::to_string(typeIndexOf(type.symbolId)) + "(" + value + "))";
+      case Bridge::Date:
+        return reporter + ".returnDouble(" + value +
+               ".timeIntervalSince1970 * 1000)";
+      case Bridge::URL:
+        return reporter + ".returnString(" + value + ".absoluteString)";
+      case Bridge::Data:
+        return reporter + ".returnBytes(" + value + ")";
+      case Bridge::Array:
+        return reporter + ".returnArray(" + value + ") { element in " +
+               returnValue(type.elements.at(0), reporter, "element") + " }";
+      case Bridge::Dictionary:
+        return reporter + ".returnMap(" + value + ") { key, element in " +
+               reporter + ".returnString(key); " +
+               returnValue(type.elements.at(0), reporter, "element") + " }";
       case Bridge::None:
         return reporter + ".returnVoid()";
     }
@@ -418,28 +474,73 @@ private final class __NSBox<Value> {
 
 // Reads arguments (24-byte slots) and reports results through the runtime's
 // API table, whose address is the first word of the call context.
+// 24-byte argument slots: tag at 0, payload at 8, length at 16. Arrays and
+// maps point at their own slots (a map's are key, value, key, value, ...).
+private struct __NSSlots {
+  let base: UnsafeRawPointer?
+
+  func isNull(_ i: Int) -> Bool { base!.load(fromByteOffset: i * 24, as: UInt32.self) == 0 }
+  func bool(_ i: Int) -> Bool { base!.load(fromByteOffset: i * 24 + 8, as: UInt8.self) != 0 }
+  func int64(_ i: Int) -> Int64 { base!.load(fromByteOffset: i * 24 + 8, as: Int64.self) }
+  func uint64(_ i: Int) -> UInt64 { base!.load(fromByteOffset: i * 24 + 8, as: UInt64.self) }
+  func double(_ i: Int) -> Double { base!.load(fromByteOffset: i * 24 + 8, as: Double.self) }
+  private func buffer(_ i: Int) -> UnsafeBufferPointer<UInt8> {
+    let start = base!.load(fromByteOffset: i * 24 + 8, as: UnsafePointer<UInt8>?.self)
+    let length = Int(base!.load(fromByteOffset: i * 24 + 16, as: UInt64.self))
+    return UnsafeBufferPointer(start: start, count: length)
+  }
+  func string(_ i: Int) -> String { String(decoding: buffer(i), as: UTF8.self) }
+  func bytes(_ i: Int) -> Data { Data(buffer(i)) }
+  func object(_ i: Int) -> AnyObject {
+    let pointer = base!.load(fromByteOffset: i * 24 + 8, as: UnsafeMutableRawPointer.self)
+    return Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue()
+  }
+  func elements(_ i: Int) -> (__NSSlots, Int) {
+    let start = base!.load(fromByteOffset: i * 24 + 8, as: UnsafeRawPointer?.self)
+    return (__NSSlots(base: start), Int(base!.load(fromByteOffset: i * 24 + 16, as: UInt64.self)))
+  }
+}
+
+// nil when an element does not convert.
+private func __nsReadArray<Element>(_ slots: __NSSlots, _ i: Int,
+                                    _ read: (__NSSlots, Int) -> Element?) -> [Element]? {
+  let (elements, count) = slots.elements(i)
+  var result: [Element] = []
+  result.reserveCapacity(count)
+  for j in 0..<count {
+    guard let element = read(elements, j) else { return nil }
+    result.append(element)
+  }
+  return result
+}
+
+private func __nsReadMap<Value>(_ slots: __NSSlots, _ i: Int,
+                                _ read: (__NSSlots, Int) -> Value?) -> [String: Value]? {
+  let (entries, count) = slots.elements(i)
+  var result: [String: Value] = [:]
+  result.reserveCapacity(count)
+  for j in 0..<count {
+    guard let value = read(entries, 2 * j + 1) else { return nil }
+    result[entries.string(2 * j)] = value
+  }
+  return result
+}
+
 private struct __NSCall {
   let call: UnsafeMutableRawPointer
-  let args: UnsafeRawPointer?
+  let slots: __NSSlots
+
+  init(call: UnsafeMutableRawPointer, args: UnsafeRawPointer?) {
+    self.call = call
+    self.slots = __NSSlots(base: args)
+  }
 
   private func slot<Function>(_ index: Int, _: Function.Type) -> Function {
     call.load(as: UnsafeRawPointer.self).load(fromByteOffset: index * 8, as: Function.self)
   }
 
-  func isNull(_ i: Int) -> Bool { args!.load(fromByteOffset: i * 24, as: UInt32.self) == 0 }
-  func bool(_ i: Int) -> Bool { args!.load(fromByteOffset: i * 24 + 8, as: UInt8.self) != 0 }
-  func int64(_ i: Int) -> Int64 { args!.load(fromByteOffset: i * 24 + 8, as: Int64.self) }
-  func uint64(_ i: Int) -> UInt64 { args!.load(fromByteOffset: i * 24 + 8, as: UInt64.self) }
-  func double(_ i: Int) -> Double { args!.load(fromByteOffset: i * 24 + 8, as: Double.self) }
-  func string(_ i: Int) -> String {
-    let base = args!.load(fromByteOffset: i * 24 + 8, as: UnsafePointer<UInt8>?.self)
-    let length = Int(args!.load(fromByteOffset: i * 24 + 16, as: UInt64.self))
-    return String(decoding: UnsafeBufferPointer(start: base, count: length), as: UTF8.self)
-  }
-  func object(_ i: Int) -> AnyObject {
-    let pointer = args!.load(fromByteOffset: i * 24 + 8, as: UnsafeMutableRawPointer.self)
-    return Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue()
-  }
+  func string(_ i: Int) -> String { slots.string(i) }
+  func object(_ i: Int) -> AnyObject { slots.object(i) }
 
   func beginAsync() -> __NSCompletion {
     let token = slot(13, (@convention(c) (UnsafeMutableRawPointer) -> UnsafeMutableRawPointer).self)(call)
@@ -470,6 +571,24 @@ private struct __NSCall {
   }
   func returnNull() {
     slot(6, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(call)
+  }
+  func returnBytes(_ value: Data) {
+    value.withUnsafeBytes {
+      slot(5, (@convention(c) (UnsafeMutableRawPointer, UnsafePointer<UInt8>?, Int) -> Void).self)(
+        call, $0.bindMemory(to: UInt8.self).baseAddress, $0.count)
+    }
+  }
+  // Each element is reported with the ordinary return* entries.
+  func returnArray<Elements: Collection>(_ values: Elements, _ each: (Elements.Element) -> Void) {
+    slot(23, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(call, values.count)
+    for value in values { each(value) }
+    slot(24, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(call)
+  }
+  // `each` reports the key (a string), then the value.
+  func returnMap<Value>(_ values: [String: Value], _ each: (String, Value) -> Void) {
+    slot(25, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(call, values.count)
+    for (key, value) in values { each(key, value) }
+    slot(26, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(call)
   }
   func returnObject(_ object: AnyObject, _ typeIndex: UInt32) {
     slot(7, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer, UInt32) -> Void).self)(
@@ -542,6 +661,22 @@ private struct __NSCompletion: @unchecked Sendable {
   }
   func returnNull() {
     slot(20, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(token)
+  }
+  func returnBytes(_ value: Data) {
+    value.withUnsafeBytes {
+      slot(19, (@convention(c) (UnsafeMutableRawPointer, UnsafePointer<UInt8>?, Int) -> Void).self)(
+        token, $0.bindMemory(to: UInt8.self).baseAddress, $0.count)
+    }
+  }
+  func returnArray<Elements: Collection>(_ values: Elements, _ each: (Elements.Element) -> Void) {
+    slot(27, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(token, values.count)
+    for value in values { each(value) }
+    slot(28, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(token)
+  }
+  func returnMap<Value>(_ values: [String: Value], _ each: (String, Value) -> Void) {
+    slot(29, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(token, values.count)
+    for (key, value) in values { each(key, value) }
+    slot(30, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(token)
   }
   func returnObject(_ object: AnyObject, _ typeIndex: UInt32) {
     slot(21, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer, UInt32) -> Void).self)(

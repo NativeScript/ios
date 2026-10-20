@@ -1,6 +1,8 @@
 // Declarations the runtime tests use to exercise value marshaling, errors and
 // object lifetime.
 
+import Foundation
+
 public func checkedSide(_ side: Double) throws -> Double {
     if side < 0 { throw ShapeError.invalidSide(side) }
     return side
@@ -48,4 +50,24 @@ public final class Palette {
         await Task.yield()
         return stroke()
     }
+}
+
+public func names(_ count: Int) -> [String] { (0..<count).map { "n\($0)" } }
+public func total(_ values: [Double]) -> Double { values.reduce(0, +) }
+public func centroid(of points: [Point]) -> Point { points.centroid() }
+public func mirrored(_ grid: [[Int]]) -> [[Int]] { grid.map { Array($0.reversed()) } }
+public func wordCounts(_ words: [String]) -> [String: Int] {
+    words.reduce(into: [:]) { $0[$1, default: 0] += 1 }
+}
+public func lengths(_ table: [String: String]) -> [String: Int] { table.mapValues { $0.count } }
+public func trackers(_ ids: [Int]) -> [Tracker] { ids.map { Tracker(id: $0) } }
+public func allFlavors() -> [Flavor] { [.vanilla, .chocolate] }
+public func nextDay(after date: Date) -> Date { date.addingTimeInterval(86_400) }
+public func host(of url: URL) -> String? { url.host }
+public func resolve(_ path: String, against base: URL) -> URL { base.appendingPathComponent(path) }
+public func checksum(_ data: Data) -> Int { data.reduce(0) { $0 + Int($1) } }
+public func ramp(_ count: Int) -> Data { Data((0..<count).map { UInt8($0 % 256) }) }
+public func namesLater(_ count: Int) async -> [String] {
+    await Task.yield()
+    return names(count)
 }

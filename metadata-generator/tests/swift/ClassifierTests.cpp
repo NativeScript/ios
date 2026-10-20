@@ -74,8 +74,7 @@ TEST(ClassifyCallables) {
   EXPECT_TIER("Polygon.make()", Tier::SwiftGenerated);
   EXPECT_TIER("Polygon.shared", Tier::SwiftGenerated);
   EXPECT_TIER("Ring.expand(by:)", Tier::SwiftGenerated);
-  EXPECT_TIER("Loader.load(path:)", Tier::Unsupported,
-              "unbridged-type:Foundation.Data");
+  EXPECT_TIER("Loader.load(path:)", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.modernOnly()", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.legacyFetch()", Tier::SwiftGenerated);
   EXPECT_TIER("makeDefaultPoint()", Tier::SwiftGenerated);
@@ -87,14 +86,13 @@ TEST(ClassifyCallables) {
 
 TEST(ClassifyRejections) {
   EXPECT_TIER("Greeter.greet(name:)", Tier::TypeOnly, "protocol-requirement");
-  EXPECT_TIER("Loader.fetch(url:)", Tier::Unsupported,
-              "unbridged-type:Foundation.URL");
+  EXPECT_TIER("Loader.fetch(url:)", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.transform(_:)", Tier::SwiftSpecialized, "generic");
   EXPECT_TIER("Loader.first(of:)", Tier::SwiftSpecialized, "generic");
   EXPECT_TIER("Loader.withCompletion(_:)", Tier::Unsupported, "closure");
   EXPECT_TIER("Loader.each(_:)", Tier::Unsupported, "closure");
   EXPECT_TIER("Loader.update(_:)", Tier::Unsupported, "inout-parameter");
-  EXPECT_TIER("Loader.lookup(table:key:)", Tier::Unsupported, "collection");
+  EXPECT_TIER("Loader.lookup(table:key:)", Tier::SwiftGenerated);
   EXPECT_TIER("Canvas.draw(_:)", Tier::Unsupported, "existential");
   EXPECT_TIER("Ring.+(_:_:)", Tier::Unsupported, "operator");
   EXPECT_TIER("Polygon.subscript(_:)", Tier::Unsupported, "subscript");
@@ -128,6 +126,28 @@ TEST(ClassifyIsolationAndAsync) {
   CHECK_EQ(flags("Palette.strokes"), std::string("sync,main"));
   CHECK_EQ(flags("Palette.strokeLater()"), std::string("async,main"));
   CHECK_EQ(flags("Canvas.init()"), std::string("sync,main"));
+}
+
+TEST(ClassifyCollectionsAndFoundation) {
+  const Capability* grid = capabilityAt("mirrored(_:)");
+  REQUIRE(grid && grid->tier == Tier::SwiftGenerated);
+  CHECK(grid->result.bridge == Bridge::Array);
+  REQUIRE(grid->result.elements.size() == 1);
+  CHECK(grid->result.elements[0].bridge == Bridge::Array);
+  CHECK(grid->result.elements[0].elements.at(0).bridge == Bridge::Integer);
+
+  const Capability* counts = capabilityAt("wordCounts(_:)");
+  REQUIRE(counts && counts->tier == Tier::SwiftGenerated);
+  CHECK(counts->result.bridge == Bridge::Dictionary);
+
+  CHECK(capabilityAt("nextDay(after:)")->result.bridge == Bridge::Date);
+  CHECK(capabilityAt("resolve(_:against:)")->parameters[1].bridge ==
+        Bridge::URL);
+  CHECK(capabilityAt("ramp(_:)")->result.bridge == Bridge::Data);
+  CHECK(capabilityAt("trackers(_:)")->result.elements.at(0).bridge ==
+        Bridge::ClassHandle);
+  CHECK(capabilityAt("allFlavors()")->result.elements.at(0).bridge ==
+        Bridge::EnumCase);
 }
 
 TEST(ClassifyBridges) {

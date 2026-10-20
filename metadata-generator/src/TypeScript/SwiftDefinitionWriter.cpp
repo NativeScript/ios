@@ -100,6 +100,21 @@ std::string codeDisplayName(const SwiftSurface& surface,
       name = index >= 0 ? surface.types[index].symbol->name : "?";
       break;
     }
+    case Bridge::Date:
+      name = "Date";
+      break;
+    case Bridge::URL:
+      name = "URL";
+      break;
+    case Bridge::Data:
+      name = "Data";
+      break;
+    case Bridge::Array:
+      name = "[" + codeDisplayName(surface, type.elements.at(0)) + "]";
+      break;
+    case Bridge::Dictionary:
+      name = "[String: " + codeDisplayName(surface, type.elements.at(0)) + "]";
+      break;
     case Bridge::None:
       name = "?";
       break;
@@ -218,8 +233,14 @@ class Writer {
       return bridge == Bridge::Integer || bridge == Bridge::Floating;
     };
     auto textual = [](Bridge bridge) {
-      return bridge == Bridge::String || bridge == Bridge::EnumCase;
+      return bridge == Bridge::String || bridge == Bridge::EnumCase ||
+             bridge == Bridge::URL;
     };
+    if (a.bridge == b.bridge &&
+        (a.bridge == Bridge::Date || a.bridge == Bridge::Data ||
+         a.bridge == Bridge::Array || a.bridge == Bridge::Dictionary)) {
+      return true;
+    }
     if (numeric(a.bridge) && numeric(b.bridge)) {
       return true;
     }
@@ -304,11 +325,26 @@ class Writer {
       case Bridge::EnumCase:
         ts = typeName(type);
         break;
+      case Bridge::Date:
+        ts = "Date";
+        break;
+      case Bridge::URL:
+        ts = "string | URL";
+        break;
+      case Bridge::Data:
+        ts = "ArrayBuffer | ArrayBufferView";
+        break;
+      case Bridge::Array:
+        ts = "readonly (" + inputType(type.elements.at(0)) + ")[]";
+        break;
+      case Bridge::Dictionary:
+        ts = "Readonly<Record<string, " + inputType(type.elements.at(0)) + ">>";
+        break;
       default:
         ts = "never";
         break;
     }
-    return type.optional ? ts + " | null | undefined" : ts;
+    return type.optional ? "(" + ts + ") | null | undefined" : ts;
   }
 
   std::string outputType(const BridgedType& type) const {
@@ -330,6 +366,21 @@ class Writer {
       case Bridge::StructBox:
       case Bridge::EnumCase:
         ts = typeName(type);
+        break;
+      case Bridge::Date:
+        ts = "Date";
+        break;
+      case Bridge::URL:
+        ts = "URL";
+        break;
+      case Bridge::Data:
+        ts = "Uint8Array";
+        break;
+      case Bridge::Array:
+        ts = "(" + outputType(type.elements.at(0)) + ")[]";
+        break;
+      case Bridge::Dictionary:
+        ts = "Record<string, " + outputType(type.elements.at(0)) + ">";
         break;
       case Bridge::None:
         ts = "never";

@@ -45,7 +45,7 @@ TEST(ThunkRegistration) {
   CHECK_EQ(thunks().registerSymbol, std::string("ns_swift_register_SwiftDemo"));
   CHECK_EQ(thunks().fingerprint.size(), size_t(16));
   CHECK(thunks().thunkCount > 0);
-  CHECK(registers("registerModule(registrar, 2, \"SwiftDemo\", \"" +
+  CHECK(registers("registerModule(registrar, 3, \"SwiftDemo\", \"" +
                   thunks().fingerprint + "\", __nsRelease)"));
   // Instance method with labels; signature (String, Int) -> String.
   CHECK(registers("\"greet\", \"greet(name:times:)\", \"s,i64>s\""));

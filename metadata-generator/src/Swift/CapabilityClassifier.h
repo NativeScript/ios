@@ -45,6 +45,16 @@ enum class Bridge {
   StructBox,
   // Module enum without payloads: its case name as a JS string.
   EnumCase,
+  // Foundation.Date: a JS Date.
+  Date,
+  // Foundation.URL: a JS URL (a string is accepted as input).
+  URL,
+  // Foundation.Data: a Uint8Array copy (any ArrayBuffer or view as input).
+  Data,
+  // [T]: a JS array copy; `elements` holds T.
+  Array,
+  // [String: T]: a plain JS object copy; `elements` holds T.
+  Dictionary,
 };
 
 struct BridgedType {
@@ -53,6 +63,8 @@ struct BridgedType {
   // Nominal bridges: the module symbol the type refers to.
   std::string symbolId;
   TypeNode node;
+  // Array and Dictionary: the element (value) type.
+  std::vector<BridgedType> elements;
 };
 
 struct Capability {
@@ -68,7 +80,7 @@ struct Capability {
   //   js-name-conflict,
   //   inout-parameter, variadic-parameter, closure, tuple, collection,
   //   existential, opaque-type, metatype, unbridged-type, unparsed-type,
-  //   nested-optional, compiler-rejected
+  //   nested-optional, optional-element, dictionary-key, compiler-rejected
   std::vector<std::string> reasons;
   // Property name, method name, or "constructor" for initializers.
   std::string jsName;

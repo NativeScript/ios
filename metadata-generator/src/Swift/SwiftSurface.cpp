@@ -93,6 +93,21 @@ std::string signatureCode(const SwiftSurface& surface,
     case Bridge::EnumCase:
       code = "e" + std::to_string(surface.indexOf(type.symbolId));
       break;
+    case Bridge::Date:
+      code = "D";
+      break;
+    case Bridge::URL:
+      code = "U";
+      break;
+    case Bridge::Data:
+      code = "B";
+      break;
+    case Bridge::Array:
+      code = "[" + signatureCode(surface, type.elements.at(0)) + "]";
+      break;
+    case Bridge::Dictionary:
+      code = "{" + signatureCode(surface, type.elements.at(0)) + "}";
+      break;
     case Bridge::None:
       code = "?";
       break;

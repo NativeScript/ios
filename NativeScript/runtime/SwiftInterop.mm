@@ -4,6 +4,8 @@
 
 #include <atomic>
 #include <cmath>
+#include <cstring>
+#include <deque>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -32,11 +34,27 @@ constexpr double kMaxSafeInteger = 9007199254740991.0;
 // --- Signatures --------------------------------------------------------------
 
 struct ValueCode {
-  enum class Kind { Void, Bool, Signed, Unsigned, Float, String, Object, Enum };
+  enum class Kind {
+    Void,
+    Bool,
+    Signed,
+    Unsigned,
+    Float,
+    String,
+    Object,
+    Enum,
+    Date,
+    URL,
+    Data,
+    Array,
+    Map,
+  };
   Kind kind = Kind::Void;
   int bits = 64;
   int typeIndex = -1;
   bool optional = false;
+  // Array and Map: the element (value) code.
+  std::vector<ValueCode> element;
 };
 
 bool ParseCode(std::string text, ValueCode& code) {
@@ -46,6 +64,13 @@ bool ParseCode(std::string text, ValueCode& code) {
   }
   if (text.empty()) {
     return false;
+  }
+  if ((text.front() == '[' && text.back() == ']') || (text.front() == '{' && text.back() == '}')) {
+    code.kind = text.front() == '[' ? ValueCode::Kind::Array : ValueCode::Kind::Map;
+    code.element.emplace_back();
+    ValueCode& element = code.element.back();
+    return ParseCode(text.substr(1, text.size() - 2), element) &&
+           element.kind != ValueCode::Kind::Void && !element.optional;
   }
   auto number = [](const std::string& digits, int& out) {
     if (digits.empty() || digits.size() > 6) {
@@ -69,6 +94,15 @@ bool ParseCode(std::string text, ValueCode& code) {
     case 's':
       code.kind = ValueCode::Kind::String;
       return text.size() == 1;
+    case 'D':
+      code.kind = ValueCode::Kind::Date;
+      return text.size() == 1;
+    case 'U':
+      code.kind = ValueCode::Kind::URL;
+      return text.size() == 1;
+    case 'B':
+      code.kind = ValueCode::Kind::Data;
+      return text.size() == 1;
     case 'i':
     case 'u':
       code.kind = text[0] == 'i' ? ValueCode::Kind::Signed : ValueCode::Kind::Unsigned;
@@ -86,6 +120,16 @@ bool ParseCode(std::string text, ValueCode& code) {
     default:
       return false;
   }
+}
+
+// The code map keys are reported with.
+const ValueCode& KeyCode() {
+  static const ValueCode code = [] {
+    ValueCode key;
+    key.kind = ValueCode::Kind::String;
+    return key;
+  }();
+  return code;
 }
 
 struct Signature {
@@ -224,6 +268,21 @@ std::string TypeDisplayName(const ModuleInfo& module, const ValueCode& code) {
     case ValueCode::Kind::String:
       name = "String";
       break;
+    case ValueCode::Kind::Date:
+      name = "Date";
+      break;
+    case ValueCode::Kind::URL:
+      name = "URL";
+      break;
+    case ValueCode::Kind::Data:
+      name = "Data";
+      break;
+    case ValueCode::Kind::Array:
+      name = "[" + TypeDisplayName(module, code.element.at(0)) + "]";
+      break;
+    case ValueCode::Kind::Map:
+      name = "[String: " + TypeDisplayName(module, code.element.at(0)) + "]";
+      break;
     case ValueCode::Kind::Object:
     case ValueCode::Kind::Enum:
       name = code.typeIndex >= 0 && code.typeIndex < static_cast<int>(module.types.size())
@@ -320,13 +379,23 @@ void ApiCompleteNull(void* token);
 void ApiCompleteObject(void* token, void* object, uint32_t typeIndex);
 void ApiCompleteError(void* token, const uint8_t* message, intptr_t messageLength,
                       const uint8_t* type, intptr_t typeLength);
+void ApiReturnArrayBegin(NSSwiftCall* call, intptr_t count);
+void ApiReturnArrayEnd(NSSwiftCall* call);
+void ApiReturnMapBegin(NSSwiftCall* call, intptr_t count);
+void ApiReturnMapEnd(NSSwiftCall* call);
+void ApiCompleteArrayBegin(void* token, intptr_t count);
+void ApiCompleteMapBegin(void* token, intptr_t count);
+void ApiCompleteContainerEnd(void* token);
 
 const NSSwiftAPI kAPI = {
-    ApiReturnVoid,     ApiReturnBool,     ApiReturnInt64,    ApiReturnUInt64,   ApiReturnDouble,
-    ApiReturnString,   ApiReturnNull,     ApiReturnObject,   ApiThrowError,     ApiThrowTypeError,
-    ApiRegisterModule, ApiRegisterType,   ApiRegisterMember, ApiBeginAsync,     ApiCompleteVoid,
-    ApiCompleteBool,   ApiCompleteInt64,  ApiCompleteUInt64, ApiCompleteDouble, ApiCompleteString,
-    ApiCompleteNull,   ApiCompleteObject, ApiCompleteError,
+    ApiReturnVoid,           ApiReturnBool,       ApiReturnInt64,          ApiReturnUInt64,
+    ApiReturnDouble,         ApiReturnString,     ApiReturnNull,           ApiReturnObject,
+    ApiThrowError,           ApiThrowTypeError,   ApiRegisterModule,       ApiRegisterType,
+    ApiRegisterMember,       ApiBeginAsync,       ApiCompleteVoid,         ApiCompleteBool,
+    ApiCompleteInt64,        ApiCompleteUInt64,   ApiCompleteDouble,       ApiCompleteString,
+    ApiCompleteNull,         ApiCompleteObject,   ApiCompleteError,        ApiReturnArrayBegin,
+    ApiReturnArrayEnd,       ApiReturnMapBegin,   ApiReturnMapEnd,         ApiCompleteArrayBegin,
+    ApiCompleteContainerEnd, ApiCompleteMapBegin, ApiCompleteContainerEnd,
 };
 
 bool IsValidModuleName(const std::string& name) {
@@ -424,10 +493,15 @@ std::string Validate(const ModuleInfo& module) {
       codes.push_back(&parameter);
     }
     codes.push_back(&member.signature.result);
-    for (const ValueCode* code : codes) {
+    while (!codes.empty()) {
+      const ValueCode* code = codes.back();
+      codes.pop_back();
       if ((code->kind == ValueCode::Kind::Object || code->kind == ValueCode::Kind::Enum) &&
           !validType(code->typeIndex)) {
         return member.swiftName + " references an unknown type";
+      }
+      for (const auto& element : code->element) {
+        codes.push_back(&element);
       }
     }
     if (member.kind != NSSwiftMemberEnumCase && member.thunk == nullptr) {
@@ -550,6 +624,17 @@ SwiftObjectWrapper* SwiftWrapperOf(Isolate* isolate, Local<Value> value) {
 
 // --- Calls -----------------------------------------------------------------------
 
+// An array or map a thunk is reporting element by element.
+struct ResultFrame {
+  bool isMap = false;
+  Local<Object> target;
+  uint32_t next = 0;
+  // Maps alternate key and value reports.
+  bool expectKey = true;
+  Local<Value> key;
+  const ValueCode* element = nullptr;
+};
+
 struct CallContext : NSSwiftCall {
   Isolate* isolate = nullptr;
   Local<Context> context;
@@ -559,6 +644,9 @@ struct CallContext : NSSwiftCall {
   const MemberInfo* member = nullptr;
   // The object `new` created, adopted by the initializer's result.
   Local<Object> constructTarget;
+  // Code of the call's result; open frames take precedence.
+  const ValueCode* resultCode = nullptr;
+  std::vector<ResultFrame> frames;
   Local<Value> result;
   bool completed = false;
   bool threw = false;
@@ -566,17 +654,75 @@ struct CallContext : NSSwiftCall {
 
 CallContext* ContextOf(NSSwiftCall* call) { return static_cast<CallContext*>(call); }
 
-void Complete(CallContext* context, Local<Value> value) {
+// The code of the value the thunk reports next.
+const ValueCode* CurrentCode(CallContext* context) {
+  if (context->frames.empty()) {
+    return context->resultCode;
+  }
+  const ResultFrame& frame = context->frames.back();
+  return frame.isMap && frame.expectKey ? &KeyCode() : frame.element;
+}
+
+void Fail(CallContext* context) {
   context->completed = true;
-  context->result = value;
+  context->threw = true;
+}
+
+void Complete(CallContext* context, Local<Value> value) {
+  if (context->frames.empty()) {
+    context->completed = true;
+    context->result = value;
+    return;
+  }
+  ResultFrame& frame = context->frames.back();
+  bool stored = true;
+  if (!frame.isMap) {
+    stored = frame.target->Set(context->context, frame.next++, value).FromMaybe(false);
+  } else if (frame.expectKey) {
+    frame.key = value;
+    frame.expectKey = false;
+  } else {
+    stored = frame.target->Set(context->context, frame.key, value).FromMaybe(false);
+    frame.expectKey = true;
+  }
+  if (!stored) {
+    Fail(context);
+  }
+}
+
+std::string RangeMessage(const std::string& value, const std::string& swiftName) {
+  return value + " returned by " + swiftName +
+         " is outside the range JavaScript numbers represent exactly";
 }
 
 void ThrowRange(CallContext* context, const std::string& what) {
-  context->completed = true;
-  context->threw = true;
-  context->isolate->ThrowException(Exception::RangeError(tns::ToV8String(
-      context->isolate, what + " returned by " + context->member->swiftName +
-                            " is outside the range JavaScript numbers represent exactly")));
+  Fail(context);
+  context->isolate->ThrowException(Exception::RangeError(
+      tns::ToV8String(context->isolate, RangeMessage(what, context->member->swiftName))));
+}
+
+// A Uint8Array holding a copy of `bytes`.
+MaybeLocal<Value> MakeBytes(Isolate* isolate, const uint8_t* bytes, size_t length) {
+  Local<v8::ArrayBuffer> buffer = v8::ArrayBuffer::New(isolate, length);
+  if (length > 0) {
+    memcpy(buffer->Data(), bytes, length);
+  }
+  return v8::Uint8Array::New(buffer, 0, length);
+}
+
+// `new URL(href)` with the realm's URL.
+MaybeLocal<Value> MakeURL(Isolate* isolate, Local<Context> context, Local<v8::String> href) {
+  Local<Value> constructor;
+  if (!context->Global()->Get(context, tns::ToV8String(isolate, "URL")).ToLocal(&constructor) ||
+      !constructor->IsFunction()) {
+    return href;
+  }
+  Local<Value> argv[] = {href};
+  Local<Object> url;
+  if (!constructor.As<v8::Function>()->NewInstance(context, 1, argv).ToLocal(&url)) {
+    return MaybeLocal<Value>();
+  }
+  return url;
 }
 
 void ApiReturnVoid(NSSwiftCall* call) {
@@ -607,19 +753,40 @@ void ApiReturnUInt64(NSSwiftCall* call, uint64_t value) {
 
 void ApiReturnDouble(NSSwiftCall* call, double value) {
   CallContext* context = ContextOf(call);
+  const ValueCode* code = CurrentCode(context);
+  if (code && code->kind == ValueCode::Kind::Date) {
+    Local<Value> date;
+    if (!v8::Date::New(context->context, value).ToLocal(&date)) {
+      return Fail(context);
+    }
+    return Complete(context, date);
+  }
   Complete(context, v8::Number::New(context->isolate, value));
 }
 
 void ApiReturnString(NSSwiftCall* call, const uint8_t* utf8, intptr_t length) {
   CallContext* context = ContextOf(call);
+  const ValueCode* code = CurrentCode(context);
+  if (code && code->kind == ValueCode::Kind::Data) {
+    Local<Value> bytes;
+    if (!MakeBytes(context->isolate, utf8, static_cast<size_t>(length)).ToLocal(&bytes)) {
+      return Fail(context);
+    }
+    return Complete(context, bytes);
+  }
   Local<v8::String> string;
   if (!v8::String::NewFromUtf8(context->isolate,
                                reinterpret_cast<const char*>(utf8 ? utf8 : (const uint8_t*)""),
                                v8::NewStringType::kNormal, static_cast<int>(length))
            .ToLocal(&string)) {
-    context->completed = true;
-    context->threw = true;
-    return;
+    return Fail(context);
+  }
+  if (code && code->kind == ValueCode::Kind::URL) {
+    Local<Value> url;
+    if (!MakeURL(context->isolate, context->context, string).ToLocal(&url)) {
+      return Fail(context);
+    }
+    return Complete(context, url);
   }
   Complete(context, string);
 }
@@ -628,6 +795,44 @@ void ApiReturnNull(NSSwiftCall* call) {
   CallContext* context = ContextOf(call);
   Complete(context, v8::Null(context->isolate));
 }
+
+void BeginContainer(CallContext* context, bool isMap, intptr_t count) {
+  const ValueCode* code = CurrentCode(context);
+  ValueCode::Kind expected = isMap ? ValueCode::Kind::Map : ValueCode::Kind::Array;
+  if (code == nullptr || code->kind != expected || code->element.empty()) {
+    Fail(context);
+    context->isolate->ThrowException(Exception::Error(tns::ToV8String(
+        context->isolate, context->member->swiftName + " reported an unexpected collection")));
+    return;
+  }
+  ResultFrame frame;
+  frame.isMap = isMap;
+  frame.target = isMap ? Local<Object>(Object::New(context->isolate))
+                       : Local<Object>(v8::Array::New(context->isolate, static_cast<int>(count)));
+  frame.element = &code->element[0];
+  context->frames.push_back(frame);
+}
+
+void EndContainer(CallContext* context) {
+  if (context->frames.empty()) {
+    return Fail(context);
+  }
+  Local<Object> target = context->frames.back().target;
+  context->frames.pop_back();
+  Complete(context, target);
+}
+
+void ApiReturnArrayBegin(NSSwiftCall* call, intptr_t count) {
+  BeginContainer(ContextOf(call), false, count);
+}
+
+void ApiReturnArrayEnd(NSSwiftCall* call) { EndContainer(ContextOf(call)); }
+
+void ApiReturnMapBegin(NSSwiftCall* call, intptr_t count) {
+  BeginContainer(ContextOf(call), true, count);
+}
+
+void ApiReturnMapEnd(NSSwiftCall* call) { EndContainer(ContextOf(call)); }
 
 // The JS wrapper for `object`, taking over the +1 retain the thunk passed.
 // Adopts `*constructTarget` (the object `new` created) when it is set.
@@ -732,16 +937,10 @@ void ApiThrowTypeError(NSSwiftCall* call, const uint8_t* message, intptr_t lengt
 // whatever thread the Swift task finishes on. Neither the token nor the
 // outcome holds V8 handles, so either may be destroyed on any thread.
 
-struct AsyncToken {
-  Isolate* isolate;
-  IsolateWrapper wrapper;
-  uint64_t id;
-  const ModuleInfo* module;
-};
-
-// What a Swift task produced, in a form that can cross threads.
+// What a Swift task produced, in a form that can cross threads. Arrays and
+// maps hold their elements (a map's alternate key and value) as children.
 struct AsyncOutcome {
-  enum class Kind { Void, Bool, Int64, UInt64, Double, String, Null, Object, Error };
+  enum class Kind { Void, Bool, Int64, UInt64, Double, String, Null, Object, Error, Array, Map };
   Kind kind = Kind::Void;
   bool boolean = false;
   int64_t int64 = 0;
@@ -752,6 +951,7 @@ struct AsyncOutcome {
   void* object = nullptr;
   uint32_t typeIndex = 0;
   const ModuleInfo* module = nullptr;
+  std::vector<std::shared_ptr<AsyncOutcome>> children;
 
   // An undelivered object (the isolate went away) still owns its retain.
   ~AsyncOutcome() {
@@ -760,6 +960,128 @@ struct AsyncOutcome {
     }
   }
 };
+
+struct AsyncToken {
+  Isolate* isolate;
+  IsolateWrapper wrapper;
+  uint64_t id;
+  const ModuleInfo* module;
+  std::shared_ptr<AsyncOutcome> root;
+  // Arrays and maps still being reported.
+  std::vector<AsyncOutcome*> open;
+};
+
+// Converts `node` (of `code`) to JS; on failure sets `rejection` and returns
+// false.
+bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
+                 const MemberInfo& member, AsyncOutcome& node, const ValueCode& code,
+                 Local<Value>& out, Local<Value>& rejection) {
+  auto range = [&](const std::string& value) {
+    rejection =
+        Exception::RangeError(tns::ToV8String(isolate, RangeMessage(value, member.swiftName)));
+    return false;
+  };
+  auto failed = [&](const char* what) {
+    rejection = Exception::Error(tns::ToV8String(isolate, member.swiftName + ": " + what));
+    return false;
+  };
+  switch (node.kind) {
+    case AsyncOutcome::Kind::Void:
+      out = v8::Undefined(isolate);
+      return true;
+    case AsyncOutcome::Kind::Bool:
+      out = v8::Boolean::New(isolate, node.boolean);
+      return true;
+    case AsyncOutcome::Kind::Int64:
+      if (std::fabs(static_cast<double>(node.int64)) > kMaxSafeInteger) {
+        return range(std::to_string(node.int64));
+      }
+      out = v8::Number::New(isolate, static_cast<double>(node.int64));
+      return true;
+    case AsyncOutcome::Kind::UInt64:
+      if (static_cast<double>(node.uint64) > kMaxSafeInteger) {
+        return range(std::to_string(node.uint64));
+      }
+      out = v8::Number::New(isolate, static_cast<double>(node.uint64));
+      return true;
+    case AsyncOutcome::Kind::Double:
+      if (code.kind == ValueCode::Kind::Date) {
+        return v8::Date::New(context, node.float64).ToLocal(&out) || failed("invalid date");
+      }
+      out = v8::Number::New(isolate, node.float64);
+      return true;
+    case AsyncOutcome::Kind::String: {
+      if (code.kind == ValueCode::Kind::Data) {
+        return MakeBytes(isolate, reinterpret_cast<const uint8_t*>(node.text.data()),
+                         node.text.size())
+                   .ToLocal(&out) ||
+               failed("could not copy data");
+      }
+      Local<v8::String> string = tns::ToV8String(isolate, node.text);
+      if (code.kind == ValueCode::Kind::URL) {
+        return MakeURL(isolate, context, string).ToLocal(&out) || failed("invalid URL");
+      }
+      out = string;
+      return true;
+    }
+    case AsyncOutcome::Kind::Null:
+      out = v8::Null(isolate);
+      return true;
+    case AsyncOutcome::Kind::Object: {
+      auto loaded = state->byInfo.find(node.module);
+      void* object = node.object;
+      // WrapSwiftObject takes over the retain.
+      node.object = nullptr;
+      Local<Object> wrapper = WrapSwiftObject(
+          isolate, context, node.module, loaded == state->byInfo.end() ? nullptr : loaded->second,
+          state, object, node.typeIndex, nullptr);
+      if (wrapper.IsEmpty()) {
+        return failed("returned an object JavaScript cannot wrap");
+      }
+      out = wrapper;
+      return true;
+    }
+    case AsyncOutcome::Kind::Array: {
+      if (code.element.empty()) {
+        return failed("returned an unexpected array");
+      }
+      Local<v8::Array> array = v8::Array::New(isolate, static_cast<int>(node.children.size()));
+      for (uint32_t i = 0; i < node.children.size(); i++) {
+        Local<Value> element;
+        if (!OutcomeToJS(isolate, context, state, member, *node.children[i], code.element[0],
+                         element, rejection) ||
+            !array->Set(context, i, element).FromMaybe(false)) {
+          return false;
+        }
+      }
+      out = array;
+      return true;
+    }
+    case AsyncOutcome::Kind::Map: {
+      if (code.element.empty()) {
+        return failed("returned an unexpected map");
+      }
+      Local<Object> object = Object::New(isolate);
+      for (size_t i = 0; i + 1 < node.children.size(); i += 2) {
+        Local<Value> key;
+        Local<Value> value;
+        if (!OutcomeToJS(isolate, context, state, member, *node.children[i], KeyCode(), key,
+                         rejection) ||
+            !OutcomeToJS(isolate, context, state, member, *node.children[i + 1], code.element[0],
+                         value, rejection) ||
+            !object->Set(context, key, value).FromMaybe(false)) {
+          return false;
+        }
+      }
+      out = object;
+      return true;
+    }
+    case AsyncOutcome::Kind::Error:
+      rejection = SwiftErrorValue(isolate, context, node.text, node.errorType);
+      return false;
+  }
+  return failed("returned an unknown value");
+}
 
 void SettleOnIsolate(Isolate* isolate, uint64_t id, AsyncOutcome& outcome) {
   auto* state = Caches::StateFor<IsolateState>(isolate);
@@ -775,93 +1097,55 @@ void SettleOnIsolate(Isolate* isolate, uint64_t id, AsyncOutcome& outcome) {
 
   Local<Context> context = isolate->GetCurrentContext();
   Local<Promise::Resolver> resolver = pending->resolver.Get(isolate);
-  const std::string& name = pending->member->swiftName;
-  auto rejectRange = [&](const std::string& value) {
-    resolver
-        ->Reject(context,
-                 Exception::RangeError(tns::ToV8String(
-                     isolate, value + " returned by " + name +
-                                  " is outside the range JavaScript numbers represent exactly")))
-        .Check();
-  };
-
   Local<Value> value;
-  switch (outcome.kind) {
-    case AsyncOutcome::Kind::Void:
-      value = v8::Undefined(isolate);
-      break;
-    case AsyncOutcome::Kind::Bool:
-      value = v8::Boolean::New(isolate, outcome.boolean);
-      break;
-    case AsyncOutcome::Kind::Int64:
-      if (std::fabs(static_cast<double>(outcome.int64)) > kMaxSafeInteger) {
-        return rejectRange(std::to_string(outcome.int64));
-      }
-      value = v8::Number::New(isolate, static_cast<double>(outcome.int64));
-      break;
-    case AsyncOutcome::Kind::UInt64:
-      if (static_cast<double>(outcome.uint64) > kMaxSafeInteger) {
-        return rejectRange(std::to_string(outcome.uint64));
-      }
-      value = v8::Number::New(isolate, static_cast<double>(outcome.uint64));
-      break;
-    case AsyncOutcome::Kind::Double:
-      value = v8::Number::New(isolate, outcome.float64);
-      break;
-    case AsyncOutcome::Kind::String:
-      value = tns::ToV8String(isolate, outcome.text);
-      break;
-    case AsyncOutcome::Kind::Null:
-      value = v8::Null(isolate);
-      break;
-    case AsyncOutcome::Kind::Object: {
-      auto loaded = state->byInfo.find(outcome.module);
-      void* object = outcome.object;
-      // WrapSwiftObject takes over the retain.
-      outcome.object = nullptr;
-      Local<Object> wrapper =
-          WrapSwiftObject(isolate, context, outcome.module,
-                          loaded == state->byInfo.end() ? nullptr : loaded->second, state, object,
-                          outcome.typeIndex, nullptr);
-      if (wrapper.IsEmpty()) {
-        resolver
-            ->Reject(context, Exception::Error(tns::ToV8String(
-                                  isolate, "Swift returned an object JavaScript cannot wrap")))
-            .Check();
-        return;
-      }
-      value = wrapper;
-      break;
-    }
-    case AsyncOutcome::Kind::Error:
-      resolver->Reject(context, SwiftErrorValue(isolate, context, outcome.text, outcome.errorType))
-          .Check();
-      return;
+  Local<Value> rejection;
+  if (OutcomeToJS(isolate, context, state, *pending->member, outcome,
+                  pending->member->signature.result, value, rejection)) {
+    resolver->Resolve(context, value).Check();
+  } else {
+    resolver->Reject(context, rejection).Check();
   }
-  resolver->Resolve(context, value).Check();
 }
 
-// Consumes `rawToken`. Safe on any thread.
-void Deliver(void* rawToken, std::shared_ptr<AsyncOutcome> outcome) {
-  std::unique_ptr<AsyncToken> token(static_cast<AsyncToken*>(rawToken));
-  outcome->module = token->module;
+// Consumes `token`. Safe on any thread.
+void Deliver(AsyncToken* rawToken) {
+  std::unique_ptr<AsyncToken> token(rawToken);
+  std::shared_ptr<AsyncOutcome> outcome = token->root;
   NativeScriptPlatform* platform = NativeScriptPlatform::Instance();
   std::shared_ptr<EventLoop> loop =
       platform ? platform->LookupEventLoop(token->isolate) : std::shared_ptr<EventLoop>();
-  if (!loop) {
+  if (!loop || !outcome) {
     return;
   }
   Isolate* isolate = token->isolate;
   IsolateWrapper wrapper = token->wrapper;
   uint64_t id = token->id;
   // The event loop enters the isolate and drains microtasks around this; a
-  // dropped post releases the outcome (and its object) here.
+  // dropped post releases the outcome (and its objects) here.
   loop->PostInternal([isolate, wrapper, id, outcome]() {
     if (!wrapper.IsValid()) {
       return;
     }
     SettleOnIsolate(isolate, id, *outcome);
   });
+}
+
+// Records one reported value; delivers once the top-level value is complete.
+void Emit(void* rawToken, std::shared_ptr<AsyncOutcome> node) {
+  auto* token = static_cast<AsyncToken*>(rawToken);
+  node->module = token->module;
+  bool opens = node->kind == AsyncOutcome::Kind::Array || node->kind == AsyncOutcome::Kind::Map;
+  AsyncOutcome* raw = node.get();
+  if (token->open.empty()) {
+    token->root = std::move(node);
+  } else {
+    token->open.back()->children.push_back(std::move(node));
+  }
+  if (opens) {
+    token->open.push_back(raw);
+  } else if (token->open.empty()) {
+    Deliver(token);
+  }
 }
 
 std::shared_ptr<AsyncOutcome> Outcome(AsyncOutcome::Kind kind) {
@@ -883,52 +1167,50 @@ void* ApiBeginAsync(NSSwiftCall* call) {
     Complete(context, resolver->GetPromise());
   } else {
     // The token is still completed later; it then finds no pending entry.
-    context->completed = true;
-    context->threw = true;
+    Fail(context);
   }
-  return new AsyncToken{isolate, IsolateWrapper(isolate), id, context->module};
+  return new AsyncToken{isolate, IsolateWrapper(isolate), id, context->module, nullptr, {}};
 }
 
-void ApiCompleteVoid(void* token) { Deliver(token, Outcome(AsyncOutcome::Kind::Void)); }
+void ApiCompleteVoid(void* token) { Emit(token, Outcome(AsyncOutcome::Kind::Void)); }
 
 void ApiCompleteBool(void* token, uint8_t value) {
   auto outcome = Outcome(AsyncOutcome::Kind::Bool);
   outcome->boolean = value != 0;
-  Deliver(token, outcome);
+  Emit(token, outcome);
 }
 
 void ApiCompleteInt64(void* token, int64_t value) {
   auto outcome = Outcome(AsyncOutcome::Kind::Int64);
   outcome->int64 = value;
-  Deliver(token, outcome);
+  Emit(token, outcome);
 }
 
 void ApiCompleteUInt64(void* token, uint64_t value) {
   auto outcome = Outcome(AsyncOutcome::Kind::UInt64);
   outcome->uint64 = value;
-  Deliver(token, outcome);
+  Emit(token, outcome);
 }
 
 void ApiCompleteDouble(void* token, double value) {
   auto outcome = Outcome(AsyncOutcome::Kind::Double);
   outcome->float64 = value;
-  Deliver(token, outcome);
+  Emit(token, outcome);
 }
 
 void ApiCompleteString(void* token, const uint8_t* utf8, intptr_t length) {
   auto outcome = Outcome(AsyncOutcome::Kind::String);
   outcome->text.assign(reinterpret_cast<const char*>(utf8), utf8 ? length : 0);
-  Deliver(token, outcome);
+  Emit(token, outcome);
 }
 
-void ApiCompleteNull(void* token) { Deliver(token, Outcome(AsyncOutcome::Kind::Null)); }
+void ApiCompleteNull(void* token) { Emit(token, Outcome(AsyncOutcome::Kind::Null)); }
 
 void ApiCompleteObject(void* token, void* object, uint32_t typeIndex) {
   auto outcome = Outcome(AsyncOutcome::Kind::Object);
   outcome->object = object;
   outcome->typeIndex = typeIndex;
-  outcome->module = static_cast<AsyncToken*>(token)->module;
-  Deliver(token, outcome);
+  Emit(token, outcome);
 }
 
 void ApiCompleteError(void* token, const uint8_t* message, intptr_t messageLength,
@@ -936,7 +1218,25 @@ void ApiCompleteError(void* token, const uint8_t* message, intptr_t messageLengt
   auto outcome = Outcome(AsyncOutcome::Kind::Error);
   outcome->text.assign(reinterpret_cast<const char*>(message), message ? messageLength : 0);
   outcome->errorType.assign(reinterpret_cast<const char*>(type), type ? typeLength : 0);
-  Deliver(token, outcome);
+  Emit(token, outcome);
+}
+
+void ApiCompleteArrayBegin(void* token, intptr_t /*count*/) {
+  Emit(token, Outcome(AsyncOutcome::Kind::Array));
+}
+
+void ApiCompleteMapBegin(void* token, intptr_t /*count*/) {
+  Emit(token, Outcome(AsyncOutcome::Kind::Map));
+}
+
+void ApiCompleteContainerEnd(void* rawToken) {
+  auto* token = static_cast<AsyncToken*>(rawToken);
+  if (!token->open.empty()) {
+    token->open.pop_back();
+  }
+  if (token->open.empty()) {
+    Deliver(token);
+  }
 }
 
 // --- Argument conversion -----------------------------------------------------------
@@ -946,7 +1246,8 @@ bool IsPlainObject(Isolate* isolate, Local<Value> value) {
          SwiftWrapperOf(isolate, value) == nullptr;
 }
 
-// Whether `value` can be passed as `code` (overload resolution; no throws).
+// Whether `value` can be passed as `code` (overload resolution; no throws, no
+// user code). Collections are checked by kind only; Convert checks elements.
 bool Accepts(Isolate* isolate, const ModuleInfo& module, const ValueCode& code,
              Local<Value> value) {
   if (value->IsNullOrUndefined()) {
@@ -970,6 +1271,18 @@ bool Accepts(Isolate* isolate, const ModuleInfo& module, const ValueCode& code,
     case ValueCode::Kind::String:
     case ValueCode::Kind::Enum:
       return value->IsString();
+    case ValueCode::Kind::URL:
+      return value->IsString() ||
+             (value->IsObject() && !value->IsArray() && SwiftWrapperOf(isolate, value) == nullptr);
+    case ValueCode::Kind::Date:
+      return value->IsDate();
+    case ValueCode::Kind::Data:
+      return value->IsArrayBuffer() || value->IsArrayBufferView();
+    case ValueCode::Kind::Array:
+      return value->IsArray();
+    case ValueCode::Kind::Map:
+      return IsPlainObject(isolate, value) && !value->IsDate() && !value->IsArrayBuffer() &&
+             !value->IsArrayBufferView();
     case ValueCode::Kind::Object: {
       SwiftObjectWrapper* wrapper = SwiftWrapperOf(isolate, value);
       return wrapper && wrapper->Module() == &module &&
@@ -990,10 +1303,35 @@ bool ThrowArgument(Isolate* isolate, const MemberInfo& member, size_t index,
   return false;
 }
 
-// Writes `value` into `slot`. `strings` keeps UTF-8 buffers alive for the call.
+// Storage the slots of one call point into. Deques keep every buffer at a
+// fixed address while more are added.
+struct SlotArena {
+  std::deque<std::string> strings;
+  std::deque<std::vector<NSSwiftValue>> slots;
+};
+
+void PointAtBytes(NSSwiftValue& slot, const void* bytes, size_t length) {
+  slot.tag = NSSwiftTagString;
+  slot.payload.utf8 = static_cast<const uint8_t*>(bytes);
+  slot.length = length;
+}
+
+bool WriteString(Isolate* isolate, Local<v8::String> string, NSSwiftValue& slot, SlotArena& arena) {
+  size_t length = string->Utf8LengthV2(isolate);
+  arena.strings.emplace_back(length, '\0');
+  std::string& buffer = arena.strings.back();
+  if (length > 0) {
+    string->WriteUtf8V2(isolate, buffer.data(), length,
+                        v8::String::WriteFlags::kReplaceInvalidUtf8);
+  }
+  PointAtBytes(slot, buffer.data(), length);
+  return true;
+}
+
+// Writes `value` into `slot`; `index` names the argument in errors.
 bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
              const MemberInfo& member, size_t index, const ValueCode& code, Local<Value> value,
-             NSSwiftValue& slot, std::vector<std::string>& strings) {
+             NSSwiftValue& slot, SlotArena& arena) {
   slot = NSSwiftValue{};
   if (value->IsNullOrUndefined()) {
     if (!code.optional) {
@@ -1086,25 +1424,104 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
       slot.payload.float64 = value.As<v8::Number>()->Value();
       return true;
 
+    case ValueCode::Kind::Date:
+      if (!value->IsDate()) {
+        return ThrowArgument(isolate, member, index, "must be a Date");
+      }
+      slot.tag = NSSwiftTagDouble;
+      slot.payload.float64 = value.As<v8::Date>()->ValueOf();
+      return true;
+
     case ValueCode::Kind::String:
-    case ValueCode::Kind::Enum: {
+    case ValueCode::Kind::Enum:
       if (!value->IsString()) {
         return ThrowArgument(isolate, member, index,
                              code.kind == ValueCode::Kind::Enum
                                  ? "must be a " + TypeDisplayName(module, code) + " case name"
                                  : "must be a string");
       }
-      Local<v8::String> string = value.As<v8::String>();
-      size_t length = string->Utf8LengthV2(isolate);
-      strings.emplace_back(length, '\0');
-      std::string& buffer = strings.back();
-      if (length > 0) {
-        string->WriteUtf8V2(isolate, buffer.data(), length,
-                            v8::String::WriteFlags::kReplaceInvalidUtf8);
+      return WriteString(isolate, value.As<v8::String>(), slot, arena);
+
+    case ValueCode::Kind::URL: {
+      Local<Value> href = value;
+      if (!value->IsString()) {
+        // A URL object (or anything else with a string href).
+        if (!value->IsObject() ||
+            !value.As<Object>()->Get(context, tns::ToV8String(isolate, "href")).ToLocal(&href) ||
+            !href->IsString()) {
+          return ThrowArgument(isolate, member, index, "must be a URL or a string");
+        }
       }
-      slot.tag = NSSwiftTagString;
-      slot.payload.utf8 = reinterpret_cast<const uint8_t*>(buffer.data());
+      return WriteString(isolate, href.As<v8::String>(), slot, arena);
+    }
+
+    case ValueCode::Kind::Data:
+      if (value->IsArrayBufferView()) {
+        Local<v8::ArrayBufferView> view = value.As<v8::ArrayBufferView>();
+        auto* base = static_cast<const uint8_t*>(view->Buffer()->Data());
+        PointAtBytes(slot, base ? base + view->ByteOffset() : nullptr, view->ByteLength());
+        return true;
+      }
+      if (value->IsArrayBuffer()) {
+        Local<v8::ArrayBuffer> buffer = value.As<v8::ArrayBuffer>();
+        PointAtBytes(slot, buffer->Data(), buffer->ByteLength());
+        return true;
+      }
+      return ThrowArgument(isolate, member, index, "must be an ArrayBuffer or a typed array");
+
+    case ValueCode::Kind::Array: {
+      if (!value->IsArray()) {
+        return ThrowArgument(isolate, member, index, "must be an array");
+      }
+      Local<v8::Array> array = value.As<v8::Array>();
+      uint32_t length = array->Length();
+      arena.slots.emplace_back(length);
+      std::vector<NSSwiftValue>& elements = arena.slots.back();
+      for (uint32_t i = 0; i < length; i++) {
+        Local<Value> element;
+        if (!array->Get(context, i).ToLocal(&element) ||
+            !Convert(isolate, context, module, member, index, code.element[0], element, elements[i],
+                     arena)) {
+          return false;
+        }
+      }
+      slot.tag = NSSwiftTagArray;
+      slot.payload.object = elements.data();
       slot.length = length;
+      return true;
+    }
+
+    case ValueCode::Kind::Map: {
+      if (!Accepts(isolate, module, code, value)) {
+        return ThrowArgument(isolate, member, index, "must be a plain object");
+      }
+      Local<Object> object = value.As<Object>();
+      Local<v8::Array> keys;
+      if (!object->GetOwnPropertyNames(context).ToLocal(&keys)) {
+        return false;
+      }
+      uint32_t count = keys->Length();
+      arena.slots.emplace_back(2 * count);
+      std::vector<NSSwiftValue>& entries = arena.slots.back();
+      for (uint32_t i = 0; i < count; i++) {
+        Local<Value> key;
+        Local<Value> entry;
+        if (!keys->Get(context, i).ToLocal(&key)) {
+          return false;
+        }
+        Local<v8::String> name;
+        if (!key->ToString(context).ToLocal(&name) || !object->Get(context, key).ToLocal(&entry)) {
+          return false;
+        }
+        WriteString(isolate, name, entries[2 * i], arena);
+        if (!Convert(isolate, context, module, member, index, code.element[0], entry,
+                     entries[2 * i + 1], arena)) {
+          return false;
+        }
+      }
+      slot.tag = NSSwiftTagMap;
+      slot.payload.object = entries.data();
+      slot.length = count;
       return true;
     }
 
@@ -1233,9 +1650,7 @@ MaybeLocal<Value> Invoke(Isolate* isolate, const MemberGroup& group, const Membe
   }
 
   std::vector<NSSwiftValue> slots;
-  std::vector<std::string> strings;
-  // Buffers must not move while slots point into them.
-  strings.reserve(arguments.size() + 1);
+  SlotArena arena;
   slots.reserve(arguments.size() + 1);
 
   if (!receiver.IsEmpty()) {
@@ -1245,7 +1660,7 @@ MaybeLocal<Value> Invoke(Isolate* isolate, const MemberGroup& group, const Membe
       ValueCode code;
       code.kind = ValueCode::Kind::Enum;
       code.typeIndex = member.owner;
-      if (!Convert(isolate, context, module, member, 0, code, receiver, slot, strings)) {
+      if (!Convert(isolate, context, module, member, 0, code, receiver, slot, arena)) {
         return MaybeLocal<Value>();
       }
     } else {
@@ -1265,7 +1680,7 @@ MaybeLocal<Value> Invoke(Isolate* isolate, const MemberGroup& group, const Membe
   if (setter) {
     NSSwiftValue slot{};
     if (!Convert(isolate, context, module, member, 0, member.signature.result, arguments[0], slot,
-                 strings)) {
+                 arena)) {
       return MaybeLocal<Value>();
     }
     slots.push_back(slot);
@@ -1273,7 +1688,7 @@ MaybeLocal<Value> Invoke(Isolate* isolate, const MemberGroup& group, const Membe
     for (size_t i = 0; i < arguments.size(); i++) {
       NSSwiftValue slot{};
       if (!Convert(isolate, context, module, member, i, member.signature.parameters[i],
-                   arguments[i], slot, strings)) {
+                   arguments[i], slot, arena)) {
         return MaybeLocal<Value>();
       }
       slots.push_back(slot);
@@ -1289,6 +1704,7 @@ MaybeLocal<Value> Invoke(Isolate* isolate, const MemberGroup& group, const Membe
   call.state = state;
   call.member = &member;
   call.constructTarget = constructTarget;
+  call.resultCode = &member.signature.result;
 
   NSSwiftThunk thunk = setter ? member.setter : member.thunk;
   thunk(&call, slots.empty() ? nullptr : slots.data(), static_cast<intptr_t>(slots.size()));

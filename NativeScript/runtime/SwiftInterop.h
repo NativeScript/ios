@@ -32,7 +32,7 @@
 // return* or throw* entry of call->api, or calls beginAsync and later
 // exactly one complete* entry with the token it returned (from any thread).
 
-#define NS_SWIFT_ABI_VERSION 2
+#define NS_SWIFT_ABI_VERSION 3
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,6 +63,11 @@ enum {
   NSSwiftTagString = 5,
   // A Swift object borrowed (+0) for the duration of the call.
   NSSwiftTagObject = 6,
+  // payload.object points at `length` element slots.
+  NSSwiftTagArray = 7,
+  // payload.object points at 2 * `length` slots: key, value, key, value...
+  // Keys are strings.
+  NSSwiftTagMap = 8,
 };
 
 typedef struct NSSwiftAPI NSSwiftAPI;
@@ -119,6 +124,11 @@ enum {
 //   s           String
 //   o<n>        object of type index n (class instance, or boxed struct)
 //   e<n>        payload-less enum of type index n, as its case name
+//   D           Date: a double of milliseconds since 1970 <-> JS Date
+//   U           URL: its string <-> JS URL (strings accepted as input)
+//   B           Data: bytes (NSSwiftTagString) <-> Uint8Array copy
+//   [<code>]    array (NSSwiftTagArray) <-> JS array copy
+//   {<code>}    [String: <code>] (NSSwiftTagMap) <-> plain JS object copy
 //   <code>?     optional: JS null/undefined <-> NSSwiftTagNull
 // e.g. "s,i64>s" is (String, Int) -> String; ">o2?" returns an optional
 // instance of type 2.
@@ -177,6 +187,18 @@ struct NSSwiftAPI {
   /* 22 */ void (*completeError)(void* token, const uint8_t* message,
                                  intptr_t messageLength, const uint8_t* type,
                                  intptr_t typeLength);
+
+  // Collections are reported element by element: Begin, then each element
+  // through the ordinary return*/complete* entries (for a map: key, then
+  // value), then End. Collections nest.
+  /* 23 */ void (*returnArrayBegin)(NSSwiftCall* call, intptr_t count);
+  /* 24 */ void (*returnArrayEnd)(NSSwiftCall* call);
+  /* 25 */ void (*returnMapBegin)(NSSwiftCall* call, intptr_t count);
+  /* 26 */ void (*returnMapEnd)(NSSwiftCall* call);
+  /* 27 */ void (*completeArrayBegin)(void* token, intptr_t count);
+  /* 28 */ void (*completeArrayEnd)(void* token);
+  /* 29 */ void (*completeMapBegin)(void* token, intptr_t count);
+  /* 30 */ void (*completeMapEnd)(void* token);
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);

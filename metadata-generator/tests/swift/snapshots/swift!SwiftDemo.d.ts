@@ -60,7 +60,10 @@ declare module "ns:swift/SwiftDemo" {
      * @deprecated Use fetch(url:) instead
      */
     legacyFetch(): void;
+    load(path: string): Uint8Array;
     wait(seconds: number): Promise<void>;
+    fetch(url: string | URL): Promise<string>;
+    lookup(table: Readonly<Record<string, number | bigint>>, key: string): number | null;
     /**
      * @deprecated Renamed to `fetch(url:)`.
      */
@@ -108,7 +111,7 @@ declare module "ns:swift/SwiftDemo" {
     "scale(by: Double)"(factor: number): void;
     "scale(by: Int)"(factor: number | bigint): void;
     static readonly shared: Polygon;
-    static describe(polygon: Polygon | null | undefined): string;
+    static describe(polygon: (Polygon) | null | undefined): string;
   }
 
   export class Tracker {
@@ -119,16 +122,30 @@ declare module "ns:swift/SwiftDemo" {
     static readonly liveCount: number;
   }
 
+  export function allFlavors(): (Flavor)[];
   export function echoUInt64(value: number | bigint): number;
   export function largestInt(): number;
+  export function namesLater(count: number | bigint): Promise<(string)[]>;
+  export function wordCounts(words: readonly (string)[]): Record<string, number>;
   export function checkedSide(side: number): number;
   export function delayedEcho(text: string, seconds: number): Promise<string>;
   export const defaultFlavor: Flavor;
   export let globalCounter: number;
   export function makeDefaultPoint(): Point;
   export function makeTrackerLater(id: number | bigint): Promise<Tracker>;
-  export function shout(name: string | null | undefined): string | null;
+  export function host(url: string | URL): string | null;
+  export function ramp(count: number | bigint): Uint8Array;
+  export function names(count: number | bigint): (string)[];
+  export function shout(name: (string) | null | undefined): string | null;
+  export function total(values: readonly (number)[]): number;
+  export function lengths(table: Readonly<Record<string, string>>): Record<string, number>;
+  export function nextDay(date: Date): Date;
+  export function resolve(path: string, base: string | URL): URL;
+  export function centroid(points: readonly (Point)[]): Point;
+  export function checksum(data: ArrayBuffer | ArrayBufferView): number;
   export function echoInt8(value: number | bigint): number;
+  export function mirrored(grid: readonly (readonly (number | bigint)[])[]): ((number)[])[];
+  export function trackers(ids: readonly (number | bigint)[]): (Tracker)[];
 }
 
 declare module "ns:swift" {

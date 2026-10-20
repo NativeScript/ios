@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module"]);
-            expect(swift.abiVersion).toBe(2);
+            expect(swift.abiVersion).toBe(3);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(2);
+            expect(info.abiVersion).toBe(3);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -51,7 +51,7 @@ describe("ns:swift", function () {
 
         it("exposes only the generated surface", function () {
             // Unsupported declarations (async, generic, closures, ...) are absent.
-            expect(SwiftDemo.Loader.prototype.fetch).toBeUndefined();
+            expect(SwiftDemo.Loader.prototype.update).toBeUndefined();
             expect(SwiftDemo.Loader.prototype.transform).toBeUndefined();
             expect(SwiftDemo.Measurement).toBeUndefined();
         });
@@ -244,6 +244,71 @@ describe("ns:swift", function () {
                 expect(e.swiftType).toBe("SwiftDemo.ShapeError");
                 expect(e.message).toContain("invalidSide(-1.0)");
             }
+        });
+    });
+
+    describe("collections and Foundation values", function () {
+        it("copies arrays both ways", function () {
+            expect(SwiftDemo.names(3)).toEqual(["n0", "n1", "n2"]);
+            expect(SwiftDemo.total([1, 2, 3.5])).toBe(6.5);
+            expect(SwiftDemo.mirrored([[1, 2], [3]])).toEqual([[2, 1], [3]]);
+            expect(SwiftDemo.allFlavors()).toEqual(["vanilla", "chocolate"]);
+            var center = SwiftDemo.centroid([new SwiftDemo.Point(0, 0), new SwiftDemo.Point(2, 2)]);
+            expect(center instanceof SwiftDemo.Point).toBe(true);
+            expect(center.x).toBe(1);
+            var trackers = SwiftDemo.trackers([4, 5]);
+            expect(trackers.length).toBe(2);
+            expect(trackers[0] instanceof SwiftDemo.Tracker).toBe(true);
+            expect(trackers[1].id).toBe(5);
+        });
+
+        it("copies [String: T] to and from plain objects", function () {
+            expect(SwiftDemo.wordCounts(["a", "b", "a"])).toEqual({ a: 2, b: 1 });
+            expect(SwiftDemo.lengths({ x: "abc", y: "" })).toEqual({ x: 3, y: 0 });
+            var loader = new SwiftDemo.Loader();
+            expect(loader.lookup({ a: 1 }, "a")).toBe(1);
+            expect(loader.lookup({}, "z")).toBe(null);
+        });
+
+        it("checks collection elements", function () {
+            expect(function () { SwiftDemo.total("x"); }).toThrowError(TypeError);
+            expect(function () { SwiftDemo.total([1, "x"]); }).toThrowError(TypeError);
+            expect(function () { SwiftDemo.mirrored([[1.5]]); }).toThrowError(TypeError);
+            expect(function () { SwiftDemo.lengths({ x: 1 }); }).toThrowError(TypeError);
+        });
+
+        it("maps Date to JS Date", function () {
+            var next = SwiftDemo.nextDay(new Date(0));
+            expect(next instanceof Date).toBe(true);
+            expect(next.getTime()).toBe(86400000);
+            expect(function () { SwiftDemo.nextDay(0); }).toThrowError(TypeError);
+        });
+
+        it("maps URL to JS URL and accepts strings", function () {
+            expect(SwiftDemo.host("https://example.com/x")).toBe("example.com");
+            expect(SwiftDemo.host(new URL("https://a.example/"))).toBe("a.example");
+            var resolved = SwiftDemo.resolve("c", "https://x.example/a/");
+            expect(resolved instanceof URL).toBe(true);
+            expect(resolved.href).toBe("https://x.example/a/c");
+        });
+
+        it("maps Data to Uint8Array and accepts any buffer", function () {
+            expect(SwiftDemo.checksum(new Uint8Array([1, 2, 3]))).toBe(6);
+            expect(SwiftDemo.checksum(new Uint8Array([1, 2, 3]).buffer)).toBe(6);
+            expect(SwiftDemo.checksum(new Uint8Array([9, 1, 2]).subarray(1))).toBe(3);
+            var bytes = SwiftDemo.ramp(4);
+            expect(bytes instanceof Uint8Array).toBe(true);
+            expect(Array.prototype.slice.call(bytes)).toEqual([0, 1, 2, 3]);
+        });
+
+        it("resolves async collections", function (done) {
+            SwiftDemo.namesLater(2).then(function (names) {
+                expect(names).toEqual(["n0", "n1"]);
+                done();
+            }, function (error) {
+                fail(error);
+                done();
+            });
         });
     });
 

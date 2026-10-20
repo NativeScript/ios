@@ -58,6 +58,15 @@ fixture's `Package.swift` builds the same files as two SwiftPM modules.
 | class, actor | an instance of the generated JS class; one JS object per Swift object |
 | struct | an instance of the generated JS class holding its own copy |
 | enum without associated values | the case name as a string; the enum's namespace object (`Flavor.vanilla`) lists them |
+| `Date` | `Date` |
+| `URL` | `URL` (inputs also accept a string) |
+| `Data` | `Uint8Array` copy (inputs accept any `ArrayBuffer` or view) |
+| `[T]` | array copy |
+| `[String: T]` | plain object copy |
+
+Collections are copied in both directions; their elements follow the same
+table (optional elements are not supported yet), and dictionary keys must be
+`String`.
 
 Structs have value semantics: reading a struct-typed property, passing a struct
 argument, or returning one copies it, so a JS object never aliases another
@@ -129,9 +138,8 @@ verification is what makes the generated surface trustworthy at SDK scale.
 ## Not yet supported
 
 Closures and callbacks, async cancellation, `inout` parameters, generics,
-protocols as values, collections,
-tuples, enums with associated values, nested types, subscripts, operators, and
-Foundation value types (`URL`, `Data`, `Date`). Each appears in the coverage
+protocols as values, tuples, sets, optional collection elements, enums with
+associated values, nested types, subscripts and operators. Each appears in the coverage
 report with its reason.
 
 ## Swift language mode

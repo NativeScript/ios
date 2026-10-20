@@ -39,7 +39,21 @@
     "s:9SwiftDemo7TrackerC",
     "s:9SwiftDemo11delayedEcho_5afterS2S_SdtYaKF",
     "s:9SwiftDemo16makeTrackerLater2idAA0D0CSi_tYaF",
-    "s:9SwiftDemo7PaletteC"
+    "s:9SwiftDemo7PaletteC",
+    "s:9SwiftDemo5namesySaySSGSiF",
+    "s:9SwiftDemo5totalySdSaySdGF",
+    "s:9SwiftDemo8centroid2ofAA5PointVSayAEG_tF",
+    "s:9SwiftDemo8mirroredySaySaySiGGADF",
+    "s:9SwiftDemo10wordCountsySDySSSiGSaySSGF",
+    "s:9SwiftDemo7lengthsySDySSSiGSDyS2SGF",
+    "s:9SwiftDemo8trackersySayAA7TrackerCGSaySiGF",
+    "s:9SwiftDemo10allFlavorsSayAA6FlavorOGyF",
+    "s:9SwiftDemo7nextDay5after10Foundation4DateVAF_tF",
+    "s:9SwiftDemo4host2ofSSSg10Foundation3URLV_tF",
+    "s:9SwiftDemo7resolve_7against10Foundation3URLVSS_AFtF",
+    "s:9SwiftDemo8checksumySi10Foundation4DataVF",
+    "s:9SwiftDemo4rampy10Foundation4DataVSiF",
+    "s:9SwiftDemo10namesLaterySaySSGSiYaF"
   ],
   "externalTypes": [
     {
@@ -292,6 +306,22 @@
       "parent": "s:9SwiftDemo10ShapeErrorO"
     },
     {
+      "id": "s:9SwiftDemo10allFlavorsSayAA6FlavorOGyF",
+      "kind": "function",
+      "path": "allFlavors()",
+      "name": "allFlavors()",
+      "access": "public",
+      "declaration": "func allFlavors() -> [Flavor]",
+      "returns": {
+        "spelling": "[Flavor]",
+        "references": [
+          "s:9SwiftDemo6FlavorO"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:63:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo10echoUInt64ys0D0VADF",
       "kind": "function",
       "path": "echoUInt64(_:)",
@@ -315,7 +345,7 @@
           "s:s6UInt64V"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Values.swift:9:12",
+      "location": "file://Sources/SwiftDemo/Values.swift:11:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -331,7 +361,63 @@
           "s:Si"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Values.swift:10:12",
+      "location": "file://Sources/SwiftDemo/Values.swift:12:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo10namesLaterySaySSGSiYaF",
+      "kind": "function",
+      "path": "namesLater(_:)",
+      "name": "namesLater(_:)",
+      "access": "public",
+      "declaration": "func namesLater(_ count: Int) async -> [String]",
+      "parameters": [
+        {
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[String]",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "async": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:69:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo10wordCountsySDySSSiGSaySSGF",
+      "kind": "function",
+      "path": "wordCounts(_:)",
+      "name": "wordCounts(_:)",
+      "access": "public",
+      "declaration": "func wordCounts(_ words: [String]) -> [String : Int]",
+      "parameters": [
+        {
+          "internalName": "words",
+          "type": {
+            "spelling": "[String]",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[String : Int]",
+        "references": [
+          "s:SS",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:58:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -532,7 +618,7 @@
         ]
       },
       "throws": true,
-      "location": "file://Sources/SwiftDemo/Values.swift:3:12",
+      "location": "file://Sources/SwiftDemo/Values.swift:5:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -571,7 +657,7 @@
       },
       "async": true,
       "throws": true,
-      "location": "file://Sources/SwiftDemo/Values.swift:27:12",
+      "location": "file://Sources/SwiftDemo/Values.swift:29:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -732,7 +818,7 @@
         ]
       },
       "async": true,
-      "location": "file://Sources/SwiftDemo/Values.swift:33:12",
+      "location": "file://Sources/SwiftDemo/Values.swift:35:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -887,6 +973,61 @@
       "location": "file://Sources/SwiftDemo/Shapes.swift:85:25",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo4RingV"
+    },
+    {
+      "id": "s:9SwiftDemo4host2ofSSSg10Foundation3URLV_tF",
+      "kind": "function",
+      "path": "host(of:)",
+      "name": "host(of:)",
+      "access": "public",
+      "declaration": "func host(of url: URL) -> String?",
+      "parameters": [
+        {
+          "label": "of",
+          "internalName": "url",
+          "type": {
+            "spelling": "URL",
+            "references": [
+              "s:10Foundation3URLV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String?",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:65:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo4rampy10Foundation4DataVSiF",
+      "kind": "function",
+      "path": "ramp(_:)",
+      "name": "ramp(_:)",
+      "access": "public",
+      "declaration": "func ramp(_ count: Int) -> Data",
+      "parameters": [
+        {
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Data",
+        "references": [
+          "s:10Foundation4DataV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:68:12",
+      "graph": "SwiftDemo.symbols.json"
     },
     {
       "id": "s:9SwiftDemo5PointV",
@@ -1084,6 +1225,33 @@
       "parent": "s:9SwiftDemo5ShapeP"
     },
     {
+      "id": "s:9SwiftDemo5namesySaySSGSiF",
+      "kind": "function",
+      "path": "names(_:)",
+      "name": "names(_:)",
+      "access": "public",
+      "declaration": "func names(_ count: Int) -> [String]",
+      "parameters": [
+        {
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[String]",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:54:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo5shoutySSSgACF",
       "kind": "function",
       "path": "shout(_:)",
@@ -1107,7 +1275,34 @@
           "s:SS"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Values.swift:11:12",
+      "location": "file://Sources/SwiftDemo/Values.swift:13:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo5totalySdSaySdGF",
+      "kind": "function",
+      "path": "total(_:)",
+      "name": "total(_:)",
+      "access": "public",
+      "declaration": "func total(_ values: [Double]) -> Double",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "[Double]",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:55:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -1966,7 +2161,7 @@
       "modifiers": [
         "final"
       ],
-      "location": "file://Sources/SwiftDemo/Values.swift:39:19",
+      "location": "file://Sources/SwiftDemo/Values.swift:41:19",
       "graph": "SwiftDemo.symbols.json",
       "members": [
         "s:9SwiftDemo7PaletteC7strokesSivp",
@@ -1995,7 +2190,7 @@
         ]
       },
       "async": true,
-      "location": "file://Sources/SwiftDemo/Values.swift:46:16",
+      "location": "file://Sources/SwiftDemo/Values.swift:48:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7PaletteC"
     },
@@ -2015,7 +2210,7 @@
           "s:Si"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Values.swift:42:16",
+      "location": "file://Sources/SwiftDemo/Values.swift:44:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7PaletteC"
     },
@@ -2036,7 +2231,7 @@
         ]
       },
       "settable": false,
-      "location": "file://Sources/SwiftDemo/Values.swift:40:28",
+      "location": "file://Sources/SwiftDemo/Values.swift:42:28",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7PaletteC"
     },
@@ -2050,7 +2245,7 @@
       "attributes": [
         "@MainActor"
       ],
-      "location": "file://Sources/SwiftDemo/Values.swift:41:11",
+      "location": "file://Sources/SwiftDemo/Values.swift:43:11",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7PaletteC"
     },
@@ -2374,7 +2569,7 @@
       "modifiers": [
         "final"
       ],
-      "location": "file://Sources/SwiftDemo/Values.swift:13:19",
+      "location": "file://Sources/SwiftDemo/Values.swift:15:19",
       "graph": "SwiftDemo.symbols.json",
       "members": [
         "s:9SwiftDemo7TrackerC9liveCountSivpZ",
@@ -2402,7 +2597,7 @@
           }
         }
       ],
-      "location": "file://Sources/SwiftDemo/Values.swift:17:11",
+      "location": "file://Sources/SwiftDemo/Values.swift:19:11",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7TrackerC"
     },
@@ -2421,7 +2616,7 @@
       },
       "settable": false,
       "let": true,
-      "location": "file://Sources/SwiftDemo/Values.swift:15:15",
+      "location": "file://Sources/SwiftDemo/Values.swift:17:15",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7TrackerC"
     },
@@ -2438,7 +2633,7 @@
           "s:9SwiftDemo7TrackerC"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Values.swift:24:16",
+      "location": "file://Sources/SwiftDemo/Values.swift:26:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7TrackerC"
     },
@@ -2460,9 +2655,158 @@
         ]
       },
       "settable": false,
-      "location": "file://Sources/SwiftDemo/Values.swift:14:35",
+      "location": "file://Sources/SwiftDemo/Values.swift:16:35",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7TrackerC"
+    },
+    {
+      "id": "s:9SwiftDemo7lengthsySDySSSiGSDyS2SGF",
+      "kind": "function",
+      "path": "lengths(_:)",
+      "name": "lengths(_:)",
+      "access": "public",
+      "declaration": "func lengths(_ table: [String : String]) -> [String : Int]",
+      "parameters": [
+        {
+          "internalName": "table",
+          "type": {
+            "spelling": "[String : String]",
+            "references": [
+              "s:SS",
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[String : Int]",
+        "references": [
+          "s:SS",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:61:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo7nextDay5after10Foundation4DateVAF_tF",
+      "kind": "function",
+      "path": "nextDay(after:)",
+      "name": "nextDay(after:)",
+      "access": "public",
+      "declaration": "func nextDay(after date: Date) -> Date",
+      "parameters": [
+        {
+          "label": "after",
+          "internalName": "date",
+          "type": {
+            "spelling": "Date",
+            "references": [
+              "s:10Foundation4DateV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Date",
+        "references": [
+          "s:10Foundation4DateV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:64:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo7resolve_7against10Foundation3URLVSS_AFtF",
+      "kind": "function",
+      "path": "resolve(_:against:)",
+      "name": "resolve(_:against:)",
+      "access": "public",
+      "declaration": "func resolve(_ path: String, against base: URL) -> URL",
+      "parameters": [
+        {
+          "internalName": "path",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        },
+        {
+          "label": "against",
+          "internalName": "base",
+          "type": {
+            "spelling": "URL",
+            "references": [
+              "s:10Foundation3URLV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "URL",
+        "references": [
+          "s:10Foundation3URLV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:66:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8centroid2ofAA5PointVSayAEG_tF",
+      "kind": "function",
+      "path": "centroid(of:)",
+      "name": "centroid(of:)",
+      "access": "public",
+      "declaration": "func centroid(of points: [Point]) -> Point",
+      "parameters": [
+        {
+          "label": "of",
+          "internalName": "points",
+          "type": {
+            "spelling": "[Point]",
+            "references": [
+              "s:9SwiftDemo5PointV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Point",
+        "references": [
+          "s:9SwiftDemo5PointV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:56:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8checksumySi10Foundation4DataVF",
+      "kind": "function",
+      "path": "checksum(_:)",
+      "name": "checksum(_:)",
+      "access": "public",
+      "declaration": "func checksum(_ data: Data) -> Int",
+      "parameters": [
+        {
+          "internalName": "data",
+          "type": {
+            "spelling": "Data",
+            "references": [
+              "s:10Foundation4DataV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:67:12",
+      "graph": "SwiftDemo.symbols.json"
     },
     {
       "id": "s:9SwiftDemo8echoInt8ys0D0VADF",
@@ -2488,7 +2832,61 @@
           "s:s4Int8V"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Values.swift:8:12",
+      "location": "file://Sources/SwiftDemo/Values.swift:10:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8mirroredySaySaySiGGADF",
+      "kind": "function",
+      "path": "mirrored(_:)",
+      "name": "mirrored(_:)",
+      "access": "public",
+      "declaration": "func mirrored(_ grid: [[Int]]) -> [[Int]]",
+      "parameters": [
+        {
+          "internalName": "grid",
+          "type": {
+            "spelling": "[[Int]]",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[[Int]]",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:57:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8trackersySayAA7TrackerCGSaySiGF",
+      "kind": "function",
+      "path": "trackers(_:)",
+      "name": "trackers(_:)",
+      "access": "public",
+      "declaration": "func trackers(_ ids: [Int]) -> [Tracker]",
+      "parameters": [
+        {
+          "internalName": "ids",
+          "type": {
+            "spelling": "[Int]",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[Tracker]",
+        "references": [
+          "s:9SwiftDemo7TrackerC"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:62:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
