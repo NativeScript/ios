@@ -19,6 +19,7 @@
     "s:9SwiftDemo0B0C",
     "s:9SwiftDemo5PointV",
     "s:9SwiftDemo6FlavorO",
+    "s:9SwiftDemo10ThermostatC",
     "s:9SwiftDemo8GreetingP",
     "s:9SwiftDemo6ScorerP",
     "s:9SwiftDemo12RankedScorerP",
@@ -137,6 +138,7 @@
   "externalNames": {
     "c:objc(cs)NSObject": "ObjectiveC.NSObject",
     "c:objc(pl)NSObject": "ObjectiveC.NSObjectProtocol",
+    "s:11Observation10ObservableP": "Observation.Observable",
     "s:SH": "Swift.Hashable",
     "s:SQ": "Swift.Equatable",
     "s:SS": "Swift.String",
@@ -1489,6 +1491,160 @@
       "location": "file://Sources/SwiftDemo/Shapes.swift:57:9",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo10ShapeErrorO"
+    },
+    {
+      "id": "s:9SwiftDemo10ThermostatC",
+      "kind": "class",
+      "path": "Thermostat",
+      "name": "Thermostat",
+      "access": "public",
+      "declaration": "final class Thermostat",
+      "modifiers": [
+        "final"
+      ],
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "17.0.0"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Observing.swift:6:31",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo10ThermostatC7celsiusSdvp",
+        "s:9SwiftDemo10ThermostatC5labelSSvp",
+        "s:9SwiftDemo10ThermostatCACycfc",
+        "s:9SwiftDemo10ThermostatC4warm2byySd_tF",
+        "s:9SwiftDemo10ThermostatC9warmLater2byySd_tF"
+      ],
+      "conformances": [
+        "s:11Observation10ObservableP",
+        "s:s8CopyableP",
+        "s:s9EscapableP"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo10ThermostatC4warm2byySd_tF",
+      "kind": "instanceMethod",
+      "path": "Thermostat.warm(by:)",
+      "name": "warm(by:)",
+      "access": "public",
+      "declaration": "func warm(by delta: Double)",
+      "parameters": [
+        {
+          "label": "by",
+          "internalName": "delta",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "17.0.0"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Observing.swift:12:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10ThermostatC"
+    },
+    {
+      "id": "s:9SwiftDemo10ThermostatC5labelSSvp",
+      "kind": "instanceProperty",
+      "path": "Thermostat.label",
+      "name": "label",
+      "access": "public",
+      "declaration": "var label: String { get set }",
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": true,
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "17.0.0"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Observing.swift:8:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10ThermostatC"
+    },
+    {
+      "id": "s:9SwiftDemo10ThermostatC7celsiusSdvp",
+      "kind": "instanceProperty",
+      "path": "Thermostat.celsius",
+      "name": "celsius",
+      "access": "public",
+      "declaration": "var celsius: Double { get set }",
+      "valueType": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "settable": true,
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "17.0.0"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Observing.swift:7:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10ThermostatC"
+    },
+    {
+      "id": "s:9SwiftDemo10ThermostatC9warmLater2byySd_tF",
+      "kind": "instanceMethod",
+      "path": "Thermostat.warmLater(by:)",
+      "name": "warmLater(by:)",
+      "access": "public",
+      "declaration": "func warmLater(by delta: Double)",
+      "parameters": [
+        {
+          "label": "by",
+          "internalName": "delta",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "17.0.0"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Observing.swift:14:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10ThermostatC"
+    },
+    {
+      "id": "s:9SwiftDemo10ThermostatCACycfc",
+      "kind": "initializer",
+      "path": "Thermostat.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "17.0.0"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Observing.swift:10:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10ThermostatC"
     },
     {
       "id": "s:9SwiftDemo10allFlavorsSayAA6FlavorOGyF",

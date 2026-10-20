@@ -79,6 +79,7 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "Demo",
                                        "Point",
                                        "Flavor",
+                                       "Thermostat",
                                        "Greeting",
                                        "Scorer",
                                        "RankedScorer",

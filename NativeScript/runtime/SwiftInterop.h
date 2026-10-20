@@ -40,7 +40,7 @@
 // calls it by reporting the arguments as an array: callbackBegin, each
 // argument through the complete* entries, then completeArrayEnd.
 
-#define NS_SWIFT_ABI_VERSION 9
+#define NS_SWIFT_ABI_VERSION 10
 
 #ifdef __cplusplus
 extern "C" {
@@ -101,6 +101,12 @@ typedef struct NSSwiftRegistrar {
 
 typedef void (*NSSwiftThunk)(NSSwiftCall* call, const NSSwiftValue* args,
                              intptr_t count);
+// Runs callback handle `read` (no arguments) tracking the observable
+// properties it reads, then calls handle `changed` once, when one of them is
+// about to change (Observation's withObservationTracking). Returns 0 when
+// Observation is unavailable on this OS.
+typedef uint8_t (*NSSwiftTracker)(const NSSwiftAPI* api, void* read,
+                                  void* changed);
 typedef void (*NSSwiftRelease)(void* object);
 
 enum {
@@ -292,6 +298,9 @@ struct NSSwiftAPI {
   // A JS object handle, as the JS object itself.
   /* 46 */ void (*returnJSObject)(NSSwiftCall* call, void* object);
   /* 47 */ void (*completeJSObject)(void* token, void* object);
+
+  /* 48 */ void (*registerTracker)(NSSwiftRegistrar* registrar,
+                                   NSSwiftTracker tracker);
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);

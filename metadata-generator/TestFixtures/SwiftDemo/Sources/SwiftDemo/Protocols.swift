@@ -48,7 +48,7 @@ public func topRank(_ scorer: any RankedScorer) throws -> String {
     "\(scorer.rank ?? -1):\(try scorer.score(1))"
 }
 
-private final class Unchecked<Value>: @unchecked Sendable {
+final class Unchecked<Value>: @unchecked Sendable {
     let value: Value
     init(_ value: Value) { self.value = value }
 }

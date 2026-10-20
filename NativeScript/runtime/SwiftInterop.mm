@@ -316,6 +316,7 @@ struct ModuleInfo {
   std::string name;
   // Its Swift modules, each an `ns:swift/<name>` namespace.
   std::vector<std::string> modules;
+  NSSwiftTracker tracker = nullptr;
   std::string fingerprint;
   uint32_t abiVersion = 0;
   NSSwiftRelease release = nullptr;
@@ -422,6 +423,10 @@ void ApiRegisterModule(NSSwiftRegistrar* registrar, uint32_t abiVersion, const c
   module->name = name ? name : "";
   module->fingerprint = fingerprint ? fingerprint : "";
   module->release = release;
+}
+
+void ApiRegisterTracker(NSSwiftRegistrar* registrar, NSSwiftTracker tracker) {
+  static_cast<Registrar*>(registrar)->module->tracker = tracker;
 }
 
 void ApiRegisterUnitModule(NSSwiftRegistrar* registrar, const char* name) {
@@ -540,6 +545,7 @@ const NSSwiftValue* ApiObjectCallEnd(void* token);
 void ApiObjectResultRelease(const NSSwiftValue* result);
 void ApiReturnJSObject(NSSwiftCall* call, void* object);
 void ApiCompleteJSObject(void* token, void* object);
+void ApiRegisterTracker(NSSwiftRegistrar* registrar, NSSwiftTracker tracker);
 struct SwiftCallback;
 Local<Value> JSObjectOf(SwiftCallback* handle, Isolate* isolate);
 void ReleaseCallback(SwiftCallback* callback);
@@ -561,6 +567,7 @@ const NSSwiftAPI kAPI = {
     ApiWriteBackEnd,         ApiReturnObjC,           ApiCompleteObjC,
     ApiRegisterUnitModule,   ApiObjectCallBegin,      ApiObjectCallEnd,
     ApiObjectResultRelease,  ApiReturnJSObject,       ApiCompleteJSObject,
+    ApiRegisterTracker,
 };
 
 // "Polygon.Style" -> "Style".
@@ -3169,6 +3176,49 @@ void LoadModuleCallback(const FunctionCallbackInfo<Value>& info) {
   }
 }
 
+// `track(read, changed)`: Observation tracking through any loaded unit.
+void TrackCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  if (info.Length() < 2 || !info[0]->IsFunction() || !info[1]->IsFunction()) {
+    isolate->ThrowException(Exception::TypeError(
+        tns::ToV8String(isolate, "track(read, onChange) takes two functions")));
+    return;
+  }
+  std::shared_ptr<const ModuleInfo> unit;
+  {
+    std::lock_guard<std::mutex> lock(gModulesMutex);
+    for (const auto& entry : gModules) {
+      if (entry.second->error.empty() && entry.second->tracker != nullptr) {
+        unit = entry.second;
+        break;
+      }
+    }
+  }
+  auto* state = Caches::StateFor<IsolateState>(isolate);
+  if (!unit || state == nullptr) {
+    isolate->ThrowException(Exception::Error(tns::ToV8String(
+        isolate, "track() needs a loaded Swift module (swift.module(name)) to observe through")));
+    return;
+  }
+  ValueCode code;
+  code.kind = ValueCode::Kind::Function;
+  auto* read = new SwiftCallback(isolate, unit.get(), code, "track", info[0].As<Object>());
+  auto* changed = new SwiftCallback(isolate, unit.get(), code, "track", info[1].As<Object>());
+  // Collects what `read` throws, as a call does.
+  CallContext call;
+  state->calls.push_back(&call);
+  uint8_t tracked = unit->tracker(&kAPI, read, changed);
+  state->calls.pop_back();
+  ReleaseCallback(read);
+  ReleaseCallback(changed);
+  if (!call.callbackException.IsEmpty()) {
+    isolate->ThrowException(call.callbackException.Get(isolate));
+  } else if (!tracked) {
+    isolate->ThrowException(
+        Exception::Error(tns::ToV8String(isolate, "Observation tracking needs iOS 17 or newer")));
+  }
+}
+
 void ModuleInfoCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
@@ -3240,8 +3290,11 @@ MaybeLocal<Object> CreateBinding(Local<Context> context) {
   Local<Object> binding = Object::New(isolate);
   Local<v8::Function> loadModule;
   Local<v8::Function> moduleInfo;
+  Local<v8::Function> track;
   if (!v8::Function::New(context, LoadModuleCallback).ToLocal(&loadModule) ||
       !v8::Function::New(context, ModuleInfoCallback).ToLocal(&moduleInfo) ||
+      !v8::Function::New(context, TrackCallback).ToLocal(&track) ||
+      !binding->Set(context, tns::ToV8String(isolate, "track"), track).FromMaybe(false) ||
       !binding->Set(context, tns::ToV8String(isolate, "loadModule"), loadModule).FromMaybe(false) ||
       !binding->Set(context, tns::ToV8String(isolate, "moduleInfo"), moduleInfo).FromMaybe(false) ||
       !binding

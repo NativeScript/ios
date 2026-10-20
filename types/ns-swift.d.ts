@@ -8,6 +8,8 @@ declare module "ns:swift" {
 
   export interface SwiftModuleInfo {
     readonly name: string;
+    /** The generation unit the module's thunks belong to. */
+    readonly unit: string;
     /** Changes whenever the module's registered surface changes. */
     readonly fingerprint: string;
     /** Interop ABI the module's thunks were generated for. */
@@ -28,4 +30,18 @@ declare module "ns:swift" {
   export function module(name: string): unknown;
 
   export function info(name: string): SwiftModuleInfo;
+
+  /**
+   * Runs `read`, then calls `onChange` once, when an `@Observable` property
+   * `read` accessed is about to change (Swift's `withObservationTracking`).
+   * Needs iOS 17 and a loaded Swift module.
+   */
+  export function track(read: () => void, onChange: () => void): void;
+
+  /**
+   * Calls `onChange` after each change to the `@Observable` properties
+   * `read` accesses, re-reading them every time. Returns a function that
+   * stops observing.
+   */
+  export function observe(read: () => void, onChange: () => void): () => void;
 }

@@ -205,6 +205,27 @@ Protocols with associated types, `Self` requirements, static or `async`
 requirements, initializers, or more than one refined module protocol stay
 type-only.
 
+## Observation
+
+`@Observable` classes (iOS 17+) can be watched from JS:
+
+```js
+const swift = require("ns:swift");
+const stop = swift.observe(() => thermostat.celsius, () => {
+    console.log("now", thermostat.celsius);
+});
+```
+
+`swift.track(read, onChange)` is Swift's `withObservationTracking`: it runs
+`read`, recording the observable properties it reads, and calls `onChange`
+once, when one of them is about to change. `swift.observe` re-arms after
+every change and calls `onChange` once a change made on the JS thread is
+stored; it returns a function that stops observing. Changes made on other
+threads are reported on the JS thread too, but Observation reports a change
+before it is made, so `onChange` can run before the other thread stores the
+new value; share such state through an actor or a lock, as Swift requires.
+Both need a loaded Swift module (its thunks carry the tracking code).
+
 ## Async, actors and the main actor
 
 - `async` functions return a Promise. The call reads its arguments

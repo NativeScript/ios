@@ -22,6 +22,32 @@ declare module "ns:swift/SwiftDemo" {
     export function localizedDescription(value: ShapeError): string;
   }
 
+  /**
+   * @remarks Requires iOS 17.0; throws on earlier versions.
+   */
+  export class Thermostat {
+    /**
+     * @remarks Requires iOS 17.0; throws on earlier versions.
+     */
+    constructor();
+    /**
+     * @remarks Requires iOS 17.0; throws on earlier versions.
+     */
+    warm(delta: number): void;
+    /**
+     * @remarks Requires iOS 17.0; throws on earlier versions.
+     */
+    label: string;
+    /**
+     * @remarks Requires iOS 17.0; throws on earlier versions.
+     */
+    celsius: number;
+    /**
+     * @remarks Requires iOS 17.0; throws on earlier versions.
+     */
+    warmLater(delta: number): void;
+  }
+
   export type Measurement =
     | { case: "area"; width: number; height: number }
     | { case: "none" }

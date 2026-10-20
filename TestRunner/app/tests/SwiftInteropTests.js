@@ -8,8 +8,8 @@ describe("ns:swift", function () {
     describe("modules", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
-            expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module"]);
-            expect(swift.abiVersion).toBe(9);
+            expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module", "observe", "track"]);
+            expect(swift.abiVersion).toBe(10);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(9);
+            expect(info.abiVersion).toBe(10);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -647,6 +647,51 @@ describe("ns:swift", function () {
                 fail(error);
                 done();
             });
+        });
+    });
+
+    describe("observation", function () {
+        it("calls onChange once when a property read is about to change", function () {
+            var thermostat = new SwiftDemo.Thermostat();
+            var changes = 0;
+            var seen;
+            swift.track(function () { seen = thermostat.celsius; }, function () { changes++; });
+            expect(seen).toBe(20);
+            thermostat.label = "office";
+            expect(changes).toBe(0);
+            thermostat.celsius = 21;
+            expect(changes).toBe(1);
+            thermostat.warm(1);
+            expect(changes).toBe(1);
+        });
+
+        it("keeps observing after each change, from any thread", function (done) {
+            var thermostat = new SwiftDemo.Thermostat();
+            var values = [];
+            var stop = swift.observe(function () { return thermostat.celsius; }, function () {
+                values.push(thermostat.celsius);
+                if (values.length === 1) {
+                    thermostat.warmLater(2);
+                    return;
+                }
+                stop();
+                // The background thread may not have stored the value it reported yet.
+                (function settle(tries) {
+                    if (thermostat.celsius !== 23 && tries > 0) {
+                        setTimeout(function () { settle(tries - 1); }, 10);
+                        return;
+                    }
+                    expect([values[0], thermostat.celsius]).toEqual([21, 23]);
+                    done();
+                })(100);
+            });
+            thermostat.warm(1);
+        });
+
+        it("throws what read throws", function () {
+            expect(function () {
+                swift.track(function () { throw new Error("nope"); }, function () {});
+            }).toThrowError("nope");
         });
     });
 

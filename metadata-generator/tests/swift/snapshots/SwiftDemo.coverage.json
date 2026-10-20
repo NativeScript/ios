@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 294,
+      "total": 300,
       "objc-direct": 1,
-      "swift-generated": 245,
+      "swift-generated": 251,
       "swift-specialized": 17,
       "type-only": 5,
       "unsupported": 26,
       "not-applicable": 0
     },
     "callable": {
-      "total": 250,
+      "total": 255,
       "objc-direct": 0,
-      "swift-generated": 209,
+      "swift-generated": 214,
       "swift-specialized": 14,
       "type-only": 2,
       "unsupported": 25,
       "not-applicable": 0
     },
-    "effectiveCallable": 209,
+    "effectiveCallable": 214,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -35,9 +35,9 @@
       "not-applicable": 0
     },
     "class": {
-      "total": 15,
+      "total": 16,
       "objc-direct": 1,
-      "swift-generated": 13,
+      "swift-generated": 14,
       "swift-specialized": 1,
       "type-only": 0,
       "unsupported": 0,
@@ -71,27 +71,27 @@
       "not-applicable": 0
     },
     "initializer": {
-      "total": 30,
+      "total": 31,
       "objc-direct": 0,
-      "swift-generated": 27,
+      "swift-generated": 28,
       "swift-specialized": 2,
       "type-only": 0,
       "unsupported": 1,
       "not-applicable": 0
     },
     "instanceMethod": {
-      "total": 60,
+      "total": 62,
       "objc-direct": 0,
-      "swift-generated": 45,
+      "swift-generated": 47,
       "swift-specialized": 7,
       "type-only": 0,
       "unsupported": 8,
       "not-applicable": 0
     },
     "instanceProperty": {
-      "total": 52,
+      "total": 54,
       "objc-direct": 0,
-      "swift-generated": 43,
+      "swift-generated": 45,
       "swift-specialized": 3,
       "type-only": 1,
       "unsupported": 5,
@@ -677,6 +677,53 @@
       "tier": "swift-generated",
       "jsName": "unknown",
       "location": "file://Sources/SwiftDemo/Shapes.swift:58"
+    },
+    {
+      "id": "s:9SwiftDemo10ThermostatC",
+      "path": "Thermostat",
+      "kind": "class",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Observing.swift:7"
+    },
+    {
+      "id": "s:9SwiftDemo10ThermostatC4warm2byySd_tF",
+      "path": "Thermostat.warm(by:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "warm",
+      "location": "file://Sources/SwiftDemo/Observing.swift:13"
+    },
+    {
+      "id": "s:9SwiftDemo10ThermostatC5labelSSvp",
+      "path": "Thermostat.label",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "label",
+      "location": "file://Sources/SwiftDemo/Observing.swift:9"
+    },
+    {
+      "id": "s:9SwiftDemo10ThermostatC7celsiusSdvp",
+      "path": "Thermostat.celsius",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "celsius",
+      "location": "file://Sources/SwiftDemo/Observing.swift:8"
+    },
+    {
+      "id": "s:9SwiftDemo10ThermostatC9warmLater2byySd_tF",
+      "path": "Thermostat.warmLater(by:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "warmLater",
+      "location": "file://Sources/SwiftDemo/Observing.swift:15"
+    },
+    {
+      "id": "s:9SwiftDemo10ThermostatCACycfc",
+      "path": "Thermostat.init()",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Observing.swift:11"
     },
     {
       "id": "s:9SwiftDemo10allFlavorsSayAA6FlavorOGyF",
