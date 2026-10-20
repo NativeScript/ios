@@ -543,6 +543,9 @@ class Classifier {
         }
         bridged.isInout = true;
       }
+      if (bridged.bridge == Bridge::AsyncSequence) {
+        reasons.push_back("async-sequence-parameter");
+      }
       if (bridged.bridge == Bridge::Closure) {
         // The declaration parser lifts type attributes onto the parameter;
         // the closure type needs them back (@Sendable, @MainActor).
@@ -664,6 +667,9 @@ class Classifier {
     if (reason.empty() && element.bridge == Bridge::Closure) {
       reason = "closure";
     }
+    if (reason.empty() && element.bridge == Bridge::AsyncSequence) {
+      reason = "unbridged-type:AsyncSequence";
+    }
     container.elements.push_back(std::move(element));
     return reason;
   }
@@ -748,8 +754,18 @@ class Classifier {
       }
       case TypeNode::Kind::Composition:
         return "existential";
-      case TypeNode::Kind::Opaque:
+      case TypeNode::Kind::Opaque: {
+        // `some AsyncSequence<Element, Failure>`.
+        const TypeNode* inner =
+            node.children.empty() ? nullptr : &node.children[0];
+        if (inner && inner->kind == TypeNode::Kind::Nominal &&
+            inner->usr() == KnownTypes::kAsyncSequence &&
+            !inner->components.back().arguments.empty()) {
+          bridged.bridge = Bridge::AsyncSequence;
+          return bridgeElement(inner->components.back().arguments[0], bridged);
+        }
         return "opaque-type";
+      }
       case TypeNode::Kind::Metatype:
         return "metatype";
       case TypeNode::Kind::Unknown:
@@ -765,6 +781,12 @@ class Classifier {
     if (node.components.size() == 1 && node.components[0].arguments.empty() &&
         isPrimitive(usr, bridged.bridge)) {
       return "";
+    }
+    if ((usr == KnownTypes::kAsyncStream ||
+         usr == KnownTypes::kAsyncThrowingStream) &&
+        !node.components.back().arguments.empty()) {
+      bridged.bridge = Bridge::AsyncSequence;
+      return bridgeElement(node.components.back().arguments[0], bridged);
     }
     if (usr == KnownTypes::kDate) {
       bridged.bridge = Bridge::Date;
@@ -998,6 +1020,9 @@ class Classifier {
         break;
       case Bridge::Protocol:
         kind = "object:" + type.symbolId;
+        break;
+      case Bridge::AsyncSequence:
+        kind = "async-iterable";
         break;
       default:
         kind = "other";

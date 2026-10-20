@@ -58,6 +58,7 @@ struct ValueCode {
     Tagged,
     ObjC,
     Protocol,
+    AsyncSequence,
   };
   Kind kind = Kind::Void;
   int bits = 64;
@@ -105,6 +106,13 @@ bool ParseCode(std::string text, ValueCode& code) {
   }
   if (text.empty()) {
     return false;
+  }
+  if (text.front() == '~') {
+    code.kind = ValueCode::Kind::AsyncSequence;
+    code.element.emplace_back();
+    ValueCode& element = code.element.back();
+    return ParseCode(text.substr(1), element) && element.kind != ValueCode::Kind::Void &&
+           element.kind != ValueCode::Kind::Function && !element.optional;
   }
   if ((text.front() == '[' && text.back() == ']') || (text.front() == '{' && text.back() == '}')) {
     code.kind = text.front() == '[' ? ValueCode::Kind::Array : ValueCode::Kind::Map;
@@ -397,6 +405,9 @@ std::string TypeDisplayName(const ModuleInfo& module, const ValueCode& code) {
     case ValueCode::Kind::ObjC:
       name = code.className;
       break;
+    case ValueCode::Kind::AsyncSequence:
+      name = "AsyncSequence<" + TypeDisplayName(module, code.element.at(0)) + ">";
+      break;
   }
   return (code.inout ? "inout " : "") + (code.optional ? name + "?" : name);
 }
@@ -546,6 +557,13 @@ void ApiObjectResultRelease(const NSSwiftValue* result);
 void ApiReturnJSObject(NSSwiftCall* call, void* object);
 void ApiCompleteJSObject(void* token, void* object);
 void ApiRegisterTracker(NSSwiftRegistrar* registrar, NSSwiftTracker tracker);
+void ApiReturnAsyncSequence(NSSwiftCall* call, void* iterator, NSSwiftThunk next);
+void ApiCompleteAsyncSequence(void* token, void* iterator, NSSwiftThunk next);
+struct IsolateState;
+// A JS async iterator over a Swift iterator (+1, taken over).
+MaybeLocal<Value> MakeAsyncIterator(Isolate* isolate, Local<Context> context,
+                                    const ModuleInfo* module, void* iterator, NSSwiftThunk next,
+                                    const ValueCode& code, const std::string& name);
 struct SwiftCallback;
 Local<Value> JSObjectOf(SwiftCallback* handle, Isolate* isolate);
 void ReleaseCallback(SwiftCallback* callback);
@@ -567,7 +585,7 @@ const NSSwiftAPI kAPI = {
     ApiWriteBackEnd,         ApiReturnObjC,           ApiCompleteObjC,
     ApiRegisterUnitModule,   ApiObjectCallBegin,      ApiObjectCallEnd,
     ApiObjectResultRelease,  ApiReturnJSObject,       ApiCompleteJSObject,
-    ApiRegisterTracker,
+    ApiRegisterTracker,      ApiReturnAsyncSequence,  ApiCompleteAsyncSequence,
 };
 
 // "Polygon.Style" -> "Style".
@@ -818,9 +836,12 @@ struct LoadedModule {
 };
 
 // An async call's Promise, settled on the isolate's thread.
+// Its own copy of what the result is: the call's member may be gone by the
+// time it settles (an iterator step's).
 struct PendingAsync {
   Global<Promise::Resolver> resolver;
-  const MemberInfo* member;
+  ValueCode code;
+  std::string name;
 };
 
 struct IsolateState {
@@ -833,6 +854,8 @@ struct IsolateState {
   robin_hood::unordered_map<void*, SwiftObjectWrapper*> identity;
   // Thunk calls in progress on the isolate's thread, innermost last.
   std::vector<CallContext*> calls;
+  // Builds async iterators from step functions (MakeAsyncIterator).
+  Global<v8::Function> iteratorFactory;
 };
 
 // Owns one retain of a Swift object for as long as its JS wrapper lives.
@@ -1015,6 +1038,22 @@ bool IsObjCInstance(id object, const ValueCode& code) {
   return object != nil && (code.objcClass == nil || [object isKindOfClass:code.objcClass]);
 }
 
+void ApiReturnAsyncSequence(NSSwiftCall* call, void* iterator, NSSwiftThunk next) {
+  CallContext* context = ContextOf(call);
+  const ValueCode* code = CurrentCode(context);
+  Local<Value> value;
+  if (code == nullptr || code->kind != ValueCode::Kind::AsyncSequence ||
+      !MakeAsyncIterator(context->isolate, context->context, context->module, iterator, next, *code,
+                         context->member->swiftName)
+           .ToLocal(&value)) {
+    if (code == nullptr || code->kind != ValueCode::Kind::AsyncSequence) {
+      context->module->release(iterator);
+    }
+    return Fail(context);
+  }
+  Complete(context, value);
+}
+
 void ApiReturnJSObject(NSSwiftCall* call, void* object) {
   CallContext* context = ContextOf(call);
   Complete(context, JSObjectOf(static_cast<SwiftCallback*>(object), context->isolate));
@@ -1127,7 +1166,9 @@ void ApiReturnNull(NSSwiftCall* call) {
 void BeginContainer(CallContext* context, bool isMap, intptr_t count) {
   const ValueCode* code = CurrentCode(context);
   ValueCode::Kind expected = isMap ? ValueCode::Kind::Map : ValueCode::Kind::Array;
-  if (code == nullptr || code->kind != expected || code->element.empty()) {
+  // An iterator step reports its element as an array.
+  bool step = !isMap && code != nullptr && code->kind == ValueCode::Kind::AsyncSequence;
+  if (code == nullptr || (code->kind != expected && !step) || code->element.empty()) {
     Fail(context);
     context->isolate->ThrowException(Exception::Error(tns::ToV8String(
         context->isolate, context->member->swiftName + " reported an unexpected collection")));
@@ -1354,6 +1395,8 @@ struct AsyncOutcome {
     ObjC,
     // `object` is a JS object handle the outcome holds a reference to.
     JSObject,
+    // `object` is a Swift iterator, stepped by `next`.
+    Sequence,
   };
   Kind kind = Kind::Void;
   bool boolean = false;
@@ -1365,6 +1408,7 @@ struct AsyncOutcome {
   void* object = nullptr;
   uint32_t typeIndex = 0;
   const ModuleInfo* module = nullptr;
+  NSSwiftThunk next = nullptr;
   std::vector<std::shared_ptr<AsyncOutcome>> children;
 
   // An undelivered object (the isolate went away) still owns its retain.
@@ -1464,6 +1508,16 @@ bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
     case AsyncOutcome::Kind::JSObject:
       out = JSObjectOf(static_cast<SwiftCallback*>(node.object), isolate);
       return true;
+    case AsyncOutcome::Kind::Sequence: {
+      if (code.kind != ValueCode::Kind::AsyncSequence) {
+        return failed("returned an unexpected sequence");
+      }
+      void* iterator = node.object;
+      node.object = nullptr;
+      return MakeAsyncIterator(isolate, context, node.module, iterator, node.next, code, name)
+                 .ToLocal(&out) ||
+             failed("returned a sequence JavaScript cannot iterate");
+    }
     case AsyncOutcome::Kind::ObjC: {
       id object = static_cast<id>(node.object);
       node.object = nullptr;
@@ -1547,8 +1601,8 @@ void SettleOnIsolate(Isolate* isolate, uint64_t id, AsyncOutcome& outcome) {
   Local<Promise::Resolver> resolver = pending->resolver.Get(isolate);
   Local<Value> value;
   Local<Value> rejection;
-  if (OutcomeToJS(isolate, context, state, pending->member->swiftName, outcome,
-                  pending->member->signature.result, value, rejection)) {
+  if (OutcomeToJS(isolate, context, state, pending->name, outcome, pending->code, value,
+                  rejection)) {
     resolver->Resolve(context, value).Check();
   } else {
     resolver->Reject(context, rejection).Check();
@@ -1740,7 +1794,8 @@ void* ApiBeginAsync(NSSwiftCall* call) {
   if (Promise::Resolver::New(context->context).ToLocal(&resolver)) {
     auto pending = std::make_unique<PendingAsync>();
     pending->resolver.Reset(isolate, resolver);
-    pending->member = context->member;
+    pending->code = *context->resultCode;
+    pending->name = context->member->swiftName;
     context->state->pending.emplace(id, std::move(pending));
     Complete(context, resolver->GetPromise());
   } else {
@@ -1826,6 +1881,13 @@ void ApiCompleteArrayBegin(void* token, intptr_t /*count*/) {
 
 void ApiCompleteMapBegin(void* token, intptr_t /*count*/) {
   Emit(token, Outcome(AsyncOutcome::Kind::Map));
+}
+
+void ApiCompleteAsyncSequence(void* token, void* iterator, NSSwiftThunk next) {
+  auto outcome = Outcome(AsyncOutcome::Kind::Sequence);
+  outcome->object = iterator;
+  outcome->next = next;
+  Emit(token, outcome);
 }
 
 void ApiCompleteJSObject(void* token, void* object) {
@@ -1932,6 +1994,7 @@ bool Accepts(Isolate* isolate, const ModuleInfo& module, const ValueCode& code,
                  ? wrapper->Module() == &module
                  : value->IsObject() && !value->IsArray() && ObjCObjectOf(isolate, value) == nil;
     }
+    case ValueCode::Kind::AsyncSequence:
     case ValueCode::Kind::Void:
       return false;
   }
@@ -2321,6 +2384,7 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
       return true;
     }
 
+    case ValueCode::Kind::AsyncSequence:
     case ValueCode::Kind::Void:
       break;
   }
@@ -2578,6 +2642,111 @@ bool Select(Isolate* isolate, Local<Context> context, const MemberGroup& group,
           : "Ambiguous call to " + group.jsName + "; call one of " + candidates + " by key";
   isolate->ThrowException(Exception::TypeError(tns::ToV8String(isolate, message)));
   return false;
+}
+
+LoadedModule* LoadedFor(Isolate* isolate, const ModuleInfo* module);
+Local<External> DataFor(Isolate* isolate, const void* pointer);
+
+// A Swift iterator owned by the step function JS calls; released when that
+// function is collected.
+struct IteratorBox {
+  Global<v8::Function> step;
+  const ModuleInfo* module;
+  void* iterator;
+  NSSwiftThunk next;
+  // Names the steps in errors; its result is the sequence's code.
+  MemberInfo member;
+};
+
+void StepCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  auto* box = static_cast<IteratorBox*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+  auto* state = Caches::StateFor<IsolateState>(isolate);
+  LoadedModule* loaded = LoadedFor(isolate, box->module);
+  if (state == nullptr || loaded == nullptr) {
+    return;
+  }
+  NSSwiftValue slot{};
+  slot.tag = NSSwiftTagObject;
+  slot.payload.object = box->iterator;
+
+  CallContext call;
+  call.api = &kAPI;
+  call.isolate = isolate;
+  call.context = isolate->GetCurrentContext();
+  call.module = box->module;
+  call.loaded = loaded;
+  call.state = state;
+  call.member = &box->member;
+  call.resultCode = &box->member.signature.result;
+  state->calls.push_back(&call);
+  box->next(&call, &slot, 1);
+  state->calls.pop_back();
+  if (!call.callbackException.IsEmpty()) {
+    isolate->ThrowException(call.callbackException.Get(isolate));
+  } else if (!call.threw && call.completed) {
+    info.GetReturnValue().Set(call.result);
+  }
+}
+
+// Turns a step function (a Promise of `[element]`, or `[]` at the end) into
+// an async iterator, one step at a time.
+constexpr const char* kIteratorFactory = R"js((function (step) {
+  let pending = Promise.resolve();
+  return {
+    next() {
+      const result = pending.then(() => step()).then((values) =>
+        values.length ? { value: values[0], done: false } : { value: undefined, done: true });
+      pending = result.then(() => undefined, () => undefined);
+      return result;
+    },
+    [Symbol.asyncIterator]() {
+      return this;
+    },
+  };
+}))js";
+
+MaybeLocal<Value> MakeAsyncIterator(Isolate* isolate, Local<Context> context,
+                                    const ModuleInfo* module, void* iterator, NSSwiftThunk next,
+                                    const ValueCode& code, const std::string& name) {
+  auto* state = Caches::StateFor<IsolateState>(isolate);
+  if (state == nullptr) {
+    module->release(iterator);
+    return MaybeLocal<Value>();
+  }
+  if (state->iteratorFactory.IsEmpty()) {
+    Local<Script> script;
+    Local<Value> factory;
+    if (!Script::Compile(context, tns::ToV8String(isolate, kIteratorFactory)).ToLocal(&script) ||
+        !script->Run(context).ToLocal(&factory) || !factory->IsFunction()) {
+      module->release(iterator);
+      return MaybeLocal<Value>();
+    }
+    state->iteratorFactory.Reset(isolate, factory.As<v8::Function>());
+  }
+
+  auto* box = new IteratorBox{{}, module, iterator, next, MemberInfo()};
+  box->member.swiftName = name + " (iterator)";
+  box->member.signature.result = code;
+  Local<v8::Function> step;
+  if (!v8::Function::New(context, StepCallback, DataFor(isolate, box)).ToLocal(&step)) {
+    module->release(iterator);
+    delete box;
+    return MaybeLocal<Value>();
+  }
+  box->step.Reset(isolate, step);
+  box->step.SetWeak(
+      box,
+      [](const WeakCallbackInfo<IteratorBox>& info) {
+        IteratorBox* collected = info.GetParameter();
+        collected->step.Reset();
+        collected->module->release(collected->iterator);
+        delete collected;
+      },
+      WeakCallbackType::kParameter);
+  Local<Value> argv[] = {step};
+  return state->iteratorFactory.Get(isolate)->Call(context, v8::Undefined(isolate), 1, argv);
 }
 
 LoadedModule* LoadedFor(Isolate* isolate, const ModuleInfo* module) {

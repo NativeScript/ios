@@ -174,10 +174,15 @@ class Emitter {
       }
       case Bridge::Void:
       case Bridge::TypeParameter:
+      case Bridge::AsyncSequence:
       case Bridge::None:
         break;
     }
     return {"nil", true};
+  }
+
+  static std::string annotation(const std::string& type) {
+    return type.empty() ? "" : ": " + type;
   }
 
   // Lines binding `name` to argument `slot`; `label` describes it in errors.
@@ -268,6 +273,10 @@ class Emitter {
         return "__nsReportProtocol" +
                std::to_string(typeIndexOf(type.symbolId)) + "(" + reporter +
                ", " + value + ")";
+      case Bridge::AsyncSequence:
+        return reporter + ".returnAsyncSequence(__NSAsyncIterator(" + value +
+               ") { r, element in " +
+               returnValue(type.elements.at(0), "r", "element") + " })";
       case Bridge::EnumCase:
         return reporter + ".returnString(__nsEnumName" +
                std::to_string(typeIndexOf(type.symbolId)) + "(" + value + "))";
@@ -401,12 +410,13 @@ class Emitter {
     }
     code += "  Task {\n" + unpack;
     if (throwing) {
-      code += "    do {\n      let " + binding + ": " + resultType + " = " +
-              expression + "\n" + returnResult(result, "      ", "completion") +
+      code += "    do {\n      let " + binding + annotation(resultType) +
+              " = " + expression + "\n" +
+              returnResult(result, "      ", "completion") +
               "    } catch {\n      completion.throwError(error)\n    }\n";
     } else {
-      code += "    let " + binding + ": " + resultType + " = " + expression +
-              "\n" + returnResult(result, "    ", "completion");
+      code += "    let " + binding + annotation(resultType) + " = " +
+              expression + "\n" + returnResult(result, "    ", "completion");
     }
     return code + "  }\n";
   }
@@ -462,7 +472,9 @@ class Emitter {
     std::string expression =
         invocationExpression(invocation, receiver, arguments);
     std::string binding = result.bridge == Bridge::Void ? "_" : "result";
-    std::string resultType = invocation.resultType;
+    // An opaque result (`some P`) is bound without naming its type.
+    std::string resultType =
+        result.node.kind == TypeNode::Kind::Opaque ? "" : invocation.resultType;
     if (invocation.isAsync) {
       code += asyncCall(owner, hasReceiver, arguments, expression, binding,
                         resultType, result, symbol.isThrowing);
@@ -478,13 +490,13 @@ class Emitter {
       };
       std::string body;
       if (symbol.isThrowing) {
-        body = "  do {\n    let " + binding + ": " + resultType + " = " +
+        body = "  do {\n    let " + binding + annotation(resultType) + " = " +
                expression + "\n" + indented("    ") +
                returnResult(result, "    ") +
                "  } catch {\n    rt.throwError(error)\n  }\n";
       } else {
-        body = "  let " + binding + ": " + resultType + " = " + expression +
-               "\n" + indented("  ") + returnResult(result, "  ");
+        body = "  let " + binding + annotation(resultType) + " = " +
+               expression + "\n" + indented("  ") + returnResult(result, "  ");
       }
       code += invocation.isMainActor ? onMainActor(symbol, body) : body;
     }
@@ -573,6 +585,7 @@ private protocol __NSReporter {
   func returnCase(_ index: Int, _ values: () -> Void)
   func returnObjC(_ object: AnyObject)
   func returnJSObject(_ object: __NSJSObject)
+  func returnAsyncSequence(_ iterator: __NSAsyncIterator)
 }
 
 // Reads arguments (24-byte slots) and reports results through the runtime's
@@ -725,6 +738,10 @@ private struct __NSCall: __NSReporter {
     slot(46, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void).self)(
       call, object.handle)
   }
+  func returnAsyncSequence(_ iterator: __NSAsyncIterator) {
+    slot(49, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer, __NSThunk) -> Void).self)(
+      call, Unmanaged.passRetained(iterator).toOpaque(), __nsIteratorNext)
+  }
   func throwError(_ error: any Error) {
     report(String(describing: error), String(reflecting: type(of: error)))
   }
@@ -826,6 +843,10 @@ private struct __NSCompletion: @unchecked Sendable, __NSReporter {
     slot(47, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void).self)(
       token, object.handle)
   }
+  func returnAsyncSequence(_ iterator: __NSAsyncIterator) {
+    slot(50, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer, __NSThunk) -> Void).self)(
+      token, Unmanaged.passRetained(iterator).toOpaque(), __nsIteratorNext)
+  }
   func throwError(_ error: any Error) {
     var message = String(describing: error)
     var type = String(reflecting: Swift.type(of: error))
@@ -914,6 +935,46 @@ private func __nsTrack(_ api: UnsafeRawPointer, _ read: UnsafeMutableRawPointer,
   }
 #endif
   return 0
+}
+
+// An asynchronous sequence JS iterates. Each step reports the next element as
+// a one-element array, or an empty one at the end; the runtime runs one step
+// at a time.
+private final class __NSAsyncIterator: @unchecked Sendable {
+  private let advance: (__NSCompletion) async -> Void
+
+  init<S: AsyncSequence>(_ sequence: S, _ report: @escaping (__NSCompletion, S.Element) -> Void) {
+    let state = __NSIteratorState(sequence.makeAsyncIterator())
+    advance = { completion in
+      do {
+        if let element = try await state.iterator.next() {
+          completion.returnArray(CollectionOfOne(element)) { report(completion, $0) }
+        } else {
+          completion.returnArray(EmptyCollection<S.Element>()) { report(completion, $0) }
+        }
+      } catch {
+        completion.throwError(error)
+      }
+    }
+  }
+
+  func next(_ completion: __NSCompletion) {
+    let advance = self.advance
+    Task { await advance(completion) }
+  }
+}
+
+private final class __NSIteratorState<Iterator: AsyncIteratorProtocol>: @unchecked Sendable {
+  var iterator: Iterator
+  init(_ iterator: Iterator) { self.iterator = iterator }
+}
+
+private func __nsIteratorNext(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+  let rt = __NSCall(call: call, args: args)
+  guard let iterator = rt.object(0) as? __NSAsyncIterator else {
+    return rt.throwTypeError("not a Swift asynchronous sequence")
+  }
+  iterator.next(rt.beginAsync())
 }
 
 private func __nsRelease(_ object: UnsafeMutableRawPointer) {

@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module", "observe", "track"]);
-            expect(swift.abiVersion).toBe(10);
+            expect(swift.abiVersion).toBe(11);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(10);
+            expect(info.abiVersion).toBe(11);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -692,6 +692,66 @@ describe("ns:swift", function () {
             expect(function () {
                 swift.track(function () { throw new Error("nope"); }, function () {});
             }).toThrowError("nope");
+        });
+    });
+
+    describe("asynchronous sequences", function () {
+        function settle(promise, done) {
+            promise.then(done, function (error) {
+                fail(error);
+                done();
+            });
+        }
+
+        it("iterates AsyncStream results with for await", function (done) {
+            settle((async function () {
+                var values = [];
+                for await (var value of SwiftDemo.countUp(3)) {
+                    values.push(value);
+                }
+                expect(values).toEqual([1, 2, 3]);
+            })(), done);
+        });
+
+        it("rejects with the sequence's error", function (done) {
+            settle((async function () {
+                var values = [];
+                try {
+                    for await (var value of SwiftDemo.countDown(3, 1)) {
+                        values.push(value);
+                    }
+                    fail("expected the sequence to throw");
+                } catch (error) {
+                    expect(error.name).toBe("SwiftError");
+                    expect(error.swiftType).toBe("SwiftDemo.CountdownError");
+                }
+                expect(values).toEqual([3, 2]);
+            })(), done);
+        });
+
+        it("iterates opaque sequences and collection elements", function (done) {
+            settle((async function () {
+                var letters = [];
+                for await (var letter of SwiftDemo.letters("abc")) {
+                    letters.push(letter);
+                }
+                expect(letters).toEqual(["a", "b", "c"]);
+                var pages = [];
+                for await (var page of SwiftDemo.pages(2)) {
+                    pages.push(page);
+                }
+                expect(pages).toEqual([["page 0", "item"], ["page 1", "item"]]);
+            })(), done);
+        });
+
+        it("runs one step at a time and stays done at the end", function (done) {
+            var iterator = SwiftDemo.countUp(2);
+            settle(Promise.all([iterator.next(), iterator.next(), iterator.next(), iterator.next()])
+                .then(function (results) {
+                    expect(results.map(function (r) { return r.done; })).toEqual([false, false, true, true]);
+                    expect(results[0].value).toBe(1);
+                    expect(results[1].value).toBe(2);
+                }), done);
         });
     });
 

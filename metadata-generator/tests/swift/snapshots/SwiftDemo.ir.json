@@ -57,6 +57,11 @@
     "s:9SwiftDemo13defaultFlavorAA0D0Ovp",
     "s:9SwiftDemo13globalCounterSivp",
     "s:9SwiftDemo11Coordinatesa",
+    "s:9SwiftDemo7countUp2toScSySiGSi_tF",
+    "s:9SwiftDemo14CountdownErrorV",
+    "s:9SwiftDemo9countDown4from9failingAtScsySis5Error_pGSi_SiSgtF",
+    "s:9SwiftDemo7letters2ofQrSS_tF",
+    "s:9SwiftDemo5pagesyScSySaySSGGSiF",
     "s:9SwiftDemo11checkedSideyS2dKF",
     "s:9SwiftDemo8echoInt8ys0D0VADF",
     "s:9SwiftDemo10echoUInt64ys0D0VADF",
@@ -2366,6 +2371,24 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo14CountdownErrorV",
+      "kind": "struct",
+      "path": "CountdownError",
+      "name": "CountdownError",
+      "access": "public",
+      "declaration": "struct CountdownError",
+      "location": "file://Sources/SwiftDemo/Streams.swift:13:14",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo14CountdownErrorV"
+      ],
+      "conformances": [
+        "s:s16SendableMetatypeP",
+        "s:s5ErrorP",
+        "s:s8SendableP"
+      ]
+    },
+    {
       "id": "s:9SwiftDemo14DoublingScorerV",
       "kind": "struct",
       "path": "DoublingScorer",
@@ -3575,6 +3598,34 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:54:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo5pagesyScSySaySSGGSiF",
+      "kind": "function",
+      "path": "pages(_:)",
+      "name": "pages(_:)",
+      "access": "public",
+      "declaration": "func pages(_ count: Int) -> AsyncStream<[String]>",
+      "parameters": [
+        {
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncStream<[String]>",
+        "references": [
+          "s:ScS",
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Streams.swift:41:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -5538,6 +5589,35 @@
       "parent": "s:9SwiftDemo7TrackerC"
     },
     {
+      "id": "s:9SwiftDemo7countUp2toScSySiGSi_tF",
+      "kind": "function",
+      "path": "countUp(to:)",
+      "name": "countUp(to:)",
+      "access": "public",
+      "declaration": "func countUp(to limit: Int) -> AsyncStream<Int>",
+      "parameters": [
+        {
+          "label": "to",
+          "internalName": "limit",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncStream<Int>",
+        "references": [
+          "s:ScS",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Streams.swift:4:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo7explainySSAA10ShapeErrorOF",
       "kind": "function",
       "path": "explain(_:)",
@@ -5591,6 +5671,42 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:61:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo7letters2ofQrSS_tF",
+      "kind": "function",
+      "path": "letters(of:)",
+      "name": "letters(of:)",
+      "access": "public",
+      "declaration": "func letters(of word: String) -> some AsyncSequence<String, Never>\n",
+      "parameters": [
+        {
+          "label": "of",
+          "internalName": "word",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "some AsyncSequence<String, Never>",
+        "references": [
+          "s:Sci",
+          "s:SS",
+          "s:s5NeverO"
+        ]
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "18.0.0"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Streams.swift:32:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -6330,6 +6446,46 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:62:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo9countDown4from9failingAtScsySis5Error_pGSi_SiSgtF",
+      "kind": "function",
+      "path": "countDown(from:failingAt:)",
+      "name": "countDown(from:failingAt:)",
+      "access": "public",
+      "declaration": "func countDown(from start: Int, failingAt failure: Int?) -> AsyncThrowingStream<Int, any Error>",
+      "parameters": [
+        {
+          "label": "from",
+          "internalName": "start",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "label": "failingAt",
+          "internalName": "failure",
+          "type": {
+            "spelling": "Int?",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncThrowingStream<Int, any Error>",
+        "references": [
+          "s:Scs",
+          "s:Si",
+          "s:s5ErrorP"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Streams.swift:15:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -7836,6 +7992,47 @@
       ],
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo10ShapeErrorO",
+      "sourceOrigin": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp"
+    },
+    {
+      "id": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo14CountdownErrorV",
+      "kind": "instanceProperty",
+      "path": "CountdownError.localizedDescription",
+      "name": "localizedDescription",
+      "access": "public",
+      "declaration": "var localizedDescription: String { get }",
+      "synthesized": true,
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "8.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.10.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "9.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "2.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo14CountdownErrorV",
       "sourceOrigin": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp"
     }
   ]

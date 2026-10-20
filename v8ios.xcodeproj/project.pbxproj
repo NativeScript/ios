@@ -350,6 +350,7 @@
 		EF918E4F1A6F3E39721F8C44 /* Shapes.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA98D6B239608C28AFB14F15 /* Shapes.swift */; };
 		1A9C83B48771CCA1BBEA3F77 /* Values.swift in Sources */ = {isa = PBXBuildFile; fileRef = D76F7C886215EB9DB96CA88E /* Values.swift */; };
 		2B7A41C09E3F4D21A6C0B001 /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7A41C09E3F4D21A6C0B002 /* Views.swift */; };
+		5D0E5ED00000000000000019 /* Streams.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5ED00000000000000018 /* Streams.swift */; };
 		5D0E5ED00000000000000017 /* Observing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5ED00000000000000016 /* Observing.swift */; };
 		5D0E5ED00000000000000015 /* Protocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5ED00000000000000014 /* Protocols.swift */; };
 		5D0E5ED00000000000000004 /* Purse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5ED00000000000000003 /* Purse.swift */; };
@@ -913,6 +914,7 @@
 		CA98D6B239608C28AFB14F15 /* Shapes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Shapes.swift"; sourceTree = "<group>"; };
 		D76F7C886215EB9DB96CA88E /* Values.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Values.swift"; sourceTree = "<group>"; };
 		2B7A41C09E3F4D21A6C0B002 /* Views.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Views.swift"; sourceTree = "<group>"; };
+		5D0E5ED00000000000000018 /* Streams.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Streams.swift"; sourceTree = "<group>"; };
 		5D0E5ED00000000000000016 /* Observing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Observing.swift"; sourceTree = "<group>"; };
 		5D0E5ED00000000000000014 /* Protocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Protocols.swift"; sourceTree = "<group>"; };
 		5D0E5ED00000000000000003 /* Purse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Purse.swift"; sourceTree = "<group>"; };
@@ -1714,6 +1716,7 @@
 				CA98D6B239608C28AFB14F15 /* Shapes.swift */,
 				D76F7C886215EB9DB96CA88E /* Values.swift */,
 				2B7A41C09E3F4D21A6C0B002 /* Views.swift */,
+				5D0E5ED00000000000000018 /* Streams.swift */,
 				5D0E5ED00000000000000016 /* Observing.swift */,
 				5D0E5ED00000000000000014 /* Protocols.swift */,
 				5D0E5ED00000000000000003 /* Purse.swift */,
@@ -2534,6 +2537,7 @@
 				EF918E4F1A6F3E39721F8C44 /* Shapes.swift in Sources */,
 				1A9C83B48771CCA1BBEA3F77 /* Values.swift in Sources */,
 				2B7A41C09E3F4D21A6C0B001 /* Views.swift in Sources */,
+				5D0E5ED00000000000000019 /* Streams.swift in Sources */,
 				5D0E5ED00000000000000017 /* Observing.swift in Sources */,
 				5D0E5ED00000000000000015 /* Protocols.swift in Sources */,
 				5D0E5ED00000000000000004 /* Purse.swift in Sources */,

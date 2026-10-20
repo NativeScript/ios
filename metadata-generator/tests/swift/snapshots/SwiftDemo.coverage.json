@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 300,
+      "total": 306,
       "objc-direct": 1,
-      "swift-generated": 251,
+      "swift-generated": 257,
       "swift-specialized": 17,
       "type-only": 5,
       "unsupported": 26,
       "not-applicable": 0
     },
     "callable": {
-      "total": 255,
+      "total": 260,
       "objc-direct": 0,
-      "swift-generated": 214,
+      "swift-generated": 219,
       "swift-specialized": 14,
       "type-only": 2,
       "unsupported": 25,
       "not-applicable": 0
     },
-    "effectiveCallable": 214,
+    "effectiveCallable": 219,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -62,9 +62,9 @@
       "not-applicable": 0
     },
     "function": {
-      "total": 61,
+      "total": 65,
       "objc-direct": 0,
-      "swift-generated": 61,
+      "swift-generated": 65,
       "swift-specialized": 0,
       "type-only": 0,
       "unsupported": 0,
@@ -89,9 +89,9 @@
       "not-applicable": 0
     },
     "instanceProperty": {
-      "total": 54,
+      "total": 55,
       "objc-direct": 0,
-      "swift-generated": 45,
+      "swift-generated": 46,
       "swift-specialized": 3,
       "type-only": 1,
       "unsupported": 5,
@@ -125,9 +125,9 @@
       "not-applicable": 0
     },
     "struct": {
-      "total": 10,
+      "total": 11,
       "objc-direct": 0,
-      "swift-generated": 9,
+      "swift-generated": 10,
       "swift-specialized": 1,
       "type-only": 0,
       "unsupported": 0,
@@ -987,6 +987,13 @@
       "location": "file://Sources/SwiftDemo/Purse.swift:5"
     },
     {
+      "id": "s:9SwiftDemo14CountdownErrorV",
+      "path": "CountdownError",
+      "kind": "struct",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Streams.swift:14"
+    },
+    {
       "id": "s:9SwiftDemo14DoublingScorerV",
       "path": "DoublingScorer",
       "kind": "struct",
@@ -1432,6 +1439,14 @@
       "tier": "swift-generated",
       "jsName": "names",
       "location": "file://Sources/SwiftDemo/Values.swift:55"
+    },
+    {
+      "id": "s:9SwiftDemo5pagesyScSySaySSGGSiF",
+      "path": "pages(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "pages",
+      "location": "file://Sources/SwiftDemo/Streams.swift:42"
     },
     {
       "id": "s:9SwiftDemo5shoutySSSgACF",
@@ -2118,6 +2133,14 @@
       "location": "file://Sources/SwiftDemo/Values.swift:17"
     },
     {
+      "id": "s:9SwiftDemo7countUp2toScSySiGSi_tF",
+      "path": "countUp(to:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "countUp",
+      "location": "file://Sources/SwiftDemo/Streams.swift:5"
+    },
+    {
       "id": "s:9SwiftDemo7explainySSAA10ShapeErrorOF",
       "path": "explain(_:)",
       "kind": "function",
@@ -2132,6 +2155,14 @@
       "tier": "swift-generated",
       "jsName": "lengths",
       "location": "file://Sources/SwiftDemo/Values.swift:62"
+    },
+    {
+      "id": "s:9SwiftDemo7letters2ofQrSS_tF",
+      "path": "letters(of:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "letters",
+      "location": "file://Sources/SwiftDemo/Streams.swift:33"
     },
     {
       "id": "s:9SwiftDemo7measure_2byAA11MeasurementOSd_SdSgtF",
@@ -2362,6 +2393,14 @@
       "tier": "swift-generated",
       "jsName": "trackers",
       "location": "file://Sources/SwiftDemo/Values.swift:63"
+    },
+    {
+      "id": "s:9SwiftDemo9countDown4from9failingAtScsySis5Error_pGSi_SiSgtF",
+      "path": "countDown(from:failingAt:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "countDown",
+      "location": "file://Sources/SwiftDemo/Streams.swift:16"
     },
     {
       "id": "s:9SwiftDemo9countdown4from_ySi_ySi_SbtXEtF",
@@ -2622,6 +2661,13 @@
     {
       "id": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo10ShapeErrorO",
       "path": "ShapeError.localizedDescription",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "localizedDescription"
+    },
+    {
+      "id": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo14CountdownErrorV",
+      "path": "CountdownError.localizedDescription",
       "kind": "instanceProperty",
       "tier": "swift-generated",
       "jsName": "localizedDescription"

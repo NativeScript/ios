@@ -40,7 +40,7 @@
 // calls it by reporting the arguments as an array: callbackBegin, each
 // argument through the complete* entries, then completeArrayEnd.
 
-#define NS_SWIFT_ABI_VERSION 10
+#define NS_SWIFT_ABI_VERSION 11
 
 #ifdef __cplusplus
 extern "C" {
@@ -173,6 +173,8 @@ enum {
 //               or a JS object implementing it (NSSwiftTagJSObject)
 //   @<Name>     instance of Objective-C class <Name> (its runtime name)
 //               (NSSwiftTagObjC) <-> NativeScript's Objective-C wrapper
+//   ~<code>     asynchronous sequence of <code> (results only) -> JS async
+//               iterator; see returnAsyncSequence
 //   <code>?     optional: JS null/undefined <-> NSSwiftTagNull
 //   &<code>     inout parameter: JS passes a reference object `{ value }`;
 //               the slot holds its value, and a successful call reports the
@@ -301,6 +303,15 @@ struct NSSwiftAPI {
 
   /* 48 */ void (*registerTracker)(NSSwiftRegistrar* registrar,
                                    NSSwiftTracker tracker);
+
+  // An asynchronous sequence, as a retained (+1) iterator object the runtime
+  // takes ownership of. Each JS `next()` calls `next` with the iterator as
+  // args[0] once the previous step settled; it reports the next element as
+  // a one-element array, or an empty array at the end, through beginAsync.
+  /* 49 */ void (*returnAsyncSequence)(NSSwiftCall* call, void* iterator,
+                                       NSSwiftThunk next);
+  /* 50 */ void (*completeAsyncSequence)(void* token, void* iterator,
+                                         NSSwiftThunk next);
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);

@@ -127,6 +127,9 @@ std::string signatureCode(const SwiftSurface& surface,
     case Bridge::Protocol:
       code = "p" + std::to_string(surface.indexOf(type.symbolId));
       break;
+    case Bridge::AsyncSequence:
+      code = "~" + signatureCode(surface, type.elements.at(0));
+      break;
     case Bridge::Date:
       code = "D";
       break;

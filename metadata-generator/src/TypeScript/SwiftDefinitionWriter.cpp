@@ -128,6 +128,10 @@ std::string codeDisplayName(const SwiftSurface& surface,
       name = "(" + llvm::join(parameters, ", ") + ") -> Void";
       break;
     }
+    case Bridge::AsyncSequence:
+      name = "AsyncSequence<" + codeDisplayName(surface, type.elements.at(0)) +
+             ">";
+      break;
     case Bridge::ObjCObject:
     case Bridge::TypeParameter:
       name = type.objcClass;
@@ -542,6 +546,9 @@ class Writer {
         break;
       case Bridge::Closure:
         ts = "never";
+        break;
+      case Bridge::AsyncSequence:
+        ts = "AsyncIterableIterator<" + outputType(type.elements.at(0)) + ">";
         break;
       case Bridge::None:
         ts = "never";

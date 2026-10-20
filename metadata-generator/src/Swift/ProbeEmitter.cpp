@@ -121,7 +121,9 @@ ProbeSource emitProbes(const Module& module,
              ")" + (invocation.isAsync ? " async" : "") +
              (invocation.isThrowing ? " throws" : "") + " {");
     const std::string receiver = "receiver";
-    out.line("  let _: " + invocation.resultType + " = " +
+    bool opaque = capability->result.node.kind == TypeNode::Kind::Opaque;
+    out.line("  let _" +
+             (opaque ? std::string() : ": " + invocation.resultType) + " = " +
              invocationExpression(invocation, receiver, arguments));
     if (invocation.isSettable) {
       out.line("  " + assignmentStatement(invocation, receiver, "newValue"));

@@ -205,6 +205,22 @@ Protocols with associated types, `Self` requirements, static or `async`
 requirements, initializers, or more than one refined module protocol stay
 type-only.
 
+## Asynchronous sequences
+
+A function or property returning `AsyncStream<T>`, `AsyncThrowingStream<T, E>`
+or `some AsyncSequence<T, E>` returns a JS async iterator:
+
+```js
+for await (const value of SwiftDemo.countUp(3)) {
+    console.log(value);
+}
+```
+
+Each `next()` advances the Swift iterator in a `Task` and settles on the JS
+thread; calls run one at a time, in order. A sequence that throws rejects
+the pending `next()` with the Swift error. Other `AsyncSequence` types,
+sequences as parameters, and cancelling an iteration are not supported yet.
+
 ## Observation
 
 `@Observable` classes (iOS 17+) can be watched from JS:
@@ -271,7 +287,8 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 ## Not yet supported
 
-Closures that return values, async cancellation, generic functions,
+Closures that return values, async cancellation, Combine publishers,
+concrete `AsyncSequence` types, generic functions,
 `Result` and other standard library generics, protocols with associated
 types, tuples, sets, optional collection
 elements, subscripts and operators. Each appears in the coverage report with

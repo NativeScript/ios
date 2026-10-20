@@ -75,6 +75,14 @@ declare module "ns:swift/SwiftDemo" {
     export function hashValue(value: Precipitation): number;
   }
 
+  export class CountdownError {
+    private constructor();
+    /**
+     * Retrieve the localized description for this error.
+     */
+    readonly localizedDescription: string;
+  }
+
   export class DoublingScorer {
     constructor();
     score(value: number | bigint): number;
@@ -304,13 +312,19 @@ declare module "ns:swift/SwiftDemo" {
   export function clear(name: { value: (string) | null | undefined }): void;
   export function halve(value: { value: number | bigint }): void;
   export function names(count: number | bigint): (string)[];
+  export function pages(count: number | bigint): AsyncIterableIterator<(string)[]>;
   export function shout(name: (string) | null | undefined): string | null;
   export function total(values: readonly (number)[]): number;
   export function append(word: string, words: { value: readonly (string)[] }): void;
   export function excite(greeting: Greeting): void;
   export function settle(value: number | bigint): import("ns:swift/SwiftDemoKit").Outcome<number>;
+  export function countUp(limit: number | bigint): AsyncIterableIterator<number>;
   export function explain(error: ShapeError): string;
   export function lengths(table: Readonly<Record<string, string>>): Record<string, number>;
+  /**
+   * @remarks Requires iOS 18.0; throws on earlier versions.
+   */
+  export function letters(word: string): AsyncIterableIterator<string>;
   export function measure(width: number, height: (number) | null | undefined): Measurement;
   export function nextDay(date: Date): Date;
   export function resolve(path: string, base: string | URL): URL;
@@ -326,6 +340,7 @@ declare module "ns:swift/SwiftDemo" {
   export function scoreAll(scorer: Scorer, values: readonly (number | bigint)[]): (number)[];
   export function simplify(formula: Formula): Formula;
   export function trackers(ids: readonly (number | bigint)[]): (Tracker)[];
+  export function countDown(start: number | bigint, failure: (number | bigint) | null | undefined): AsyncIterableIterator<number>;
   export function countdown(start: number | bigint, tick: (arg0: number, arg1: boolean) => void): void;
   export function introduce(greeting: Greeting, other: string): string;
   export function makeLabel(text: string): UILabel;

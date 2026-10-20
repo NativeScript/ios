@@ -71,6 +71,10 @@ enum class Bridge {
   // implementing it (through a generated adapter), or a Swift value that
   // conforms to it.
   Protocol,
+  // A result that is an asynchronous sequence (AsyncStream,
+  // AsyncThrowingStream, `some AsyncSequence<E, F>`): a JS async iterator;
+  // `elements` holds the element type.
+  AsyncSequence,
 };
 
 struct BridgedType {
@@ -103,6 +107,7 @@ struct Capability {
   //   objc-visible, not-public, unavailable, obsoleted, unknown-kind,
   //   deinitializer, macro, extension-block, protocol, protocol-requirement,
   //   type-alias, associated-type, generic, noncopyable, protocol-static,
+  //   async-sequence-parameter,
   //   nonescapable, async-initializer, operator, subscript,
   //   enum-associated-values,
   //   external-type-extension, owner-not-bridged, missing-owner,
