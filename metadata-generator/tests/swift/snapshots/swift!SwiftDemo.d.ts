@@ -132,6 +132,13 @@ declare module "ns:swift/SwiftDemo" {
     hostingController(): UIViewController;
   }
 
+  export class Bench {
+    constructor();
+    echo(value: number | bigint): number;
+    static echo(value: number | bigint): number;
+    value: number;
+  }
+
   export class Point {
     constructor(x: number, y: number);
     constructor(args: { x: number; y: number });
@@ -290,6 +297,7 @@ declare module "ns:swift/SwiftDemo" {
 
   export type Score = import("ns:swift/SwiftDemoKit").Pair<string, number>;
   export function allFlavors(): (Flavor)[];
+  export function echoString(value: string): string;
   export function echoUInt64(value: number | bigint): number;
   export function greetLater(name: (string) | null | undefined, completion: (arg0: string | null) => void): void;
   export function largestInt(): number;
@@ -330,6 +338,7 @@ declare module "ns:swift/SwiftDemo" {
   export function excite(greeting: Greeting): void;
   export function settle(value: number | bigint): import("ns:swift/SwiftDemoKit").Outcome<number>;
   export function countUp(limit: number | bigint): AsyncIterableIterator<number>;
+  export function echoInt(value: number | bigint): number;
   export function explain(error: ShapeError): string;
   export function lengths(table: Readonly<Record<string, string>>): Record<string, number>;
   /**

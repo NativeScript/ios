@@ -285,6 +285,9 @@ struct MemberGroup {
   int owner = -1;
   // Module-level groups: the Swift module whose namespace holds them.
   std::string swiftModule;
+  // Overloads of several types (a generic family's instantiations): a call
+  // picks those of its receiver's type.
+  bool mixedOwners = false;
   uint32_t kind = 0;
   std::string jsName;
   std::vector<const MemberInfo*> overloads;
@@ -661,6 +664,7 @@ void BuildGroups(ModuleInfo& module) {
     } else {
       group = it->second;
     }
+    group->mixedOwners |= !group->overloads.empty() && group->overloads[0]->owner != member.owner;
     group->overloads.push_back(&member);
     if (member.kind == NSSwiftMemberInitializer && member.owner >= 0) {
       module.types[member.owner].initializers = group;
@@ -2873,20 +2877,25 @@ bool ReceiverIsEnumArgument(const MemberGroup& group) {
 // Methods, functions, and enum instance members (whose receiver, a case
 // name, is the first argument).
 // A family's group holds every instantiation's overloads; an instance call
-// can only reach those of the receiver's own type.
-MemberGroup ForReceiver(Isolate* isolate, const MemberGroup& group, Local<Value> receiver) {
-  SwiftObjectWrapper* wrapper = receiver.IsEmpty() ? nullptr : SwiftWrapperOf(isolate, receiver);
+// can only reach those of the receiver's own type. Returns `group` itself
+// unless it filtered into `storage`.
+const MemberGroup& ForReceiver(Isolate* isolate, const MemberGroup& group, Local<Value> receiver,
+                               MemberGroup& storage) {
+  if (!group.mixedOwners || receiver.IsEmpty()) {
+    return group;
+  }
+  SwiftObjectWrapper* wrapper = SwiftWrapperOf(isolate, receiver);
   if (wrapper == nullptr || wrapper->Module() != group.module) {
     return group;
   }
-  MemberGroup filtered = group;
-  filtered.overloads.clear();
+  storage = group;
+  storage.overloads.clear();
   for (const MemberInfo* member : group.overloads) {
     if (group.module->IsA(wrapper->TypeIndex(), member->owner)) {
-      filtered.overloads.push_back(member);
+      storage.overloads.push_back(member);
     }
   }
-  return filtered.overloads.empty() ? group : filtered;
+  return storage.overloads.empty() ? group : storage;
 }
 
 void MethodCallback(const FunctionCallbackInfo<Value>& info) {
@@ -2906,7 +2915,8 @@ void MethodCallback(const FunctionCallbackInfo<Value>& info) {
   } else if (IsInstanceKind(all.kind)) {
     receiver = info.This();
   }
-  MemberGroup group = ForReceiver(isolate, all, receiver);
+  MemberGroup storage;
+  const MemberGroup& group = ForReceiver(isolate, all, receiver, storage);
 
   std::vector<Local<Value>> arguments = ArgumentsOf(info, first);
   Selection selection;
@@ -2956,7 +2966,8 @@ void GetterCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   const MemberGroup& all = *GroupOf(info);
   Local<Value> receiver = IsInstanceKind(all.kind) ? Local<Value>(info.This()) : Local<Value>();
-  MemberGroup group = ForReceiver(isolate, all, receiver);
+  MemberGroup storage;
+  const MemberGroup& group = ForReceiver(isolate, all, receiver, storage);
   Local<Value> result;
   if (Invoke(isolate, group, *group.overloads[0], receiver, {}, false, Local<Object>())
           .ToLocal(&result)) {
@@ -2968,7 +2979,8 @@ void SetterCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   const MemberGroup& all = *GroupOf(info);
   Local<Value> receiver = IsInstanceKind(all.kind) ? Local<Value>(info.This()) : Local<Value>();
-  MemberGroup group = ForReceiver(isolate, all, receiver);
+  MemberGroup storage;
+  const MemberGroup& group = ForReceiver(isolate, all, receiver, storage);
   std::vector<Local<Value>> arguments = {info.Length() > 0 ? info[0]
                                                            : Local<Value>(v8::Undefined(isolate))};
   Invoke(isolate, group, *group.overloads[0], receiver, arguments, true, Local<Object>());

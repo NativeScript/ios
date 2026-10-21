@@ -105,6 +105,9 @@
     "s:9SwiftDemo5halveyySizKF",
     "s:9SwiftDemo5clearyySSSgzF",
     "s:9SwiftDemo12swapTrackersyyAA7TrackerCz_ADztF",
+    "s:9SwiftDemo7echoIntyS2iF",
+    "s:9SwiftDemo10echoStringyS2SF",
+    "s:9SwiftDemo5BenchC",
     "s:9SwiftDemo8describeySSSo6UIViewCF",
     "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
     "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
@@ -65610,6 +65613,33 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo10echoStringyS2SF",
+      "kind": "function",
+      "path": "echoString(_:)",
+      "name": "echoString(_:)",
+      "access": "public",
+      "declaration": "func echoString(_ value: String) -> String",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:176:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo10echoUInt64ys0D0VADF",
       "kind": "function",
       "path": "echoUInt64(_:)",
@@ -68201,6 +68231,114 @@
       "parent": "s:9SwiftDemo5BadgeV"
     },
     {
+      "id": "s:9SwiftDemo5BenchC",
+      "kind": "class",
+      "path": "Bench",
+      "name": "Bench",
+      "access": "public",
+      "declaration": "final class Bench",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:178:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo5BenchC5valueSivp",
+        "s:9SwiftDemo5BenchCACycfc",
+        "s:9SwiftDemo5BenchC4echoyS2iFZ",
+        "s:9SwiftDemo5BenchC4echoyS2iF"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo5BenchC4echoyS2iF",
+      "kind": "instanceMethod",
+      "path": "Bench.echo(_:)",
+      "name": "echo(_:)",
+      "access": "public",
+      "declaration": "func echo(_ value: Int) -> Int",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:182:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BenchC"
+    },
+    {
+      "id": "s:9SwiftDemo5BenchC4echoyS2iFZ",
+      "kind": "typeMethod",
+      "path": "Bench.echo(_:)",
+      "name": "echo(_:)",
+      "access": "public",
+      "declaration": "static func echo(_ value: Int) -> Int",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:181:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BenchC"
+    },
+    {
+      "id": "s:9SwiftDemo5BenchC5valueSivp",
+      "kind": "instanceProperty",
+      "path": "Bench.value",
+      "name": "value",
+      "access": "public",
+      "declaration": "var value: Int",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:179:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BenchC"
+    },
+    {
+      "id": "s:9SwiftDemo5BenchCACycfc",
+      "kind": "initializer",
+      "path": "Bench.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "location": "file://Sources/SwiftDemo/Values.swift:180:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BenchC"
+    },
+    {
       "id": "s:9SwiftDemo5PointV",
       "kind": "struct",
       "path": "Point",
@@ -70528,6 +70666,33 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Streams.swift:4:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo7echoIntyS2iF",
+      "kind": "function",
+      "path": "echoInt(_:)",
+      "name": "echoInt(_:)",
+      "access": "public",
+      "declaration": "func echoInt(_ value: Int) -> Int",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:175:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {

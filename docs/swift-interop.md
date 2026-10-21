@@ -291,6 +291,25 @@ released when the wrapper is garbage collected; returning the same object again
 yields the same wrapper. Wrappers belong to the isolate that created them, so
 each worker gets its own JS objects.
 
+## Performance
+
+`TestRunner/app/tests/SwiftInteropBenchmarks.js` times the same operations
+through the Objective-C/C metadata path and through Swift thunks, and writes
+the results to the app's `Documents/swift-bench.txt`. On a Debug runtime in
+the iOS simulator (indicative only; measure Release builds on devices for real
+numbers):
+
+| Operation | Objective-C/C | Swift thunk |
+|---|---|---|
+| function `(Int) -> Int` | 1733 ns | 1500 ns |
+| class method | 1722 ns | 1500 ns |
+| instance method | 1786 ns | 1722 ns |
+| string round trip | 1717 ns | 1752 ns |
+| construct an object | 3018 ns | 1608 ns |
+| read a property | 1014 ns | 864 ns |
+
+Comparisons with other runtimes (OneJS) are not part of the suite.
+
 ## Coverage and verification
 
 Every declaration gets one tier — `objc-direct`, `swift-generated`,
