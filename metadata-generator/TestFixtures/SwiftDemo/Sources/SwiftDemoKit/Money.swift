@@ -54,6 +54,9 @@ public final class Box<Value> {
     public func replaced(with value: Value) -> Box<Value> { Box(value) }
     // On every instantiation, like WeatherKit's `WeatherQuery.daily`.
     public static var sample: Box<Int> { Box<Int>(7) }
+    // The same signature on every instantiation: one overload per
+    // instantiation, which JS calls as one.
+    public static func make(_ value: Int) -> Box<Int> { Box<Int>(value) }
 }
 
 public enum Outcome<Value> {

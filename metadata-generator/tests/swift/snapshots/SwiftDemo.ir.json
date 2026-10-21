@@ -403,8 +403,115 @@
         "s:12SwiftDemoKit3BoxC5valuexvp",
         "s:12SwiftDemoKit3BoxCyACyxGxcfc",
         "s:12SwiftDemoKit3BoxC8replaced4withACyxGx_tF",
-        "s:12SwiftDemoKit3BoxC6sampleACySiGvpZ"
+        "s:12SwiftDemoKit3BoxC6sampleACySiGvpZ",
+        "s:12SwiftDemoKit3BoxC4makeyACySiGSiFZ"
       ]
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC4makeyACySiGSiFZ",
+      "kind": "typeMethod",
+      "path": "Box.make(_:)",
+      "name": "make(_:)",
+      "access": "public",
+      "declaration": "static func make(_ value: Int) -> Box<Int>",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Box<Int>",
+        "references": [
+          "s:12SwiftDemoKit3BoxC",
+          "s:Si"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "Value",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:58:23",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit3BoxC"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC4makeyACySiGSiFZ@s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>",
+      "kind": "typeMethod",
+      "path": "Box.make(_:)",
+      "name": "make(_:)",
+      "access": "public",
+      "declaration": "static func make(_ value: Int) -> Box<Int>",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Box<Int>",
+        "references": [
+          "s:12SwiftDemoKit3BoxC",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemoKit/Money.swift:58:23",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC4makeyACySiGSiFZ@s:12SwiftDemoKit3BoxC<s:Si>",
+      "kind": "typeMethod",
+      "path": "Box.make(_:)",
+      "name": "make(_:)",
+      "access": "public",
+      "declaration": "static func make(_ value: Int) -> Box<Int>",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Box<Int>",
+        "references": [
+          "s:12SwiftDemoKit3BoxC",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemoKit/Money.swift:58:23",
+      "graph": "SwiftDemoKit.symbols.json",
+      "parent": "s:12SwiftDemoKit3BoxC<s:Si>"
     },
     {
       "id": "s:12SwiftDemoKit3BoxC5valuexvp",
@@ -639,7 +746,8 @@
         "s:12SwiftDemoKit3BoxC5valuexvp@s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>",
         "s:12SwiftDemoKit3BoxCyACyxGxcfc@s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>",
         "s:12SwiftDemoKit3BoxC8replaced4withACyxGx_tF@s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>",
-        "s:12SwiftDemoKit3BoxC6sampleACySiGvpZ@s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>"
+        "s:12SwiftDemoKit3BoxC6sampleACySiGvpZ@s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>",
+        "s:12SwiftDemoKit3BoxC4makeyACySiGSiFZ@s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>"
       ]
     },
     {
@@ -658,7 +766,8 @@
         "s:12SwiftDemoKit3BoxC5valuexvp@s:12SwiftDemoKit3BoxC<s:Si>",
         "s:12SwiftDemoKit3BoxCyACyxGxcfc@s:12SwiftDemoKit3BoxC<s:Si>",
         "s:12SwiftDemoKit3BoxC8replaced4withACyxGx_tF@s:12SwiftDemoKit3BoxC<s:Si>",
-        "s:12SwiftDemoKit3BoxC6sampleACySiGvpZ@s:12SwiftDemoKit3BoxC<s:Si>"
+        "s:12SwiftDemoKit3BoxC6sampleACySiGvpZ@s:12SwiftDemoKit3BoxC<s:Si>",
+        "s:12SwiftDemoKit3BoxC4makeyACySiGSiFZ@s:12SwiftDemoKit3BoxC<s:Si>"
       ]
     },
     {
@@ -1412,7 +1521,7 @@
           "index": 0
         }
       ],
-      "location": "file://Sources/SwiftDemoKit/Money.swift:58:12",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:61:12",
       "graph": "SwiftDemoKit.symbols.json",
       "members": [
         "s:12SwiftDemoKit7OutcomeO4doneyACyxGxcAEmlF",
@@ -1436,7 +1545,7 @@
           }
         }
       ],
-      "location": "file://Sources/SwiftDemoKit/Money.swift:59:9",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:62:9",
       "graph": "SwiftDemoKit.symbols.json",
       "parent": "s:12SwiftDemoKit7OutcomeO"
     },
@@ -1457,7 +1566,7 @@
           }
         }
       ],
-      "location": "file://Sources/SwiftDemoKit/Money.swift:59:9",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:62:9",
       "graph": "SwiftDemoKit.symbols.json",
       "parent": "s:12SwiftDemoKit7OutcomeO<s:Si>"
     },
@@ -1480,7 +1589,7 @@
           }
         }
       ],
-      "location": "file://Sources/SwiftDemoKit/Money.swift:60:9",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:63:9",
       "graph": "SwiftDemoKit.symbols.json",
       "parent": "s:12SwiftDemoKit7OutcomeO"
     },
@@ -1503,7 +1612,7 @@
           }
         }
       ],
-      "location": "file://Sources/SwiftDemoKit/Money.swift:60:9",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:63:9",
       "graph": "SwiftDemoKit.symbols.json",
       "parent": "s:12SwiftDemoKit7OutcomeO<s:Si>"
     },
@@ -1514,7 +1623,7 @@
       "name": "Outcome",
       "access": "public",
       "declaration": "enum Outcome<Value>",
-      "location": "file://Sources/SwiftDemoKit/Money.swift:58:12",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:61:12",
       "graph": "SwiftDemoKit.symbols.json",
       "members": [
         "s:12SwiftDemoKit7OutcomeO4doneyACyxGxcAEmlF@s:12SwiftDemoKit7OutcomeO<s:Si>",

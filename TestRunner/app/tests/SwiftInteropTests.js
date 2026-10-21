@@ -1266,6 +1266,7 @@ describe("ns:swift", function () {
             expect(SwiftDemo.unbox(SwiftDemo.countBox(3))).toBe(3);
             expect(SwiftDemo.unbox(SwiftDemo.boxed(new Kit.Money(2, "EUR"))).amount).toBe(2);
             expect(SwiftDemo.unbox(Kit.Box.sample)).toBe(7);
+            expect(Kit.Box.make(4).value).toBe(4);
             expect(SwiftDemo.firstOf(SwiftDemo.makeScore("ada", 3))).toBe("ada");
             expect(SwiftDemo.firstOf(new Kit.Pair(2, "two"))).toBe(2);
         });

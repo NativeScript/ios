@@ -3262,7 +3262,14 @@ bool Select(Isolate* isolate, Local<Context> context, const MemberGroup& group,
     }
   }
 
-  if (matches.size() == 1) {
+  // The same member registered by several instantiations of a generic type
+  // (a static whose signature does not involve the type's arguments).
+  bool same =
+      matches.size() > 1 && std::all_of(matches.begin(), matches.end(), [&](const MemberInfo* m) {
+        return m->swiftName == matches[0]->swiftName &&
+               m->signatureText == matches[0]->signatureText;
+      });
+  if (matches.size() == 1 || same) {
     selection.member = matches[0];
     selection.arguments = arguments;
     return true;
@@ -3860,10 +3867,14 @@ std::vector<std::pair<std::string, const MemberInfo*>> OverloadKeys(const Member
   for (const MemberInfo* member : group.overloads) {
     counts[member->swiftName]++;
   }
+  // Each key once: a template cannot define a property twice.
+  robin_hood::unordered_set<std::string> seen{group.jsName};
   for (const MemberInfo* member : group.overloads) {
-    keys.emplace_back(
-        counts[member->swiftName] == 1 ? member->swiftName : TypedKey(*group.module, *member),
-        member);
+    std::string key =
+        counts[member->swiftName] == 1 ? member->swiftName : TypedKey(*group.module, *member);
+    if (seen.insert(key).second) {
+      keys.emplace_back(key, member);
+    }
   }
   return keys;
 }

@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 1372,
+      "total": 1375,
       "objc-direct": 3,
-      "swift-generated": 414,
-      "swift-specialized": 401,
+      "swift-generated": 416,
+      "swift-specialized": 402,
       "type-only": 6,
       "unsupported": 548,
       "not-applicable": 0
     },
     "callable": {
-      "total": 1303,
+      "total": 1306,
       "objc-direct": 1,
-      "swift-generated": 355,
-      "swift-specialized": 398,
+      "swift-generated": 357,
+      "swift-specialized": 399,
       "type-only": 2,
       "unsupported": 547,
       "not-applicable": 0
     },
-    "effectiveCallable": 356,
+    "effectiveCallable": 358,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -143,10 +143,10 @@
       "not-applicable": 0
     },
     "typeMethod": {
-      "total": 24,
+      "total": 27,
       "objc-direct": 0,
-      "swift-generated": 21,
-      "swift-specialized": 0,
+      "swift-generated": 23,
+      "swift-specialized": 1,
       "type-only": 0,
       "unsupported": 3,
       "not-applicable": 0
@@ -178,7 +178,7 @@
     "generic": 402,
     "opaque-type": 413,
     "operator": 11,
-    "owner-not-bridged": 12,
+    "owner-not-bridged": 13,
     "unavailable": 5,
     "unbridged-type": 546,
     "variadic-parameter": 8
@@ -223,6 +223,32 @@
         "generic"
       ],
       "location": "file://Sources/SwiftDemoKit/Money.swift:51"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC4makeyACySiGSiFZ",
+      "path": "Box.make(_:)",
+      "kind": "typeMethod",
+      "tier": "swift-specialized",
+      "reasons": [
+        "owner-not-bridged"
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:59"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC4makeyACySiGSiFZ@s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>",
+      "path": "Box.make(_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "make",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:59"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC4makeyACySiGSiFZ@s:12SwiftDemoKit3BoxC<s:Si>",
+      "path": "Box.make(_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "make",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:59"
     },
     {
       "id": "s:12SwiftDemoKit3BoxC5valuexvp",
@@ -603,7 +629,7 @@
       "reasons": [
         "generic"
       ],
-      "location": "file://Sources/SwiftDemoKit/Money.swift:59"
+      "location": "file://Sources/SwiftDemoKit/Money.swift:62"
     },
     {
       "id": "s:12SwiftDemoKit7OutcomeO4doneyACyxGxcAEmlF",
@@ -613,7 +639,7 @@
       "reasons": [
         "owner-not-bridged"
       ],
-      "location": "file://Sources/SwiftDemoKit/Money.swift:60"
+      "location": "file://Sources/SwiftDemoKit/Money.swift:63"
     },
     {
       "id": "s:12SwiftDemoKit7OutcomeO4doneyACyxGxcAEmlF@s:12SwiftDemoKit7OutcomeO<s:Si>",
@@ -621,7 +647,7 @@
       "kind": "enumCase",
       "tier": "swift-generated",
       "jsName": "done",
-      "location": "file://Sources/SwiftDemoKit/Money.swift:60"
+      "location": "file://Sources/SwiftDemoKit/Money.swift:63"
     },
     {
       "id": "s:12SwiftDemoKit7OutcomeO6failedyACyxGSS_tcAEmlF",
@@ -631,7 +657,7 @@
       "reasons": [
         "owner-not-bridged"
       ],
-      "location": "file://Sources/SwiftDemoKit/Money.swift:61"
+      "location": "file://Sources/SwiftDemoKit/Money.swift:64"
     },
     {
       "id": "s:12SwiftDemoKit7OutcomeO6failedyACyxGSS_tcAEmlF@s:12SwiftDemoKit7OutcomeO<s:Si>",
@@ -639,14 +665,14 @@
       "kind": "enumCase",
       "tier": "swift-generated",
       "jsName": "failed",
-      "location": "file://Sources/SwiftDemoKit/Money.swift:61"
+      "location": "file://Sources/SwiftDemoKit/Money.swift:64"
     },
     {
       "id": "s:12SwiftDemoKit7OutcomeO<s:Si>",
       "path": "Outcome",
       "kind": "enum",
       "tier": "swift-generated",
-      "location": "file://Sources/SwiftDemoKit/Money.swift:59"
+      "location": "file://Sources/SwiftDemoKit/Money.swift:62"
     },
     {
       "id": "s:12SwiftDemoKit9formattedySSAA5MoneyVF",
