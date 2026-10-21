@@ -1322,6 +1322,70 @@ static std::string FormatTokens(const std::vector<std::string>& tokens) {
   return result + " }";
 }
 
+namespace {
+
+// The initializers a class implements, indexed by their constructor tokens sorted and
+// ':'-joined, so matching super(...) options never rescans metadata.
+struct InitializerTokenTable {
+  struct Entry {
+    const MethodMeta* meta;
+    std::vector<std::string> tokens;
+  };
+  std::vector<Entry> entries;
+  robin_hood::unordered_map<std::string, std::vector<size_t>> bySortedTokens;
+};
+
+struct InitializerTokenTablesState {
+  robin_hood::unordered_map<Class, std::unique_ptr<InitializerTokenTable>> tables;
+};
+
+std::string SortedTokensKey(std::vector<std::string> tokens) {
+  std::sort(tokens.begin(), tokens.end());
+  std::string key;
+  for (const std::string& token : tokens) {
+    key += token;
+    key += ':';
+  }
+  return key;
+}
+
+const InitializerTokenTable* GetInitializerTokenTable(Isolate* isolate, Class klass) {
+  InitializerTokenTablesState* state = Caches::StateFor<InitializerTokenTablesState>(isolate);
+  if (state == nullptr) {
+    return nullptr;
+  }
+  auto it = state->tables.find(klass);
+  if (it != state->tables.end()) {
+    return it->second.get();
+  }
+
+  auto table = std::make_unique<InitializerTokenTable>();
+  const Meta* meta = ArgConverter::FindMeta(klass);
+  if (meta != nullptr && meta->type() == MetaType::Interface) {
+    auto cache = Caches::Get(isolate);
+    std::set<SEL> seen;
+    for (const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
+         interfaceMeta != nullptr; interfaceMeta = interfaceMeta->baseMeta()) {
+      for (const MethodMeta* candidate : ArgConverter::GetInitializers(
+               cache.get(), objc_getClass(interfaceMeta->name()), interfaceMeta)) {
+        SEL selector = candidate->selector();
+        if (candidate->isVariadic() || !seen.insert(selector).second ||
+            ![klass instancesRespondToSelector:selector]) {
+          continue;
+        }
+        std::vector<std::string> tokens = ArgConverter::ConstructorTokens(candidate);
+        table->bySortedTokens[SortedTokensKey(tokens)].push_back(table->entries.size());
+        table->entries.push_back({candidate, std::move(tokens)});
+      }
+    }
+  }
+  const InitializerTokenTable* result = table.get();
+  state->tables.emplace(klass, std::move(table));
+  return result;
+}
+
+}  // namespace
+
 const MethodMeta* ArgConverter::FindInitializerByTokens(Local<Context> context, Class klass,
                                                         Local<Object> tokens,
                                                         std::vector<Local<Value>>& args,
@@ -1341,41 +1405,24 @@ const MethodMeta* ArgConverter::FindInitializerByTokens(Local<Context> context, 
       keys.push_back(tns::ToString(isolate, name));
     }
   }
-  std::vector<std::string> sortedKeys = keys;
-  std::sort(sortedKeys.begin(), sortedKeys.end());
 
-  std::vector<const MethodMeta*> matches;
-  const MethodMeta* sameOrder = nullptr;
-  std::vector<std::string> available;
-  const Meta* meta = FindMeta(klass);
-  if (meta != nullptr && meta->type() == MetaType::Interface) {
-    auto cache = Caches::Get(isolate);
-    std::set<SEL> seen;
-    for (const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
-         interfaceMeta != nullptr; interfaceMeta = interfaceMeta->baseMeta()) {
-      for (const MethodMeta* candidate :
-           GetInitializers(cache.get(), objc_getClass(interfaceMeta->name()), interfaceMeta)) {
-        SEL selector = candidate->selector();
-        if (candidate->isVariadic() || !seen.insert(selector).second ||
-            ![klass instancesRespondToSelector:selector]) {
-          continue;
-        }
-        std::vector<std::string> candidateTokens = ConstructorTokens(candidate);
-        available.push_back(FormatTokens(candidateTokens));
-        std::vector<std::string> sortedTokens = candidateTokens;
-        std::sort(sortedTokens.begin(), sortedTokens.end());
-        if (sortedTokens != sortedKeys) {
-          continue;
-        }
-        matches.push_back(candidate);
-        if (candidateTokens == keys && sameOrder == nullptr) {
-          sameOrder = candidate;
+  const InitializerTokenTable* table = GetInitializerTokenTable(isolate, klass);
+  std::vector<const InitializerTokenTable::Entry*> matches;
+  const InitializerTokenTable::Entry* sameOrder = nullptr;
+  if (table != nullptr) {
+    auto found = table->bySortedTokens.find(SortedTokensKey(keys));
+    if (found != table->bySortedTokens.end()) {
+      for (size_t index : found->second) {
+        const InitializerTokenTable::Entry* entry = &table->entries[index];
+        matches.push_back(entry);
+        if (sameOrder == nullptr && entry->tokens == keys) {
+          sameOrder = entry;
         }
       }
     }
   }
 
-  const MethodMeta* match = nullptr;
+  const InitializerTokenTable::Entry* match = nullptr;
   if (matches.size() == 1) {
     match = matches[0];
   } else if (matches.size() > 1 && sameOrder != nullptr) {
@@ -1390,15 +1437,17 @@ const MethodMeta* ArgConverter::FindInitializerByTokens(Local<Context> context, 
     if (matches.size() > 1) {
       ss << "More than one initializer of " << class_getName(klass) << " takes "
          << FormatTokens(keys) << ":";
-      for (const MethodMeta* candidate : matches) {
-        ss << " " << candidate->selectorAsString();
+      for (const InitializerTokenTable::Entry* candidate : matches) {
+        ss << " " << candidate->meta->selectorAsString();
       }
       ss << ". List the keys in the order of the one to run.";
     } else {
       ss << "No initializer of " << class_getName(klass) << " takes " << FormatTokens(keys)
          << ". Available:";
-      for (size_t i = 0; i < available.size(); i++) {
-        ss << (i > 0 ? ", " : " ") << available[i];
+      if (table != nullptr) {
+        for (size_t i = 0; i < table->entries.size(); i++) {
+          ss << (i > 0 ? ", " : " ") << FormatTokens(table->entries[i].tokens);
+        }
       }
     }
     throw NativeScriptException(ss.str());
@@ -1407,8 +1456,10 @@ const MethodMeta* ArgConverter::FindInitializerByTokens(Local<Context> context, 
   args.clear();
   // A parameterless initializer still has a token (initWithEmpty -> { empty }), so the values
   // passed are bounded by the parameters, not the tokens.
-  size_t paramsCount = match->encodings()->count - 1 - (match->hasErrorOutParameter() ? 1 : 0);
-  std::vector<std::string> matchTokens = ConstructorTokens(match);
+  const MethodMeta* initializer = match->meta;
+  size_t paramsCount =
+      initializer->encodings()->count - 1 - (initializer->hasErrorOutParameter() ? 1 : 0);
+  const std::vector<std::string>& matchTokens = match->tokens;
   TryCatch tc(isolate);
   for (size_t i = 0; i < matchTokens.size() && i < paramsCount; i++) {
     Local<Value> value;
@@ -1417,11 +1468,11 @@ const MethodMeta* ArgConverter::FindInitializerByTokens(Local<Context> context, 
     }
     args.push_back(value);
   }
-  if (match->hasErrorOutParameter()) {
+  if (initializer->hasErrorOutParameter()) {
     // The NSError** an error-out initializer takes: never exposed as a token.
     args.push_back(v8::Null(isolate));
   }
-  return match;
+  return initializer;
 }
 
 }  // namespace tns

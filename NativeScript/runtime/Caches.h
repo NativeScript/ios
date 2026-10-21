@@ -155,10 +155,6 @@ class Caches {
   robin_hood::unordered_map<std::string,
                             std::unique_ptr<v8::Persistent<v8::Function>>>
       ProtocolCtorFuncs;
-  // Classes registered from plain ES `class X extends Native {}` constructors.
-  // Membership is the cheap test that keeps every object's first wrap from
-  // looking up a constructor by name.
-  robin_hood::unordered_set<Class> ESClasses;
   robin_hood::unordered_map<BinaryTypeEncodingType,
                             std::unique_ptr<v8::Persistent<v8::Object>>>
       PrimitiveInteropTypes;

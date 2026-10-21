@@ -94,16 +94,39 @@ class NativeConstructionScope {
   ~NativeConstructionScope() { nativeConstructions.pop_back(); }
 };
 
+struct ESClassState {
+  // Classes registered from plain ES `class X extends Native {}` constructors.
+  robin_hood::unordered_set<Class> classes;
+  // The ES class each class wrapped so far belongs to (nil for none), so an object's first wrap
+  // costs one lookup. A negative entry stays valid: ES classes are always new classes, so no
+  // class seen before one was registered can ever descend from it.
+  robin_hood::unordered_map<Class, Class> esClassOf;
+  Global<Object> objectPrototype;
+};
+
 // The ES class object belongs to: its own class, or the one a runtime-created dynamic subclass
 // (KVO's NSKVONotifying_*) was made from. Nothing else can subclass a class the runtime
 // registered, so the first one found walking up is it.
-Class FindESClass(const std::shared_ptr<Caches>& cache, id object) {
-  for (Class klass = object_getClass(object); klass != nil; klass = class_getSuperclass(klass)) {
-    if (cache->ESClasses.count(klass) != 0) {
-      return klass;
+Class FindESClass(Isolate* isolate, id object) {
+  ESClassState* state = Caches::StateFor<ESClassState>(isolate);
+  if (state == nullptr) {
+    return nil;
+  }
+  Class objectClass = object_getClass(object);
+  auto memo = state->esClassOf.find(objectClass);
+  if (memo != state->esClassOf.end()) {
+    return memo->second;
+  }
+
+  Class esClass = nil;
+  for (Class klass = objectClass; klass != nil; klass = class_getSuperclass(klass)) {
+    if (state->classes.count(klass) != 0) {
+      esClass = klass;
+      break;
     }
   }
-  return nil;
+  state->esClassOf.emplace(objectClass, esClass);
+  return esClass;
 }
 
 void CallSuperInitializer(ffi_cif* cif, void* retValue, void** argValues, Class hookClass) {
@@ -172,7 +195,15 @@ bool IsOptionsObject(Isolate* isolate, Local<Value> value) {
       tns::GetValue(isolate, value) != nullptr) {
     return false;
   }
-  return tns::ToString(isolate, value.As<Object>()->GetConstructorName()) == "Object";
+  ESClassState* state = Caches::StateFor<ESClassState>(isolate);
+  if (state == nullptr) {
+    return false;
+  }
+  if (state->objectPrototype.IsEmpty()) {
+    state->objectPrototype.Reset(isolate, Object::New(isolate)->GetPrototype().As<Object>());
+  }
+  Local<Value> prototype = value.As<Object>()->GetPrototype();
+  return prototype->IsNull() || prototype->StrictEquals(state->objectPrototype.Get(isolate));
 }
 
 void InitializerHookCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData) {
@@ -204,7 +235,7 @@ void InitializerHookCallback(ffi_cif* cif, void* retValue, void** argValues, voi
     Local<Context> context = cache->GetContext();
     Context::Scope context_scope(context);
 
-    Class klass = FindESClass(cache, self);
+    Class klass = FindESClass(isolate, self);
     auto ctorIt =
         klass != nil ? cache->CtorFuncs.find(class_getName(klass)) : cache->CtorFuncs.end();
     if (ctorIt == cache->CtorFuncs.end()) {
@@ -794,7 +825,10 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context, Local<v8::Functi
   auto extendedPersistent = std::make_unique<Persistent<v8::Function>>(isolate, ctorFunc);
   extendedPersistent->SetWrapperClassId(Constants::ClassTypes::DataWrapper);
   cache->CtorFuncs.emplace(extendedClassName, std::move(extendedPersistent));
-  cache->ESClasses.insert(extendedClass);
+  if (ESClassState* esClasses = Caches::StateFor<ESClassState>(isolate)) {
+    esClasses->classes.insert(extendedClass);
+    esClasses->esClassOf[extendedClass] = extendedClass;
+  }
 
   cache->ClassPrototypes.emplace(
       extendedClassName, std::make_unique<Persistent<Object>>(isolate, implementationObject));
@@ -1013,7 +1047,7 @@ bool ClassBuilder::TryAdoptNativeInstance(Local<Context> context, id target, Loc
   Isolate* isolate = v8::Isolate::GetCurrent();
   auto cache = Caches::Get(isolate);
   // Runs for every object's first wrap; set lookups keep that path flat.
-  Class klass = FindESClass(cache, target);
+  Class klass = FindESClass(isolate, target);
   if (klass == nil || IsUnderInit(target)) {
     return false;
   }
@@ -1779,13 +1813,24 @@ void ClassBuilder::SuperAccessorGetterCallback(const FunctionCallbackInfo<Value>
 }
 
 Class ClassBuilder::GetNativeSuperclass(Class klass) {
+  // Every native call on an extended instance asks this, and a class's superclass chain never
+  // changes once registered, so the walk over each level's protocol list runs once per class.
+  // Per thread, so the hot path takes no lock.
+  thread_local robin_hood::unordered_map<Class, Class> nativeSuperclasses;
+  auto it = nativeSuperclasses.find(klass);
+  if (it != nativeSuperclasses.end()) {
+    return it->second;
+  }
+
   Class rootmostDerived = nil;
   for (Class c = klass; c != nil; c = class_getSuperclass(c)) {
     if (class_conformsToProtocol(c, @protocol(TNSDerivedClass))) {
       rootmostDerived = c;
     }
   }
-  return class_getSuperclass(rootmostDerived != nil ? rootmostDerived : klass);
+  Class nativeSuperclass = class_getSuperclass(rootmostDerived != nil ? rootmostDerived : klass);
+  nativeSuperclasses.emplace(klass, nativeSuperclass);
+  return nativeSuperclass;
 }
 
 IMP ClassBuilder::FindNotOverridenMethod(Class klass, SEL method) {
