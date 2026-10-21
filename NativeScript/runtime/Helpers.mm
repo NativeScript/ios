@@ -229,6 +229,28 @@ Local<Value> tns::ProxyReadSource(Local<Value> original, Local<Value> target) {
   return original;
 }
 
+namespace {
+
+// The private key wrapper state lives under on objects without an internal field (constructor
+// functions, plain objects). Cached so reading it is one GetPrivate, not a string, a registry
+// lookup, a HasPrivate and a Locker: static calls, alloc() and construction all read it.
+struct WrapperKeyState {
+  Global<Private> key;
+};
+
+Local<Private> WrapperKey(Isolate* isolate) {
+  WrapperKeyState* state = tns::Caches::StateFor<WrapperKeyState>(isolate);
+  if (state == nullptr) {
+    return Private::ForApi(isolate, tns::ToV8String(isolate, "metadata"));
+  }
+  if (state->key.IsEmpty()) {
+    state->key.Reset(isolate, Private::ForApi(isolate, tns::ToV8String(isolate, "metadata")));
+  }
+  return state->key.Get(isolate);
+}
+
+}  // namespace
+
 Local<Context> tns::GetCreationContextOrCurrent(Isolate* isolate, const Local<Object>& obj) {
   Local<Context> context;
   if (obj->GetCreationContext(isolate).ToLocal(&context)) {
@@ -301,7 +323,11 @@ void tns::SetValue(Isolate* isolate, const Local<Object>& val, BaseDataWrapper* 
   if (obj->InternalFieldCount() > 0) {
     obj->SetInternalField(0, ext);
   } else {
-    tns::SetPrivateValue(obj, tns::ToV8String(isolate, "metadata"), ext);
+    Local<Context> context = tns::GetCreationContextOrCurrent(isolate, obj);
+    bool success = false;
+    if (!obj->SetPrivate(context, WrapperKey(isolate), ext).To(&success) || !success) {
+      tns::Assert(false, isolate);
+    }
   }
 }
 
@@ -328,8 +354,10 @@ tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
         field.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
   }
 
-  Local<Value> metadataProp = tns::GetPrivateValue(obj, tns::ToV8String(isolate, "metadata"));
-  if (metadataProp.IsEmpty() || metadataProp->IsNullOrUndefined() || !metadataProp->IsExternal()) {
+  Local<Context> context = tns::GetCreationContextOrCurrent(isolate, obj);
+  Local<Value> metadataProp;
+  if (!obj->GetPrivate(context, WrapperKey(isolate)).ToLocal(&metadataProp) ||
+      !metadataProp->IsExternal()) {
     return nullptr;
   }
 
@@ -568,14 +596,12 @@ void tns::DeleteValue(Isolate* isolate, const Local<Value>& val) {
     return;
   }
 
-  Local<v8::String> metadataKey = tns::ToV8String(isolate, "metadata");
-  Local<Value> metadataProp = tns::GetPrivateValue(obj, metadataKey);
-  if (metadataProp.IsEmpty() || metadataProp->IsNullOrUndefined() || !metadataProp->IsExternal()) {
+  Local<Context> context = tns::GetCreationContextOrCurrent(isolate, obj);
+  Local<Private> privateKey = WrapperKey(isolate);
+  Local<Value> metadataProp;
+  if (!obj->GetPrivate(context, privateKey).ToLocal(&metadataProp) || !metadataProp->IsExternal()) {
     return;
   }
-
-  Local<Context> context = tns::GetCreationContextOrCurrent(isolate, obj);
-  Local<Private> privateKey = Private::ForApi(isolate, metadataKey);
 
   bool success = obj->DeletePrivate(context, privateKey).FromMaybe(false);
   tns::Assert(success, isolate);
