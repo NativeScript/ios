@@ -16,6 +16,11 @@
   ],
   "topLevel": [
     "s:9SwiftDemo5BadgeV",
+    "s:9SwiftDemo17BenchmarkDelegateP",
+    "s:9SwiftDemo15BenchmarkRecordV",
+    "s:9SwiftDemo14BenchmarkPointV",
+    "s:9SwiftDemo16BenchmarkFailureV",
+    "s:9SwiftDemo9BenchmarkC",
     "s:9SwiftDemo7GreeterP",
     "s:9SwiftDemo0B0C",
     "s:9SwiftDemo5PointV",
@@ -68648,6 +68653,90 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo14BenchmarkPointV",
+      "kind": "struct",
+      "path": "BenchmarkPoint",
+      "name": "BenchmarkPoint",
+      "access": "public",
+      "declaration": "struct BenchmarkPoint",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:16:14",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo14BenchmarkPointV1xSdvp",
+        "s:9SwiftDemo14BenchmarkPointV1ySdvp",
+        "s:9SwiftDemo14BenchmarkPointV1x1yACSd_Sdtcfc"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo14BenchmarkPointV1x1yACSd_Sdtcfc",
+      "kind": "initializer",
+      "path": "BenchmarkPoint.init(x:y:)",
+      "name": "init(x:y:)",
+      "access": "public",
+      "declaration": "init(x: Double, y: Double)",
+      "parameters": [
+        {
+          "label": "x",
+          "internalName": "x",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        },
+        {
+          "label": "y",
+          "internalName": "y",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:19:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo14BenchmarkPointV"
+    },
+    {
+      "id": "s:9SwiftDemo14BenchmarkPointV1xSdvp",
+      "kind": "instanceProperty",
+      "path": "BenchmarkPoint.x",
+      "name": "x",
+      "access": "public",
+      "declaration": "var x: Double",
+      "valueType": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:17:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo14BenchmarkPointV"
+    },
+    {
+      "id": "s:9SwiftDemo14BenchmarkPointV1ySdvp",
+      "kind": "instanceProperty",
+      "path": "BenchmarkPoint.y",
+      "name": "y",
+      "access": "public",
+      "declaration": "var y: Double",
+      "valueType": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:18:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo14BenchmarkPointV"
+    },
+    {
       "id": "s:9SwiftDemo14CountdownErrorV",
       "kind": "struct",
       "path": "CountdownError",
@@ -68925,6 +69014,93 @@
       "parent": "s:9SwiftDemo14GreetingHolderC"
     },
     {
+      "id": "s:9SwiftDemo15BenchmarkRecordV",
+      "kind": "struct",
+      "path": "BenchmarkRecord",
+      "name": "BenchmarkRecord",
+      "access": "public",
+      "declaration": "struct BenchmarkRecord",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:10:14",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo15BenchmarkRecordV4nameSSvp",
+        "s:9SwiftDemo15BenchmarkRecordV5scoreSdvp",
+        "s:9SwiftDemo15BenchmarkRecordV4rankSivp"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo15BenchmarkRecordV4nameSSvp",
+      "kind": "instanceProperty",
+      "path": "BenchmarkRecord.name",
+      "name": "name",
+      "access": "public",
+      "declaration": "var name: String",
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:11:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo15BenchmarkRecordV"
+    },
+    {
+      "id": "s:9SwiftDemo15BenchmarkRecordV4rankSivp",
+      "kind": "instanceProperty",
+      "path": "BenchmarkRecord.rank",
+      "name": "rank",
+      "access": "public",
+      "declaration": "var rank: Int",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:13:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo15BenchmarkRecordV"
+    },
+    {
+      "id": "s:9SwiftDemo15BenchmarkRecordV5scoreSdvp",
+      "kind": "instanceProperty",
+      "path": "BenchmarkRecord.score",
+      "name": "score",
+      "access": "public",
+      "declaration": "var score: Double",
+      "valueType": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:12:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo15BenchmarkRecordV"
+    },
+    {
+      "id": "s:9SwiftDemo16BenchmarkFailureV",
+      "kind": "struct",
+      "path": "BenchmarkFailure",
+      "name": "BenchmarkFailure",
+      "access": "public",
+      "declaration": "struct BenchmarkFailure",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:22:14",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo16BenchmarkFailureV"
+      ],
+      "conformances": [
+        "s:s16SendableMetatypeP",
+        "s:s5ErrorP",
+        "s:s8SendableP"
+      ]
+    },
+    {
       "id": "s:9SwiftDemo16GreetingRegistryC",
       "kind": "class",
       "path": "GreetingRegistry",
@@ -69089,6 +69265,49 @@
       "async": true,
       "location": "file://Sources/SwiftDemo/Values.swift:35:12",
       "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo17BenchmarkDelegateP",
+      "kind": "protocol",
+      "path": "BenchmarkDelegate",
+      "name": "BenchmarkDelegate",
+      "access": "public",
+      "declaration": "protocol BenchmarkDelegate : AnyObject",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:6:16",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo17BenchmarkDelegateP5value3forS2i_tF"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo17BenchmarkDelegateP5value3forS2i_tF",
+      "kind": "instanceMethod",
+      "path": "BenchmarkDelegate.value(for:)",
+      "name": "value(for:)",
+      "access": "public",
+      "declaration": "func value(for index: Int) -> Int",
+      "protocolRequirement": true,
+      "parameters": [
+        {
+          "label": "for",
+          "internalName": "index",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:7:9",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo17BenchmarkDelegateP"
     },
     {
       "id": "s:9SwiftDemo17greetInBackgroundySSAA8Greeting_pYaF",
@@ -76108,6 +76327,669 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo9BenchmarkC",
+      "kind": "class",
+      "path": "Benchmark",
+      "name": "Benchmark",
+      "access": "public",
+      "declaration": "final class Benchmark",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:24:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo9BenchmarkC7counterSivp",
+        "s:9SwiftDemo9BenchmarkCACycfc",
+        "s:9SwiftDemo9BenchmarkC4noopyyFZ",
+        "s:9SwiftDemo9BenchmarkC7echoIntyS2iFZ",
+        "s:9SwiftDemo9BenchmarkC7combineyS2d_S2dtFZ",
+        "s:9SwiftDemo9BenchmarkC6negateyS2bFZ",
+        "s:9SwiftDemo9BenchmarkC10echoStringyS2SFZ",
+        "s:9SwiftDemo9BenchmarkC6length2ofSiSS_tFZ",
+        "s:9SwiftDemo9BenchmarkC9incrementSiyF",
+        "s:9SwiftDemo9BenchmarkC3sumySiSaySiGFZ",
+        "s:9SwiftDemo9BenchmarkC9makeArrayySaySiGSiFZ",
+        "s:9SwiftDemo9BenchmarkC9sumValuesySiSDySSSiGFZ",
+        "s:9SwiftDemo9BenchmarkC14makeDictionaryySDySSSiGSiFZ",
+        "s:9SwiftDemo9BenchmarkC8midpointySo7CGPointVAF_AFtFZ",
+        "s:9SwiftDemo9BenchmarkC10midpointOfyAA0C5PointVAF_AFtFZ",
+        "s:9SwiftDemo9BenchmarkC11callClosure_5timesS3iXE_SitFZ",
+        "s:9SwiftDemo9BenchmarkC12callDelegate_5timesSiAA0cE0_p_SitFZ",
+        "s:9SwiftDemo9BenchmarkC9echoLateryS2iYaFZ",
+        "s:9SwiftDemo9BenchmarkC4failyyKFZ",
+        "s:9SwiftDemo9BenchmarkC10topRecords_12minimumScoreSayAA0C6RecordVGSi_SdtFZ"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC10echoStringyS2SFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.echoString(_:)",
+      "name": "echoString(_:)",
+      "access": "public",
+      "declaration": "static func echoString(_ value: String) -> String",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:32:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC10midpointOfyAA0C5PointVAF_AFtFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.midpointOf(_:_:)",
+      "name": "midpointOf(_:_:)",
+      "access": "public",
+      "declaration": "static func midpointOf(_ a: BenchmarkPoint, _ b: BenchmarkPoint) -> BenchmarkPoint",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "a",
+          "type": {
+            "spelling": "BenchmarkPoint",
+            "references": [
+              "s:9SwiftDemo14BenchmarkPointV"
+            ]
+          }
+        },
+        {
+          "internalName": "b",
+          "type": {
+            "spelling": "BenchmarkPoint",
+            "references": [
+              "s:9SwiftDemo14BenchmarkPointV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "BenchmarkPoint",
+        "references": [
+          "s:9SwiftDemo14BenchmarkPointV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:49:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC10topRecords_12minimumScoreSayAA0C6RecordVGSi_SdtFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.topRecords(_:minimumScore:)",
+      "name": "topRecords(_:minimumScore:)",
+      "access": "public",
+      "declaration": "static func topRecords(_ count: Int, minimumScore minimum: Double) -> [BenchmarkRecord]",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "label": "minimumScore",
+          "internalName": "minimum",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[BenchmarkRecord]",
+        "references": [
+          "s:9SwiftDemo15BenchmarkRecordV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:64:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC11callClosure_5timesS3iXE_SitFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.callClosure(_:times:)",
+      "name": "callClosure(_:times:)",
+      "access": "public",
+      "declaration": "static func callClosure(_ body: (Int) -> Int, times count: Int) -> Int",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "body",
+          "type": {
+            "spelling": "(Int) -> Int",
+            "references": [
+              "s:Si",
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "label": "times",
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:52:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC12callDelegate_5timesSiAA0cE0_p_SitFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.callDelegate(_:times:)",
+      "name": "callDelegate(_:times:)",
+      "access": "public",
+      "declaration": "static func callDelegate(_ delegate: any BenchmarkDelegate, times count: Int) -> Int",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "delegate",
+          "type": {
+            "spelling": "any BenchmarkDelegate",
+            "references": [
+              "s:9SwiftDemo17BenchmarkDelegateP"
+            ]
+          }
+        },
+        {
+          "label": "times",
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:57:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC14makeDictionaryySDySSSiGSiFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.makeDictionary(_:)",
+      "name": "makeDictionary(_:)",
+      "access": "public",
+      "declaration": "static func makeDictionary(_ count: Int) -> [String : Int]",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[String : Int]",
+        "references": [
+          "s:SS",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:41:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC3sumySiSaySiGFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.sum(_:)",
+      "name": "sum(_:)",
+      "access": "public",
+      "declaration": "static func sum(_ values: [Int]) -> Int",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "[Int]",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:38:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC4failyyKFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.fail()",
+      "name": "fail()",
+      "access": "public",
+      "declaration": "static func fail() throws",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "throws": true,
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:63:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC4noopyyFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.noop()",
+      "name": "noop()",
+      "access": "public",
+      "declaration": "static func noop()",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:28:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC6length2ofSiSS_tFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.length(of:)",
+      "name": "length(of:)",
+      "access": "public",
+      "declaration": "static func length(of value: String) -> Int",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "label": "of",
+          "internalName": "value",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:33:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC6negateyS2bFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.negate(_:)",
+      "name": "negate(_:)",
+      "access": "public",
+      "declaration": "static func negate(_ value: Bool) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Bool",
+            "references": [
+              "s:Sb"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:31:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC7combineyS2d_S2dtFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.combine(_:_:_:)",
+      "name": "combine(_:_:_:)",
+      "access": "public",
+      "declaration": "static func combine(_ a: Double, _ b: Double, _ c: Double) -> Double",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "a",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        },
+        {
+          "internalName": "b",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        },
+        {
+          "internalName": "c",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:30:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC7counterSivp",
+      "kind": "instanceProperty",
+      "path": "Benchmark.counter",
+      "name": "counter",
+      "access": "public",
+      "declaration": "var counter: Int",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:25:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC7echoIntyS2iFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.echoInt(_:)",
+      "name": "echoInt(_:)",
+      "access": "public",
+      "declaration": "static func echoInt(_ value: Int) -> Int",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:29:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC8midpointySo7CGPointVAF_AFtFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.midpoint(_:_:)",
+      "name": "midpoint(_:_:)",
+      "access": "public",
+      "declaration": "static func midpoint(_ a: CGPoint, _ b: CGPoint) -> CGPoint",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "a",
+          "type": {
+            "spelling": "CGPoint",
+            "references": [
+              "c:@S@CGPoint"
+            ]
+          }
+        },
+        {
+          "internalName": "b",
+          "type": {
+            "spelling": "CGPoint",
+            "references": [
+              "c:@S@CGPoint"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "CGPoint",
+        "references": [
+          "c:@S@CGPoint"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:46:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC9echoLateryS2iYaFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.echoLater(_:)",
+      "name": "echoLater(_:)",
+      "access": "public",
+      "declaration": "static func echoLater(_ value: Int) async -> Int",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "async": true,
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:62:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC9incrementSiyF",
+      "kind": "instanceMethod",
+      "path": "Benchmark.increment()",
+      "name": "increment()",
+      "access": "public",
+      "declaration": "func increment() -> Int",
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:34:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC9makeArrayySaySiGSiFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.makeArray(_:)",
+      "name": "makeArray(_:)",
+      "access": "public",
+      "declaration": "static func makeArray(_ count: Int) -> [Int]",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[Int]",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:39:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC9sumValuesySiSDySSSiGFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.sumValues(_:)",
+      "name": "sumValues(_:)",
+      "access": "public",
+      "declaration": "static func sumValues(_ values: [String : Int]) -> Int",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "[String : Int]",
+            "references": [
+              "s:SS",
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:40:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkCACycfc",
+      "kind": "initializer",
+      "path": "Benchmark.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:26:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
       "id": "s:9SwiftDemo9CancelLogC",
       "kind": "class",
       "path": "CancelLog",
@@ -81670,6 +82552,47 @@
       ],
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo14CountdownErrorV",
+      "sourceOrigin": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp"
+    },
+    {
+      "id": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo16BenchmarkFailureV",
+      "kind": "instanceProperty",
+      "path": "BenchmarkFailure.localizedDescription",
+      "name": "localizedDescription",
+      "access": "public",
+      "declaration": "var localizedDescription: String { get }",
+      "synthesized": true,
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "8.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.10.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "9.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "2.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo16BenchmarkFailureV",
       "sourceOrigin": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp"
     }
   ]

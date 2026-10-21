@@ -462,6 +462,13 @@ describe("ns:swift", function () {
         });
     });
 
+    describe("static members named like function properties", function () {
+        it("redefines name and length on the class", function () {
+            expect(SwiftDemo.Benchmark.length("abc")).toBe(3);
+            expect(typeof SwiftDemo.Benchmark.noop).toBe("function");
+        });
+    });
+
     describe("operators and comparisons", function () {
         it("calls operators as named methods", function () {
             var a = new SwiftDemo.Vector2(1, 2);

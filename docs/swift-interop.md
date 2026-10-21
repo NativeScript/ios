@@ -444,22 +444,60 @@ each worker gets its own JS objects.
 
 ## Performance
 
-`TestRunner/app/tests/SwiftInteropBenchmarks.js` times the same operations
-through the Objective-C/C metadata path and through Swift thunks, and writes
-the results to the app's `Documents/swift-bench.txt`. On a Debug runtime in
-the iOS simulator (indicative only; measure Release builds on devices for real
-numbers):
+`TestRunner/app/tests/SwiftInteropBenchmarks.js` calls one API implemented
+twice: in Objective-C (`TestFixtures/Marshalling/TNSBenchmark`, reached
+through NativeScript's metadata, the path apps have used for years) and in
+Swift (`SwiftDemo`'s `Benchmark.swift`, reached through `ns:swift`). The two
+implementations do the same work, and every case consumes its result in JS
+as an app would, so NativeScript's lazily wrapped `NSArray`s pay for the
+elements read and nothing is compared against a no-op. Each figure is the
+median of three timed rounds after a warm-up, per call; the suite writes its
+results to the app's `Documents/swift-bench.txt`.
 
-| Operation | Objective-C/C | Swift thunk |
-|---|---|---|
-| function `(Int) -> Int` | 1733 ns | 1500 ns |
-| class method | 1722 ns | 1500 ns |
-| instance method | 1786 ns | 1722 ns |
-| string round trip | 1717 ns | 1752 ns |
-| construct an object | 3018 ns | 1608 ns |
-| read a property | 1014 ns | 864 ns |
+Release build of TestRunner, iPhone 17 Pro simulator (iOS 26), Apple M3 Max,
+Xcode 27.1 (lower is better):
 
-Comparisons with other runtimes (OneJS) are not part of the suite.
+| Workload | Objective-C | Swift (ns:swift) | Swift / Objective-C |
+|---|---|---|---|
+| call: no arguments | 0.16 µs | 0.09 µs | 0.58x |
+| call: int -> int | 0.17 µs | 0.13 µs | 0.79x |
+| call: 3 doubles -> double | 0.22 µs | 0.20 µs | 0.92x |
+| call: bool -> bool | 0.17 µs | 0.13 µs | 0.75x |
+| string: short round trip | 0.29 µs | 0.21 µs | 0.72x |
+| string: 10 KB in | 1.53 µs | 0.92 µs | 0.60x |
+| string: 10 KB round trip | 1.91 µs | 1.64 µs | 0.86x |
+| object: construct | 0.67 µs | 0.28 µs | 0.42x |
+| object: instance method | 0.10 µs | 0.11 µs | 1.13x |
+| object: property read | 0.09 µs | 0.08 µs | 0.93x |
+| object: property write | 0.11 µs | 0.11 µs | 0.98x |
+| array: 1000 ints in | 66.47 µs | 22.31 µs | 0.34x |
+| array: 1000 ints out, all read | 151.95 µs | 47.43 µs | 0.31x |
+| dictionary: 10 keys in | 4.51 µs | 1.63 µs | 0.36x |
+| dictionary: 10 keys out, all read | 5.67 µs | 2.28 µs | 0.40x |
+| struct: CGPoint in and out | 0.89 µs | 0.88 µs | 0.99x |
+| callback: native calls JS 100 times | 10.21 µs | 21.51 µs | 2.11x |
+| delegate: native calls JS object 100 times | 10.81 µs | 26.36 µs | 2.44x |
+| error: thrown and caught | 15.43 µs | 13.09 µs | 0.85x |
+| batch: build, filter, sort 1000 records, all read | 934.60 µs | 256.73 µs | 0.27x |
+| async: call and await, sequential | 76.93 µs | 11.70 µs | 0.15x |
+
+- Swift is faster for almost every call shape: scalar calls run in 0.6 to 0.9
+  of the time, object construction in 0.4, and thrown errors in 0.85.
+- Collections are where the difference is largest: arrays and dictionaries
+  cross in about a third of the time, since a thunk converts them in one pass
+  instead of through per-element Objective-C wrappers. The record batch,
+  which builds, filters and sorts 1000 structs natively and reads every field
+  in JS, runs in 0.27 of the time.
+- Async calls settle about 6x faster: a Swift `async` call resolves its
+  Promise directly, while the Objective-C version goes through a
+  completion block dispatched to the main queue.
+- Native code calling JS is slower: a Swift closure or delegate calling a JS
+  function costs about 0.2 µs per call against about 0.1 µs for an
+  Objective-C block or a JS subclass, because each invocation reports its
+  arguments as a stream the runtime assembles before calling into JS.
+- A Debug build (unoptimized thunks) is slower on both paths; there Swift's
+  scalar calls are about 1.2x Objective-C's while the collection, batch and
+  async cases keep most of their lead.
 
 ## Coverage and verification
 

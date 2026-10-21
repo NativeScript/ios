@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 1339,
+      "total": 1372,
       "objc-direct": 3,
-      "swift-generated": 381,
+      "swift-generated": 414,
       "swift-specialized": 401,
       "type-only": 6,
       "unsupported": 548,
       "not-applicable": 0
     },
     "callable": {
-      "total": 1275,
+      "total": 1303,
       "objc-direct": 1,
-      "swift-generated": 327,
+      "swift-generated": 355,
       "swift-specialized": 398,
       "type-only": 2,
       "unsupported": 547,
       "not-applicable": 0
     },
-    "effectiveCallable": 328,
+    "effectiveCallable": 356,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -35,9 +35,9 @@
       "not-applicable": 0
     },
     "class": {
-      "total": 25,
+      "total": 26,
       "objc-direct": 2,
-      "swift-generated": 22,
+      "swift-generated": 23,
       "swift-specialized": 1,
       "type-only": 0,
       "unsupported": 0,
@@ -71,27 +71,27 @@
       "not-applicable": 0
     },
     "initializer": {
-      "total": 42,
+      "total": 44,
       "objc-direct": 0,
-      "swift-generated": 40,
+      "swift-generated": 42,
       "swift-specialized": 2,
       "type-only": 0,
       "unsupported": 0,
       "not-applicable": 0
     },
     "instanceMethod": {
-      "total": 974,
+      "total": 976,
       "objc-direct": 0,
-      "swift-generated": 63,
+      "swift-generated": 65,
       "swift-specialized": 385,
       "type-only": 0,
       "unsupported": 526,
       "not-applicable": 0
     },
     "instanceProperty": {
-      "total": 75,
+      "total": 82,
       "objc-direct": 1,
-      "swift-generated": 65,
+      "swift-generated": 72,
       "swift-specialized": 3,
       "type-only": 1,
       "unsupported": 5,
@@ -116,18 +116,18 @@
       "not-applicable": 0
     },
     "protocol": {
-      "total": 5,
+      "total": 6,
       "objc-direct": 0,
-      "swift-generated": 4,
+      "swift-generated": 5,
       "swift-specialized": 0,
       "type-only": 1,
       "unsupported": 0,
       "not-applicable": 0
     },
     "struct": {
-      "total": 19,
+      "total": 22,
       "objc-direct": 0,
-      "swift-generated": 18,
+      "swift-generated": 21,
       "swift-specialized": 1,
       "type-only": 0,
       "unsupported": 0,
@@ -143,9 +143,9 @@
       "not-applicable": 0
     },
     "typeMethod": {
-      "total": 7,
+      "total": 24,
       "objc-direct": 0,
-      "swift-generated": 4,
+      "swift-generated": 21,
       "swift-specialized": 0,
       "type-only": 0,
       "unsupported": 3,
@@ -9450,6 +9450,37 @@
       "location": "file://Sources/SwiftDemo/Values.swift:261"
     },
     {
+      "id": "s:9SwiftDemo14BenchmarkPointV",
+      "path": "BenchmarkPoint",
+      "kind": "struct",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:17"
+    },
+    {
+      "id": "s:9SwiftDemo14BenchmarkPointV1x1yACSd_Sdtcfc",
+      "path": "BenchmarkPoint.init(x:y:)",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:20"
+    },
+    {
+      "id": "s:9SwiftDemo14BenchmarkPointV1xSdvp",
+      "path": "BenchmarkPoint.x",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "x",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:18"
+    },
+    {
+      "id": "s:9SwiftDemo14BenchmarkPointV1ySdvp",
+      "path": "BenchmarkPoint.y",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "y",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:19"
+    },
+    {
       "id": "s:9SwiftDemo14CountdownErrorV",
       "path": "CountdownError",
       "kind": "struct",
@@ -9558,6 +9589,44 @@
       "location": "file://Sources/SwiftDemo/Protocols.swift:63"
     },
     {
+      "id": "s:9SwiftDemo15BenchmarkRecordV",
+      "path": "BenchmarkRecord",
+      "kind": "struct",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:11"
+    },
+    {
+      "id": "s:9SwiftDemo15BenchmarkRecordV4nameSSvp",
+      "path": "BenchmarkRecord.name",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "name",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:12"
+    },
+    {
+      "id": "s:9SwiftDemo15BenchmarkRecordV4rankSivp",
+      "path": "BenchmarkRecord.rank",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "rank",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:14"
+    },
+    {
+      "id": "s:9SwiftDemo15BenchmarkRecordV5scoreSdvp",
+      "path": "BenchmarkRecord.score",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "score",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:13"
+    },
+    {
+      "id": "s:9SwiftDemo16BenchmarkFailureV",
+      "path": "BenchmarkFailure",
+      "kind": "struct",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:23"
+    },
+    {
       "id": "s:9SwiftDemo16GreetingRegistryC",
       "path": "GreetingRegistry",
       "kind": "class",
@@ -9619,6 +9688,21 @@
       "tier": "swift-generated",
       "jsName": "makeTrackerLater",
       "location": "file://Sources/SwiftDemo/Values.swift:36"
+    },
+    {
+      "id": "s:9SwiftDemo17BenchmarkDelegateP",
+      "path": "BenchmarkDelegate",
+      "kind": "protocol",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:7"
+    },
+    {
+      "id": "s:9SwiftDemo17BenchmarkDelegateP5value3forS2i_tF",
+      "path": "BenchmarkDelegate.value(for:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "value",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:8"
     },
     {
       "id": "s:9SwiftDemo17greetInBackgroundySSAA8Greeting_pYaF",
@@ -11543,6 +11627,173 @@
       "location": "file://Sources/SwiftDemo/Values.swift:63"
     },
     {
+      "id": "s:9SwiftDemo9BenchmarkC",
+      "path": "Benchmark",
+      "kind": "class",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:25"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC10echoStringyS2SFZ",
+      "path": "Benchmark.echoString(_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "echoString",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:33"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC10midpointOfyAA0C5PointVAF_AFtFZ",
+      "path": "Benchmark.midpointOf(_:_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "midpointOf",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:50"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC10topRecords_12minimumScoreSayAA0C6RecordVGSi_SdtFZ",
+      "path": "Benchmark.topRecords(_:minimumScore:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "topRecords",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:65"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC11callClosure_5timesS3iXE_SitFZ",
+      "path": "Benchmark.callClosure(_:times:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "callClosure",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:53"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC12callDelegate_5timesSiAA0cE0_p_SitFZ",
+      "path": "Benchmark.callDelegate(_:times:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "callDelegate",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:58"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC14makeDictionaryySDySSSiGSiFZ",
+      "path": "Benchmark.makeDictionary(_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "makeDictionary",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:42"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC3sumySiSaySiGFZ",
+      "path": "Benchmark.sum(_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "sum",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:39"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC4failyyKFZ",
+      "path": "Benchmark.fail()",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "fail",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:64"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC4noopyyFZ",
+      "path": "Benchmark.noop()",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "noop",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:29"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC6length2ofSiSS_tFZ",
+      "path": "Benchmark.length(of:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "length",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:34"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC6negateyS2bFZ",
+      "path": "Benchmark.negate(_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "negate",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:32"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC7combineyS2d_S2dtFZ",
+      "path": "Benchmark.combine(_:_:_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "combine",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:31"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC7counterSivp",
+      "path": "Benchmark.counter",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "counter",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:26"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC7echoIntyS2iFZ",
+      "path": "Benchmark.echoInt(_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "echoInt",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:30"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC8midpointySo7CGPointVAF_AFtFZ",
+      "path": "Benchmark.midpoint(_:_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "midpoint",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:47"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC9echoLateryS2iYaFZ",
+      "path": "Benchmark.echoLater(_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "echoLater",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:63"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC9incrementSiyF",
+      "path": "Benchmark.increment()",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "increment",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:35"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC9makeArrayySaySiGSiFZ",
+      "path": "Benchmark.makeArray(_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "makeArray",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:40"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC9sumValuesySiSDySSSiGFZ",
+      "path": "Benchmark.sumValues(_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "sumValues",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:41"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkCACycfc",
+      "path": "Benchmark.init()",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:27"
+    },
+    {
       "id": "s:9SwiftDemo9CancelLogC",
       "path": "CancelLog",
       "kind": "class",
@@ -12502,6 +12753,13 @@
     {
       "id": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo14CountdownErrorV",
       "path": "CountdownError.localizedDescription",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "localizedDescription"
+    },
+    {
+      "id": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo16BenchmarkFailureV",
+      "path": "BenchmarkFailure.localizedDescription",
       "kind": "instanceProperty",
       "tier": "swift-generated",
       "jsName": "localizedDescription"

@@ -109,6 +109,13 @@ declare module "ns:swift/SwiftDemo" {
     export function hashValue(value: Precipitation): number;
   }
 
+  export class BenchmarkPoint {
+    constructor(x: number, y: number);
+    constructor(args: { x: number; y: number });
+    x: number;
+    y: number;
+  }
+
   export class CountdownError {
     private constructor();
     /**
@@ -138,12 +145,31 @@ declare module "ns:swift/SwiftDemo" {
     greeting: Greeting | null;
   }
 
+  export class BenchmarkRecord {
+    private constructor();
+    name: string;
+    rank: number;
+    score: number;
+  }
+
+  export class BenchmarkFailure {
+    private constructor();
+    /**
+     * Retrieve the localized description for this error.
+     */
+    readonly localizedDescription: string;
+  }
+
   export class GreetingRegistry {
     constructor();
     add(greeting: Greeting): void;
     readonly count: number;
     remove(greeting: Greeting): void;
     contains(greeting: Greeting): boolean;
+  }
+
+  export interface BenchmarkDelegate {
+    value(index: number | bigint): number;
   }
 
   export class WeakGreetingHolder {
@@ -397,6 +423,29 @@ declare module "ns:swift/SwiftDemo" {
     readonly count: number;
     publish(message: string): void;
     subscribe(handler: (arg0: string) => void): void;
+  }
+
+  export class Benchmark {
+    constructor();
+    static echoString(value: string): string;
+    static midpointOf(a: BenchmarkPoint, b: BenchmarkPoint): BenchmarkPoint;
+    static topRecords(count: number | bigint, minimum: number): (BenchmarkRecord)[];
+    static callClosure(body: (arg0: number) => number | bigint, count: number | bigint): number;
+    static callDelegate(delegate: BenchmarkDelegate, count: number | bigint): number;
+    static makeDictionary(count: number | bigint): Record<string, number>;
+    static sum(values: readonly (number | bigint)[]): number;
+    static fail(): void;
+    static noop(): void;
+    static length(value: string): number;
+    static negate(value: boolean): boolean;
+    static combine(a: number, b: number, c: number): number;
+    counter: number;
+    static echoInt(value: number | bigint): number;
+    static midpoint(a: { readonly x: number; readonly y: number }, b: { readonly x: number; readonly y: number }): { x: number; y: number };
+    static echoLater(value: number | bigint, signal?: AbortSignal): Promise<number>;
+    increment(): number;
+    static makeArray(count: number | bigint): (number)[];
+    static sumValues(values: Readonly<Record<string, number | bigint>>): number;
   }
 
   export class CancelLog {

@@ -2034,7 +2034,26 @@ SwiftCallback* AdapterHandle(Isolate* isolate, Local<Context> context, IsolateSt
 
 // Runs `body` on the isolate's thread with the isolate locked and valid:
 // now when called there, otherwise queued. Returns false when it will not run.
+// The context JS callbacks run in: the current one inside a call, the main
+// one when queued.
+Local<Context> CallbackContext(Isolate* isolate) {
+  return isolate->InContext() ? isolate->GetCurrentContext() : Caches::Get(isolate)->GetContext();
+}
+
+// On `isolate`'s thread while it is locked, as inside a call from JS: work
+// can run at once, without locking or queueing.
+bool InsideIsolate(Isolate* isolate) {
+  return Isolate::TryGetCurrent() == isolate && v8::Locker::IsLocked(isolate);
+}
+
 bool OnIsolateThread(Isolate* isolate, IsolateWrapper wrapper, std::function<void()> body) {
+  if (InsideIsolate(isolate)) {
+    if (!wrapper.IsValid()) {
+      return false;
+    }
+    body();
+    return true;
+  }
   if (Isolate::TryGetCurrent() == isolate) {
     v8::Locker locker(isolate);
     if (!wrapper.IsValid()) {
@@ -2070,7 +2089,7 @@ void RunCallback(SwiftCallback* callback, AsyncOutcome& arguments) {
   if (state == nullptr) {
     return;
   }
-  Local<Context> context = Caches::Get(isolate)->GetContext();
+  Local<Context> context = CallbackContext(isolate);
   Context::Scope contextScope(context);
 
   // On the isolate's thread the innermost call in progress is the one whose
@@ -2119,6 +2138,11 @@ void RunCallback(SwiftCallback* callback, AsyncOutcome& arguments) {
 
 void DeliverCallback(std::unique_ptr<AsyncToken> token) {
   SwiftCallback* callback = token->callback;
+  if (InsideIsolate(callback->isolate) && callback->wrapper.IsValid()) {
+    RunCallback(callback, *token->root);
+    ReleaseCallback(callback);
+    return;
+  }
   std::shared_ptr<AsyncOutcome> arguments = token->root;
   bool scheduled = OnIsolateThread(callback->isolate, callback->wrapper, [callback, arguments]() {
     RunCallback(callback, *arguments);
@@ -2915,7 +2939,7 @@ ObjectResult* RunObjectCall(SwiftCallback* handle, AsyncOutcome& arguments, intp
   if (state == nullptr) {
     return nullptr;
   }
-  Local<Context> context = Caches::Get(isolate)->GetContext();
+  Local<Context> context = CallbackContext(isolate);
   Context::Scope contextScope(context);
 
   const ModuleInfo& module = *handle->module;
@@ -3059,9 +3083,12 @@ const NSSwiftValue* ApiObjectCallEnd(void* rawToken) {
   SwiftCallback* handle = token->callback;
   std::shared_ptr<AsyncOutcome> arguments = token->root;
   intptr_t encoded = token->requirement;
-  ObjectResult* result = RunAndWait(handle, [handle, arguments, encoded]() {
-    return RunObjectCall(handle, *arguments, encoded);
-  });
+  ObjectResult* result =
+      InsideIsolate(handle->isolate)
+          ? (handle->wrapper.IsValid() ? RunObjectCall(handle, *arguments, encoded) : nullptr)
+          : RunAndWait(handle, [handle, arguments, encoded]() {
+              return RunObjectCall(handle, *arguments, encoded);
+            });
   ReleaseCallback(handle);
   return result ? &result->value : nullptr;
 }
@@ -3076,7 +3103,7 @@ ObjectResult* RunFunctionCall(SwiftCallback* handle, AsyncOutcome& arguments) {
   if (state == nullptr) {
     return nullptr;
   }
-  Local<Context> context = Caches::Get(isolate)->GetContext();
+  Local<Context> context = CallbackContext(isolate);
   Context::Scope contextScope(context);
   CallContext* call = state->calls.empty() ? nullptr : state->calls.back();
   if (call != nullptr && !call->callbackException.IsEmpty()) {
@@ -3134,7 +3161,10 @@ const NSSwiftValue* ApiCallbackCallEnd(void* rawToken) {
   SwiftCallback* handle = token->callback;
   std::shared_ptr<AsyncOutcome> arguments = token->root;
   ObjectResult* result =
-      RunAndWait(handle, [handle, arguments]() { return RunFunctionCall(handle, *arguments); });
+      InsideIsolate(handle->isolate)
+          ? (handle->wrapper.IsValid() ? RunFunctionCall(handle, *arguments) : nullptr)
+          : RunAndWait(handle,
+                       [handle, arguments]() { return RunFunctionCall(handle, *arguments); });
   ReleaseCallback(handle);
   return result ? &result->value : nullptr;
 }
@@ -3887,6 +3917,9 @@ class Builder {
     std::vector<const MemberGroup*> moduleGroups;
     std::vector<const MemberGroup*> enumGroups;
     std::vector<const MemberGroup*> objcGroups;
+    // Static members named like a function's own `name` or `length`, which a
+    // template cannot hold.
+    std::vector<const MemberGroup*> shadowing;
     for (const auto& group : _module.groups) {
       if (group->owner < 0) {
         moduleGroups.push_back(group.get());
@@ -3899,6 +3932,10 @@ class Builder {
       }
       if (owner.kind == NSSwiftTypeObjCClass) {
         objcGroups.push_back(group.get());
+        continue;
+      }
+      if (ShadowsFunctionBuiltin(*group)) {
+        shadowing.push_back(group.get());
         continue;
       }
       InstallOnTemplate(templates[group->owner], *group);
@@ -3926,6 +3963,11 @@ class Builder {
     }
     for (const TypeInfo& type : _module.types) {
       values[type.index] = values[type.family];
+    }
+    for (const MemberGroup* group : shadowing) {
+      if (!InstallShadowing(values[group->owner], *group)) {
+        return false;
+      }
     }
 
     // Nested types hang off their parent by JS path ("Polygon.Style"); a
@@ -4157,6 +4199,52 @@ class Builder {
       default:
         return true;
     }
+  }
+
+  // A static member named like a property every function has: `name` and
+  // `length` (configurable, so redefined on the class once it exists), or
+  // `prototype`, `arguments` and `caller`, which cannot be.
+  static bool ShadowsFunctionBuiltin(const MemberGroup& group) {
+    bool isStatic =
+        group.kind == NSSwiftMemberStaticMethod || group.kind == NSSwiftMemberStaticProperty;
+    return isStatic &&
+           (group.jsName == "name" || group.jsName == "length" || group.jsName == "prototype" ||
+            group.jsName == "arguments" || group.jsName == "caller");
+  }
+
+  bool InstallShadowing(Local<Object> constructor, const MemberGroup& group) {
+    if (group.jsName != "name" && group.jsName != "length") {
+      // Not configurable on a function: the member stays unreachable.
+      return true;
+    }
+    Local<v8::String> name = tns::ToV8String(_isolate, group.jsName);
+    if (group.kind == NSSwiftMemberStaticProperty) {
+      Local<v8::Function> getter;
+      Local<v8::Function> setter;
+      if (!MethodTemplate(group, GetterCallback)->GetFunction(_context).ToLocal(&getter) ||
+          (HasSetter(group) &&
+           !MethodTemplate(group, SetterCallback)->GetFunction(_context).ToLocal(&setter))) {
+        return false;
+      }
+      constructor->SetAccessorProperty(name, getter, setter, DontEnum);
+      return true;
+    }
+    auto define = [&](const std::string& key, Local<FunctionTemplate> tmpl) {
+      Local<v8::Function> function;
+      return tmpl->GetFunction(_context).ToLocal(&function) &&
+             constructor
+                 ->DefineOwnProperty(_context, tns::ToV8String(_isolate, key), function, DontEnum)
+                 .FromMaybe(false);
+    };
+    if (!define(group.jsName, MethodTemplate(group))) {
+      return false;
+    }
+    for (const auto& key : OverloadKeys(group)) {
+      if (!define(key.first, MethodTemplate(*ExactGroupFor(group, *key.second), ExactCallback))) {
+        return false;
+      }
+    }
+    return true;
   }
 
   // Enum and module-level members, on a plain object.

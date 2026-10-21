@@ -79,6 +79,11 @@ TEST(TopLevelDeclarationsInSourceOrder) {
     }
   }
   std::vector<std::string> expected = {"Badge",
+                                       "BenchmarkDelegate",
+                                       "BenchmarkRecord",
+                                       "BenchmarkPoint",
+                                       "BenchmarkFailure",
+                                       "Benchmark",
                                        "Greeter",
                                        "Demo",
                                        "Point",
