@@ -154,6 +154,14 @@
     "s:9SwiftDemo10parseLaterys6ResultOySis5Error_pGSSYaF",
     "s:9SwiftDemo9fetchItemyySi_ys6ResultOySSs5Error_pGYbctF",
     "s:9SwiftDemo13describeErrorySSs0D0_pSgF",
+    "s:9SwiftDemo8shoutAllySSxSyRzlF",
+    "s:9SwiftDemo8shoutAllySSxSyRzlF@<s:SS>",
+    "s:9SwiftDemo13describeValueySSxs23CustomStringConvertibleRzlF",
+    "s:9SwiftDemo13describeValueySSxs23CustomStringConvertibleRzlF@<s:Sd>",
+    "s:9SwiftDemo13describeValueySSxs23CustomStringConvertibleRzlF@<s:SS>",
+    "s:9SwiftDemo13describeValueySSxs23CustomStringConvertibleRzlF@<s:Sb>",
+    "s:9SwiftDemo9greetOnceySSx_SStAA8GreetingRzlF",
+    "s:9SwiftDemo9greetOnceySSx_SStAA8GreetingRzlF@<any Greeting>",
     "s:9SwiftDemo8describeySSSo6UIViewCF",
     "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
     "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
@@ -169,6 +177,8 @@
     "s:9SwiftDemo5inset_2bySo6CGRectVAE_So12UIEdgeInsetsVtF",
     "s:9SwiftDemo7fittingySo6CGSizeVSgAEF",
     "s:9SwiftDemo12latitudeSpanySdSo22CLLocationCoordinate2DV_ADtF",
+    "s:9SwiftDemo5tagOfySixSo6UIViewCRbzlF",
+    "s:9SwiftDemo5tagOfySixSo6UIViewCRbzlF@<c:objc(cs)UIView>",
     "s:12SwiftDemoKit5MoneyV",
     "s:12SwiftDemoKit6WalletC",
     "s:12SwiftDemoKit4CoinO",
@@ -11440,6 +11450,213 @@
           "rhsPrecise": "s:SQ"
         }
       ],
+      "extension": {
+        "extendedModule": "SwiftUICore",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "17.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "14.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "17.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "10.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BadgeV",
+      "sourceOrigin": "s:7SwiftUI4ViewPAAE11transaction5value_Qrqd___yAA11TransactionVzctSQRd__lF"
+    },
+    {
+      "id": "s:7SwiftUI4ViewPAAE11transaction5value_Qrqd___yAA11TransactionVzctSQRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:SS>",
+      "kind": "instanceMethod",
+      "path": "Badge.transaction(value:_:)",
+      "name": "transaction(value:_:)",
+      "access": "public",
+      "declaration": "@export(implementation) nonisolated func transaction(value: some Equatable, _ transform: @escaping (inout Transaction) -> Void) -> some View\n",
+      "attributes": [
+        "@export(implementation)",
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "value",
+          "internalName": "value",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        },
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(inout Transaction) -> Void",
+            "references": [
+              "s:7SwiftUI11TransactionV",
+              "s:s4Voida"
+            ]
+          },
+          "attributes": [
+            "@escaping"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "some View",
+        "references": [
+          "s:7SwiftUI4ViewP"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftUICore",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "17.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "14.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "17.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "10.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BadgeV",
+      "sourceOrigin": "s:7SwiftUI4ViewPAAE11transaction5value_Qrqd___yAA11TransactionVzctSQRd__lF"
+    },
+    {
+      "id": "s:7SwiftUI4ViewPAAE11transaction5value_Qrqd___yAA11TransactionVzctSQRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sb>",
+      "kind": "instanceMethod",
+      "path": "Badge.transaction(value:_:)",
+      "name": "transaction(value:_:)",
+      "access": "public",
+      "declaration": "@export(implementation) nonisolated func transaction(value: some Equatable, _ transform: @escaping (inout Transaction) -> Void) -> some View\n",
+      "attributes": [
+        "@export(implementation)",
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "value",
+          "internalName": "value",
+          "type": {
+            "spelling": "Bool",
+            "references": [
+              "s:Sb"
+            ]
+          }
+        },
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(inout Transaction) -> Void",
+            "references": [
+              "s:7SwiftUI11TransactionV",
+              "s:s4Voida"
+            ]
+          },
+          "attributes": [
+            "@escaping"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "some View",
+        "references": [
+          "s:7SwiftUI4ViewP"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftUICore",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "17.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "14.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "17.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "10.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BadgeV",
+      "sourceOrigin": "s:7SwiftUI4ViewPAAE11transaction5value_Qrqd___yAA11TransactionVzctSQRd__lF"
+    },
+    {
+      "id": "s:7SwiftUI4ViewPAAE11transaction5value_Qrqd___yAA11TransactionVzctSQRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sd>",
+      "kind": "instanceMethod",
+      "path": "Badge.transaction(value:_:)",
+      "name": "transaction(value:_:)",
+      "access": "public",
+      "declaration": "@export(implementation) nonisolated func transaction(value: some Equatable, _ transform: @escaping (inout Transaction) -> Void) -> some View\n",
+      "attributes": [
+        "@export(implementation)",
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "value",
+          "internalName": "value",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        },
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(inout Transaction) -> Void",
+            "references": [
+              "s:7SwiftUI11TransactionV",
+              "s:s4Voida"
+            ]
+          },
+          "attributes": [
+            "@escaping"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "some View",
+        "references": [
+          "s:7SwiftUI4ViewP"
+        ]
+      },
       "extension": {
         "extendedModule": "SwiftUICore",
         "typeKind": "swift.protocol"
@@ -41740,6 +41957,171 @@
       "sourceOrigin": "s:7SwiftUI4ViewPAAE21scrollIndicatorsFlash7triggerQrqd___tSQRd__lF"
     },
     {
+      "id": "s:7SwiftUI4ViewPAAE21scrollIndicatorsFlash7triggerQrqd___tSQRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:SS>",
+      "kind": "instanceMethod",
+      "path": "Badge.scrollIndicatorsFlash(trigger:)",
+      "name": "scrollIndicatorsFlash(trigger:)",
+      "access": "public",
+      "declaration": "nonisolated func scrollIndicatorsFlash(trigger value: some Equatable) -> some View\n",
+      "attributes": [
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "trigger",
+          "internalName": "value",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "some View",
+        "references": [
+          "s:7SwiftUI4ViewP"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftUICore",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "17.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "14.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "17.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "10.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BadgeV",
+      "sourceOrigin": "s:7SwiftUI4ViewPAAE21scrollIndicatorsFlash7triggerQrqd___tSQRd__lF"
+    },
+    {
+      "id": "s:7SwiftUI4ViewPAAE21scrollIndicatorsFlash7triggerQrqd___tSQRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sb>",
+      "kind": "instanceMethod",
+      "path": "Badge.scrollIndicatorsFlash(trigger:)",
+      "name": "scrollIndicatorsFlash(trigger:)",
+      "access": "public",
+      "declaration": "nonisolated func scrollIndicatorsFlash(trigger value: some Equatable) -> some View\n",
+      "attributes": [
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "trigger",
+          "internalName": "value",
+          "type": {
+            "spelling": "Bool",
+            "references": [
+              "s:Sb"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "some View",
+        "references": [
+          "s:7SwiftUI4ViewP"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftUICore",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "17.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "14.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "17.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "10.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BadgeV",
+      "sourceOrigin": "s:7SwiftUI4ViewPAAE21scrollIndicatorsFlash7triggerQrqd___tSQRd__lF"
+    },
+    {
+      "id": "s:7SwiftUI4ViewPAAE21scrollIndicatorsFlash7triggerQrqd___tSQRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sd>",
+      "kind": "instanceMethod",
+      "path": "Badge.scrollIndicatorsFlash(trigger:)",
+      "name": "scrollIndicatorsFlash(trigger:)",
+      "access": "public",
+      "declaration": "nonisolated func scrollIndicatorsFlash(trigger value: some Equatable) -> some View\n",
+      "attributes": [
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "trigger",
+          "internalName": "value",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "some View",
+        "references": [
+          "s:7SwiftUI4ViewP"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftUICore",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "17.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "14.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "17.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "10.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BadgeV",
+      "sourceOrigin": "s:7SwiftUI4ViewPAAE21scrollIndicatorsFlash7triggerQrqd___tSQRd__lF"
+    },
+    {
       "id": "s:7SwiftUI4ViewPAAE21scrollIndicatorsFlash8onAppearQrSb_tF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
       "kind": "instanceMethod",
       "path": "Badge.scrollIndicatorsFlash(onAppear:)",
@@ -45853,6 +46235,249 @@
       "sourceOrigin": "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2in13configurationQrqd___AA9NamespaceV2IDVqd_0_AA012EmptyMatchedeF13ConfigurationVXEtSHRd__AA0mefN0Rd_0_r0_lF"
     },
     {
+      "id": "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2in13configurationQrqd___AA9NamespaceV2IDVqd_0_AA012EmptyMatchedeF13ConfigurationVXEtSHRd__AA0mefN0Rd_0_r0_lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:SS>",
+      "kind": "instanceMethod",
+      "path": "Badge.matchedTransitionSource(id:in:configuration:)",
+      "name": "matchedTransitionSource(id:in:configuration:)",
+      "access": "public",
+      "declaration": "nonisolated func matchedTransitionSource(id: some Hashable, in namespace: Namespace.ID, configuration: (EmptyMatchedTransitionSourceConfiguration) -> some MatchedTransitionSourceConfiguration) -> some View\n",
+      "attributes": [
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "id",
+          "internalName": "id",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        },
+        {
+          "label": "in",
+          "internalName": "namespace",
+          "type": {
+            "spelling": "Namespace.ID",
+            "references": [
+              "s:7SwiftUI9NamespaceV",
+              "s:7SwiftUI9NamespaceV2IDV"
+            ]
+          }
+        },
+        {
+          "label": "configuration",
+          "internalName": "configuration",
+          "type": {
+            "spelling": "(EmptyMatchedTransitionSourceConfiguration) -> some MatchedTransitionSourceConfiguration",
+            "references": [
+              "s:7SwiftUI41EmptyMatchedTransitionSourceConfigurationV",
+              "s:7SwiftUI36MatchedTransitionSourceConfigurationP"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "some View",
+        "references": [
+          "s:7SwiftUI4ViewP"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftUICore",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "15.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "2.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "11.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BadgeV",
+      "sourceOrigin": "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2in13configurationQrqd___AA9NamespaceV2IDVqd_0_AA012EmptyMatchedeF13ConfigurationVXEtSHRd__AA0mefN0Rd_0_r0_lF"
+    },
+    {
+      "id": "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2in13configurationQrqd___AA9NamespaceV2IDVqd_0_AA012EmptyMatchedeF13ConfigurationVXEtSHRd__AA0mefN0Rd_0_r0_lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sb>",
+      "kind": "instanceMethod",
+      "path": "Badge.matchedTransitionSource(id:in:configuration:)",
+      "name": "matchedTransitionSource(id:in:configuration:)",
+      "access": "public",
+      "declaration": "nonisolated func matchedTransitionSource(id: some Hashable, in namespace: Namespace.ID, configuration: (EmptyMatchedTransitionSourceConfiguration) -> some MatchedTransitionSourceConfiguration) -> some View\n",
+      "attributes": [
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "id",
+          "internalName": "id",
+          "type": {
+            "spelling": "Bool",
+            "references": [
+              "s:Sb"
+            ]
+          }
+        },
+        {
+          "label": "in",
+          "internalName": "namespace",
+          "type": {
+            "spelling": "Namespace.ID",
+            "references": [
+              "s:7SwiftUI9NamespaceV",
+              "s:7SwiftUI9NamespaceV2IDV"
+            ]
+          }
+        },
+        {
+          "label": "configuration",
+          "internalName": "configuration",
+          "type": {
+            "spelling": "(EmptyMatchedTransitionSourceConfiguration) -> some MatchedTransitionSourceConfiguration",
+            "references": [
+              "s:7SwiftUI41EmptyMatchedTransitionSourceConfigurationV",
+              "s:7SwiftUI36MatchedTransitionSourceConfigurationP"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "some View",
+        "references": [
+          "s:7SwiftUI4ViewP"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftUICore",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "15.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "2.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "11.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BadgeV",
+      "sourceOrigin": "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2in13configurationQrqd___AA9NamespaceV2IDVqd_0_AA012EmptyMatchedeF13ConfigurationVXEtSHRd__AA0mefN0Rd_0_r0_lF"
+    },
+    {
+      "id": "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2in13configurationQrqd___AA9NamespaceV2IDVqd_0_AA012EmptyMatchedeF13ConfigurationVXEtSHRd__AA0mefN0Rd_0_r0_lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sd>",
+      "kind": "instanceMethod",
+      "path": "Badge.matchedTransitionSource(id:in:configuration:)",
+      "name": "matchedTransitionSource(id:in:configuration:)",
+      "access": "public",
+      "declaration": "nonisolated func matchedTransitionSource(id: some Hashable, in namespace: Namespace.ID, configuration: (EmptyMatchedTransitionSourceConfiguration) -> some MatchedTransitionSourceConfiguration) -> some View\n",
+      "attributes": [
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "id",
+          "internalName": "id",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        },
+        {
+          "label": "in",
+          "internalName": "namespace",
+          "type": {
+            "spelling": "Namespace.ID",
+            "references": [
+              "s:7SwiftUI9NamespaceV",
+              "s:7SwiftUI9NamespaceV2IDV"
+            ]
+          }
+        },
+        {
+          "label": "configuration",
+          "internalName": "configuration",
+          "type": {
+            "spelling": "(EmptyMatchedTransitionSourceConfiguration) -> some MatchedTransitionSourceConfiguration",
+            "references": [
+              "s:7SwiftUI41EmptyMatchedTransitionSourceConfigurationV",
+              "s:7SwiftUI36MatchedTransitionSourceConfigurationP"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "some View",
+        "references": [
+          "s:7SwiftUI4ViewP"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftUICore",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "15.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "2.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "11.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BadgeV",
+      "sourceOrigin": "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2in13configurationQrqd___AA9NamespaceV2IDVqd_0_AA012EmptyMatchedeF13ConfigurationVXEtSHRd__AA0mefN0Rd_0_r0_lF"
+    },
+    {
       "id": "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2inQrqd___AA9NamespaceV2IDVtSHRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
       "kind": "instanceMethod",
       "path": "Badge.matchedTransitionSource(id:in:)",
@@ -45900,6 +46525,216 @@
           "rhsPrecise": "s:SH"
         }
       ],
+      "extension": {
+        "extendedModule": "SwiftUICore",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "15.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "2.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "11.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BadgeV",
+      "sourceOrigin": "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2inQrqd___AA9NamespaceV2IDVtSHRd__lF"
+    },
+    {
+      "id": "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2inQrqd___AA9NamespaceV2IDVtSHRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:SS>",
+      "kind": "instanceMethod",
+      "path": "Badge.matchedTransitionSource(id:in:)",
+      "name": "matchedTransitionSource(id:in:)",
+      "access": "public",
+      "declaration": "nonisolated func matchedTransitionSource(id: some Hashable, in namespace: Namespace.ID) -> some View\n",
+      "attributes": [
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "id",
+          "internalName": "id",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        },
+        {
+          "label": "in",
+          "internalName": "namespace",
+          "type": {
+            "spelling": "Namespace.ID",
+            "references": [
+              "s:7SwiftUI9NamespaceV",
+              "s:7SwiftUI9NamespaceV2IDV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "some View",
+        "references": [
+          "s:7SwiftUI4ViewP"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftUICore",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "15.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "2.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "11.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BadgeV",
+      "sourceOrigin": "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2inQrqd___AA9NamespaceV2IDVtSHRd__lF"
+    },
+    {
+      "id": "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2inQrqd___AA9NamespaceV2IDVtSHRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sb>",
+      "kind": "instanceMethod",
+      "path": "Badge.matchedTransitionSource(id:in:)",
+      "name": "matchedTransitionSource(id:in:)",
+      "access": "public",
+      "declaration": "nonisolated func matchedTransitionSource(id: some Hashable, in namespace: Namespace.ID) -> some View\n",
+      "attributes": [
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "id",
+          "internalName": "id",
+          "type": {
+            "spelling": "Bool",
+            "references": [
+              "s:Sb"
+            ]
+          }
+        },
+        {
+          "label": "in",
+          "internalName": "namespace",
+          "type": {
+            "spelling": "Namespace.ID",
+            "references": [
+              "s:7SwiftUI9NamespaceV",
+              "s:7SwiftUI9NamespaceV2IDV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "some View",
+        "references": [
+          "s:7SwiftUI4ViewP"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftUICore",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "15.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "2.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "11.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BadgeV",
+      "sourceOrigin": "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2inQrqd___AA9NamespaceV2IDVtSHRd__lF"
+    },
+    {
+      "id": "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2inQrqd___AA9NamespaceV2IDVtSHRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sd>",
+      "kind": "instanceMethod",
+      "path": "Badge.matchedTransitionSource(id:in:)",
+      "name": "matchedTransitionSource(id:in:)",
+      "access": "public",
+      "declaration": "nonisolated func matchedTransitionSource(id: some Hashable, in namespace: Namespace.ID) -> some View\n",
+      "attributes": [
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "id",
+          "internalName": "id",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        },
+        {
+          "label": "in",
+          "internalName": "namespace",
+          "type": {
+            "spelling": "Namespace.ID",
+            "references": [
+              "s:7SwiftUI9NamespaceV",
+              "s:7SwiftUI9NamespaceV2IDV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "some View",
+        "references": [
+          "s:7SwiftUI4ViewP"
+        ]
+      },
       "extension": {
         "extendedModule": "SwiftUICore",
         "typeKind": "swift.protocol"
@@ -47771,6 +48606,76 @@
           "rhsPrecise": "s:Sy"
         }
       ],
+      "extension": {
+        "extendedModule": "SwiftUICore",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "26.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "26.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "26.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "26.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "26.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5BadgeV",
+      "sourceOrigin": "s:7SwiftUI4ViewPAAE25accessibilityScrollStatus_9isEnabledAA15ModifiedContentVyxAA31AccessibilityAttachmentModifierVGqd___SbtSyRd__lF"
+    },
+    {
+      "id": "s:7SwiftUI4ViewPAAE25accessibilityScrollStatus_9isEnabledAA15ModifiedContentVyxAA31AccessibilityAttachmentModifierVGqd___SbtSyRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:SS>",
+      "kind": "instanceMethod",
+      "path": "Badge.accessibilityScrollStatus(_:isEnabled:)",
+      "name": "accessibilityScrollStatus(_:isEnabled:)",
+      "access": "public",
+      "declaration": "nonisolated func accessibilityScrollStatus(_ status: some StringProtocol, isEnabled: Bool = true) -> ModifiedContent<Self, AccessibilityAttachmentModifier>",
+      "attributes": [
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "status",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        },
+        {
+          "label": "isEnabled",
+          "internalName": "isEnabled",
+          "type": {
+            "spelling": "Bool",
+            "references": [
+              "s:Sb"
+            ]
+          },
+          "default": "true"
+        }
+      ],
+      "returns": {
+        "spelling": "ModifiedContent<Self, AccessibilityAttachmentModifier>",
+        "references": [
+          "s:7SwiftUI15ModifiedContentV",
+          "s:7SwiftUI31AccessibilityAttachmentModifierV"
+        ]
+      },
       "extension": {
         "extendedModule": "SwiftUICore",
         "typeKind": "swift.protocol"
@@ -67163,6 +68068,122 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo13describeValueySSxs23CustomStringConvertibleRzlF",
+      "kind": "function",
+      "path": "describeValue(_:)",
+      "name": "describeValue(_:)",
+      "access": "public",
+      "declaration": "func describeValue(_ value: some CustomStringConvertible) -> String",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "some CustomStringConvertible",
+            "references": [
+              "s:s23CustomStringConvertibleP"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "some CustomStringConvertible",
+          "rhs": "CustomStringConvertible",
+          "rhsPrecise": "s:s23CustomStringConvertibleP"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:253:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo13describeValueySSxs23CustomStringConvertibleRzlF@<s:SS>",
+      "kind": "function",
+      "path": "describeValue(_:)",
+      "name": "describeValue(_:)",
+      "access": "public",
+      "declaration": "func describeValue(_ value: some CustomStringConvertible) -> String",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:253:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo13describeValueySSxs23CustomStringConvertibleRzlF@<s:Sb>",
+      "kind": "function",
+      "path": "describeValue(_:)",
+      "name": "describeValue(_:)",
+      "access": "public",
+      "declaration": "func describeValue(_ value: some CustomStringConvertible) -> String",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Bool",
+            "references": [
+              "s:Sb"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:253:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo13describeValueySSxs23CustomStringConvertibleRzlF@<s:Sd>",
+      "kind": "function",
+      "path": "describeValue(_:)",
+      "name": "describeValue(_:)",
+      "access": "public",
+      "declaration": "func describeValue(_ value: some CustomStringConvertible) -> String",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:253:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo13globalCounterSivp",
       "kind": "variable",
       "path": "globalCounter",
@@ -68455,6 +69476,9 @@
         "s:7SwiftUI4ViewPAAE11toggleStyleyQrqd__AA06ToggleE0Rd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE11toolbarRoleyQrAA07ToolbarE0VF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE11transaction5value_Qrqd___yAA11TransactionVzctSQRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
+        "s:7SwiftUI4ViewPAAE11transaction5value_Qrqd___yAA11TransactionVzctSQRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sd>",
+        "s:7SwiftUI4ViewPAAE11transaction5value_Qrqd___yAA11TransactionVzctSQRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:SS>",
+        "s:7SwiftUI4ViewPAAE11transaction5value_Qrqd___yAA11TransactionVzctSQRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sb>",
         "s:7SwiftUI4ViewPAAE11transaction_4bodyQryAA11TransactionVzc_qd__AA018PlaceholderContentC0VyxGXEtAaBRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE11transactionyQryAA11TransactionVzcF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE12buttonSizingyQrAA06ButtonE0VF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
@@ -68858,6 +69882,9 @@
         "s:7SwiftUI4ViewPAAE21presentationPlacementyQrAA012PresentationE0VF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE21scrollEdgeEffectStyle_3forQrAA06ScrollefG0VSg_AA0E0O3SetVtF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE21scrollIndicatorsFlash7triggerQrqd___tSQRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
+        "s:7SwiftUI4ViewPAAE21scrollIndicatorsFlash7triggerQrqd___tSQRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sd>",
+        "s:7SwiftUI4ViewPAAE21scrollIndicatorsFlash7triggerQrqd___tSQRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:SS>",
+        "s:7SwiftUI4ViewPAAE21scrollIndicatorsFlash7triggerQrqd___tSQRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sb>",
         "s:7SwiftUI4ViewPAAE21scrollIndicatorsFlash8onAppearQrSb_tF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE21searchToolbarBehavioryQrAA06SearcheF0VF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE21sliderThumbVisibilityyQrAA0F0OF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
@@ -68918,7 +69945,13 @@
         "s:7SwiftUI4ViewPAAE23labelIconToTitleSpacingyQr14CoreFoundation7CGFloatVF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE23layoutDirectionBehavioryQrAA06LayouteF0OF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2in13configurationQrqd___AA9NamespaceV2IDVqd_0_AA012EmptyMatchedeF13ConfigurationVXEtSHRd__AA0mefN0Rd_0_r0_lF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
+        "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2in13configurationQrqd___AA9NamespaceV2IDVqd_0_AA012EmptyMatchedeF13ConfigurationVXEtSHRd__AA0mefN0Rd_0_r0_lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sd>",
+        "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2in13configurationQrqd___AA9NamespaceV2IDVqd_0_AA012EmptyMatchedeF13ConfigurationVXEtSHRd__AA0mefN0Rd_0_r0_lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:SS>",
+        "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2in13configurationQrqd___AA9NamespaceV2IDVqd_0_AA012EmptyMatchedeF13ConfigurationVXEtSHRd__AA0mefN0Rd_0_r0_lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sb>",
         "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2inQrqd___AA9NamespaceV2IDVtSHRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
+        "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2inQrqd___AA9NamespaceV2IDVtSHRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sd>",
+        "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2inQrqd___AA9NamespaceV2IDVtSHRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:SS>",
+        "s:7SwiftUI4ViewPAAE23matchedTransitionSource2id2inQrqd___AA9NamespaceV2IDVtSHRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:Sb>",
         "s:7SwiftUI4ViewPAAE23scrollContentBackgroundyQrAA10VisibilityOF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE23scrollDismissesKeyboardyQrAA06ScrolleF4ModeVF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE23searchDictationBehavioryQrAA09TextInputeF0VF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
@@ -68948,6 +69981,7 @@
         "s:7SwiftUI4ViewPAAE25accessibilityScrollStatus_9isEnabledAA15ModifiedContentVyxAA31AccessibilityAttachmentModifierVGAA18LocalizedStringKeyV_SbtF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE25accessibilityScrollStatus_9isEnabledAA15ModifiedContentVyxAA31AccessibilityAttachmentModifierVGAA4TextV_SbtF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE25accessibilityScrollStatus_9isEnabledAA15ModifiedContentVyxAA31AccessibilityAttachmentModifierVGqd___SbtSyRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
+        "s:7SwiftUI4ViewPAAE25accessibilityScrollStatus_9isEnabledAA15ModifiedContentVyxAA31AccessibilityAttachmentModifierVGqd___SbtSyRd__lF::SYNTHESIZED::s:9SwiftDemo5BadgeV@<s:SS>",
         "s:7SwiftUI4ViewPAAE25accessibilitySortPriorityyAA15ModifiedContentVyxAA31AccessibilityAttachmentModifierVGSdF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE25backgroundExtensionEffect9isEnabledQrSb_tF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
         "s:7SwiftUI4ViewPAAE25backgroundExtensionEffectQryF::SYNTHESIZED::s:9SwiftDemo5BadgeV",
@@ -69848,6 +70882,68 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:223:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo5tagOfySixSo6UIViewCRbzlF",
+      "kind": "function",
+      "path": "tagOf(_:)",
+      "name": "tagOf(_:)",
+      "access": "public",
+      "declaration": "func tagOf(_ view: some UIView) -> Int",
+      "parameters": [
+        {
+          "internalName": "view",
+          "type": {
+            "spelling": "some UIView",
+            "references": [
+              "c:objc(cs)UIView"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "genericConstraints": [
+        {
+          "kind": "superclass",
+          "lhs": "some UIView",
+          "rhs": "UIView",
+          "rhsPrecise": "c:objc(cs)UIView"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Views.swift:62:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo5tagOfySixSo6UIViewCRbzlF@<c:objc(cs)UIView>",
+      "kind": "function",
+      "path": "tagOf(_:)",
+      "name": "tagOf(_:)",
+      "access": "public",
+      "declaration": "func tagOf(_ view: some UIView) -> Int",
+      "parameters": [
+        {
+          "internalName": "view",
+          "type": {
+            "spelling": "UIView",
+            "references": [
+              "c:objc(cs)UIView"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:62:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -73559,6 +74655,68 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo8shoutAllySSxSyRzlF",
+      "kind": "function",
+      "path": "shoutAll(_:)",
+      "name": "shoutAll(_:)",
+      "access": "public",
+      "declaration": "func shoutAll(_ value: some StringProtocol) -> String",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "some StringProtocol",
+            "references": [
+              "s:Sy"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "some StringProtocol",
+          "rhs": "StringProtocol",
+          "rhsPrecise": "s:Sy"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:252:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8shoutAllySSxSyRzlF@<s:SS>",
+      "kind": "function",
+      "path": "shoutAll(_:)",
+      "name": "shoutAll(_:)",
+      "access": "public",
+      "declaration": "func shoutAll(_ value: some StringProtocol) -> String",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:252:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo8simplifyyAA7FormulaOADF",
       "kind": "function",
       "path": "simplify(_:)",
@@ -73749,6 +74907,86 @@
         }
       ],
       "location": "file://Sources/SwiftDemo/Values.swift:244:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo9greetOnceySSx_SStAA8GreetingRzlF",
+      "kind": "function",
+      "path": "greetOnce(_:_:)",
+      "name": "greetOnce(_:_:)",
+      "access": "public",
+      "declaration": "func greetOnce(_ greeting: some Greeting, _ other: String) -> String",
+      "parameters": [
+        {
+          "internalName": "greeting",
+          "type": {
+            "spelling": "some Greeting",
+            "references": [
+              "s:9SwiftDemo8GreetingP"
+            ]
+          }
+        },
+        {
+          "internalName": "other",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "some Greeting",
+          "rhs": "Greeting",
+          "rhsPrecise": "s:9SwiftDemo8GreetingP"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:254:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo9greetOnceySSx_SStAA8GreetingRzlF@<any Greeting>",
+      "kind": "function",
+      "path": "greetOnce(_:_:)",
+      "name": "greetOnce(_:_:)",
+      "access": "public",
+      "declaration": "func greetOnce(_ greeting: some Greeting, _ other: String) -> String",
+      "parameters": [
+        {
+          "internalName": "greeting",
+          "type": {
+            "spelling": "any Greeting",
+            "references": [
+              "s:9SwiftDemo8GreetingP"
+            ]
+          }
+        },
+        {
+          "internalName": "other",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:254:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {

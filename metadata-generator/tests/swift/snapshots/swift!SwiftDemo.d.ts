@@ -342,6 +342,9 @@ declare module "ns:swift/SwiftDemo" {
   export function swapTrackers(a: { value: Tracker }, b: { value: Tracker }): void;
   export const defaultFlavor: Flavor;
   export function describeError(error: (Error | string) | null | undefined): string;
+  export function describeValue(value: string): string;
+  export function describeValue(value: boolean): string;
+  export function describeValue(value: number): string;
   export let globalCounter: number;
   export function starterWallet(owner: string): import("ns:swift/SwiftDemoKit").Wallet;
   export function makeDefaultPoint(): Point;
@@ -369,6 +372,7 @@ declare module "ns:swift/SwiftDemo" {
   export function pages(count: number | bigint): AsyncIterableIterator<(string)[]>;
   export function shout(name: (string) | null | undefined): string | null;
   export function spans(): ([string, number | null])[];
+  export function tagOf(view: UIView): number;
   export function total(values: readonly (number)[]): number;
   export function unbox(box: import("ns:swift/SwiftDemoKit").Box<import("ns:swift/SwiftDemoKit").Money>): import("ns:swift/SwiftDemoKit").Money;
   export function unbox(box: import("ns:swift/SwiftDemoKit").Box<number>): number;
@@ -411,12 +415,14 @@ declare module "ns:swift/SwiftDemo" {
   export function repeated(value: boolean, times: number | bigint): (boolean)[];
   export function repeated(value: number, times: number | bigint): (number)[];
   export function scoreAll(scorer: Scorer, values: readonly (number | bigint)[]): (number)[];
+  export function shoutAll(value: string): string;
   export function simplify(formula: Formula): Formula;
   export function swapPair(pair: readonly [number | bigint, string]): [string, number];
   export function trackers(ids: readonly (number | bigint)[]): (Tracker)[];
   export function countDown(start: number | bigint, failure: (number | bigint) | null | undefined): AsyncIterableIterator<number>;
   export function countdown(start: number | bigint, tick: (arg0: number, arg1: boolean) => void): void;
   export function fetchItem(id: number | bigint, completion: (arg0: { case: "success"; value: string } | { case: "failure"; value: Error }) => void): void;
+  export function greetOnce(greeting: Greeting, other: string): string;
   export function introduce(greeting: Greeting, other: string): string;
   export function makeLabel(text: string): UILabel;
   export function makeScore(name: string, points: number | bigint): import("ns:swift/SwiftDemoKit").Pair<string, number>;

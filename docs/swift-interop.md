@@ -137,8 +137,10 @@ A generic function is left out when a type parameter appears as a metatype
 constrained by another module's protocol, when its arguments could not tell
 several instantiations apart (a type parameter only in the result or in a
 closure), or when it would need more than six instantiations (sixteen from a
-generic type's instantiations). Generic
-methods of generic types, and `some P` parameters, are not instantiated yet.
+generic type's instantiations). A `some P` parameter is an implicit type
+parameter, instantiated the same way: `describe(_ value: some
+CustomStringConvertible)` takes a number, a string or a boolean. Generic
+methods of generic types are not instantiated yet.
 
 ## Value model
 

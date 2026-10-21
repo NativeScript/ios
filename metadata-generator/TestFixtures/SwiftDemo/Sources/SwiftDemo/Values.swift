@@ -248,3 +248,8 @@ public func fetchItem(_ id: Int, _ completion: @escaping @Sendable (Result<Strin
     }
 }
 public func describeError(_ error: (any Error)?) -> String { error.map { "\($0)" } ?? "none" }
+
+// `some P` parameters: implicit generic parameters, instantiated the same way.
+public func shoutAll(_ value: some StringProtocol) -> String { value.uppercased() }
+public func describeValue(_ value: some CustomStringConvertible) -> String { value.description }
+public func greetOnce(_ greeting: some Greeting, _ other: String) -> String { greeting.greet(other) }

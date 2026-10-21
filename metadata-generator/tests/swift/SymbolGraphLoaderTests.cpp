@@ -203,6 +203,9 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "parseLater(_:)",
                                        "fetchItem(_:_:)",
                                        "describeError(_:)",
+                                       "shoutAll(_:)",
+                                       "describeValue(_:)",
+                                       "greetOnce(_:_:)",
                                        "describe(_:)",
                                        "makeLabel(_:)",
                                        "tags(_:)",
@@ -217,6 +220,7 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "inset(_:by:)",
                                        "fitting(_:)",
                                        "latitudeSpan(_:_:)",
+                                       "tagOf(_:)",
                                        "Money",
                                        "Wallet",
                                        "Coin",
@@ -607,6 +611,14 @@ TEST(GenericFunctionInstantiations) {
   // The arguments of the unit's Box and Pair instantiations.
   CHECK(standIns("unbox(_:)").size() == 2);
   CHECK(standIns("firstOf(_:)").size() == 4);
+  // `some P` parameters.
+  CHECK(standIns("shoutAll(_:)") == List({"some StringProtocol=String"}));
+  CHECK(standIns("describeValue(_:)") ==
+        List({"some CustomStringConvertible=Bool",
+              "some CustomStringConvertible=Double",
+              "some CustomStringConvertible=String"}));
+  CHECK(standIns("greetOnce(_:_:)") == List({"some Greeting=any Greeting"}));
+  CHECK(standIns("tagOf(_:)") == List({"some UIView=UIView"}));
   CHECK(standIns("decodeJSON(_:from:)").empty());
   CHECK(standIns("firstElement(_:)").empty());
   // 3 x 3 combinations.

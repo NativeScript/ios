@@ -1043,6 +1043,58 @@ std::vector<TypeNode> familyArguments(const Module& module,
   return result;
 }
 
+// The constraint `some P` (a parameter's implicit generic parameter) puts
+// on its stand-ins: conformance to a protocol, or a superclass.
+std::optional<GenericConstraint> opaqueConstraint(const Module& module,
+                                                  const TypeNode& node) {
+  if (node.children.size() != 1 ||
+      node.children[0].kind != TypeNode::Kind::Nominal ||
+      !node.children[0].components.back().arguments.empty()) {
+    return std::nullopt;
+  }
+  const TypeNode& bound = node.children[0];
+  llvm::StringRef usr(bound.usr());
+  GenericConstraint constraint;
+  constraint.lhs = "some " + spelling(bound);
+  constraint.rhs = spelling(bound);
+  constraint.rhsPrecise = usr.str();
+  // `some` bounds a protocol or a class; standard library protocols' USRs
+  // are substitutions ("s:Sy") rather than names ending in P.
+  const Symbol* symbol = module.find(constraint.rhsPrecise);
+  if ((symbol && symbol->kind == SymbolKind::Class) ||
+      usr.startswith("c:objc(cs)")) {
+    constraint.kind = "superclass";
+  } else if (usr.startswith("s:")) {
+    constraint.kind = "conformance";
+  } else {
+    return std::nullopt;
+  }
+  return constraint;
+}
+
+// A declaration's spelling of a stand-in: a nominal, or a protocol's
+// existential.
+TypeRef typeRefOf(const TypeNode& node) {
+  TypeRef ref;
+  ref.spelling = spelling(node);
+  const TypeNode* nominal = &node;
+  if (node.kind == TypeNode::Kind::Existential) {
+    ref.fragments.push_back(Fragment{"keyword", "any", ""});
+    ref.fragments.push_back(Fragment{"text", " ", ""});
+    nominal = &node.children[0];
+  }
+  for (size_t i = 0; i < nominal->components.size(); i++) {
+    if (i > 0) {
+      ref.fragments.push_back(Fragment{"text", ".", ""});
+    }
+    const auto& component = nominal->components[i];
+    ref.fragments.push_back(Fragment{
+        "typeIdentifier", component.name,
+        i + 1 == nominal->components.size() ? component.usr : std::string()});
+  }
+  return ref;
+}
+
 bool isGenericFunctionKind(SymbolKind kind) {
   return kind == SymbolKind::Function || kind == SymbolKind::InstanceMethod ||
          kind == SymbolKind::TypeMethod || kind == SymbolKind::Initializer;
@@ -1058,8 +1110,13 @@ void instantiateGenericFunctions(Module& module) {
   constexpr size_t kMaxFamilyInstantiations = 16;
   std::vector<std::string> ids;
   for (const auto& entry : module.symbols) {
+    bool opaque = std::any_of(
+        entry.second.parameters.begin(), entry.second.parameters.end(),
+        [](const Parameter& p) {
+          return llvm::StringRef(p.type.spelling).startswith("some ");
+        });
     if (isGenericFunctionKind(entry.second.kind) &&
-        !entry.second.genericParameters.empty()) {
+        (!entry.second.genericParameters.empty() || opaque)) {
       ids.push_back(entry.first);
     }
   }
@@ -1106,9 +1163,38 @@ void instantiateGenericFunctions(Module& module) {
     }
 
     std::vector<std::vector<TypeNode>> options;
+    // Per option: the generic parameter it substitutes, and for a `some P`
+    // parameter (an implicit generic parameter) the parameter it retypes.
+    std::vector<std::pair<std::string, int>> targets;
     size_t combinations = 1;
     bool fromFamilies = false;
+    for (size_t i = 0; i < source.parameters.size(); i++) {
+      const TypeNode& node = types[i];
+      if (node.kind != TypeNode::Kind::Opaque) {
+        continue;
+      }
+      std::vector<TypeNode> candidates;
+      if (const auto constraint = opaqueConstraint(module, node);
+          constraint && source.parameters[i].modifier.empty()) {
+        candidates = standIns(module, constraint->lhs, {*constraint});
+      }
+      if (candidates.empty()) {
+        combinations = 0;
+        break;
+      }
+      combinations *= candidates.size();
+      options.push_back(std::move(candidates));
+      targets.emplace_back(source.parameters[i].type.spelling,
+                           static_cast<int>(i));
+    }
     for (const auto& parameter : source.genericParameters) {
+      if (combinations == 0) {
+        break;
+      }
+      if (llvm::StringRef(parameter.name).startswith("some ")) {
+        // An implicit generic parameter, handled above.
+        continue;
+      }
       ParameterUse use;
       for (size_t i = 0; i < types.size(); i++) {
         collectUse(types[i], parameter.name, isArgument[i], false, false, use);
@@ -1131,6 +1217,7 @@ void instantiateGenericFunctions(Module& module) {
       }
       combinations *= candidates.size();
       options.push_back(std::move(candidates));
+      targets.emplace_back(parameter.name, -1);
     }
     if (combinations == 0 ||
         combinations >
@@ -1149,8 +1236,12 @@ void instantiateGenericFunctions(Module& module) {
       for (size_t i = 0; i < options.size(); i++) {
         const TypeNode& argument = options[i][rest % options[i].size()];
         rest /= options[i].size();
-        copy.substitutions.emplace_back(source.genericParameters[i].name,
-                                        argument);
+        // A `some P` parameter's entry only marks the copy an
+        // instantiation: its type is rewritten instead.
+        copy.substitutions.emplace_back(targets[i].first, argument);
+        if (targets[i].second >= 0) {
+          copy.parameters[targets[i].second].type = typeRefOf(argument);
+        }
         key += (i > 0 ? "," : "") + typeKey(argument);
       }
       copy.preciseId = source.preciseId + "@<" + key + ">";

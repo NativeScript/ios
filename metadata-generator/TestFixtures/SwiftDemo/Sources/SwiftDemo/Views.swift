@@ -60,3 +60,4 @@ public func fitting(_ size: CGSize?) -> CGSize? { size.map { CGSize(width: $0.wi
 public func latitudeSpan(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> Double {
     abs(a.latitude - b.latitude)
 }
+public func tagOf(_ view: some UIView) -> Int { view.tag }

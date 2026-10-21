@@ -1033,6 +1033,18 @@ describe("ns:swift", function () {
             expect(SwiftDemo.firstOf(new Kit.Pair(2, "two"))).toBe(2);
         });
 
+        it("instantiates `some P` parameters", function () {
+            expect(SwiftDemo.shoutAll("abc")).toBe("ABC");
+            expect(SwiftDemo.describeValue(true)).toBe("true");
+            expect(SwiftDemo.describeValue(2.5)).toBe("2.5");
+            expect(SwiftDemo.describeValue("x")).toBe("x");
+            expect(SwiftDemo.greetOnce(SwiftDemo.makeGreeting("swift"), "ada"))
+                .toBe("Good day, ada, from swift");
+            var label = UILabel.new();
+            label.tag = 4;
+            expect(SwiftDemo.tagOf(label)).toBe(4);
+        });
+
         it("leaves functions without known stand-ins out", function () {
             expect(SwiftDemo.decodeJSON).toBeUndefined();
             expect(SwiftDemo.firstElement).toBeUndefined();

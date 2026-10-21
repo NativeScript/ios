@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 1217,
+      "total": 1221,
       "objc-direct": 3,
-      "swift-generated": 317,
+      "swift-generated": 321,
       "swift-specialized": 371,
       "type-only": 5,
       "unsupported": 521,
       "not-applicable": 0
     },
     "callable": {
-      "total": 1167,
+      "total": 1171,
       "objc-direct": 1,
-      "swift-generated": 276,
+      "swift-generated": 280,
       "swift-specialized": 368,
       "type-only": 2,
       "unsupported": 520,
       "not-applicable": 0
     },
-    "effectiveCallable": 277,
+    "effectiveCallable": 281,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -62,9 +62,9 @@
       "not-applicable": 0
     },
     "function": {
-      "total": 103,
+      "total": 107,
       "objc-direct": 0,
-      "swift-generated": 100,
+      "swift-generated": 104,
       "swift-specialized": 3,
       "type-only": 0,
       "unsupported": 0,
@@ -9283,6 +9283,37 @@
       "location": "file://Sources/SwiftDemo/Values.swift:250"
     },
     {
+      "id": "s:9SwiftDemo13describeValueySSxs23CustomStringConvertibleRzlF",
+      "path": "describeValue(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Values.swift:254"
+    },
+    {
+      "id": "s:9SwiftDemo13describeValueySSxs23CustomStringConvertibleRzlF@<s:SS>",
+      "path": "describeValue(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "describeValue",
+      "location": "file://Sources/SwiftDemo/Values.swift:254"
+    },
+    {
+      "id": "s:9SwiftDemo13describeValueySSxs23CustomStringConvertibleRzlF@<s:Sb>",
+      "path": "describeValue(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "describeValue",
+      "location": "file://Sources/SwiftDemo/Values.swift:254"
+    },
+    {
+      "id": "s:9SwiftDemo13describeValueySSxs23CustomStringConvertibleRzlF@<s:Sd>",
+      "path": "describeValue(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "describeValue",
+      "location": "file://Sources/SwiftDemo/Values.swift:254"
+    },
+    {
       "id": "s:9SwiftDemo13globalCounterSivp",
       "path": "globalCounter",
       "kind": "variable",
@@ -9930,6 +9961,21 @@
       "tier": "swift-generated",
       "jsName": "spans",
       "location": "file://Sources/SwiftDemo/Values.swift:224"
+    },
+    {
+      "id": "s:9SwiftDemo5tagOfySixSo6UIViewCRbzlF",
+      "path": "tagOf(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Views.swift:63"
+    },
+    {
+      "id": "s:9SwiftDemo5tagOfySixSo6UIViewCRbzlF@<c:objc(cs)UIView>",
+      "path": "tagOf(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "tagOf",
+      "location": "file://Sources/SwiftDemo/Views.swift:63"
     },
     {
       "id": "s:9SwiftDemo5totalySdSaySdGF",
@@ -11069,6 +11115,21 @@
       "location": "file://Sources/SwiftDemo/Protocols.swift:43"
     },
     {
+      "id": "s:9SwiftDemo8shoutAllySSxSyRzlF",
+      "path": "shoutAll(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Values.swift:253"
+    },
+    {
+      "id": "s:9SwiftDemo8shoutAllySSxSyRzlF@<s:SS>",
+      "path": "shoutAll(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "shoutAll",
+      "location": "file://Sources/SwiftDemo/Values.swift:253"
+    },
+    {
       "id": "s:9SwiftDemo8simplifyyAA7FormulaOADF",
       "path": "simplify(_:)",
       "kind": "function",
@@ -11115,6 +11176,21 @@
       "tier": "swift-generated",
       "jsName": "fetchItem",
       "location": "file://Sources/SwiftDemo/Values.swift:245"
+    },
+    {
+      "id": "s:9SwiftDemo9greetOnceySSx_SStAA8GreetingRzlF",
+      "path": "greetOnce(_:_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Values.swift:255"
+    },
+    {
+      "id": "s:9SwiftDemo9greetOnceySSx_SStAA8GreetingRzlF@<any Greeting>",
+      "path": "greetOnce(_:_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "greetOnce",
+      "location": "file://Sources/SwiftDemo/Values.swift:255"
     },
     {
       "id": "s:9SwiftDemo9introduce_2toSSAA8Greeting_p_SStF",
