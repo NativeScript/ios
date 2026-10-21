@@ -17,6 +17,47 @@ point.x;                             // 2
 Flavor.vanilla;                      // "vanilla"
 ```
 
+## Quick start in an app
+
+1. Write Swift in `App_Resources/iOS/src` (or add a SwiftPM package through
+   `ios.SPMPackages` in `nativescript.config.ts`):
+
+   ```swift
+   public struct Forecast {
+       public let city: String
+       public let highs: [Double]
+   }
+
+   public final class WeatherClient {
+       public init() {}
+       public func forecast(for city: String) async throws -> Forecast {
+           Forecast(city: city, highs: [21, 23.5, 19])
+       }
+   }
+   ```
+
+2. List the module in `App_Resources/iOS/build.xcconfig` (the app's own module
+   is `$(PRODUCT_MODULE_NAME)`; add SDK modules and packages by name), and
+   optionally where TypeScript declarations go:
+
+   ```
+   NS_SWIFT_MODULES = $(PRODUCT_MODULE_NAME)
+   NS_TYPESCRIPT_DECLARATIONS_PATH = $(SRCROOT)/typescript-declarations
+   ```
+
+3. Call it from JavaScript or TypeScript (the app module's name is the app's
+   product module, `nstsrs` for an app called nstsrs):
+
+   ```ts
+   import { WeatherClient } from "ns:swift/nstsrs";
+
+   const forecast = await new WeatherClient().forecast("Lisbon");
+   forecast.highs; // [21, 23.5, 19]
+   ```
+
+`ns build ios` generates, verifies, compiles and links the thunks; there is
+nothing else to configure.
+
 ## How it fits together
 
 1. **Symbol graphs.** Compile the Swift module with `-emit-symbol-graph` (or run
@@ -501,6 +542,52 @@ Xcode 27.1 (lower is better):
 - A Debug build (unoptimized thunks) is slower on both paths; there Swift's
   scalar calls are about 1.2x Objective-C's while the collection, batch and
   async cases keep most of their lead.
+
+## Recipes
+
+- **A SwiftUI view in a NativeScript layout.** `hostingController()` on any
+  bridged `View` struct returns a `UIHostingController`; add its `view` to a
+  NativeScript container (for example a `ContentView`'s `nativeView`, or a
+  custom `View` subclass whose `createNativeView()` returns it):
+
+  ```ts
+  const controller = new Badge("Inbox", 3).hostingController();
+  const native = controller.view; // a UIView, sized by SwiftUI
+  ```
+
+- **A delegate implemented in JavaScript.** Declare a class-bound protocol in
+  Swift and pass a plain JS object; keep it referenced from JS when Swift
+  holds it `weak`:
+
+  ```swift
+  public protocol UploadDelegate: AnyObject { func progress(_ fraction: Double) }
+  public final class Uploader { public weak var delegate: (any UploadDelegate)? ... }
+  ```
+  ```ts
+  this.delegate = { progress: (f: number) => (this.percent = f * 100) };
+  uploader.delegate = this.delegate;
+  ```
+
+- **A cancellable request.** An `async` Swift function takes an `AbortSignal`
+  after its arguments; aborting cancels the Swift task:
+
+  ```ts
+  const controller = new AbortController();
+  const items = client.search("swift", controller.signal);
+  controller.abort(); // items rejects; Swift's Task.sleep / URLSession throw CancellationError
+  ```
+
+- **Streams.** Return `AsyncStream<T>`, a type conforming to `AsyncSequence`,
+  or a Combine `AnyPublisher<T, E>`, and iterate it with `for await`;
+  `break` ends the Swift stream.
+
+- **JSON-like payloads.** `[String: Any]` takes and returns plain JS objects;
+  give Swift a typed struct where the shape is known, and TypeScript types it
+  precisely.
+
+- **Swift-only API on a UIKit subclass.** A `UIView` or `UIViewController`
+  subclass keeps its NativeScript class (`MyView.new()`), and its Swift-only
+  methods are added to it once `ns:swift/<Module>` is loaded.
 
 ## Coverage and verification
 
