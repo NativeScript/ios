@@ -137,6 +137,9 @@
     "s:9SwiftDemo10decodeJSON_4fromxSgxm_SStSeRzlF",
     "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF",
     "s:9SwiftDemo6joinedySSx_q_tr0_lF",
+    "s:9SwiftDemo7compactySaySiGSaySiSgGF",
+    "s:9SwiftDemo5holesySaySSSgGSiF",
+    "s:9SwiftDemo11knownScoresySDySSSiSgGADF",
     "s:9SwiftDemo8describeySSSo6UIViewCF",
     "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
     "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
@@ -66309,6 +66312,35 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo11knownScoresySDySSSiSgGADF",
+      "kind": "function",
+      "path": "knownScores(_:)",
+      "name": "knownScores(_:)",
+      "access": "public",
+      "declaration": "func knownScores(_ scores: [String : Int?]) -> [String : Int?]",
+      "parameters": [
+        {
+          "internalName": "scores",
+          "type": {
+            "spelling": "[String : Int?]",
+            "references": [
+              "s:SS",
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[String : Int?]",
+        "references": [
+          "s:SS",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:217:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo11sortedNames_2bySaySSGAD_SbSS_SStXEtF",
       "kind": "function",
       "path": "sortedNames(_:by:)",
@@ -69057,6 +69089,33 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo5holesySaySSSgGSiF",
+      "kind": "function",
+      "path": "holes(_:)",
+      "name": "holes(_:)",
+      "access": "public",
+      "declaration": "func holes(_ count: Int) -> [String?]",
+      "parameters": [
+        {
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[String?]",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:216:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo5namesySaySSGSiF",
       "kind": "function",
       "path": "names(_:)",
@@ -71344,6 +71403,33 @@
       "location": "file://Sources/SwiftDemo/Values.swift:16:35",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7TrackerC"
+    },
+    {
+      "id": "s:9SwiftDemo7compactySaySiGSaySiSgGF",
+      "kind": "function",
+      "path": "compact(_:)",
+      "name": "compact(_:)",
+      "access": "public",
+      "declaration": "func compact(_ values: [Int?]) -> [Int]",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "[Int?]",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[Int]",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:215:12",
+      "graph": "SwiftDemo.symbols.json"
     },
     {
       "id": "s:9SwiftDemo7countUp2toScSySiGSi_tF",

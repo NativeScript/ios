@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 1185,
+      "total": 1188,
       "objc-direct": 1,
-      "swift-generated": 284,
+      "swift-generated": 287,
       "swift-specialized": 371,
       "type-only": 5,
       "unsupported": 524,
       "not-applicable": 0
     },
     "callable": {
-      "total": 1137,
+      "total": 1140,
       "objc-direct": 0,
-      "swift-generated": 244,
+      "swift-generated": 247,
       "swift-specialized": 368,
       "type-only": 2,
       "unsupported": 523,
       "not-applicable": 0
     },
-    "effectiveCallable": 244,
+    "effectiveCallable": 247,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -62,9 +62,9 @@
       "not-applicable": 0
     },
     "function": {
-      "total": 83,
+      "total": 86,
       "objc-direct": 0,
-      "swift-generated": 80,
+      "swift-generated": 83,
       "swift-specialized": 3,
       "type-only": 0,
       "unsupported": 0,
@@ -9056,6 +9056,14 @@
       "location": "file://Sources/SwiftDemo/Values.swift:30"
     },
     {
+      "id": "s:9SwiftDemo11knownScoresySDySSSiSgGADF",
+      "path": "knownScores(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "knownScores",
+      "location": "file://Sources/SwiftDemo/Values.swift:218"
+    },
+    {
       "id": "s:9SwiftDemo11sortedNames_2bySaySSGAD_SbSS_SStXEtF",
       "path": "sortedNames(_:by:)",
       "kind": "function",
@@ -9738,6 +9746,14 @@
       "tier": "swift-generated",
       "jsName": "halve",
       "location": "file://Sources/SwiftDemo/Values.swift:168"
+    },
+    {
+      "id": "s:9SwiftDemo5holesySaySSSgGSiF",
+      "path": "holes(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "holes",
+      "location": "file://Sources/SwiftDemo/Values.swift:217"
     },
     {
       "id": "s:9SwiftDemo5namesySaySSGSiF",
@@ -10500,6 +10516,14 @@
       "tier": "swift-generated",
       "jsName": "liveCount",
       "location": "file://Sources/SwiftDemo/Values.swift:17"
+    },
+    {
+      "id": "s:9SwiftDemo7compactySaySiGSaySiSgGF",
+      "path": "compact(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "compact",
+      "location": "file://Sources/SwiftDemo/Values.swift:216"
     },
     {
       "id": "s:9SwiftDemo7countUp2toScSySiGSi_tF",

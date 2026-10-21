@@ -136,8 +136,7 @@ bool ParseCode(std::string text, ValueCode& code) {
     code.element.emplace_back();
     ValueCode& element = code.element.back();
     return ParseCode(text.substr(1, text.size() - 2), element) &&
-           element.kind != ValueCode::Kind::Void && element.kind != ValueCode::Kind::Function &&
-           !element.optional;
+           element.kind != ValueCode::Kind::Void && element.kind != ValueCode::Kind::Function;
   }
   if (text.front() == '(' && text.back() == ')') {
     code.kind = ValueCode::Kind::Function;

@@ -138,11 +138,22 @@ class Emitter {
         ValueExpression inner = valueExpression(element, "s", "j");
         std::string reader =
             type.bridge == Bridge::Array ? "__nsReadArray" : "__nsReadMap";
+        std::string elementType = valueTypeName(element);
+        std::string body = inner.code;
+        if (element.optional) {
+          // nil still means the element did not convert; .some(nil) is null.
+          elementType += "?";
+          body = "if s.isNull(j) { return .some(nil) }; " +
+                 std::string(inner.failable
+                                 ? "guard let v = " + inner.code +
+                                       " else { return nil }; return .some(v)"
+                                 : "return .some(" + inner.code + ")");
+        }
         // An explicit closure argument: trailing closures cannot appear in
         // guard conditions.
         return {reader + "(" + slots + ", " + index +
-                    ", { (s: __NSSlots, j: Int) -> " + valueTypeName(element) +
-                    "? in " + inner.code + " })",
+                    ", { (s: __NSSlots, j: Int) -> " + elementType + "? in " +
+                    body + " })",
                 true};
       }
       case Bridge::Closure: {
@@ -234,6 +245,10 @@ class Emitter {
            " }\n" + "    " + name + " = value\n" + "  }\n";
   }
 
+  std::string describeElement(const BridgedType& element) const {
+    return describe(element) + (element.optional ? " or null" : "");
+  }
+
   // How errors describe what a value must be.
   std::string describe(const BridgedType& type) const {
     switch (type.bridge) {
@@ -243,9 +258,10 @@ class Emitter {
       case Bridge::URL:
         return "a valid URL";
       case Bridge::Array:
-        return "an array of " + describe(type.elements.at(0));
+        return "an array of " + describeElement(type.elements.at(0));
       case Bridge::Dictionary:
-        return "an object whose values are " + describe(type.elements.at(0));
+        return "an object whose values are " +
+               describeElement(type.elements.at(0));
       case Bridge::ClassHandle:
       case Bridge::StructBox:
         return typeName(type.symbolId);
@@ -264,6 +280,15 @@ class Emitter {
       return typeName(type.symbolId);
     }
     return swiftTypeText(unwrappedNode(type), _module);
+  }
+
+  // Statements returning a collection's `element`, null when it is nil.
+  std::string returnElement(const BridgedType& element,
+                            const std::string& reporter) const {
+    std::string write = returnValue(element, reporter, "element");
+    return element.optional ? "if let element { " + write + " } else { " +
+                                  reporter + ".returnNull() }"
+                            : write;
   }
 
   // Statements returning `value` (a non-optional expression of `type`).
@@ -316,11 +341,11 @@ class Emitter {
         return reporter + ".returnBytes(" + value + ")";
       case Bridge::Array:
         return reporter + ".returnArray(" + value + ") { element in " +
-               returnValue(type.elements.at(0), reporter, "element") + " }";
+               returnElement(type.elements.at(0), reporter) + " }";
       case Bridge::Dictionary:
         return reporter + ".returnMap(" + value + ") { key, element in " +
                reporter + ".returnString(key); " +
-               returnValue(type.elements.at(0), reporter, "element") + " }";
+               returnElement(type.elements.at(0), reporter) + " }";
       case Bridge::Closure:
       case Bridge::TypeParameter:
       case Bridge::None:

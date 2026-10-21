@@ -314,6 +314,7 @@ declare module "ns:swift/SwiftDemo" {
   export function wordCounts(words: readonly (string)[]): Record<string, number>;
   export function checkedSide(side: number): number;
   export function delayedEcho(text: string, seconds: number): Promise<string>;
+  export function knownScores(scores: Readonly<Record<string, (number | bigint) | null | undefined>>): Record<string, number | null>;
   export function sortedNames(names: readonly (string)[], less: (arg0: string, arg1: string) => boolean): (string)[];
   export function firstSubview(view: UIView): UIView | null;
   export function makeGreeting(name: string): Greeting;
@@ -341,6 +342,7 @@ declare module "ns:swift/SwiftDemo" {
   export function boxed(money: import("ns:swift/SwiftDemoKit").Money): import("ns:swift/SwiftDemoKit").Box<import("ns:swift/SwiftDemoKit").Money>;
   export function clear(name: { value: (string) | null | undefined }): void;
   export function halve(value: { value: number | bigint }): void;
+  export function holes(count: number | bigint): (string | null)[];
   export function names(count: number | bigint): (string)[];
   export function pages(count: number | bigint): AsyncIterableIterator<(string)[]>;
   export function shout(name: (string) | null | undefined): string | null;
@@ -351,6 +353,7 @@ declare module "ns:swift/SwiftDemo" {
   export function excite(greeting: Greeting): void;
   export function lookup(key: string, resolve: (arg0: string) => (number | bigint) | null | undefined): number;
   export function settle(value: number | bigint): import("ns:swift/SwiftDemoKit").Outcome<number>;
+  export function compact(values: readonly ((number | bigint) | null | undefined)[]): (number)[];
   export function countUp(limit: number | bigint): AsyncIterableIterator<number>;
   export function echoInt(value: number | bigint): number;
   export function explain(error: ShapeError): string;

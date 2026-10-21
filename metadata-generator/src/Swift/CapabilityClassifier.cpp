@@ -652,15 +652,23 @@ class Classifier {
   }
 
   // Bridges a collection's element (value) type into `container.elements`.
-  std::string bridgeElement(const TypeNode& node,
-                            BridgedType& container) const {
+  // Arrays and dictionaries hold optional elements as nulls; an async
+  // sequence's nil ends it.
+  std::string bridgeElement(const TypeNode& node, BridgedType& container,
+                            bool allowOptional = true) const {
     BridgedType element;
     element.node = node;
+    const TypeNode* inner = &node;
     if (node.kind == TypeNode::Kind::Optional ||
         node.kind == TypeNode::Kind::ImplicitlyUnwrappedOptional) {
-      return "optional-element";
+      inner = &node.children[0];
+      if (!allowOptional || inner->kind == TypeNode::Kind::Optional ||
+          inner->kind == TypeNode::Kind::ImplicitlyUnwrappedOptional) {
+        return "optional-element";
+      }
+      element.optional = true;
     }
-    std::string reason = bridgeNonOptional(node, element);
+    std::string reason = bridgeNonOptional(*inner, element);
     if (reason.empty() && element.bridge == Bridge::Void) {
       reason = "unbridged-type:Void";
     }
@@ -781,7 +789,8 @@ class Classifier {
             inner->usr() == KnownTypes::kAsyncSequence &&
             !inner->components.back().arguments.empty()) {
           bridged.bridge = Bridge::AsyncSequence;
-          return bridgeElement(inner->components.back().arguments[0], bridged);
+          return bridgeElement(inner->components.back().arguments[0], bridged,
+                               false);
         }
         return "opaque-type";
       }
@@ -805,7 +814,7 @@ class Classifier {
          usr == KnownTypes::kAsyncThrowingStream) &&
         !node.components.back().arguments.empty()) {
       bridged.bridge = Bridge::AsyncSequence;
-      return bridgeElement(node.components.back().arguments[0], bridged);
+      return bridgeElement(node.components.back().arguments[0], bridged, false);
     }
     if (usr == KnownTypes::kDate) {
       bridged.bridge = Bridge::Date;

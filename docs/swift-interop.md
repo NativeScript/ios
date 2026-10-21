@@ -162,7 +162,7 @@ methods of generic types, and `some P` parameters, are not instantiated yet.
 | Objective-C class (`UIView`, an `NSObject` subclass) | NativeScript's ordinary Objective-C wrapper, with the identity Objective-C calls give it |
 
 Collections are copied in both directions; their elements follow the same
-table (optional elements are not supported yet), and dictionary keys must be
+table (an optional element is `null` when it is `nil`), and dictionary keys must be
 `String`.
 
 An enum with associated values keys each value by its label; a case's only,
@@ -393,11 +393,10 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 ## Not yet supported
 
-Async cancellation, Combine publishers,
-concrete `AsyncSequence` types, generic methods of generic types,
-`Result` and other standard library generics, protocols with associated
-types, tuples, sets, optional collection
-elements, subscripts and operators. Each appears in the coverage report with
+Async cancellation, Combine publishers, concrete `AsyncSequence` types,
+generic methods of generic types, `Result` and other standard library
+generics, protocols with associated types, tuples, sets, subscripts and
+operators. Each appears in the coverage report with
 its reason.
 
 ## Swift language mode

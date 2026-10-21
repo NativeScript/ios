@@ -211,3 +211,8 @@ public func decodeJSON<T: Decodable>(_ type: T.Type, from text: String) -> T? {
 }
 public func firstElement<C: Collection>(_ values: C) -> C.Element? { values.first }
 public func joined<A, B>(_ first: A, _ second: B) -> String { "\(first)/\(second)" }
+
+// Optional collection elements (JS nulls).
+public func compact(_ values: [Int?]) -> [Int] { values.compactMap { $0 } }
+public func holes(_ count: Int) -> [String?] { (0..<count).map { $0 % 2 == 0 ? "x" : nil } }
+public func knownScores(_ scores: [String: Int?]) -> [String: Int?] { scores.filter { $0.value != nil } }

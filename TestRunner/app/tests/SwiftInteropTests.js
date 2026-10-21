@@ -272,6 +272,13 @@ describe("ns:swift", function () {
     });
 
     describe("collections and Foundation values", function () {
+        it("passes optional elements as nulls", function () {
+            expect(SwiftDemo.compact([1, null, 3, undefined])).toEqual([1, 3]);
+            expect(SwiftDemo.holes(3)).toEqual(["x", null, "x"]);
+            expect(SwiftDemo.knownScores({ a: 1, b: null })).toEqual({ a: 1 });
+            expect(function () { SwiftDemo.compact([1, "two"]); }).toThrowError(TypeError);
+        });
+
         it("copies arrays both ways", function () {
             expect(SwiftDemo.names(3)).toEqual(["n0", "n1", "n2"]);
             expect(SwiftDemo.total([1, 2, 3.5])).toBe(6.5);
