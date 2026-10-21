@@ -74,3 +74,4 @@ enable_testing()
 add_subdirectory(tests)
 # copy build-step-metadata-generator.py to the bin folder
 configure_file(build-step-metadata-generator.py ${CMAKE_CURRENT_BINARY_DIR}/bin/build-step-metadata-generator.py COPYONLY)
+configure_file(build-step-swift-interop.py ${CMAKE_CURRENT_BINARY_DIR}/bin/build-step-swift-interop.py COPYONLY)

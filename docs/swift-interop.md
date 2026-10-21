@@ -46,6 +46,33 @@ the fixture sources together with the generated `Interop/` file, whose
 contents the generator tests keep identical to the generator's output. The
 fixture's `Package.swift` builds the same files as two SwiftPM modules.
 
+## In an app
+
+An app names the Swift modules JavaScript uses in
+`App_Resources/iOS/build.xcconfig`:
+
+```
+NS_SWIFT_MODULES = WeatherKit MyPackage $(PRODUCT_MODULE_NAME)
+```
+
+SDK modules, SwiftPM packages (`ios.SPMPackages`) and the app's own Swift
+module (from `App_Resources/iOS/src`) all work. At link time, `internal/nsld.sh`
+runs `build-step-swift-interop.py` for each architecture, next to the
+Objective-C metadata step:
+
+1. `swift-symbolgraph-extract` reads every listed module from the build
+   products and the SDK.
+2. The generator writes them as one unit (`NS_SWIFT_UNIT`, by default
+   `<product module>Swift`), verified by the Swift compiler unless
+   `NS_SWIFT_VERIFY = NO`. With `NS_TYPESCRIPT_DECLARATIONS_PATH` set, the
+   declarations go to its `swift` folder.
+3. `swiftc` compiles the thunks to an object, which is linked into the app
+   with `-u` for every register symbol.
+
+The step's logs and outputs are in `$(CONFIGURATION_BUILD_DIR)/NSSwiftInterop-<arch>`.
+Verification and compilation add build time (WeatherKit: about 19 s per
+architecture in a Release build).
+
 ## Generation units
 
 Modules generated together form a unit: `--swift-unit <Name>` with one

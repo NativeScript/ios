@@ -67,6 +67,19 @@ printf "Generating metadata..."
 GEN_METADATA $TARGET_ARCH
 DELETE_SWIFT_MODULES_DIR
 
+# ns:swift: thunks for the Swift modules NS_SWIFT_MODULES names (see
+# build-step-swift-interop.py), linked into the app.
+SWIFT_INTEROP_ARGS=()
+if [[ -n "$NS_SWIFT_MODULES" ]]; then
+    printf "Generating Swift interop..."
+    pushd "$SRCROOT/internal/metadata-generator-$(uname -m)/bin"
+    ./build-step-swift-interop.py $TARGET_ARCH
+    popd
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && SWIFT_INTEROP_ARGS+=("$line")
+    done < "$CONFIGURATION_BUILD_DIR/NSSwiftInterop-$TARGET_ARCH/link-arguments.txt"
+fi
+
 function resolve_clang() {
     # 1) If NS_LD is set and executable, honor it.
     if [[ -n "$NS_LD" && -x "$NS_LD" ]]; then
@@ -119,4 +132,4 @@ fi
 
 # For visibility downstream, set NS_LD to the resolved path and invoke.
 NS_LD="$CLANG_PATH"
-"$NS_LD" "$@"
+"$NS_LD" "$@" "${SWIFT_INTEROP_ARGS[@]}"
