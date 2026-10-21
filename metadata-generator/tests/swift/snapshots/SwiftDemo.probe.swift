@@ -1974,168 +1974,178 @@ func __nsProbe401(_ a0: Int) {
   let _: Int = SwiftDemo.Benchmark.`echoInt`(a0)
 }
 
+// s:9SwiftDemo9BenchmarkC8checksumySi10Foundation4DataVFZ
+func __nsProbe402(_ a0: Data) {
+  let _: Int = SwiftDemo.Benchmark.`checksum`(a0)
+}
+
+// s:9SwiftDemo9BenchmarkC8makeDatay10Foundation0E0VSiFZ
+func __nsProbe403(_ a0: Int) {
+  let _: Data = SwiftDemo.Benchmark.`makeData`(a0)
+}
+
 // s:9SwiftDemo9BenchmarkC8midpointySo7CGPointVAF_AFtFZ
-func __nsProbe402(_ a0: CGPoint, _ a1: CGPoint) {
+func __nsProbe404(_ a0: CGPoint, _ a1: CGPoint) {
   let _: CGPoint = SwiftDemo.Benchmark.`midpoint`(a0, a1)
 }
 
 // s:9SwiftDemo9BenchmarkC9echoLateryS2iYaFZ
-func __nsProbe403(_ a0: Int) async {
+func __nsProbe405(_ a0: Int) async {
   let _: Int = await SwiftDemo.Benchmark.`echoLater`(a0)
 }
 
 // s:9SwiftDemo9BenchmarkC9incrementSiyF
-func __nsProbe404(_ receiver: SwiftDemo.Benchmark) {
+func __nsProbe406(_ receiver: SwiftDemo.Benchmark) {
   let _: Int = receiver.`increment`()
 }
 
 // s:9SwiftDemo9BenchmarkC9makeArrayySaySiGSiFZ
-func __nsProbe405(_ a0: Int) {
+func __nsProbe407(_ a0: Int) {
   let _: [Int] = SwiftDemo.Benchmark.`makeArray`(a0)
 }
 
 // s:9SwiftDemo9BenchmarkC9sumValuesySiSDySSSiGFZ
-func __nsProbe406(_ a0: [String: Int]) {
+func __nsProbe408(_ a0: [String: Int]) {
   let _: Int = SwiftDemo.Benchmark.`sumValues`(a0)
 }
 
 // s:9SwiftDemo9BenchmarkCACycfc
-func __nsProbe407() {
+func __nsProbe409() {
   let _: SwiftDemo.Benchmark = SwiftDemo.Benchmark()
 }
 
 // s:9SwiftDemo9CancelLogC
-func __nsProbe408(_ value: SwiftDemo.CancelLog) -> SwiftDemo.CancelLog { value }
+func __nsProbe410(_ value: SwiftDemo.CancelLog) -> SwiftDemo.CancelLog { value }
 
 // s:9SwiftDemo9CancelLogC13cancellationsSivpZ
-func __nsProbe409(_ newValue: Int) {
+func __nsProbe411(_ newValue: Int) {
   let _: Int = SwiftDemo.CancelLog.`cancellations`
   SwiftDemo.CancelLog.`cancellations` = newValue
 }
 
 // s:9SwiftDemo9CountdownV
-func __nsProbe410(_ value: SwiftDemo.Countdown) -> SwiftDemo.Countdown { value }
+func __nsProbe412(_ value: SwiftDemo.Countdown) -> SwiftDemo.Countdown { value }
 
 // s:9SwiftDemo9CountdownV13AsyncIteratorV
-func __nsProbe411(_ value: SwiftDemo.Countdown.AsyncIterator) -> SwiftDemo.Countdown.AsyncIterator { value }
+func __nsProbe413(_ value: SwiftDemo.Countdown.AsyncIterator) -> SwiftDemo.Countdown.AsyncIterator { value }
 
 // s:9SwiftDemo9CountdownV13AsyncIteratorV4nextSiSgyYaF
-func __nsProbe412(_ receiver: inout SwiftDemo.Countdown.AsyncIterator) async {
+func __nsProbe414(_ receiver: inout SwiftDemo.Countdown.AsyncIterator) async {
   let _: Int? = await receiver.`next`()
 }
 
 // s:9SwiftDemo9CountdownV17makeAsyncIteratorAC0eF0VyF
-func __nsProbe413(_ receiver: SwiftDemo.Countdown) {
+func __nsProbe415(_ receiver: SwiftDemo.Countdown) {
   let _: SwiftDemo.Countdown.AsyncIterator = receiver.`makeAsyncIterator`()
 }
 
 // s:9SwiftDemo9CountdownV4fromACSi_tcfc
-func __nsProbe414(_ a0: Int) {
+func __nsProbe416(_ a0: Int) {
   let _: SwiftDemo.Countdown = SwiftDemo.Countdown(from: a0)
 }
 
 // s:9SwiftDemo9CountdownV5labelSSvp
-func __nsProbe415(_ receiver: SwiftDemo.Countdown) {
+func __nsProbe417(_ receiver: SwiftDemo.Countdown) {
   let _: String = receiver.`label`
 }
 
 // s:9SwiftDemo9CountdownV5startSivp
-func __nsProbe416(_ receiver: SwiftDemo.Countdown) {
+func __nsProbe418(_ receiver: SwiftDemo.Countdown) {
   let _: Int = receiver.`start`
 }
 
 // s:9SwiftDemo9StreamLogC
-func __nsProbe417(_ value: SwiftDemo.StreamLog) -> SwiftDemo.StreamLog { value }
+func __nsProbe419(_ value: SwiftDemo.StreamLog) -> SwiftDemo.StreamLog { value }
 
 // s:9SwiftDemo9StreamLogC12terminationsSivpZ
-func __nsProbe418(_ newValue: Int) {
+func __nsProbe420(_ newValue: Int) {
   let _: Int = SwiftDemo.StreamLog.`terminations`
   SwiftDemo.StreamLog.`terminations` = newValue
 }
 
 // s:9SwiftDemo9countDown4from9failingAtScsySis5Error_pGSi_SiSgtF
-func __nsProbe419(_ a0: Int, _ a1: Int?) {
+func __nsProbe421(_ a0: Int, _ a1: Int?) {
   let _: AsyncThrowingStream<Int, any Error> = SwiftDemo.`countDown`(from: a0, failingAt: a1)
 }
 
 // s:9SwiftDemo9countdown4from_ySi_ySi_SbtXEtF
-func __nsProbe420(_ a0: Int, _ a1: (Int, Bool) -> Void) {
+func __nsProbe422(_ a0: Int, _ a1: (Int, Bool) -> Void) {
   let _: Void = SwiftDemo.`countdown`(from: a0, a1)
 }
 
 // s:9SwiftDemo9fetchItemyySi_ys6ResultOySSs5Error_pGYbctF
-func __nsProbe421(_ a0: Int, _ a1: @escaping @Sendable (Result<String, any Error>) -> Void) {
+func __nsProbe423(_ a0: Int, _ a1: @escaping @Sendable (Result<String, any Error>) -> Void) {
   let _: Void = SwiftDemo.`fetchItem`(a0, a1)
 }
 
 // s:9SwiftDemo9greetOnceySSx_SStAA8GreetingRzlF@<any Greeting>
-func __nsProbe422(_ a0: any SwiftDemo.Greeting, _ a1: String) {
+func __nsProbe424(_ a0: any SwiftDemo.Greeting, _ a1: String) {
   let _: String = SwiftDemo.`greetOnce`(a0, a1)
 }
 
 // s:9SwiftDemo9introduce_2toSSAA8Greeting_p_SStF
-func __nsProbe423(_ a0: any SwiftDemo.Greeting, _ a1: String) {
+func __nsProbe425(_ a0: any SwiftDemo.Greeting, _ a1: String) {
   let _: String = SwiftDemo.`introduce`(a0, to: a1)
 }
 
 // s:9SwiftDemo9makeLabelySo7UILabelCSSF
 @MainActor
-func __nsProbe424(_ a0: String) {
+func __nsProbe426(_ a0: String) {
   let _: UILabel = SwiftDemo.`makeLabel`(a0)
 }
 
 // s:9SwiftDemo9makeScorey0aB3Kit4PairVySSSiGSS_SitF
-func __nsProbe425(_ a0: String, _ a1: Int) {
+func __nsProbe427(_ a0: String, _ a1: Int) {
   let _: Score = SwiftDemo.`makeScore`(a0, a1)
 }
 
 // s:9SwiftDemo9noteLateryAA4NoteCSSYaF
-func __nsProbe426(_ a0: String) async {
+func __nsProbe428(_ a0: String) async {
   let _: SwiftDemo.Note = await SwiftDemo.`noteLater`(a0)
 }
 
 // s:9SwiftDemo9onMeasureyyyAA11MeasurementOXEF
-func __nsProbe427(_ a0: (SwiftDemo.Measurement) -> Void) {
+func __nsProbe429(_ a0: (SwiftDemo.Measurement) -> Void) {
   let _: Void = SwiftDemo.`onMeasure`(a0)
 }
 
 // s:9SwiftDemo9transformySaySSGSaySiG_SSSiXEtF
-func __nsProbe428(_ a0: [Int], _ a1: (Int) -> String) {
+func __nsProbe430(_ a0: [Int], _ a1: (Int) -> String) {
   let _: [String] = SwiftDemo.`transform`(a0, a1)
 }
 
 // s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo13PrecipitationO
-func __nsProbe429(_ receiver: SwiftDemo.Precipitation) {
+func __nsProbe431(_ receiver: SwiftDemo.Precipitation) {
   let _: Int = receiver.`hashValue`
 }
 
 // s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo6FlavorO
-func __nsProbe430(_ receiver: SwiftDemo.Flavor) {
+func __nsProbe432(_ receiver: SwiftDemo.Flavor) {
   let _: Int = receiver.`hashValue`
 }
 
 // s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo7PolygonC5StyleO
-func __nsProbe431(_ receiver: SwiftDemo.Polygon.Style) {
+func __nsProbe433(_ receiver: SwiftDemo.Polygon.Style) {
   let _: Int = receiver.`hashValue`
 }
 
 // s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo10ShapeErrorO
-func __nsProbe432(_ receiver: SwiftDemo.ShapeError) {
+func __nsProbe434(_ receiver: SwiftDemo.ShapeError) {
   let _: String = receiver.`localizedDescription`
 }
 
 // s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo12ParseFailureV
-func __nsProbe433(_ receiver: SwiftDemo.ParseFailure) {
+func __nsProbe435(_ receiver: SwiftDemo.ParseFailure) {
   let _: String = receiver.`localizedDescription`
 }
 
 // s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo14CountdownErrorV
-func __nsProbe434(_ receiver: SwiftDemo.CountdownError) {
+func __nsProbe436(_ receiver: SwiftDemo.CountdownError) {
   let _: String = receiver.`localizedDescription`
 }
 
 // s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo16BenchmarkFailureV
-func __nsProbe435(_ receiver: SwiftDemo.BenchmarkFailure) {
+func __nsProbe437(_ receiver: SwiftDemo.BenchmarkFailure) {
   let _: String = receiver.`localizedDescription`
 }
 

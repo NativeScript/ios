@@ -29,6 +29,8 @@
 + (NSInteger)sumValues:(NSDictionary<NSString*, NSNumber*>*)values;
 + (NSDictionary<NSString*, NSNumber*>*)makeDictionary:(NSInteger)count;
 + (CGPoint)midpointOf:(CGPoint)a with:(CGPoint)b;
++ (NSData*)makeData:(NSInteger)length;
++ (NSInteger)checksum:(NSData*)data;
 + (NSInteger)callBlock:(NSInteger (^)(NSInteger))block times:(NSInteger)count;
 + (NSInteger)callDelegate:(id<TNSBenchmarkDelegate>)delegate times:(NSInteger)count;
 + (void)echoLater:(NSInteger)value completion:(void (^)(NSInteger))completion;

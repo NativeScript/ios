@@ -132,6 +132,22 @@ describe("ns:swift benchmarks", function () {
                 }
                 return total;
             });
+        var megabyte = new Uint8Array(1024 * 1024);
+        for (var b = 0; b < megabyte.length; b++) {
+            megabyte[b] = b & 255;
+        }
+        compare("data: 1 MB in", 50,
+            function () { return TNSBenchmark.checksum(megabyte.buffer); },
+            function () { return Benchmark.checksum(megabyte); });
+        compare("data: 1 MB out as bytes", 50,
+            function () {
+                var bytes = new Uint8Array(interop.bufferFromData(TNSBenchmark.makeData(1024 * 1024)));
+                return bytes.length + bytes[0] + bytes[bytes.length - 1];
+            },
+            function () {
+                var bytes = Benchmark.makeData(1024 * 1024);
+                return bytes.length + bytes[0] + bytes[bytes.length - 1];
+            });
         compare("struct: CGPoint in and out", 10000,
             function () {
                 var point = TNSBenchmark.midpointOfWith({ x: 0, y: 0 }, { x: 4, y: 2 });

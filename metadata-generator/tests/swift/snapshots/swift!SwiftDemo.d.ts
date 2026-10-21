@@ -441,6 +441,8 @@ declare module "ns:swift/SwiftDemo" {
     static combine(a: number, b: number, c: number): number;
     counter: number;
     static echoInt(value: number | bigint): number;
+    static checksum(data: ArrayBuffer | ArrayBufferView): number;
+    static makeData(length: number | bigint): Uint8Array;
     static midpoint(a: { readonly x: number; readonly y: number }, b: { readonly x: number; readonly y: number }): { x: number; y: number };
     static echoLater(value: number | bigint, signal?: AbortSignal): Promise<number>;
     increment(): number;

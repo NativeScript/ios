@@ -50,6 +50,16 @@ public final class Benchmark {
     public static func midpointOf(_ a: BenchmarkPoint, _ b: BenchmarkPoint) -> BenchmarkPoint {
         BenchmarkPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
     }
+    public static func makeData(_ length: Int) -> Data {
+        var data = Data(count: length)
+        data.withUnsafeMutableBytes { (buffer: UnsafeMutableRawBufferPointer) in
+            for i in 0..<length { buffer[i] = UInt8(truncatingIfNeeded: i) }
+        }
+        return data
+    }
+    public static func checksum(_ data: Data) -> Int {
+        data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in buffer.reduce(0) { $0 + Int($1) } }
+    }
     public static func callClosure(_ body: (Int) -> Int, times count: Int) -> Int {
         var total = 0
         for i in 0..<count { total += body(i) }

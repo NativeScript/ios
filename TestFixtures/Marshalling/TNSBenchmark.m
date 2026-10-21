@@ -69,6 +69,24 @@
   return CGPointMake((a.x + b.x) / 2, (a.y + b.y) / 2);
 }
 
++ (NSData*)makeData:(NSInteger)length {
+  NSMutableData* data = [NSMutableData dataWithLength:length];
+  uint8_t* bytes = data.mutableBytes;
+  for (NSInteger i = 0; i < length; i++) {
+    bytes[i] = (uint8_t)i;
+  }
+  return data;
+}
+
++ (NSInteger)checksum:(NSData*)data {
+  const uint8_t* bytes = data.bytes;
+  NSInteger total = 0;
+  for (NSUInteger i = 0; i < data.length; i++) {
+    total += bytes[i];
+  }
+  return total;
+}
+
 + (NSInteger)callBlock:(NSInteger (^)(NSInteger))block times:(NSInteger)count {
   NSInteger total = 0;
   for (NSInteger i = 0; i < count; i++) {

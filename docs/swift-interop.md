@@ -504,26 +504,28 @@ Xcode 27.1 (lower is better):
 | Workload | Objective-C | Swift (ns:swift) | Swift / Objective-C |
 |---|---|---|---|
 | call: no arguments | 0.16 µs | 0.09 µs | 0.58x |
-| call: int -> int | 0.17 µs | 0.13 µs | 0.79x |
-| call: 3 doubles -> double | 0.22 µs | 0.20 µs | 0.92x |
+| call: int -> int | 0.18 µs | 0.14 µs | 0.74x |
+| call: 3 doubles -> double | 0.22 µs | 0.20 µs | 0.91x |
 | call: bool -> bool | 0.17 µs | 0.13 µs | 0.75x |
-| string: short round trip | 0.29 µs | 0.21 µs | 0.72x |
-| string: 10 KB in | 1.53 µs | 0.92 µs | 0.60x |
-| string: 10 KB round trip | 1.91 µs | 1.64 µs | 0.86x |
-| object: construct | 0.67 µs | 0.28 µs | 0.42x |
-| object: instance method | 0.10 µs | 0.11 µs | 1.13x |
-| object: property read | 0.09 µs | 0.08 µs | 0.93x |
+| string: short round trip | 0.31 µs | 0.21 µs | 0.70x |
+| string: 10 KB in | 1.68 µs | 0.97 µs | 0.58x |
+| string: 10 KB round trip | 2.70 µs | 1.67 µs | 0.62x |
+| object: construct | 0.70 µs | 0.29 µs | 0.42x |
+| object: instance method | 0.10 µs | 0.12 µs | 1.14x |
+| object: property read | 0.09 µs | 0.09 µs | 0.91x |
 | object: property write | 0.11 µs | 0.11 µs | 0.98x |
-| array: 1000 ints in | 66.47 µs | 22.31 µs | 0.34x |
-| array: 1000 ints out, all read | 151.95 µs | 47.43 µs | 0.31x |
-| dictionary: 10 keys in | 4.51 µs | 1.63 µs | 0.36x |
-| dictionary: 10 keys out, all read | 5.67 µs | 2.28 µs | 0.40x |
-| struct: CGPoint in and out | 0.89 µs | 0.88 µs | 0.99x |
-| callback: native calls JS 100 times | 10.21 µs | 21.51 µs | 2.11x |
-| delegate: native calls JS object 100 times | 10.81 µs | 26.36 µs | 2.44x |
-| error: thrown and caught | 15.43 µs | 13.09 µs | 0.85x |
-| batch: build, filter, sort 1000 records, all read | 934.60 µs | 256.73 µs | 0.27x |
-| async: call and await, sequential | 76.93 µs | 11.70 µs | 0.15x |
+| array: 1000 ints in | 70.55 µs | 22.68 µs | 0.32x |
+| array: 1000 ints out, all read | 155.22 µs | 48.47 µs | 0.31x |
+| dictionary: 10 keys in | 4.64 µs | 1.71 µs | 0.37x |
+| dictionary: 10 keys out, all read | 5.82 µs | 2.31 µs | 0.40x |
+| data: 1 MB in | 4248.88 µs | 416.88 µs | 0.10x |
+| data: 1 MB out as bytes | 389.34 µs | 261.52 µs | 0.67x |
+| struct: CGPoint in and out | 0.94 µs | 0.92 µs | 0.98x |
+| callback: native calls JS 100 times | 10.78 µs | 21.25 µs | 1.97x |
+| delegate: native calls JS object 100 times | 10.65 µs | 27.55 µs | 2.59x |
+| error: thrown and caught | 16.34 µs | 13.66 µs | 0.84x |
+| batch: build, filter, sort 1000 records, all read | 966.46 µs | 260.39 µs | 0.27x |
+| async: call and await, sequential | 125.27 µs | 11.56 µs | 0.09x |
 
 - Swift is faster for almost every call shape: scalar calls run in 0.6 to 0.9
   of the time, object construction in 0.4, and thrown errors in 0.85.
@@ -532,9 +534,13 @@ Xcode 27.1 (lower is better):
   instead of through per-element Objective-C wrappers. The record batch,
   which builds, filters and sorts 1000 structs natively and reads every field
   in JS, runs in 0.27 of the time.
-- Async calls settle about 6x faster: a Swift `async` call resolves its
-  Promise directly, while the Objective-C version goes through a
-  completion block dispatched to the main queue.
+- Binary data crosses fast: a 1 MB `Data` argument takes a tenth of the time
+  (one copy from the typed array, against NativeScript's per-call
+  conversion), and a 1 MB result two thirds.
+- Async calls settle 6 to 10x faster (the Objective-C figure varies from run
+  to run with main-queue scheduling): a Swift `async` call resolves its
+  Promise directly, while the Objective-C version goes through a completion
+  block dispatched to the main queue.
 - Native code calling JS is slower: a Swift closure or delegate calling a JS
   function costs about 0.2 µs per call against about 0.1 µs for an
   Objective-C block or a JS subclass, because each invocation reports its

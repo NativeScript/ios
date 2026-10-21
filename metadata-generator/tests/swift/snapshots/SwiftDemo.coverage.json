@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 1384,
+      "total": 1386,
       "objc-direct": 3,
-      "swift-generated": 425,
+      "swift-generated": 427,
       "swift-specialized": 402,
       "type-only": 6,
       "unsupported": 548,
       "not-applicable": 0
     },
     "callable": {
-      "total": 1315,
+      "total": 1317,
       "objc-direct": 1,
-      "swift-generated": 366,
+      "swift-generated": 368,
       "swift-specialized": 399,
       "type-only": 2,
       "unsupported": 547,
       "not-applicable": 0
     },
-    "effectiveCallable": 367,
+    "effectiveCallable": 369,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -143,9 +143,9 @@
       "not-applicable": 0
     },
     "typeMethod": {
-      "total": 27,
+      "total": 29,
       "objc-direct": 0,
-      "swift-generated": 23,
+      "swift-generated": 25,
       "swift-specialized": 1,
       "type-only": 0,
       "unsupported": 3,
@@ -11753,7 +11753,7 @@
       "kind": "typeMethod",
       "tier": "swift-generated",
       "jsName": "topRecords",
-      "location": "file://Sources/SwiftDemo/Benchmark.swift:65"
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:75"
     },
     {
       "id": "s:9SwiftDemo9BenchmarkC11callClosure_5timesS3iXE_SitFZ",
@@ -11761,7 +11761,7 @@
       "kind": "typeMethod",
       "tier": "swift-generated",
       "jsName": "callClosure",
-      "location": "file://Sources/SwiftDemo/Benchmark.swift:53"
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:63"
     },
     {
       "id": "s:9SwiftDemo9BenchmarkC12callDelegate_5timesSiAA0cE0_p_SitFZ",
@@ -11769,7 +11769,7 @@
       "kind": "typeMethod",
       "tier": "swift-generated",
       "jsName": "callDelegate",
-      "location": "file://Sources/SwiftDemo/Benchmark.swift:58"
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:68"
     },
     {
       "id": "s:9SwiftDemo9BenchmarkC14makeDictionaryySDySSSiGSiFZ",
@@ -11793,7 +11793,7 @@
       "kind": "typeMethod",
       "tier": "swift-generated",
       "jsName": "fail",
-      "location": "file://Sources/SwiftDemo/Benchmark.swift:64"
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:74"
     },
     {
       "id": "s:9SwiftDemo9BenchmarkC4noopyyFZ",
@@ -11844,6 +11844,22 @@
       "location": "file://Sources/SwiftDemo/Benchmark.swift:30"
     },
     {
+      "id": "s:9SwiftDemo9BenchmarkC8checksumySi10Foundation4DataVFZ",
+      "path": "Benchmark.checksum(_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "checksum",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:60"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC8makeDatay10Foundation0E0VSiFZ",
+      "path": "Benchmark.makeData(_:)",
+      "kind": "typeMethod",
+      "tier": "swift-generated",
+      "jsName": "makeData",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:53"
+    },
+    {
       "id": "s:9SwiftDemo9BenchmarkC8midpointySo7CGPointVAF_AFtFZ",
       "path": "Benchmark.midpoint(_:_:)",
       "kind": "typeMethod",
@@ -11857,7 +11873,7 @@
       "kind": "typeMethod",
       "tier": "swift-generated",
       "jsName": "echoLater",
-      "location": "file://Sources/SwiftDemo/Benchmark.swift:63"
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:73"
     },
     {
       "id": "s:9SwiftDemo9BenchmarkC9incrementSiyF",

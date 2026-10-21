@@ -76701,6 +76701,8 @@
         "s:9SwiftDemo9BenchmarkC14makeDictionaryySDySSSiGSiFZ",
         "s:9SwiftDemo9BenchmarkC8midpointySo7CGPointVAF_AFtFZ",
         "s:9SwiftDemo9BenchmarkC10midpointOfyAA0C5PointVAF_AFtFZ",
+        "s:9SwiftDemo9BenchmarkC8makeDatay10Foundation0E0VSiFZ",
+        "s:9SwiftDemo9BenchmarkC8checksumySi10Foundation4DataVFZ",
         "s:9SwiftDemo9BenchmarkC11callClosure_5timesS3iXE_SitFZ",
         "s:9SwiftDemo9BenchmarkC12callDelegate_5timesSiAA0cE0_p_SitFZ",
         "s:9SwiftDemo9BenchmarkC9echoLateryS2iYaFZ",
@@ -76819,7 +76821,7 @@
           "s:9SwiftDemo15BenchmarkRecordV"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Benchmark.swift:64:23",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:74:23",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo9BenchmarkC"
     },
@@ -76862,7 +76864,7 @@
           "s:Si"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Benchmark.swift:52:23",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:62:23",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo9BenchmarkC"
     },
@@ -76904,7 +76906,7 @@
           "s:Si"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Benchmark.swift:57:23",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:67:23",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo9BenchmarkC"
     },
@@ -76985,7 +76987,7 @@
       ],
       "static": true,
       "throws": true,
-      "location": "file://Sources/SwiftDemo/Benchmark.swift:63:23",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:73:23",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo9BenchmarkC"
     },
@@ -77170,6 +77172,70 @@
       "parent": "s:9SwiftDemo9BenchmarkC"
     },
     {
+      "id": "s:9SwiftDemo9BenchmarkC8checksumySi10Foundation4DataVFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.checksum(_:)",
+      "name": "checksum(_:)",
+      "access": "public",
+      "declaration": "static func checksum(_ data: Data) -> Int",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "data",
+          "type": {
+            "spelling": "Data",
+            "references": [
+              "s:10Foundation4DataV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:59:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
+      "id": "s:9SwiftDemo9BenchmarkC8makeDatay10Foundation0E0VSiFZ",
+      "kind": "typeMethod",
+      "path": "Benchmark.makeData(_:)",
+      "name": "makeData(_:)",
+      "access": "public",
+      "declaration": "static func makeData(_ length: Int) -> Data",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "length",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Data",
+        "references": [
+          "s:10Foundation4DataV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:52:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9BenchmarkC"
+    },
+    {
       "id": "s:9SwiftDemo9BenchmarkC8midpointySo7CGPointVAF_AFtFZ",
       "kind": "typeMethod",
       "path": "Benchmark.midpoint(_:_:)",
@@ -77239,7 +77305,7 @@
         ]
       },
       "async": true,
-      "location": "file://Sources/SwiftDemo/Benchmark.swift:62:23",
+      "location": "file://Sources/SwiftDemo/Benchmark.swift:72:23",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo9BenchmarkC"
     },
