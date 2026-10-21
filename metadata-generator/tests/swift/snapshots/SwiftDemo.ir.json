@@ -198,6 +198,8 @@
     "s:9SwiftDemo7initial2ofSJSgSS_tF",
     "s:9SwiftDemo15repeatCharacterySSSJ_SitF",
     "s:9SwiftDemo5halve5priceSo9NSDecimalaAE_tF",
+    "s:9SwiftDemo9summarizeyS2iSDySSSaySiGG_SayAA7Vector2VGSiSgtXEF",
+    "s:9SwiftDemo21reportUnrepresentableyyySiXEF",
     "s:9SwiftDemo8describeySSSo6UIViewCF",
     "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
     "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
@@ -69718,6 +69720,28 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo21reportUnrepresentableyyySiXEF",
+      "kind": "function",
+      "path": "reportUnrepresentable(_:)",
+      "name": "reportUnrepresentable(_:)",
+      "access": "public",
+      "declaration": "func reportUnrepresentable(_ body: (Int) -> Void)",
+      "parameters": [
+        {
+          "internalName": "body",
+          "type": {
+            "spelling": "(Int) -> Void",
+            "references": [
+              "s:Si",
+              "s:s4Voida"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:344:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo3JobO",
       "kind": "enum",
       "path": "Job",
@@ -78002,6 +78026,37 @@
         }
       ],
       "location": "file://Sources/SwiftDemo/Values.swift:118:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo9summarizeyS2iSDySSSaySiGG_SayAA7Vector2VGSiSgtXEF",
+      "kind": "function",
+      "path": "summarize(_:)",
+      "name": "summarize(_:)",
+      "access": "public",
+      "declaration": "func summarize(_ body: ([String : [Int]], [Vector2], Int?) -> Int) -> Int",
+      "parameters": [
+        {
+          "internalName": "body",
+          "type": {
+            "spelling": "([String : [Int]], [Vector2], Int?) -> Int",
+            "references": [
+              "s:SS",
+              "s:Si",
+              "s:9SwiftDemo7Vector2V",
+              "s:Si",
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:341:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {

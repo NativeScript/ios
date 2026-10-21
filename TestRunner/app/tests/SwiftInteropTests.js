@@ -1371,6 +1371,26 @@ describe("ns:swift", function () {
             expect(calls).toBe(1);
         });
 
+        it("passes collections and objects to functions called while the call runs", function () {
+            var total = SwiftDemo.summarize(function (groups, points, missing) {
+                expect(groups).toEqual({ odd: [1, 3] });
+                expect(points.length).toBe(1);
+                expect(points[0] instanceof SwiftDemo.Vector2).toBe(true);
+                expect(points[0].y).toBe(2);
+                expect(missing).toBeNull();
+                return groups.odd.length + points[0].x;
+            });
+            expect(total).toBe(3);
+        });
+
+        it("throws from the call when a closure's argument does not convert", function () {
+            var calls = 0;
+            expect(function () {
+                SwiftDemo.reportUnrepresentable(function () { calls++; });
+            }).toThrowError(RangeError);
+            expect(calls).toBe(0);
+        });
+
         it("refuses values that are not functions", function () {
             expect(function () { SwiftDemo.countdown(1, 5); })
                 .toThrowError(TypeError, /countdown.*\(Int, Bool\) -> Void/);

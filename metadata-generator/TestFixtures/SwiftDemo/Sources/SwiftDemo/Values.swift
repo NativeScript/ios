@@ -339,3 +339,7 @@ public func identifierText(_ id: UUID) -> String { id.uuidString.lowercased() }
 public func initial(of text: String) -> Character? { text.first }
 public func repeatCharacter(_ character: Character, _ count: Int) -> String { String(repeating: character, count: count) }
 public func halve(price: Decimal) -> Decimal { price / 2 }
+public func summarize(_ body: ([String: [Int]], [Vector2], Int?) -> Int) -> Int {
+    body(["odd": [1, 3]], [Vector2(x: 1, y: 2)], nil)
+}
+public func reportUnrepresentable(_ body: (Int) -> Void) { body(Int.max) }

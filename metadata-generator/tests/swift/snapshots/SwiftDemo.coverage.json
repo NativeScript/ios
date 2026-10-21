@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 1386,
+      "total": 1388,
       "objc-direct": 3,
-      "swift-generated": 427,
+      "swift-generated": 429,
       "swift-specialized": 402,
       "type-only": 6,
       "unsupported": 548,
       "not-applicable": 0
     },
     "callable": {
-      "total": 1317,
+      "total": 1319,
       "objc-direct": 1,
-      "swift-generated": 368,
+      "swift-generated": 370,
       "swift-specialized": 399,
       "type-only": 2,
       "unsupported": 547,
       "not-applicable": 0
     },
-    "effectiveCallable": 369,
+    "effectiveCallable": 371,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -62,9 +62,9 @@
       "not-applicable": 0
     },
     "function": {
-      "total": 122,
+      "total": 124,
       "objc-direct": 0,
-      "swift-generated": 120,
+      "swift-generated": 122,
       "swift-specialized": 2,
       "type-only": 0,
       "unsupported": 0,
@@ -9826,6 +9826,14 @@
       "location": "file://Sources/SwiftDemo/Values.swift:195"
     },
     {
+      "id": "s:9SwiftDemo21reportUnrepresentableyyySiXEF",
+      "path": "reportUnrepresentable(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "reportUnrepresentable",
+      "location": "file://Sources/SwiftDemo/Values.swift:345"
+    },
+    {
       "id": "s:9SwiftDemo3JobO",
       "path": "Job",
       "kind": "enum",
@@ -12079,6 +12087,14 @@
       "tier": "swift-generated",
       "jsName": "onMeasure",
       "location": "file://Sources/SwiftDemo/Values.swift:119"
+    },
+    {
+      "id": "s:9SwiftDemo9summarizeyS2iSDySSSaySiGG_SayAA7Vector2VGSiSgtXEF",
+      "path": "summarize(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "summarize",
+      "location": "file://Sources/SwiftDemo/Values.swift:342"
     },
     {
       "id": "s:9SwiftDemo9transformySaySSGSaySiG_SSSiXEtF",

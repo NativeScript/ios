@@ -64,7 +64,8 @@ TEST(LoadsFixtureWithoutDiagnostics) {
   CHECK_EQ(diagnosticCodes(fixture().diagnostics), std::string());
   const Module& module = demo();
   CHECK_EQ(module.name, std::string("SwiftDemo"));
-  CHECK_EQ(llvm::join(module.unitModules, ","), std::string("SwiftDemo,SwiftDemoKit"));
+  CHECK_EQ(llvm::join(module.unitModules, ","),
+           std::string("SwiftDemo,SwiftDemoKit"));
   CHECK_EQ(module.graphFiles.size(), size_t(4));
   CHECK_EQ(module.platform.operatingSystem, std::string("ios"));
   CHECK_EQ(module.platform.environment, std::string("simulator"));
@@ -237,6 +238,8 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "initial(of:)",
                                        "repeatCharacter(_:_:)",
                                        "halve(price:)",
+                                       "summarize(_:)",
+                                       "reportUnrepresentable(_:)",
                                        "describe(_:)",
                                        "makeLabel(_:)",
                                        "tags(_:)",
@@ -623,7 +626,8 @@ TEST(GenericFunctionInstantiations) {
       }
       std::vector<std::string> parts;
       for (const auto& substitution : entry.second.substitutions) {
-        parts.push_back(substitution.first + "=" + spelling(substitution.second));
+        parts.push_back(substitution.first + "=" +
+                        spelling(substitution.second));
       }
       result.push_back(llvm::join(parts, ","));
     }
@@ -632,13 +636,15 @@ TEST(GenericFunctionInstantiations) {
   };
   using List = std::vector<std::string>;
   CHECK(standIns("largest(_:)") == List({"T=Double", "T=String"}));
-  CHECK(standIns("repeated(_:times:)") == List({"T=Bool", "T=Double", "T=String"}));
+  CHECK(standIns("repeated(_:times:)") ==
+        List({"T=Bool", "T=Double", "T=String"}));
   CHECK(standIns("popCount(_:)") == List({"I=Int"}));
   // One stand-in: the result alone decides it.
   CHECK(standIns("zero()") == List({"N=Double"}));
   CHECK(standIns("greetTwice(_:_:)") == List({"G=any Greeting"}));
   CHECK(standIns("viewTag(_:)") == List({"V=UIView"}));
-  CHECK(standIns("Loader.first(of:)") == List({"Element=Bool", "Element=Double", "Element=String"}));
+  CHECK(standIns("Loader.first(of:)") ==
+        List({"Element=Bool", "Element=Double", "Element=String"}));
   // The arguments of the unit's Box and Pair instantiations.
   CHECK(standIns("unbox(_:)").size() == 2);
   CHECK(standIns("firstOf(_:)").size() == 4);

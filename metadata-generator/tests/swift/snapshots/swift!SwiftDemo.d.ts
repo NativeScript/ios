@@ -530,6 +530,7 @@ declare module "ns:swift/SwiftDemo" {
   export function makeTrackerLater(id: number | bigint, signal?: AbortSignal): Promise<Tracker>;
   export function greetInBackground(greeting: Greeting, signal?: AbortSignal): Promise<string>;
   export function computeInBackground(provider: () => number | bigint, signal?: AbortSignal): Promise<number>;
+  export function reportUnrepresentable(body: (arg0: number) => void): void;
   export function sum(amounts: readonly (import("ns:swift/SwiftDemoKit").Money)[]): import("ns:swift/SwiftDemoKit").Money;
   export function area(measurement: Measurement): number;
   export function bump(value: { value: number | bigint }): void;
@@ -614,6 +615,7 @@ declare module "ns:swift/SwiftDemo" {
   export function makeScore(name: string, points: number | bigint): import("ns:swift/SwiftDemoKit").Pair<string, number>;
   export function noteLater(text: string, signal?: AbortSignal): Promise<Note>;
   export function onMeasure(body: (arg0: Measurement) => void): void;
+  export function summarize(body: (arg0: Record<string, (number)[]>, arg1: (Vector2)[], arg2: number | null) => number | bigint): number;
   export function transform(values: readonly (number | bigint)[], body: (arg0: number) => string): (string)[];
 
   global {
