@@ -35,6 +35,20 @@ set(GENERATOR_HEADERS
     Utils/StringUtils.h
     Yaml/MetaYamlTraits.h
     Yaml/YamlSerializer.h
+    
+    # Swift support
+    Swift/CapabilityClassifier.h
+    Swift/CoverageReport.h
+    Swift/FragmentTokens.h
+    Swift/ProbeEmitter.h
+    Swift/ProbeVerifier.h
+    Swift/SwiftSource.h
+    Swift/SwiftSurface.h
+    Swift/SwiftTypes.h
+    Swift/SwiftIR.h
+    Swift/SymbolGraphLoader.h
+    Swift/ThunkEmitter.h
+    TypeScript/SwiftDefinitionWriter.h
 )
 
 set(GENERATOR_SOURCES
@@ -63,6 +77,20 @@ set(GENERATOR_SOURCES
     TypeScript/DocSetManager.cpp
     Utils/fileStream.cpp
     Utils/memoryStream.cpp
+    
+    # Swift support
+    Swift/CapabilityClassifier.cpp
+    Swift/CoverageReport.cpp
+    Swift/FragmentTokens.cpp
+    Swift/ProbeEmitter.cpp
+    Swift/ProbeVerifier.cpp
+    Swift/SwiftSource.cpp
+    Swift/SwiftSurface.cpp
+    Swift/SwiftTypes.cpp
+    Swift/SwiftIR.cpp
+    Swift/SymbolGraphLoader.cpp
+    Swift/ThunkEmitter.cpp
+    TypeScript/SwiftDefinitionWriter.cpp
 )
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${LIBXML2_INCLUDE_DIR})
