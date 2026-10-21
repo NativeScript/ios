@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 1221,
+      "total": 1231,
       "objc-direct": 3,
-      "swift-generated": 321,
+      "swift-generated": 331,
       "swift-specialized": 371,
       "type-only": 5,
       "unsupported": 521,
       "not-applicable": 0
     },
     "callable": {
-      "total": 1171,
+      "total": 1179,
       "objc-direct": 1,
-      "swift-generated": 280,
+      "swift-generated": 288,
       "swift-specialized": 368,
       "type-only": 2,
       "unsupported": 520,
       "not-applicable": 0
     },
-    "effectiveCallable": 281,
+    "effectiveCallable": 289,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -35,9 +35,9 @@
       "not-applicable": 0
     },
     "class": {
-      "total": 18,
+      "total": 20,
       "objc-direct": 2,
-      "swift-generated": 15,
+      "swift-generated": 17,
       "swift-specialized": 1,
       "type-only": 0,
       "unsupported": 0,
@@ -71,27 +71,27 @@
       "not-applicable": 0
     },
     "initializer": {
-      "total": 33,
+      "total": 35,
       "objc-direct": 0,
-      "swift-generated": 31,
+      "swift-generated": 33,
       "swift-specialized": 2,
       "type-only": 0,
       "unsupported": 0,
       "not-applicable": 0
     },
     "instanceMethod": {
-      "total": 914,
+      "total": 918,
       "objc-direct": 0,
-      "swift-generated": 53,
+      "swift-generated": 57,
       "swift-specialized": 357,
       "type-only": 0,
       "unsupported": 504,
       "not-applicable": 0
     },
     "instanceProperty": {
-      "total": 65,
+      "total": 67,
       "objc-direct": 1,
-      "swift-generated": 55,
+      "swift-generated": 57,
       "swift-specialized": 3,
       "type-only": 1,
       "unsupported": 5,
@@ -9438,6 +9438,53 @@
       "location": "file://Sources/SwiftDemo/Protocols.swift:63"
     },
     {
+      "id": "s:9SwiftDemo16GreetingRegistryC",
+      "path": "GreetingRegistry",
+      "kind": "class",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:75"
+    },
+    {
+      "id": "s:9SwiftDemo16GreetingRegistryC3addyyAA0C0_pF",
+      "path": "GreetingRegistry.add(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "add",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:79"
+    },
+    {
+      "id": "s:9SwiftDemo16GreetingRegistryC5countSivp",
+      "path": "GreetingRegistry.count",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "count",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:78"
+    },
+    {
+      "id": "s:9SwiftDemo16GreetingRegistryC6removeyyAA0C0_pF",
+      "path": "GreetingRegistry.remove(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "remove",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:80"
+    },
+    {
+      "id": "s:9SwiftDemo16GreetingRegistryC8containsySbAA0C0_pF",
+      "path": "GreetingRegistry.contains(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "contains",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:81"
+    },
+    {
+      "id": "s:9SwiftDemo16GreetingRegistryCACycfc",
+      "path": "GreetingRegistry.init()",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:77"
+    },
+    {
       "id": "s:9SwiftDemo16makeDefaultPointAA0E0VyF",
       "path": "makeDefaultPoint()",
       "kind": "function",
@@ -9460,6 +9507,37 @@
       "tier": "swift-generated",
       "jsName": "greetInBackground",
       "location": "file://Sources/SwiftDemo/Protocols.swift:56"
+    },
+    {
+      "id": "s:9SwiftDemo18WeakGreetingHolderC",
+      "path": "WeakGreetingHolder",
+      "kind": "class",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:68"
+    },
+    {
+      "id": "s:9SwiftDemo18WeakGreetingHolderC5greetySSSgSSF",
+      "path": "WeakGreetingHolder.greet(_:)",
+      "kind": "instanceMethod",
+      "tier": "swift-generated",
+      "jsName": "greet",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:71"
+    },
+    {
+      "id": "s:9SwiftDemo18WeakGreetingHolderC8greetingAA0D0_pSgvp",
+      "path": "WeakGreetingHolder.greeting",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "greeting",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:69"
+    },
+    {
+      "id": "s:9SwiftDemo18WeakGreetingHolderCACycfc",
+      "path": "WeakGreetingHolder.init()",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:70"
     },
     {
       "id": "s:9SwiftDemo19computeInBackgroundyS2iyYbcYaF",

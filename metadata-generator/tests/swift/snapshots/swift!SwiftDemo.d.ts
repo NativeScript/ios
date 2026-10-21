@@ -114,6 +114,20 @@ declare module "ns:swift/SwiftDemo" {
     greeting: Greeting | null;
   }
 
+  export class GreetingRegistry {
+    constructor();
+    add(greeting: Greeting): void;
+    readonly count: number;
+    remove(greeting: Greeting): void;
+    contains(greeting: Greeting): boolean;
+  }
+
+  export class WeakGreetingHolder {
+    constructor();
+    greet(other: string): string | null;
+    greeting: Greeting | null;
+  }
+
   export namespace Job {
     export class Ticket {
       constructor(id: number | bigint);

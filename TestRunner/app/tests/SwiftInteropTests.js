@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module", "observe", "track"]);
-            expect(swift.abiVersion).toBe(13);
+            expect(swift.abiVersion).toBe(14);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(13);
+            expect(info.abiVersion).toBe(14);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -683,6 +683,79 @@ describe("ns:swift", function () {
                 fail(error);
                 done();
             });
+        });
+    });
+
+    describe("JS implementations held by Swift", function () {
+        function makeGreeting(name) {
+            return {
+                name: name,
+                punctuation: "!",
+                greet: function (other) { return name + " greets " + other; },
+                reset: function () {}
+            };
+        }
+
+        it("gives one JS object one Swift identity", function () {
+            var registry = new SwiftDemo.GreetingRegistry();
+            var a = makeGreeting("a");
+            var b = makeGreeting("b");
+            registry.add(a);
+            registry.add(b);
+            registry.add(a);
+            expect(registry.count).toBe(3);
+            registry.remove(a);
+            expect(registry.count).toBe(1);
+            expect(registry.contains(a)).toBe(false);
+            expect(registry.contains(b)).toBe(true);
+        });
+
+        it("keeps a weakly held delegate while JS keeps it", function () {
+            var holder = new SwiftDemo.WeakGreetingHolder();
+            var delegate = makeGreeting("weak");
+            holder.greeting = delegate;
+            gc();
+            gc();
+            expect(holder.greet("x")).toBe("weak greets x");
+            expect(holder.greeting).toBe(delegate);
+        });
+
+        it("lets a weakly held delegate go with its JS object", function (done) {
+            var holder = new SwiftDemo.WeakGreetingHolder();
+            (function () { holder.greeting = makeGreeting("gone"); })();
+            gc();
+            setTimeout(function () {
+                gc();
+                setTimeout(function () {
+                    expect(holder.greet("x")).toBeNull();
+                    expect(holder.greeting).toBeNull();
+                    done();
+                }, 0);
+            }, 0);
+        });
+
+        it("keeps a strongly held JS object alive until Swift lets it go", function (done) {
+            var holder = new SwiftDemo.GreetingHolder();
+            var weak;
+            (function () {
+                var greeting = makeGreeting("strong");
+                weak = new WeakRef(greeting);
+                holder.greeting = greeting;
+            })();
+            setTimeout(function () {
+                gc();
+                gc();
+                expect(holder.greet("x")).toBe("strong greets x");
+                holder.greeting = null;
+                setTimeout(function () {
+                    gc();
+                    setTimeout(function () {
+                        gc();
+                        expect(weak.deref()).toBeUndefined();
+                        done();
+                    }, 0);
+                }, 0);
+            }, 0);
         });
     });
 

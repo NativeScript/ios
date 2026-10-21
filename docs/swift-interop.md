@@ -306,8 +306,17 @@ the type has none.
 
 A protocol value returned to JS is the JS object it came from, a Swift
 object of its own registered class, or else a boxed value of the protocol.
-Swift holds the adapter, and through it the JS object, as long as it keeps
-the value; a `weak` reference does not keep it.
+
+A JS object has one adapter per protocol, so Swift sees one identity for it
+(`===`, `removeAll { $0 === listener }`). Its lifetime follows NativeScript's
+rule for the JS side of Objective-C objects:
+
+- While Swift holds the adapter strongly (`var delegate`), it keeps the JS
+  object alive.
+- A `weak` reference (`weak var delegate`) keeps it only as long as JS does:
+  keep the delegate referenced from JS, as for Objective-C delegates. Once
+  the JS object is collected, the weak reference becomes `nil`.
+- Once neither side holds it, both are collected.
 
 Protocols with associated types, `Self` requirements, static or `async`
 requirements, initializers, or more than one refined module protocol stay

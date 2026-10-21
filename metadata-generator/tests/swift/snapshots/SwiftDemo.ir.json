@@ -35,6 +35,8 @@
     "s:9SwiftDemo7topRankySSAA12RankedScorer_pKF",
     "s:9SwiftDemo17greetInBackgroundySSAA8Greeting_pYaF",
     "s:9SwiftDemo14GreetingHolderC",
+    "s:9SwiftDemo18WeakGreetingHolderC",
+    "s:9SwiftDemo16GreetingRegistryC",
     "s:9SwiftDemo13starterWallet3for0aB3Kit0D0CSS_tF",
     "s:9SwiftDemo3sum2of0aB3Kit5MoneyVSayAFG_tF",
     "s:9SwiftDemo4flipy0aB3Kit4CoinOAEF",
@@ -68506,6 +68508,127 @@
       "parent": "s:9SwiftDemo14GreetingHolderC"
     },
     {
+      "id": "s:9SwiftDemo16GreetingRegistryC",
+      "kind": "class",
+      "path": "GreetingRegistry",
+      "name": "GreetingRegistry",
+      "access": "public",
+      "declaration": "final class GreetingRegistry",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Protocols.swift:74:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo16GreetingRegistryCACycfc",
+        "s:9SwiftDemo16GreetingRegistryC5countSivp",
+        "s:9SwiftDemo16GreetingRegistryC3addyyAA0C0_pF",
+        "s:9SwiftDemo16GreetingRegistryC6removeyyAA0C0_pF",
+        "s:9SwiftDemo16GreetingRegistryC8containsySbAA0C0_pF"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo16GreetingRegistryC3addyyAA0C0_pF",
+      "kind": "instanceMethod",
+      "path": "GreetingRegistry.add(_:)",
+      "name": "add(_:)",
+      "access": "public",
+      "declaration": "func add(_ greeting: any Greeting)",
+      "parameters": [
+        {
+          "internalName": "greeting",
+          "type": {
+            "spelling": "any Greeting",
+            "references": [
+              "s:9SwiftDemo8GreetingP"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Protocols.swift:78:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo16GreetingRegistryC"
+    },
+    {
+      "id": "s:9SwiftDemo16GreetingRegistryC5countSivp",
+      "kind": "instanceProperty",
+      "path": "GreetingRegistry.count",
+      "name": "count",
+      "access": "public",
+      "declaration": "var count: Int { get }",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Protocols.swift:77:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo16GreetingRegistryC"
+    },
+    {
+      "id": "s:9SwiftDemo16GreetingRegistryC6removeyyAA0C0_pF",
+      "kind": "instanceMethod",
+      "path": "GreetingRegistry.remove(_:)",
+      "name": "remove(_:)",
+      "access": "public",
+      "declaration": "func remove(_ greeting: any Greeting)",
+      "parameters": [
+        {
+          "internalName": "greeting",
+          "type": {
+            "spelling": "any Greeting",
+            "references": [
+              "s:9SwiftDemo8GreetingP"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Protocols.swift:79:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo16GreetingRegistryC"
+    },
+    {
+      "id": "s:9SwiftDemo16GreetingRegistryC8containsySbAA0C0_pF",
+      "kind": "instanceMethod",
+      "path": "GreetingRegistry.contains(_:)",
+      "name": "contains(_:)",
+      "access": "public",
+      "declaration": "func contains(_ greeting: any Greeting) -> Bool",
+      "parameters": [
+        {
+          "internalName": "greeting",
+          "type": {
+            "spelling": "any Greeting",
+            "references": [
+              "s:9SwiftDemo8GreetingP"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Protocols.swift:80:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo16GreetingRegistryC"
+    },
+    {
+      "id": "s:9SwiftDemo16GreetingRegistryCACycfc",
+      "kind": "initializer",
+      "path": "GreetingRegistry.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:76:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo16GreetingRegistryC"
+    },
+    {
       "id": "s:9SwiftDemo16makeDefaultPointAA0E0VyF",
       "kind": "function",
       "path": "makeDefaultPoint()",
@@ -68577,6 +68700,84 @@
       "async": true,
       "location": "file://Sources/SwiftDemo/Protocols.swift:55:12",
       "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo18WeakGreetingHolderC",
+      "kind": "class",
+      "path": "WeakGreetingHolder",
+      "name": "WeakGreetingHolder",
+      "access": "public",
+      "declaration": "final class WeakGreetingHolder",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Protocols.swift:67:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo18WeakGreetingHolderC8greetingAA0D0_pSgvp",
+        "s:9SwiftDemo18WeakGreetingHolderCACycfc",
+        "s:9SwiftDemo18WeakGreetingHolderC5greetySSSgSSF"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo18WeakGreetingHolderC5greetySSSgSSF",
+      "kind": "instanceMethod",
+      "path": "WeakGreetingHolder.greet(_:)",
+      "name": "greet(_:)",
+      "access": "public",
+      "declaration": "func greet(_ other: String) -> String?",
+      "parameters": [
+        {
+          "internalName": "other",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String?",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Protocols.swift:70:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo18WeakGreetingHolderC"
+    },
+    {
+      "id": "s:9SwiftDemo18WeakGreetingHolderC8greetingAA0D0_pSgvp",
+      "kind": "instanceProperty",
+      "path": "WeakGreetingHolder.greeting",
+      "name": "greeting",
+      "access": "public",
+      "declaration": "weak var greeting: (any Greeting)?",
+      "modifiers": [
+        "weak"
+      ],
+      "valueType": {
+        "spelling": "(any Greeting)?",
+        "references": [
+          "s:9SwiftDemo8GreetingP"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Protocols.swift:68:20",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo18WeakGreetingHolderC"
+    },
+    {
+      "id": "s:9SwiftDemo18WeakGreetingHolderCACycfc",
+      "kind": "initializer",
+      "path": "WeakGreetingHolder.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:69:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo18WeakGreetingHolderC"
     },
     {
       "id": "s:9SwiftDemo19computeInBackgroundyS2iyYbcYaF",

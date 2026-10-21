@@ -697,6 +697,8 @@ void ApiReturnErrorValue(NSSwiftCall* call, const uint8_t* message, intptr_t mes
                          const uint8_t* type, intptr_t typeLength);
 void ApiCompleteErrorValue(void* token, const uint8_t* message, intptr_t messageLength,
                            const uint8_t* type, intptr_t typeLength);
+void* ApiAdapterOf(void* handle);
+void ApiAdoptAdapter(void* handle, void* adapter);
 void ApiReturnAsyncSequence(NSSwiftCall* call, void* iterator, NSSwiftThunk next);
 void ApiCompleteAsyncSequence(void* token, void* iterator, NSSwiftThunk next);
 struct IsolateState;
@@ -709,24 +711,62 @@ Local<Value> JSObjectOf(SwiftCallback* handle, Isolate* isolate);
 void ReleaseCallback(SwiftCallback* callback);
 
 const NSSwiftAPI kAPI = {
-    ApiReturnVoid,           ApiReturnBool,           ApiReturnInt64,
-    ApiReturnUInt64,         ApiReturnDouble,         ApiReturnString,
-    ApiReturnNull,           ApiReturnObject,         ApiThrowError,
-    ApiThrowTypeError,       ApiRegisterModule,       ApiRegisterType,
-    ApiRegisterMember,       ApiBeginAsync,           ApiCompleteVoid,
-    ApiCompleteBool,         ApiCompleteInt64,        ApiCompleteUInt64,
-    ApiCompleteDouble,       ApiCompleteString,       ApiCompleteNull,
-    ApiCompleteObject,       ApiCompleteError,        ApiReturnArrayBegin,
-    ApiReturnArrayEnd,       ApiReturnMapBegin,       ApiReturnMapEnd,
-    ApiCompleteArrayBegin,   ApiCompleteContainerEnd, ApiCompleteMapBegin,
-    ApiCompleteContainerEnd, ApiCallbackBegin,        ApiCallbackRetain,
-    ApiCallbackRelease,      ApiReturnCaseBegin,      ApiCompleteCaseBegin,
-    ApiReturnArrayEnd,       ApiCompleteContainerEnd, ApiWriteBackBegin,
-    ApiWriteBackEnd,         ApiReturnObjC,           ApiCompleteObjC,
-    ApiRegisterUnitModule,   ApiObjectCallBegin,      ApiObjectCallEnd,
-    ApiObjectResultRelease,  ApiReturnJSObject,       ApiCompleteJSObject,
-    ApiRegisterTracker,      ApiReturnAsyncSequence,  ApiCompleteAsyncSequence,
-    ApiCallbackCallEnd,      ApiReturnErrorValue,     ApiCompleteErrorValue,
+    ApiReturnVoid,
+    ApiReturnBool,
+    ApiReturnInt64,
+    ApiReturnUInt64,
+    ApiReturnDouble,
+    ApiReturnString,
+    ApiReturnNull,
+    ApiReturnObject,
+    ApiThrowError,
+    ApiThrowTypeError,
+    ApiRegisterModule,
+    ApiRegisterType,
+    ApiRegisterMember,
+    ApiBeginAsync,
+    ApiCompleteVoid,
+    ApiCompleteBool,
+    ApiCompleteInt64,
+    ApiCompleteUInt64,
+    ApiCompleteDouble,
+    ApiCompleteString,
+    ApiCompleteNull,
+    ApiCompleteObject,
+    ApiCompleteError,
+    ApiReturnArrayBegin,
+    ApiReturnArrayEnd,
+    ApiReturnMapBegin,
+    ApiReturnMapEnd,
+    ApiCompleteArrayBegin,
+    ApiCompleteContainerEnd,
+    ApiCompleteMapBegin,
+    ApiCompleteContainerEnd,
+    ApiCallbackBegin,
+    ApiCallbackRetain,
+    ApiCallbackRelease,
+    ApiReturnCaseBegin,
+    ApiCompleteCaseBegin,
+    ApiReturnArrayEnd,
+    ApiCompleteContainerEnd,
+    ApiWriteBackBegin,
+    ApiWriteBackEnd,
+    ApiReturnObjC,
+    ApiCompleteObjC,
+    ApiRegisterUnitModule,
+    ApiObjectCallBegin,
+    ApiObjectCallEnd,
+    ApiObjectResultRelease,
+    ApiReturnJSObject,
+    ApiCompleteJSObject,
+    ApiRegisterTracker,
+    ApiReturnAsyncSequence,
+    ApiCompleteAsyncSequence,
+    ApiCallbackCallEnd,
+    ApiReturnErrorValue,
+    ApiCompleteErrorValue,
+    ApiAdapterOf,
+    ApiAdoptAdapter,
 };
 
 // "Polygon.Style" -> "Style".
@@ -986,6 +1026,19 @@ struct PendingAsync {
   std::string name;
 };
 
+struct SwiftCallback;
+
+// The protocol adapters Swift made of one JS object, one per protocol (the
+// handles' `adapter`), each owned (+1) until the object is collected. A
+// handle holds the object strongly while Swift retains its adapter beyond
+// that, and weakly otherwise, as NativeScript holds the JS side of
+// Objective-C objects: Swift's strong references keep the object alive,
+// weak ones (`weak var delegate`) last as long as JS keeps it.
+struct AdaptedObject {
+  Global<Object> object;
+  std::vector<SwiftCallback*> handles;
+};
+
 struct IsolateState {
   // Resolvers stay here, on the isolate's thread: a v8::Global must not be
   // destroyed by the thread that completes the call.
@@ -998,6 +1051,12 @@ struct IsolateState {
   std::vector<CallContext*> calls;
   // Builds async iterators from step functions (MakeAsyncIterator).
   Global<v8::Function> iteratorFactory;
+  // JS objects with protocol adapters, and whether the GC hook that keeps
+  // their strength in step is installed (see AdaptedObject).
+  robin_hood::unordered_set<AdaptedObject*> adapted;
+  bool adapterHook = false;
+
+  ~IsolateState();
 };
 
 // Owns one retain of a Swift object for as long as its JS wrapper lives.
@@ -1860,10 +1919,103 @@ struct SwiftCallback {
   std::string name;
   Global<Object> target;
   std::atomic<int> references{1};
+  // A JS object's protocol handle: its Swift adapter (+1), once made.
+  void* adapter = nullptr;
 };
 
+// Null once the JS object an adapter held weakly was collected.
 Local<Value> JSObjectOf(SwiftCallback* handle, Isolate* isolate) {
+  if (handle->target.IsEmpty()) {
+    return v8::Null(isolate);
+  }
   return handle->target.Get(isolate);
+}
+
+// Before each collection: a handle is strong exactly while something besides
+// its AdaptedObject retains the adapter.
+void AdapterGCPrologue(Isolate* isolate, v8::GCType, v8::GCCallbackFlags, void*) {
+  auto* state = Caches::StateFor<IsolateState>(isolate);
+  if (state == nullptr) {
+    return;
+  }
+  for (AdaptedObject* adapted : state->adapted) {
+    for (SwiftCallback* handle : adapted->handles) {
+      if (handle->target.IsEmpty()) {
+        continue;
+      }
+      bool shared = handle->adapter != nullptr && CFGetRetainCount((CFTypeRef)handle->adapter) > 1;
+      if (shared && handle->target.IsWeak()) {
+        handle->target.ClearWeak<void>();
+      } else if (!shared && !handle->target.IsWeak()) {
+        handle->target.SetWeak();
+      }
+    }
+  }
+}
+
+// The JS object was collected: release its adapters and handles.
+void ReleaseAdaptedObject(const v8::WeakCallbackInfo<AdaptedObject>& info) {
+  AdaptedObject* adapted = info.GetParameter();
+  adapted->object.Reset();
+  info.SetSecondPassCallback([](const v8::WeakCallbackInfo<AdaptedObject>& info) {
+    AdaptedObject* adapted = info.GetParameter();
+    if (auto* state = Caches::StateFor<IsolateState>(info.GetIsolate())) {
+      state->adapted.erase(adapted);
+    }
+    for (SwiftCallback* handle : adapted->handles) {
+      if (handle->adapter != nullptr) {
+        handle->module->release(handle->adapter);
+      }
+      ReleaseCallback(handle);
+    }
+    delete adapted;
+  });
+}
+
+IsolateState::~IsolateState() {
+  // The isolate is going away: adapters still alive keep their handles.
+  for (AdaptedObject* adapted : adapted) {
+    adapted->object.Reset();
+    delete adapted;
+  }
+}
+
+// `object`'s handle for `protocol` (+1 for the caller): the one its adapter
+// was made for, so Swift sees one adapter per JS object and protocol.
+SwiftCallback* AdapterHandle(Isolate* isolate, Local<Context> context, IsolateState* state,
+                             const ModuleInfo* module, const ValueCode& code,
+                             const std::string& name, Local<Object> object) {
+  Local<v8::Private> key =
+      v8::Private::ForApi(isolate, tns::ToV8String(isolate, "ns:swift.adapters"));
+  Local<Value> stored;
+  AdaptedObject* adapted = nullptr;
+  if (object->GetPrivate(context, key).ToLocal(&stored) && stored->IsExternal()) {
+    adapted = static_cast<AdaptedObject*>(
+        stored.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+  } else {
+    adapted = new AdaptedObject();
+    adapted->object.Reset(isolate, object);
+    adapted->object.SetWeak(adapted, ReleaseAdaptedObject, v8::WeakCallbackType::kParameter);
+    object
+        ->SetPrivate(context, key,
+                     External::New(isolate, adapted, v8::kExternalPointerTypeTagDefault))
+        .Check();
+    state->adapted.insert(adapted);
+    if (!state->adapterHook) {
+      isolate->AddGCPrologueCallback(AdapterGCPrologue);
+      state->adapterHook = true;
+    }
+  }
+  for (SwiftCallback* handle : adapted->handles) {
+    if (handle->module == module && handle->code.typeIndex == code.typeIndex) {
+      handle->references.fetch_add(1, std::memory_order_relaxed);
+      return handle;
+    }
+  }
+  auto* handle = new SwiftCallback(isolate, module, code, name, object);
+  adapted->handles.push_back(handle);
+  handle->references.fetch_add(1, std::memory_order_relaxed);
+  return handle;
 }
 
 // Runs `body` on the isolate's thread with the isolate locked and valid:
@@ -2053,6 +2205,17 @@ void ApiCallbackRetain(void* callback) {
 }
 
 void ApiCallbackRelease(void* callback) { ReleaseCallback(static_cast<SwiftCallback*>(callback)); }
+
+void* ApiAdapterOf(void* handle) { return static_cast<SwiftCallback*>(handle)->adapter; }
+
+void ApiAdoptAdapter(void* handle, void* adapter) {
+  auto* callback = static_cast<SwiftCallback*>(handle);
+  if (callback->adapter != nullptr) {
+    callback->module->release(adapter);
+    return;
+  }
+  callback->adapter = adapter;
+}
 
 void ApiCompleteVoid(void* token) { Emit(token, Outcome(AsyncOutcome::Kind::Void)); }
 
@@ -2659,7 +2822,12 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
             isolate, member, index,
             "does not implement " + protocol.jsName + " (missing " + missing + ")");
       }
-      auto* handle = new SwiftCallback(isolate, &module, code, member.swiftName, object);
+      auto* state = Caches::StateFor<IsolateState>(isolate);
+      if (state == nullptr) {
+        return false;
+      }
+      SwiftCallback* handle =
+          AdapterHandle(isolate, context, state, &module, code, member.swiftName, object);
       arena.callbacks.push_back(handle);
       slot.tag = NSSwiftTagJSObject;
       slot.payload.object = handle;
@@ -2752,6 +2920,10 @@ ObjectResult* RunObjectCall(SwiftCallback* handle, AsyncOutcome& arguments, intp
   }
 
   auto result = std::make_unique<ObjectResult>();
+  if (handle->target.IsEmpty()) {
+    // A weakly held JS implementation was collected.
+    return nullptr;
+  }
   Local<Object> target = handle->target.Get(isolate);
   Local<v8::String> key = tns::ToV8String(isolate, member.jsName);
   bool done = false;

@@ -98,6 +98,8 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "topRank(_:)",
                                        "greetInBackground(_:)",
                                        "GreetingHolder",
+                                       "WeakGreetingHolder",
+                                       "GreetingRegistry",
                                        "starterWallet(for:)",
                                        "sum(of:)",
                                        "flip(_:)",

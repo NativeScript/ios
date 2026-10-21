@@ -40,7 +40,7 @@
 // calls it by reporting the arguments as an array: callbackBegin, each
 // argument through the complete* entries, then completeArrayEnd.
 
-#define NS_SWIFT_ABI_VERSION 13
+#define NS_SWIFT_ABI_VERSION 14
 
 #ifdef __cplusplus
 extern "C" {
@@ -344,6 +344,15 @@ struct NSSwiftAPI {
   /* 53 */ void (*completeErrorValue)(void* token, const uint8_t* message,
                                       intptr_t messageLength,
                                       const uint8_t* type, intptr_t typeLength);
+
+  // A JS object argument (NSSwiftTagJSObject) carries the same handle for
+  // the same JS object and protocol. adapterOf returns the Swift adapter
+  // adopted for it (+0), or null; adoptAdapter hands the runtime the first
+  // one (+1), which it keeps while the JS object lives. The runtime holds
+  // the JS object strongly while anything else retains the adapter, weakly
+  // otherwise.
+  /* 54 */ void* (*adapterOf)(void* handle);
+  /* 55 */ void (*adoptAdapter)(void* handle, void* adapter);
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);

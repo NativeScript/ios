@@ -1116,6 +1116,24 @@ private final class __NSCallback: @unchecked Sendable {
   }
 }
 
+// The adapter of JS object argument `i`: the one already made for that JS
+// object and protocol, so Swift sees one identity, or a new one the runtime
+// keeps for as long as the JS object lives.
+private func __nsAdapter<A: AnyObject>(_ slots: __NSSlots, _ i: Int,
+                                       _ make: (__NSJSObject) -> A) -> A {
+  let handle = slots.callback(i)
+  let existing = slots.api.load(fromByteOffset: 54 * 8,
+                                as: (@convention(c) (UnsafeMutableRawPointer) -> UnsafeMutableRawPointer?).self)(handle)
+  if let existing, let adapter = Unmanaged<AnyObject>.fromOpaque(existing).takeUnretainedValue() as? A {
+    return adapter
+  }
+  let adapter = make(__NSJSObject(api: slots.api, handle: handle))
+  slots.api.load(fromByteOffset: 55 * 8,
+                 as: (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void).self)(
+    handle, Unmanaged.passRetained(adapter).toOpaque())
+  return adapter
+}
+
 // A JS object implementing a protocol; adapters call its members. Calls from
 // other threads run on the isolate's thread and wait for it.
 private final class __NSJSObject: @unchecked Sendable {
@@ -1441,9 +1459,9 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
     out += attribute + "private func __nsProtocol" + index +
            "(_ slots: __NSSlots, _ i: Int) -> (" + existential +
            ")? {\n"
-           "  if slots.tag(i) == 12 {\n    return " +
+           "  if slots.tag(i) == 12 {\n    return __nsAdapter(slots, i) { " +
            adapter +
-           "(__NSJSObject(api: slots.api, handle: slots.callback(i)))\n  }\n"
+           "($0) }\n  }\n"
            "  let object = slots.object(i)\n"
            "  if let box = object as? __NSAnyBox { return box.anyValue as? " +
            existential + " }\n  return object as? " + existential + "\n}\n\n";
