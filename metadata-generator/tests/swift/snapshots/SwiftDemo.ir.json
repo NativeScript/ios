@@ -164,6 +164,10 @@
     "s:9SwiftDemo9noteLateryAA4NoteCSSYaF",
     "s:9SwiftDemo7viewTagySixSo6UIViewCRbzlF",
     "s:9SwiftDemo7viewTagySixSo6UIViewCRbzlF@<c:objc(cs)UIView>",
+    "s:9SwiftDemo8midpointySo7CGPointVAD_ADtF",
+    "s:9SwiftDemo5inset_2bySo6CGRectVAE_So12UIEdgeInsetsVtF",
+    "s:9SwiftDemo7fittingySo6CGSizeVSgAEF",
+    "s:9SwiftDemo12latitudeSpanySdSo22CLLocationCoordinate2DV_ADtF",
     "s:12SwiftDemoKit5MoneyV",
     "s:12SwiftDemoKit6WalletC",
     "s:12SwiftDemoKit4CoinO",
@@ -223,7 +227,7 @@
       "modifiers": [
         "final"
       ],
-      "location": "file://Sources/SwiftDemo/Views.swift:17:19",
+      "location": "file://Sources/SwiftDemo/Views.swift:18:19",
       "graph": "SwiftDemo.symbols.json",
       "members": [
         "s:9SwiftDemo4NoteC4textSSvp",
@@ -66728,7 +66732,43 @@
           "c:objc(cs)UIView"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Views.swift:15:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:16:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo12latitudeSpanySdSo22CLLocationCoordinate2DV_ADtF",
+      "kind": "function",
+      "path": "latitudeSpan(_:_:)",
+      "name": "latitudeSpan(_:_:)",
+      "access": "public",
+      "declaration": "func latitudeSpan(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> Double",
+      "parameters": [
+        {
+          "internalName": "a",
+          "type": {
+            "spelling": "CLLocationCoordinate2D",
+            "references": [
+              "c:@S@CLLocationCoordinate2D"
+            ]
+          }
+        },
+        {
+          "internalName": "b",
+          "type": {
+            "spelling": "CLLocationCoordinate2D",
+            "references": [
+              "c:@S@CLLocationCoordinate2D"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:39:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -67539,7 +67579,7 @@
           }
         }
       ],
-      "location": "file://Sources/SwiftDemo/Views.swift:19:11",
+      "location": "file://Sources/SwiftDemo/Views.swift:20:11",
       "graph": "SwiftDemo.symbols.json",
       "parent": "c:@M@SwiftDemo@objc(cs)Note"
     },
@@ -67558,7 +67598,7 @@
       },
       "settable": false,
       "let": true,
-      "location": "file://Sources/SwiftDemo/Views.swift:18:15",
+      "location": "file://Sources/SwiftDemo/Views.swift:19:15",
       "graph": "SwiftDemo.symbols.json",
       "parent": "c:@M@SwiftDemo@objc(cs)Note"
     },
@@ -67953,7 +67993,7 @@
           "s:Si"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Views.swift:13:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:14:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -67981,7 +68021,7 @@
           "s:SS"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Views.swift:23:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:24:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -69415,6 +69455,43 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:216:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo5inset_2bySo6CGRectVAE_So12UIEdgeInsetsVtF",
+      "kind": "function",
+      "path": "inset(_:by:)",
+      "name": "inset(_:by:)",
+      "access": "public",
+      "declaration": "func inset(_ rect: CGRect, by insets: UIEdgeInsets) -> CGRect",
+      "parameters": [
+        {
+          "internalName": "rect",
+          "type": {
+            "spelling": "CGRect",
+            "references": [
+              "c:@S@CGRect"
+            ]
+          }
+        },
+        {
+          "label": "by",
+          "internalName": "insets",
+          "type": {
+            "spelling": "UIEdgeInsets",
+            "references": [
+              "c:@S@UIEdgeInsets"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "CGRect",
+        "references": [
+          "c:@S@CGRect"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:37:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -72044,6 +72121,33 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo7fittingySo6CGSizeVSgAEF",
+      "kind": "function",
+      "path": "fitting(_:)",
+      "name": "fitting(_:)",
+      "access": "public",
+      "declaration": "func fitting(_ size: CGSize?) -> CGSize?",
+      "parameters": [
+        {
+          "internalName": "size",
+          "type": {
+            "spelling": "CGSize?",
+            "references": [
+              "c:@S@CGSize"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "CGSize?",
+        "references": [
+          "c:@S@CGSize"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:38:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo7largestyxSgSayxGSLRzlF",
       "kind": "function",
       "path": "largest(_:)",
@@ -72364,7 +72468,7 @@
           "rhsPrecise": "c:objc(cs)UIView"
         }
       ],
-      "location": "file://Sources/SwiftDemo/Views.swift:30:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:31:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -72391,7 +72495,7 @@
           "s:Si"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Views.swift:30:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:31:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -72828,7 +72932,7 @@
           "s:SS"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Views.swift:5:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:6:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -72882,7 +72986,43 @@
           "c:@M@SwiftDemo@objc(cs)Note"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Views.swift:22:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:23:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8midpointySo7CGPointVAD_ADtF",
+      "kind": "function",
+      "path": "midpoint(_:_:)",
+      "name": "midpoint(_:_:)",
+      "access": "public",
+      "declaration": "func midpoint(_ a: CGPoint, _ b: CGPoint) -> CGPoint",
+      "parameters": [
+        {
+          "internalName": "a",
+          "type": {
+            "spelling": "CGPoint",
+            "references": [
+              "c:@S@CGPoint"
+            ]
+          }
+        },
+        {
+          "internalName": "b",
+          "type": {
+            "spelling": "CGPoint",
+            "references": [
+              "c:@S@CGPoint"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "CGPoint",
+        "references": [
+          "c:@S@CGPoint"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:34:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -73418,7 +73558,7 @@
           "c:objc(cs)UILabel"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Views.swift:7:23",
+      "location": "file://Sources/SwiftDemo/Views.swift:8:23",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -73482,7 +73622,7 @@
         ]
       },
       "async": true,
-      "location": "file://Sources/SwiftDemo/Views.swift:25:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:26:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {

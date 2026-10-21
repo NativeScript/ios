@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 1205,
+      "total": 1209,
       "objc-direct": 1,
-      "swift-generated": 305,
+      "swift-generated": 309,
       "swift-specialized": 371,
       "type-only": 5,
       "unsupported": 523,
       "not-applicable": 0
     },
     "callable": {
-      "total": 1156,
+      "total": 1160,
       "objc-direct": 0,
-      "swift-generated": 264,
+      "swift-generated": 268,
       "swift-specialized": 368,
       "type-only": 2,
       "unsupported": 522,
       "not-applicable": 0
     },
-    "effectiveCallable": 264,
+    "effectiveCallable": 268,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -62,9 +62,9 @@
       "not-applicable": 0
     },
     "function": {
-      "total": 99,
+      "total": 103,
       "objc-direct": 0,
-      "swift-generated": 96,
+      "swift-generated": 100,
       "swift-specialized": 3,
       "type-only": 0,
       "unsupported": 0,
@@ -181,7 +181,7 @@
     "owner-not-bridged": 14,
     "subscript": 1,
     "unavailable": 5,
-    "unbridged-type": 551,
+    "unbridged-type": 536,
     "variadic-parameter": 8
   },
   "symbols": [
@@ -193,7 +193,7 @@
       "reasons": [
         "objc-visible"
       ],
-      "location": "file://Sources/SwiftDemo/Views.swift:18"
+      "location": "file://Sources/SwiftDemo/Views.swift:19"
     },
     {
       "id": "s:12SwiftDemoKit3BoxC",
@@ -1417,7 +1417,6 @@
       "tier": "unsupported",
       "reasons": [
         "opaque-type",
-        "unbridged-type:CGSize",
         "unbridged-type:SwiftUI.ContentMode"
       ]
     },
@@ -1588,7 +1587,6 @@
       "tier": "unsupported",
       "reasons": [
         "opaque-type",
-        "unbridged-type:CGSize",
         "unbridged-type:SwiftUI.Shader"
       ]
     },
@@ -1687,7 +1685,6 @@
       "tier": "unsupported",
       "reasons": [
         "opaque-type",
-        "unbridged-type:CGSize",
         "unbridged-type:SwiftUI.UnitPoint"
       ]
     },
@@ -2064,7 +2061,6 @@
       "tier": "unsupported",
       "reasons": [
         "opaque-type",
-        "unbridged-type:CGPoint",
         "unbridged-type:SwiftUI.GestureInputKinds"
       ]
     },
@@ -2075,7 +2071,6 @@
       "tier": "unsupported",
       "reasons": [
         "opaque-type",
-        "unbridged-type:CGPoint",
         "unbridged-type:SwiftUI.CoordinateSpace"
       ]
     },
@@ -2085,8 +2080,7 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "opaque-type",
-        "unbridged-type:CGPoint"
+        "opaque-type"
       ]
     },
     {
@@ -2292,7 +2286,6 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "unbridged-type:CGPoint",
         "unbridged-type:SwiftUI.ModifiedContent"
       ]
     },
@@ -3205,8 +3198,7 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "opaque-type",
-        "unbridged-type:CGAffineTransform"
+        "opaque-type"
       ]
     },
     {
@@ -3252,7 +3244,6 @@
       "tier": "unsupported",
       "reasons": [
         "opaque-type",
-        "unbridged-type:CGSize",
         "unbridged-type:SwiftUI.Shader"
       ]
     },
@@ -7004,7 +6995,6 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "unbridged-type:CGPoint",
         "unbridged-type:SwiftUI.ModifiedContent"
       ]
     },
@@ -7024,7 +7014,6 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "unbridged-type:CGPoint",
         "unbridged-type:SwiftUI.ModifiedContent"
       ]
     },
@@ -7944,8 +7933,7 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "opaque-type",
-        "unbridged-type:CGSize"
+        "opaque-type"
       ]
     },
     {
@@ -7973,7 +7961,6 @@
       "tier": "unsupported",
       "reasons": [
         "opaque-type",
-        "unbridged-type:CGPoint",
         "unbridged-type:SwiftUI.Binding",
         "unbridged-type:UniformTypeIdentifiers.UTType"
       ]
@@ -7996,7 +7983,6 @@
       "tier": "unsupported",
       "reasons": [
         "opaque-type",
-        "unbridged-type:CGPoint",
         "unbridged-type:SwiftUI.Binding"
       ]
     },
@@ -8387,8 +8373,7 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "opaque-type",
-        "unbridged-type:CGPoint"
+        "opaque-type"
       ]
     },
     {
@@ -9165,7 +9150,15 @@
       "kind": "function",
       "tier": "swift-generated",
       "jsName": "firstSubview",
-      "location": "file://Sources/SwiftDemo/Views.swift:16"
+      "location": "file://Sources/SwiftDemo/Views.swift:17"
+    },
+    {
+      "id": "s:9SwiftDemo12latitudeSpanySdSo22CLLocationCoordinate2DV_ADtF",
+      "path": "latitudeSpan(_:_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "latitudeSpan",
+      "location": "file://Sources/SwiftDemo/Views.swift:40"
     },
     {
       "id": "s:9SwiftDemo12makeGreetingyAA0D0_pSSF",
@@ -9479,7 +9472,7 @@
       "reasons": [
         "owner-not-bridged"
       ],
-      "location": "file://Sources/SwiftDemo/Views.swift:20"
+      "location": "file://Sources/SwiftDemo/Views.swift:21"
     },
     {
       "id": "s:9SwiftDemo4NoteC4textSSvp",
@@ -9489,7 +9482,7 @@
       "reasons": [
         "owner-not-bridged"
       ],
-      "location": "file://Sources/SwiftDemo/Views.swift:19"
+      "location": "file://Sources/SwiftDemo/Views.swift:20"
     },
     {
       "id": "s:9SwiftDemo4RingV",
@@ -9610,7 +9603,7 @@
       "kind": "function",
       "tier": "swift-generated",
       "jsName": "tags",
-      "location": "file://Sources/SwiftDemo/Views.swift:14"
+      "location": "file://Sources/SwiftDemo/Views.swift:15"
     },
     {
       "id": "s:9SwiftDemo4text2ofSSAA4NoteC_tF",
@@ -9618,7 +9611,7 @@
       "kind": "function",
       "tier": "swift-generated",
       "jsName": "text",
-      "location": "file://Sources/SwiftDemo/Views.swift:24"
+      "location": "file://Sources/SwiftDemo/Views.swift:25"
     },
     {
       "id": "s:9SwiftDemo4zeroxySjRzlF",
@@ -9833,6 +9826,14 @@
       "tier": "swift-generated",
       "jsName": "holes",
       "location": "file://Sources/SwiftDemo/Values.swift:217"
+    },
+    {
+      "id": "s:9SwiftDemo5inset_2bySo6CGRectVAE_So12UIEdgeInsetsVtF",
+      "path": "inset(_:by:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "inset",
+      "location": "file://Sources/SwiftDemo/Views.swift:38"
     },
     {
       "id": "s:9SwiftDemo5namesySaySSGSiF",
@@ -10674,6 +10675,14 @@
       "location": "file://Sources/SwiftDemo/Purse.swift:37"
     },
     {
+      "id": "s:9SwiftDemo7fittingySo6CGSizeVSgAEF",
+      "path": "fitting(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "fitting",
+      "location": "file://Sources/SwiftDemo/Views.swift:39"
+    },
+    {
       "id": "s:9SwiftDemo7largestyxSgSayxGSLRzlF",
       "path": "largest(_:)",
       "kind": "function",
@@ -10749,7 +10758,7 @@
       "path": "viewTag(_:)",
       "kind": "function",
       "tier": "swift-generated",
-      "location": "file://Sources/SwiftDemo/Views.swift:31"
+      "location": "file://Sources/SwiftDemo/Views.swift:32"
     },
     {
       "id": "s:9SwiftDemo7viewTagySixSo6UIViewCRbzlF@<c:objc(cs)UIView>",
@@ -10757,7 +10766,7 @@
       "kind": "function",
       "tier": "swift-generated",
       "jsName": "viewTag",
-      "location": "file://Sources/SwiftDemo/Views.swift:31"
+      "location": "file://Sources/SwiftDemo/Views.swift:32"
     },
     {
       "id": "s:9SwiftDemo8GreetingP",
@@ -10907,7 +10916,7 @@
       "kind": "function",
       "tier": "swift-generated",
       "jsName": "describe",
-      "location": "file://Sources/SwiftDemo/Views.swift:6"
+      "location": "file://Sources/SwiftDemo/Views.swift:7"
     },
     {
       "id": "s:9SwiftDemo8echoInt8ys0D0VADF",
@@ -10923,7 +10932,15 @@
       "kind": "function",
       "tier": "swift-generated",
       "jsName": "makeNote",
-      "location": "file://Sources/SwiftDemo/Views.swift:23"
+      "location": "file://Sources/SwiftDemo/Views.swift:24"
+    },
+    {
+      "id": "s:9SwiftDemo8midpointySo7CGPointVAD_ADtF",
+      "path": "midpoint(_:_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "midpoint",
+      "location": "file://Sources/SwiftDemo/Views.swift:35"
     },
     {
       "id": "s:9SwiftDemo8mirroredySaySaySiGGADF",
@@ -11049,7 +11066,7 @@
       "kind": "function",
       "tier": "swift-generated",
       "jsName": "makeLabel",
-      "location": "file://Sources/SwiftDemo/Views.swift:8"
+      "location": "file://Sources/SwiftDemo/Views.swift:9"
     },
     {
       "id": "s:9SwiftDemo9makeScorey0aB3Kit4PairVySSSiGSS_SitF",
@@ -11065,7 +11082,7 @@
       "kind": "function",
       "tier": "swift-generated",
       "jsName": "noteLater",
-      "location": "file://Sources/SwiftDemo/Views.swift:26"
+      "location": "file://Sources/SwiftDemo/Views.swift:27"
     },
     {
       "id": "s:9SwiftDemo9onMeasureyyyAA11MeasurementOXEF",

@@ -335,6 +335,7 @@ declare module "ns:swift/SwiftDemo" {
   export function parseNumber(text: string): { case: "success"; value: number } | { case: "failure"; value: Error };
   export function sortedNames(names: readonly (string)[], less: (arg0: string, arg1: string) => boolean): (string)[];
   export function firstSubview(view: UIView): UIView | null;
+  export function latitudeSpan(a: { readonly latitude: number; readonly longitude: number }, b: { readonly latitude: number; readonly longitude: number }): number;
   export function makeGreeting(name: string): Greeting;
   export function measureLater(width: number): Promise<Measurement>;
   export function measurements(): (Measurement)[];
@@ -363,6 +364,7 @@ declare module "ns:swift/SwiftDemo" {
   export function clear(name: { value: (string) | null | undefined }): void;
   export function halve(value: { value: number | bigint }): void;
   export function holes(count: number | bigint): (string | null)[];
+  export function inset(rect: { readonly origin: { readonly x: number; readonly y: number }; readonly size: { readonly width: number; readonly height: number } }, insets: { readonly top: number; readonly left: number; readonly bottom: number; readonly right: number }): { origin: { x: number; y: number }; size: { width: number; height: number } };
   export function names(count: number | bigint): (string)[];
   export function pages(count: number | bigint): AsyncIterableIterator<(string)[]>;
   export function shout(name: (string) | null | undefined): string | null;
@@ -382,6 +384,7 @@ declare module "ns:swift/SwiftDemo" {
   export function explain(error: ShapeError): string;
   export function firstOf(pair: import("ns:swift/SwiftDemoKit").Pair<string, number>): string;
   export function firstOf(pair: import("ns:swift/SwiftDemoKit").Pair<number, string>): number;
+  export function fitting(size: ({ readonly width: number; readonly height: number }) | null | undefined): { width: number; height: number } | null;
   export function largest(values: readonly (string)[]): string | null;
   export function largest(values: readonly (number)[]): number | null;
   export function lengths(table: Readonly<Record<string, string>>): Record<string, number>;
@@ -401,6 +404,7 @@ declare module "ns:swift/SwiftDemo" {
   export function describe(view: UIView): string;
   export function echoInt8(value: number | bigint): number;
   export function makeNote(text: string): NSObject;
+  export function midpoint(a: { readonly x: number; readonly y: number }, b: { readonly x: number; readonly y: number }): { x: number; y: number };
   export function mirrored(grid: readonly (readonly (number | bigint)[])[]): ((number)[])[];
   export function popCount(value: number | bigint): number;
   export function repeated(value: string, times: number | bigint): (string)[];

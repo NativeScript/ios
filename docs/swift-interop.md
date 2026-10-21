@@ -162,6 +162,7 @@ methods of generic types, and `some P` parameters, are not instantiated yet.
 | `(A, B)` | array copy, `[a, b]` |
 | `(x: A, y: B)` | plain object copy, `{ x: a, y: b }` |
 | `any Error` | `Error` named `SwiftError` (with `swiftType`); inputs accept any value, an `Error`'s message describing it |
+| `CGPoint`, `CGSize`, `CGRect`, `CGVector`, `CGAffineTransform`, `UIEdgeInsets`, `NSDirectionalEdgeInsets`, `UIOffset`, `NSRange`, `CLLocationCoordinate2D`, `MKCoordinateSpan`, `MKCoordinateRegion` | plain object copy of the fields, `{ x, y }` (inputs also accept NativeScript's struct values, `CGPointMake(1, 2)`) |
 | `Result<S, F>` | `{ case: "success", value }` or `{ case: "failure", value }` (no `value` for `Result<Void, F>`) |
 | `(A, B) -> Void` (parameters only) | `function (a, b)` |
 | Objective-C class (`UIView`, an `NSObject` subclass) | NativeScript's ordinary Objective-C wrapper, with the identity Objective-C calls give it |

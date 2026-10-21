@@ -130,7 +130,8 @@ std::string codeDisplayName(const SwiftSurface& surface,
       name = "Result<" + codeDisplayName(surface, type.elements.at(0)) + ", " +
              codeDisplayName(surface, type.elements.at(1)) + ">";
       break;
-    case Bridge::Tuple: {
+    case Bridge::Tuple:
+    case Bridge::CStruct: {
       std::vector<std::string> elements;
       for (size_t i = 0; i < type.elements.size(); i++) {
         elements.push_back((type.labels.empty() ? "" : type.labels[i] + ": ") +
@@ -357,7 +358,8 @@ class Writer {
     }
     auto record = [](Bridge bridge) {
       return bridge == Bridge::Dictionary || bridge == Bridge::TaggedEnum ||
-             bridge == Bridge::Tuple || bridge == Bridge::Result;
+             bridge == Bridge::Tuple || bridge == Bridge::Result ||
+             bridge == Bridge::CStruct;
     };
     auto arrayLike = [](const BridgedType& type) {
       return type.bridge == Bridge::Array || type.bridge == Bridge::Set ||
@@ -526,6 +528,7 @@ class Writer {
         break;
       }
       case Bridge::Tuple:
+      case Bridge::CStruct:
         ts = tupleType(type, true);
         break;
       case Bridge::Error:
@@ -630,6 +633,7 @@ class Writer {
         ts = "Set<" + outputType(type.elements.at(0)) + ">";
         break;
       case Bridge::Tuple:
+      case Bridge::CStruct:
         ts = tupleType(type, false);
         break;
       case Bridge::Error:

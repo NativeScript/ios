@@ -182,6 +182,23 @@ class Emitter {
                     "e)\n    default: return nil\n    }\n  })()",
                 true};
       }
+      case Bridge::CStruct: {
+        // Its fields as a labeled tuple, then the memberwise initializer.
+        BridgedType fields = type;
+        fields.bridge = Bridge::Tuple;
+        fields.optional = false;
+        fields.node = TypeNode();
+        fields.node.kind = TypeNode::Kind::Tuple;
+        fields.node.labels = type.labels;
+        std::vector<std::string> arguments;
+        for (size_t k = 0; k < type.elements.size(); k++) {
+          fields.node.children.push_back(type.elements[k].node);
+          arguments.push_back(type.labels[k] + ": $0." + std::to_string(k));
+        }
+        return {valueExpression(fields, slots, index).code + ".map({ " +
+                    type.objcClass + "(" + llvm::join(arguments, ", ") + ") })",
+                true};
+      }
       case Bridge::Tuple: {
         // Its own slots name: element readers may nest another tuple's.
         std::string own = "t" + std::to_string(_tupleCount++);
@@ -302,6 +319,9 @@ class Emitter {
         return "a valid URL";
       case Bridge::Result:
         return "a Result ({ case: \"success\" | \"failure\", value })";
+      case Bridge::CStruct:
+        return "a " + type.objcClass + " ({ " + llvm::join(type.labels, ", ") +
+               " })";
       case Bridge::Array:
         return "an array of " + describeElement(type.elements.at(0));
       case Bridge::Dictionary:
@@ -404,6 +424,16 @@ class Emitter {
                "; case .failure(let " + own + "e): " + reporter +
                ".returnCase(1) { " +
                returnValue(type.elements.at(1), reporter, own + "e") + " } }";
+      }
+      case Bridge::CStruct: {
+        std::vector<std::string> reports;
+        for (size_t k = 0; k < type.elements.size(); k++) {
+          reports.push_back(returnValue(type.elements[k], reporter,
+                                        value + "." + type.labels[k]));
+        }
+        return reporter + ".returnTuple(" +
+               std::to_string(type.elements.size()) + ") { " +
+               llvm::join(reports, "; ") + " }";
       }
       case Bridge::Tuple: {
         std::vector<std::string> reports;

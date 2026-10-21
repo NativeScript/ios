@@ -68,6 +68,10 @@ enum class Bridge {
   // `any Error` as a value: a JS Error named "SwiftError"; any JS value
   // as input, whose message the Swift error describes.
   Error,
+  // A C struct Swift imports whose fields are known (cStructBridge):
+  // a plain JS object copy of its fields, `{ x, y }`; `elements` holds the
+  // fields, `labels` their names, and `objcClass` the struct's name.
+  CStruct,
   // Result<Success, Failure>: a plain JS object copy,
   // `{ case: "success", value }` or `{ case: "failure", value }`;
   // `elements` holds Success (Void for none) and Failure.
@@ -175,6 +179,13 @@ Classification classify(
 
 // Whether `kind` is something JavaScript can call or read.
 bool isCallableKind(SymbolKind kind);
+
+// `name` (a C struct Swift imports, such as CGPoint or
+// CLLocationCoordinate2D) as a CStruct bridge, when its fields are known.
+std::optional<BridgedType> cStructBridge(const std::string& name);
+
+// The framework that declares the C struct `name`, or null.
+const char* frameworkOfCStruct(const std::string& name);
 
 // Whether enum `symbol` has a case with associated values.
 bool hasAssociatedValues(const Module& module, const Symbol& symbol);

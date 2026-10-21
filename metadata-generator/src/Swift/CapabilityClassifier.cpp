@@ -50,6 +50,112 @@ bool isCallableKind(SymbolKind kind) {
   }
 }
 
+namespace {
+
+struct CStructInfo {
+  const char* name;
+  const char* framework;
+  // Field names and types: CGFloat, Double, Int, or another struct here.
+  std::vector<std::pair<const char*, const char*>> fields;
+};
+
+const std::vector<CStructInfo>& cStructs() {
+  static const std::vector<CStructInfo> list = {
+      {"CGPoint", "CoreGraphics", {{"x", "CGFloat"}, {"y", "CGFloat"}}},
+      {"CGSize", "CoreGraphics", {{"width", "CGFloat"}, {"height", "CGFloat"}}},
+      {"CGVector", "CoreGraphics", {{"dx", "CGFloat"}, {"dy", "CGFloat"}}},
+      {"CGRect", "CoreGraphics", {{"origin", "CGPoint"}, {"size", "CGSize"}}},
+      {"CGAffineTransform",
+       "CoreGraphics",
+       {{"a", "CGFloat"},
+        {"b", "CGFloat"},
+        {"c", "CGFloat"},
+        {"d", "CGFloat"},
+        {"tx", "CGFloat"},
+        {"ty", "CGFloat"}}},
+      {"UIEdgeInsets",
+       "UIKit",
+       {{"top", "CGFloat"},
+        {"left", "CGFloat"},
+        {"bottom", "CGFloat"},
+        {"right", "CGFloat"}}},
+      {"NSDirectionalEdgeInsets",
+       "UIKit",
+       {{"top", "CGFloat"},
+        {"leading", "CGFloat"},
+        {"bottom", "CGFloat"},
+        {"trailing", "CGFloat"}}},
+      {"UIOffset",
+       "UIKit",
+       {{"horizontal", "CGFloat"}, {"vertical", "CGFloat"}}},
+      {"NSRange", "Foundation", {{"location", "Int"}, {"length", "Int"}}},
+      {"CLLocationCoordinate2D",
+       "CoreLocation",
+       {{"latitude", "Double"}, {"longitude", "Double"}}},
+      {"MKCoordinateSpan",
+       "MapKit",
+       {{"latitudeDelta", "Double"}, {"longitudeDelta", "Double"}}},
+      {"MKCoordinateRegion",
+       "MapKit",
+       {{"center", "CLLocationCoordinate2D"}, {"span", "MKCoordinateSpan"}}},
+  };
+  return list;
+}
+
+const CStructInfo* findCStruct(const std::string& name) {
+  for (const auto& info : cStructs()) {
+    if (name == info.name) {
+      return &info;
+    }
+  }
+  return nullptr;
+}
+
+TypeNode nominal(const std::string& name, const std::string& usr) {
+  TypeNode node;
+  node.kind = TypeNode::Kind::Nominal;
+  TypeNode::Component component;
+  component.name = name;
+  component.usr = usr;
+  node.components.push_back(std::move(component));
+  return node;
+}
+
+}  // namespace
+
+std::optional<BridgedType> cStructBridge(const std::string& name) {
+  const CStructInfo* info = findCStruct(name);
+  if (!info) {
+    return std::nullopt;
+  }
+  BridgedType bridged;
+  bridged.bridge = Bridge::CStruct;
+  bridged.objcClass = info->name;
+  bridged.node = nominal(info->name, "");
+  for (const auto& field : info->fields) {
+    std::string type = field.second;
+    BridgedType element;
+    if (type == "CGFloat" || type == "Double") {
+      element.bridge = Bridge::Floating;
+      element.node = nominal(
+          type, type == "CGFloat" ? KnownTypes::kCGFloat : KnownTypes::kDouble);
+    } else if (type == "Int") {
+      element.bridge = Bridge::Integer;
+      element.node = nominal(type, KnownTypes::kInt);
+    } else {
+      element = *cStructBridge(type);
+    }
+    bridged.labels.push_back(field.first);
+    bridged.elements.push_back(std::move(element));
+  }
+  return bridged;
+}
+
+const char* frameworkOfCStruct(const std::string& name) {
+  const CStructInfo* info = findCStruct(name);
+  return info ? info->framework : nullptr;
+}
+
 bool hasAssociatedValues(const Module& module, const Symbol& symbol) {
   if (symbol.kind != SymbolKind::Enum) {
     return false;
@@ -833,6 +939,16 @@ class Classifier {
         isPrimitive(usr, bridged.bridge)) {
       return "";
     }
+    if (llvm::StringRef(usr).startswith("c:") && node.components.size() == 1 &&
+        node.components[0].arguments.empty()) {
+      if (auto structure = cStructBridge(node.components[0].name)) {
+        bridged.bridge = Bridge::CStruct;
+        bridged.objcClass = structure->objcClass;
+        bridged.labels = std::move(structure->labels);
+        bridged.elements = std::move(structure->elements);
+        return "";
+      }
+    }
     if (usr == KnownTypes::kError && node.components.size() == 1) {
       bridged.bridge = Bridge::Error;
       return "";
@@ -1110,6 +1226,7 @@ class Classifier {
       case Bridge::Dictionary:
       case Bridge::TaggedEnum:
       case Bridge::Result:
+      case Bridge::CStruct:
         kind = "record";
         break;
       case Bridge::Closure:

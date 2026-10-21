@@ -1,6 +1,7 @@
 // Objective-C classes in Swift signatures, which cross as NativeScript's
 // ordinary Objective-C wrappers.
 
+import CoreLocation
 import UIKit
 
 public func describe(_ view: UIView) -> String { "\(type(of: view)) \(view.tag)" }
@@ -29,3 +30,13 @@ public func noteLater(_ text: String) async -> Note {
 }
 
 public func viewTag<V: UIView>(_ view: V) -> Int { view.tag }
+
+// C structs with known fields (plain JS objects).
+public func midpoint(_ a: CGPoint, _ b: CGPoint) -> CGPoint {
+    CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
+}
+public func inset(_ rect: CGRect, by insets: UIEdgeInsets) -> CGRect { rect.inset(by: insets) }
+public func fitting(_ size: CGSize?) -> CGSize? { size.map { CGSize(width: $0.width * 2, height: $0.height * 2) } }
+public func latitudeSpan(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> Double {
+    abs(a.latitude - b.latitude)
+}

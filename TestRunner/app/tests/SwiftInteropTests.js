@@ -806,6 +806,23 @@ describe("ns:swift", function () {
         });
     });
 
+    describe("C structs", function () {
+        it("copies known C structs as plain objects", function () {
+            expect(SwiftDemo.midpoint({ x: 0, y: 0 }, { x: 4, y: 2 })).toEqual({ x: 2, y: 1 });
+            var rect = SwiftDemo.inset({ origin: { x: 0, y: 0 }, size: { width: 10, height: 10 } },
+                                       { top: 1, left: 2, bottom: 3, right: 4 });
+            expect(rect).toEqual({ origin: { x: 2, y: 1 }, size: { width: 4, height: 6 } });
+            expect(SwiftDemo.fitting({ width: 1, height: 2 })).toEqual({ width: 2, height: 4 });
+            expect(SwiftDemo.fitting(null)).toBeNull();
+            expect(SwiftDemo.latitudeSpan({ latitude: 10, longitude: 0 }, { latitude: 4, longitude: 1 })).toBe(6);
+            expect(function () { SwiftDemo.midpoint({ x: 1 }, { x: 0, y: 0 }); }).toThrowError(TypeError);
+        });
+
+        it("accepts NativeScript's struct values", function () {
+            expect(SwiftDemo.midpoint(CGPointMake(0, 0), CGPointMake(2, 2))).toEqual({ x: 1, y: 1 });
+        });
+    });
+
     describe("Objective-C objects", function () {
         it("passes NativeScript's Objective-C wrappers", function () {
             var view = UIView.new();
