@@ -37,8 +37,90 @@ SwiftSurface::MemberKind memberKind(SymbolKind kind) {
       return SwiftSurface::kVariable;
     case SymbolKind::EnumCase:
       return SwiftSurface::kEnumCase;
+    case SymbolKind::Operator:
+      return SwiftSurface::kStaticMethod;
+    // Subscripts are methods: `subscript(...)` and `setSubscript(..., value)`.
+    case SymbolKind::InstanceSubscript:
+      return SwiftSurface::kInstanceMethod;
+    case SymbolKind::TypeSubscript:
+      return SwiftSurface::kStaticMethod;
     default:
       return SwiftSurface::kFunction;
+  }
+}
+
+// `equals(other)` and, for a Comparable type, `compare(other)`, unless the
+// type declares members of those names (`==` declared explicitly is already
+// `equals`).
+void addComparisons(SwiftSurface& surface, const SwiftSurface::Type& type,
+                    const Capability& capability) {
+  for (auto comparison :
+       {SwiftSurface::Member::kEquals, SwiftSurface::Member::kCompare}) {
+    const char* name =
+        comparison == SwiftSurface::Member::kEquals ? "equals" : "compare";
+    bool taken = std::any_of(surface.members.begin(), surface.members.end(),
+                             [&](const SwiftSurface::Member& member) {
+                               return member.owner == type.index &&
+                                      member.capability->jsName == name;
+                             });
+    if (taken || (comparison == SwiftSurface::Member::kCompare &&
+                  !capability.comparable)) {
+      continue;
+    }
+    const Symbol& owner = *type.symbol;
+    Symbol symbol;
+    symbol.preciseId = owner.preciseId;
+    symbol.kind = SymbolKind::InstanceMethod;
+    symbol.name = std::string(name) + "(_:)";
+    symbol.baseName = name;
+    symbol.pathComponents = owner.pathComponents;
+    symbol.pathComponents.push_back(symbol.name);
+    symbol.parentId = owner.preciseId;
+    symbol.module = owner.module;
+    Parameter other;
+    other.internalName = "other";
+    symbol.parameters.push_back(other);
+    symbol.docComment =
+        comparison == SwiftSurface::Member::kEquals
+            ? "Whether the values are equal (Swift's `==`)."
+            : "-1, 0 or 1 as this value sorts before, with or after `other` "
+              "(Swift's `<`): `list.sort((a, b) => a.compare(b))`.";
+    surface.syntheticSymbols.push_back(std::move(symbol));
+
+    Capability compare;
+    compare.tier = Tier::SwiftGenerated;
+    compare.jsName = name;
+    BridgedType self;
+    self.bridge = type.kind == SwiftSurface::kStruct ? Bridge::StructBox
+                                                     : Bridge::ClassHandle;
+    self.symbolId = owner.preciseId;
+    self.node.kind = TypeNode::Kind::Nominal;
+    self.node.components.push_back(
+        TypeNode::Component{owner.name, owner.preciseId, {}});
+    compare.parameters.push_back(self);
+    if (comparison == SwiftSurface::Member::kEquals) {
+      compare.result.bridge = Bridge::Bool;
+    } else {
+      compare.result.bridge = Bridge::Integer;
+      compare.result.node.kind = TypeNode::Kind::Nominal;
+      compare.result.node.components.push_back(
+          TypeNode::Component{"Int", KnownTypes::kInt, {}});
+    }
+    surface.syntheticCapabilities.push_back(std::move(compare));
+
+    SwiftSurface::Member member;
+    member.symbol = &surface.syntheticSymbols.back();
+    member.capability = &surface.syntheticCapabilities.back();
+    member.owner = type.index;
+    member.module = type.module;
+    member.kind = SwiftSurface::kInstanceMethod;
+    member.flags = 0;
+    member.result = member.capability->result;
+    member.signature =
+        signatureCode(surface, member.capability->parameters[0]) + ">" +
+        signatureCode(surface, member.result);
+    member.comparison = comparison;
+    surface.members.push_back(std::move(member));
   }
 }
 
@@ -244,10 +326,14 @@ SwiftSurface describeSurface(const Module& module,
     member.module = member.owner >= 0       ? surface.types[member.owner].module
                     : symbol.module.empty() ? module.name
                                             : symbol.module;
-    member.kind = memberKind(symbol.kind);
+    member.kind = capability->operatorInstance ? SwiftSurface::kInstanceMethod
+                                               : memberKind(symbol.kind);
+    bool subscript = symbol.kind == SymbolKind::InstanceSubscript ||
+                     symbol.kind == SymbolKind::TypeSubscript;
     member.flags =
         (symbol.isThrowing ? SwiftSurface::kThrows : 0) |
-        (capability->isSettable && member.kind != SwiftSurface::kEnumCase
+        (capability->isSettable && member.kind != SwiftSurface::kEnumCase &&
+                 !subscript
              ? SwiftSurface::kSettable
              : 0) |
         (capability->ambiguousOverload ? SwiftSurface::kAmbiguous : 0) |
@@ -262,6 +348,96 @@ SwiftSurface describeSurface(const Module& module,
                           signatureCode(surface, capability->parameters[i]);
     }
     member.signature += ">" + signatureCode(surface, member.result);
+    if (subscript && capability->isSettable && !capability->isAsync) {
+      Symbol setter = symbol;
+      setter.name = "setSubscript(";
+      for (size_t i = 0; i < symbol.parameters.size(); i++) {
+        setter.name += "_:";
+      }
+      setter.name += "_:)";
+      setter.baseName = "setSubscript";
+      Parameter value;
+      value.internalName = "value";
+      value.type = *symbol.valueType;
+      setter.parameters.push_back(value);
+      setter.valueType.reset();
+      setter.returnType.reset();
+      surface.syntheticSymbols.push_back(std::move(setter));
+
+      Capability assign = *capability;
+      assign.jsName = "setSubscript";
+      assign.isSettable = false;
+      assign.parameters.push_back(capability->result);
+      assign.result = BridgedType();
+      assign.result.bridge = Bridge::Void;
+      surface.syntheticCapabilities.push_back(std::move(assign));
+
+      SwiftSurface::Member assigner = member;
+      assigner.symbol = &surface.syntheticSymbols.back();
+      assigner.capability = &surface.syntheticCapabilities.back();
+      assigner.result = assigner.capability->result;
+      assigner.assignsSubscript = &symbol;
+      assigner.signature.clear();
+      for (size_t i = 0; i < assigner.capability->parameters.size(); i++) {
+        assigner.signature +=
+            (i > 0 ? "," : "") +
+            signatureCode(surface, assigner.capability->parameters[i]);
+      }
+      assigner.signature += ">v";
+      surface.members.push_back(std::move(member));
+      surface.members.push_back(std::move(assigner));
+      continue;
+    }
+    surface.members.push_back(std::move(member));
+  }
+
+  for (const auto& type : surface.types) {
+    const Capability* capability = classification.find(type.symbol->preciseId);
+    if (capability && capability->equatable &&
+        (type.kind == SwiftSurface::kStruct ||
+         type.kind == SwiftSurface::kClass)) {
+      addComparisons(surface, type, *capability);
+    }
+  }
+
+  for (const auto& type : surface.types) {
+    const Capability* capability = classification.find(type.symbol->preciseId);
+    if (!capability || !capability->asyncElement ||
+        (type.kind != SwiftSurface::kStruct &&
+         type.kind != SwiftSurface::kClass)) {
+      continue;
+    }
+    const Symbol& sequence = *type.symbol;
+    Symbol symbol;
+    symbol.preciseId = sequence.preciseId;
+    symbol.kind = SymbolKind::InstanceMethod;
+    symbol.name = "makeAsyncIterator()";
+    symbol.baseName = kAsyncIteratorKey;
+    symbol.pathComponents = sequence.pathComponents;
+    symbol.pathComponents.push_back(symbol.name);
+    symbol.parentId = sequence.preciseId;
+    symbol.module = sequence.module;
+    symbol.docComment =
+        "Iterates the sequence: `for await (const x of value)`.";
+    surface.syntheticSymbols.push_back(std::move(symbol));
+
+    Capability iterate;
+    iterate.tier = Tier::SwiftGenerated;
+    iterate.jsName = kAsyncIteratorKey;
+    iterate.result.bridge = Bridge::AsyncSequence;
+    iterate.result.elements.push_back(*capability->asyncElement);
+    surface.syntheticCapabilities.push_back(std::move(iterate));
+
+    SwiftSurface::Member member;
+    member.symbol = &surface.syntheticSymbols.back();
+    member.capability = &surface.syntheticCapabilities.back();
+    member.owner = type.index;
+    member.module = type.module;
+    member.kind = SwiftSurface::kInstanceMethod;
+    member.flags = 0;
+    member.result = member.capability->result;
+    member.signature = ">" + signatureCode(surface, member.result);
+    member.iteratesSelf = true;
     surface.members.push_back(std::move(member));
   }
 

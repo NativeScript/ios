@@ -388,10 +388,20 @@ class Emitter {
         return "__nsReportProtocol" +
                std::to_string(typeIndexOf(type.symbolId)) + "(" + reporter +
                ", " + value + ")";
-      case Bridge::AsyncSequence:
-        return reporter + ".returnAsyncSequence(__NSAsyncIterator(" + value +
-               ") { r, element in " +
-               returnValue(type.elements.at(0), "r", "element") + " })";
+      case Bridge::AsyncSequence: {
+        std::string report = ") { r, element in " +
+                             returnValue(type.elements.at(0), "r", "element") +
+                             " })";
+        if (!type.publisher) {
+          return reporter + ".returnAsyncSequence(__NSAsyncIterator(" + value +
+                 report;
+        }
+        // A publisher's `values` needs iOS 15; earlier systems get null.
+        return "if #available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *) "
+               "{ " +
+               reporter + ".returnAsyncSequence(__NSAsyncIterator(" + value +
+               ".values" + report + " } else { " + reporter + ".returnNull() }";
+      }
       case Bridge::EnumCase:
         return reporter + ".returnString(__nsEnumName" +
                std::to_string(typeIndexOf(type.symbolId)) + "(" + value + "))";
@@ -406,9 +416,13 @@ class Emitter {
       case Bridge::Data:
         return reporter + ".returnBytes(" + value + ")";
       case Bridge::Array:
-      case Bridge::Set:
-        return reporter + ".returnArray(" + value + ") { element in " +
+      case Bridge::Set: {
+        // `any Sequence<E>` is copied out as an array.
+        bool sequence = unwrappedNode(type).kind == TypeNode::Kind::Existential;
+        return reporter + ".returnArray(" +
+               (sequence ? "Array(" + value + ")" : value) + ") { element in " +
                returnElement(type.elements.at(0), reporter) + " }";
+      }
       case Bridge::Error:
         return reporter + ".returnErrorValue(" + value + ")";
       case Bridge::Result: {
@@ -565,7 +579,7 @@ class Emitter {
       code += "  let captured = __NSUnchecked((" + list + "))\n";
       unpack = "    let (" + list + ") = captured.value\n";
     }
-    code += "  Task {\n" + unpack;
+    code += "  let task = Task {\n" + unpack;
     if (throwing) {
       code += "    do {\n      let " + binding + annotation(resultType) +
               " = " + expression + "\n" +
@@ -575,7 +589,7 @@ class Emitter {
       code += "    let " + binding + annotation(resultType) + " = " +
               expression + "\n" + returnResult(result, "    ", "completion");
     }
-    return code + "  }\n";
+    return code + "  }\n  completion.onCancel { task.cancel() }\n";
   }
 
   std::string emitMember(const SwiftSurface::Member& member) {
@@ -589,6 +603,15 @@ class Emitter {
 
     if (member.hostsView) {
       return emitHosting(member);
+    }
+    if (member.assignsSubscript) {
+      return emitSubscriptAssignment(member);
+    }
+    if (member.iteratesSelf) {
+      return emitIteration(member);
+    }
+    if (member.comparison != SwiftSurface::Member::kNone) {
+      return emitComparison(member);
     }
     if (member.kind == SwiftSurface::kEnumCase) {
       // Cases are values (names, or objects JS builds); nothing to call.
@@ -684,6 +707,86 @@ class Emitter {
 
     addRegistration(member, "__nsThunk" + std::to_string(getterIndex),
                     setterName);
+    return code;
+  }
+
+  // `equals(other)` (`==`) or `compare(other)` (-1, 0, 1 from `<`).
+  std::string emitComparison(const SwiftSurface::Member& member) {
+    const Symbol& owner = *_module.find(member.symbol->parentId);
+    int index = _thunkCount++;
+    std::string code = "// " + owner.preciseId + " (" +
+                       member.capability->jsName + ")\n" + thunkHeader(index);
+    std::string availability = availabilityCondition(_module, owner);
+    if (!availability.empty()) {
+      code += "  guard #available(" + availability +
+              ") else { return rt.throwMessage(" +
+              quoted(owner.name + " is not available") + ") }\n";
+    }
+    std::string receiver = bindReceiver(owner, code);
+    code += readArgument(member.capability->parameters[0], 1, "other",
+                         "argument 1");
+    code += member.comparison == SwiftSurface::Member::kEquals
+                ? "  rt.returnBool(" + receiver + " == other)\n"
+                : "  rt.returnInt64(" + receiver + " < other ? -1 : (other < " +
+                      receiver + " ? 1 : 0))\n";
+    code += "}\n\n";
+    addRegistration(member, "__nsThunk" + std::to_string(index), "nil");
+    return code;
+  }
+
+  // `[Symbol.asyncIterator]()`: an async iterator over the receiver.
+  std::string emitIteration(const SwiftSurface::Member& member) {
+    const Symbol& sequence = *_module.find(member.symbol->parentId);
+    int index = _thunkCount++;
+    std::string code =
+        "// " + sequence.preciseId + " (async iterator)\n" + thunkHeader(index);
+    std::string availability = availabilityCondition(_module, sequence);
+    if (!availability.empty()) {
+      code += "  guard #available(" + availability +
+              ") else { return rt.throwMessage(" +
+              quoted(sequence.name + " is not available") + ") }\n";
+    }
+    std::string receiver = bindReceiver(sequence, code);
+    code += "  " + returnValue(member.result, "rt", receiver) + "\n}\n\n";
+    addRegistration(member, "__nsThunk" + std::to_string(index), "nil");
+    return code;
+  }
+
+  // `setSubscript(..., value)`: assigns the subscript at the indices.
+  std::string emitSubscriptAssignment(const SwiftSurface::Member& member) {
+    const Symbol& subscript = *member.assignsSubscript;
+    const Capability& capability = *_classification.find(subscript.preciseId);
+    Invocation invocation = describeInvocation(_module, subscript, capability);
+    const Symbol* owner =
+        subscript.parentId.empty() ? nullptr : _module.find(subscript.parentId);
+    int index = _thunkCount++;
+    std::string code =
+        "// " + subscript.preciseId + " (setter)\n" + thunkHeader(index);
+    code += availabilityGuard(invocation, subscript);
+    std::string receiver;
+    int firstArgument = 0;
+    if (invocation.needsReceiver) {
+      receiver = bindReceiver(*owner, code);
+      firstArgument = 1;
+    }
+    std::vector<std::string> indices;
+    for (size_t i = 0; i < capability.parameters.size(); i++) {
+      std::string name = "a" + std::to_string(i);
+      code += readArgument(capability.parameters[i],
+                           firstArgument + static_cast<int>(i), name,
+                           "argument " + std::to_string(i + 1));
+      indices.push_back(name);
+    }
+    code += readArgument(
+        capability.result,
+        firstArgument + static_cast<int>(capability.parameters.size()),
+        "newValue", "value");
+    std::string body =
+        "  " + assignmentStatement(invocation, receiver, "newValue", indices) +
+        "\n  rt.returnVoid()\n";
+    code += invocation.isMainActor ? onMainActor(subscript, body) : body;
+    code += "}\n\n";
+    addRegistration(member, "__nsThunk" + std::to_string(index), "nil");
     return code;
   }
 
@@ -984,6 +1087,18 @@ private struct __NSCompletion: @unchecked Sendable, __NSReporter {
   let api: UnsafeRawPointer
   let token: UnsafeMutableRawPointer
 
+  // `cancel` runs when JS aborts the call (its AbortSignal); the runtime
+  // drops it once the call settles.
+  func onCancel(_ cancel: @escaping @Sendable () -> Void) {
+    let box = Unmanaged.passRetained(__NSCancellation(cancel)).toOpaque()
+    slot(56, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer,
+                              @convention(c) (UnsafeMutableRawPointer) -> Void,
+                              @convention(c) (UnsafeMutableRawPointer) -> Void) -> Void).self)(
+      token, box,
+      { Unmanaged<__NSCancellation>.fromOpaque($0).takeUnretainedValue().cancel() },
+      { Unmanaged<__NSCancellation>.fromOpaque($0).release() })
+  }
+
   private func slot<Function>(_ index: Int, _: Function.Type) -> Function {
     api.load(fromByteOffset: index * 8, as: Function.self)
   }
@@ -1114,6 +1229,29 @@ private final class __NSCallback: @unchecked Sendable {
     arguments(completion)
     api.load(fromByteOffset: 28 * 8, as: (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(completion.token)
   }
+}
+
+private final class __NSCancellation {
+  let cancel: @Sendable () -> Void
+  init(_ cancel: @escaping @Sendable () -> Void) { self.cancel = cancel }
+}
+
+// The adapter of JS object argument `i`: the one already made for that JS
+// object and protocol, so Swift sees one identity, or a new one the runtime
+// keeps for as long as the JS object lives.
+private func __nsAdapter<A: AnyObject>(_ slots: __NSSlots, _ i: Int,
+                                       _ make: (__NSJSObject) -> A) -> A {
+  let handle = slots.callback(i)
+  let existing = slots.api.load(fromByteOffset: 54 * 8,
+                                as: (@convention(c) (UnsafeMutableRawPointer) -> UnsafeMutableRawPointer?).self)(handle)
+  if let existing, let adapter = Unmanaged<AnyObject>.fromOpaque(existing).takeUnretainedValue() as? A {
+    return adapter
+  }
+  let adapter = make(__NSJSObject(api: slots.api, handle: handle))
+  slots.api.load(fromByteOffset: 55 * 8,
+                 as: (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void).self)(
+    handle, Unmanaged.passRetained(adapter).toOpaque())
+  return adapter
 }
 
 // A JS object implementing a protocol; adapters call its members. Calls from
@@ -1441,9 +1579,9 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
     out += attribute + "private func __nsProtocol" + index +
            "(_ slots: __NSSlots, _ i: Int) -> (" + existential +
            ")? {\n"
-           "  if slots.tag(i) == 12 {\n    return " +
+           "  if slots.tag(i) == 12 {\n    return __nsAdapter(slots, i) { " +
            adapter +
-           "(__NSJSObject(api: slots.api, handle: slots.callback(i)))\n  }\n"
+           "($0) }\n  }\n"
            "  let object = slots.object(i)\n"
            "  if let box = object as? __NSAnyBox { return box.anyValue as? " +
            existential + " }\n  return object as? " + existential + "\n}\n\n";

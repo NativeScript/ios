@@ -697,6 +697,9 @@ void ApiReturnErrorValue(NSSwiftCall* call, const uint8_t* message, intptr_t mes
                          const uint8_t* type, intptr_t typeLength);
 void ApiCompleteErrorValue(void* token, const uint8_t* message, intptr_t messageLength,
                            const uint8_t* type, intptr_t typeLength);
+void* ApiAdapterOf(void* handle);
+void ApiAdoptAdapter(void* handle, void* adapter);
+void ApiSetCancel(void* token, void* context, void (*cancel)(void*), void (*release)(void*));
 void ApiReturnAsyncSequence(NSSwiftCall* call, void* iterator, NSSwiftThunk next);
 void ApiCompleteAsyncSequence(void* token, void* iterator, NSSwiftThunk next);
 struct IsolateState;
@@ -709,24 +712,63 @@ Local<Value> JSObjectOf(SwiftCallback* handle, Isolate* isolate);
 void ReleaseCallback(SwiftCallback* callback);
 
 const NSSwiftAPI kAPI = {
-    ApiReturnVoid,           ApiReturnBool,           ApiReturnInt64,
-    ApiReturnUInt64,         ApiReturnDouble,         ApiReturnString,
-    ApiReturnNull,           ApiReturnObject,         ApiThrowError,
-    ApiThrowTypeError,       ApiRegisterModule,       ApiRegisterType,
-    ApiRegisterMember,       ApiBeginAsync,           ApiCompleteVoid,
-    ApiCompleteBool,         ApiCompleteInt64,        ApiCompleteUInt64,
-    ApiCompleteDouble,       ApiCompleteString,       ApiCompleteNull,
-    ApiCompleteObject,       ApiCompleteError,        ApiReturnArrayBegin,
-    ApiReturnArrayEnd,       ApiReturnMapBegin,       ApiReturnMapEnd,
-    ApiCompleteArrayBegin,   ApiCompleteContainerEnd, ApiCompleteMapBegin,
-    ApiCompleteContainerEnd, ApiCallbackBegin,        ApiCallbackRetain,
-    ApiCallbackRelease,      ApiReturnCaseBegin,      ApiCompleteCaseBegin,
-    ApiReturnArrayEnd,       ApiCompleteContainerEnd, ApiWriteBackBegin,
-    ApiWriteBackEnd,         ApiReturnObjC,           ApiCompleteObjC,
-    ApiRegisterUnitModule,   ApiObjectCallBegin,      ApiObjectCallEnd,
-    ApiObjectResultRelease,  ApiReturnJSObject,       ApiCompleteJSObject,
-    ApiRegisterTracker,      ApiReturnAsyncSequence,  ApiCompleteAsyncSequence,
-    ApiCallbackCallEnd,      ApiReturnErrorValue,     ApiCompleteErrorValue,
+    ApiReturnVoid,
+    ApiReturnBool,
+    ApiReturnInt64,
+    ApiReturnUInt64,
+    ApiReturnDouble,
+    ApiReturnString,
+    ApiReturnNull,
+    ApiReturnObject,
+    ApiThrowError,
+    ApiThrowTypeError,
+    ApiRegisterModule,
+    ApiRegisterType,
+    ApiRegisterMember,
+    ApiBeginAsync,
+    ApiCompleteVoid,
+    ApiCompleteBool,
+    ApiCompleteInt64,
+    ApiCompleteUInt64,
+    ApiCompleteDouble,
+    ApiCompleteString,
+    ApiCompleteNull,
+    ApiCompleteObject,
+    ApiCompleteError,
+    ApiReturnArrayBegin,
+    ApiReturnArrayEnd,
+    ApiReturnMapBegin,
+    ApiReturnMapEnd,
+    ApiCompleteArrayBegin,
+    ApiCompleteContainerEnd,
+    ApiCompleteMapBegin,
+    ApiCompleteContainerEnd,
+    ApiCallbackBegin,
+    ApiCallbackRetain,
+    ApiCallbackRelease,
+    ApiReturnCaseBegin,
+    ApiCompleteCaseBegin,
+    ApiReturnArrayEnd,
+    ApiCompleteContainerEnd,
+    ApiWriteBackBegin,
+    ApiWriteBackEnd,
+    ApiReturnObjC,
+    ApiCompleteObjC,
+    ApiRegisterUnitModule,
+    ApiObjectCallBegin,
+    ApiObjectCallEnd,
+    ApiObjectResultRelease,
+    ApiReturnJSObject,
+    ApiCompleteJSObject,
+    ApiRegisterTracker,
+    ApiReturnAsyncSequence,
+    ApiCompleteAsyncSequence,
+    ApiCallbackCallEnd,
+    ApiReturnErrorValue,
+    ApiCompleteErrorValue,
+    ApiAdapterOf,
+    ApiAdoptAdapter,
+    ApiSetCancel,
 };
 
 // "Polygon.Style" -> "Style".
@@ -984,6 +1026,29 @@ struct PendingAsync {
   Global<Promise::Resolver> resolver;
   ValueCode code;
   std::string name;
+  // Cancels the Swift task (setCancel); released with the entry.
+  void* cancelContext = nullptr;
+  void (*cancel)(void*) = nullptr;
+  void (*release)(void*) = nullptr;
+
+  ~PendingAsync() {
+    if (release != nullptr) {
+      release(cancelContext);
+    }
+  }
+};
+
+struct SwiftCallback;
+
+// The protocol adapters Swift made of one JS object, one per protocol (the
+// handles' `adapter`), each owned (+1) until the object is collected. A
+// handle holds the object strongly while Swift retains its adapter beyond
+// that, and weakly otherwise, as NativeScript holds the JS side of
+// Objective-C objects: Swift's strong references keep the object alive,
+// weak ones (`weak var delegate`) last as long as JS keeps it.
+struct AdaptedObject {
+  Global<Object> object;
+  std::vector<SwiftCallback*> handles;
 };
 
 struct IsolateState {
@@ -998,6 +1063,12 @@ struct IsolateState {
   std::vector<CallContext*> calls;
   // Builds async iterators from step functions (MakeAsyncIterator).
   Global<v8::Function> iteratorFactory;
+  // JS objects with protocol adapters, and whether the GC hook that keeps
+  // their strength in step is installed (see AdaptedObject).
+  robin_hood::unordered_set<AdaptedObject*> adapted;
+  bool adapterHook = false;
+
+  ~IsolateState();
 };
 
 // Owns one retain of a Swift object for as long as its JS wrapper lives.
@@ -1080,6 +1151,8 @@ struct CallContext : NSSwiftCall {
   Local<Value> result;
   bool completed = false;
   bool threw = false;
+  // The pending entry of an async call (beginAsync), or 0.
+  uint64_t asyncId = 0;
   // The first exception a JS callback threw while the thunk ran; it is
   // thrown from the call once the thunk returns.
   Global<Value> callbackException;
@@ -1860,10 +1933,103 @@ struct SwiftCallback {
   std::string name;
   Global<Object> target;
   std::atomic<int> references{1};
+  // A JS object's protocol handle: its Swift adapter (+1), once made.
+  void* adapter = nullptr;
 };
 
+// Null once the JS object an adapter held weakly was collected.
 Local<Value> JSObjectOf(SwiftCallback* handle, Isolate* isolate) {
+  if (handle->target.IsEmpty()) {
+    return v8::Null(isolate);
+  }
   return handle->target.Get(isolate);
+}
+
+// Before each collection: a handle is strong exactly while something besides
+// its AdaptedObject retains the adapter.
+void AdapterGCPrologue(Isolate* isolate, v8::GCType, v8::GCCallbackFlags, void*) {
+  auto* state = Caches::StateFor<IsolateState>(isolate);
+  if (state == nullptr) {
+    return;
+  }
+  for (AdaptedObject* adapted : state->adapted) {
+    for (SwiftCallback* handle : adapted->handles) {
+      if (handle->target.IsEmpty()) {
+        continue;
+      }
+      bool shared = handle->adapter != nullptr && CFGetRetainCount((CFTypeRef)handle->adapter) > 1;
+      if (shared && handle->target.IsWeak()) {
+        handle->target.ClearWeak<void>();
+      } else if (!shared && !handle->target.IsWeak()) {
+        handle->target.SetWeak();
+      }
+    }
+  }
+}
+
+// The JS object was collected: release its adapters and handles.
+void ReleaseAdaptedObject(const v8::WeakCallbackInfo<AdaptedObject>& info) {
+  AdaptedObject* adapted = info.GetParameter();
+  adapted->object.Reset();
+  info.SetSecondPassCallback([](const v8::WeakCallbackInfo<AdaptedObject>& info) {
+    AdaptedObject* adapted = info.GetParameter();
+    if (auto* state = Caches::StateFor<IsolateState>(info.GetIsolate())) {
+      state->adapted.erase(adapted);
+    }
+    for (SwiftCallback* handle : adapted->handles) {
+      if (handle->adapter != nullptr) {
+        handle->module->release(handle->adapter);
+      }
+      ReleaseCallback(handle);
+    }
+    delete adapted;
+  });
+}
+
+IsolateState::~IsolateState() {
+  // The isolate is going away: adapters still alive keep their handles.
+  for (AdaptedObject* adapted : adapted) {
+    adapted->object.Reset();
+    delete adapted;
+  }
+}
+
+// `object`'s handle for `protocol` (+1 for the caller): the one its adapter
+// was made for, so Swift sees one adapter per JS object and protocol.
+SwiftCallback* AdapterHandle(Isolate* isolate, Local<Context> context, IsolateState* state,
+                             const ModuleInfo* module, const ValueCode& code,
+                             const std::string& name, Local<Object> object) {
+  Local<v8::Private> key =
+      v8::Private::ForApi(isolate, tns::ToV8String(isolate, "ns:swift.adapters"));
+  Local<Value> stored;
+  AdaptedObject* adapted = nullptr;
+  if (object->GetPrivate(context, key).ToLocal(&stored) && stored->IsExternal()) {
+    adapted = static_cast<AdaptedObject*>(
+        stored.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+  } else {
+    adapted = new AdaptedObject();
+    adapted->object.Reset(isolate, object);
+    adapted->object.SetWeak(adapted, ReleaseAdaptedObject, v8::WeakCallbackType::kParameter);
+    object
+        ->SetPrivate(context, key,
+                     External::New(isolate, adapted, v8::kExternalPointerTypeTagDefault))
+        .Check();
+    state->adapted.insert(adapted);
+    if (!state->adapterHook) {
+      isolate->AddGCPrologueCallback(AdapterGCPrologue);
+      state->adapterHook = true;
+    }
+  }
+  for (SwiftCallback* handle : adapted->handles) {
+    if (handle->module == module && handle->code.typeIndex == code.typeIndex) {
+      handle->references.fetch_add(1, std::memory_order_relaxed);
+      return handle;
+    }
+  }
+  auto* handle = new SwiftCallback(isolate, module, code, name, object);
+  adapted->handles.push_back(handle);
+  handle->references.fetch_add(1, std::memory_order_relaxed);
+  return handle;
 }
 
 // Runs `body` on the isolate's thread with the isolate locked and valid:
@@ -2025,6 +2191,7 @@ void* ApiBeginAsync(NSSwiftCall* call) {
     pending->code = *context->resultCode;
     pending->name = context->member->swiftName;
     context->state->pending.emplace(id, std::move(pending));
+    context->asyncId = id;
     Complete(context, resolver->GetPromise());
   } else {
     // The token is still completed later; it then finds no pending entry.
@@ -2053,6 +2220,35 @@ void ApiCallbackRetain(void* callback) {
 }
 
 void ApiCallbackRelease(void* callback) { ReleaseCallback(static_cast<SwiftCallback*>(callback)); }
+
+void* ApiAdapterOf(void* handle) { return static_cast<SwiftCallback*>(handle)->adapter; }
+
+// On the isolate's thread, during the call that began `token`.
+void ApiSetCancel(void* token, void* context, void (*cancel)(void*), void (*release)(void*)) {
+  auto* async = static_cast<AsyncToken*>(token);
+  auto* state = Caches::StateFor<IsolateState>(async->isolate);
+  if (state == nullptr) {
+    release(context);
+    return;
+  }
+  auto it = state->pending.find(async->id);
+  if (it == state->pending.end()) {
+    release(context);
+    return;
+  }
+  it->second->cancelContext = context;
+  it->second->cancel = cancel;
+  it->second->release = release;
+}
+
+void ApiAdoptAdapter(void* handle, void* adapter) {
+  auto* callback = static_cast<SwiftCallback*>(handle);
+  if (callback->adapter != nullptr) {
+    callback->module->release(adapter);
+    return;
+  }
+  callback->adapter = adapter;
+}
 
 void ApiCompleteVoid(void* token) { Emit(token, Outcome(AsyncOutcome::Kind::Void)); }
 
@@ -2659,7 +2855,12 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
             isolate, member, index,
             "does not implement " + protocol.jsName + " (missing " + missing + ")");
       }
-      auto* handle = new SwiftCallback(isolate, &module, code, member.swiftName, object);
+      auto* state = Caches::StateFor<IsolateState>(isolate);
+      if (state == nullptr) {
+        return false;
+      }
+      SwiftCallback* handle =
+          AdapterHandle(isolate, context, state, &module, code, member.swiftName, object);
       arena.callbacks.push_back(handle);
       slot.tag = NSSwiftTagJSObject;
       slot.payload.object = handle;
@@ -2752,6 +2953,10 @@ ObjectResult* RunObjectCall(SwiftCallback* handle, AsyncOutcome& arguments, intp
   }
 
   auto result = std::make_unique<ObjectResult>();
+  if (handle->target.IsEmpty()) {
+    // A weakly held JS implementation was collected.
+    return nullptr;
+  }
   Local<Object> target = handle->target.Get(isolate);
   Local<v8::String> key = tns::ToV8String(isolate, member.jsName);
   bool done = false;
@@ -3049,8 +3254,9 @@ bool Select(Isolate* isolate, Local<Context> context, const MemberGroup& group,
 LoadedModule* LoadedFor(Isolate* isolate, const ModuleInfo* module);
 Local<External> DataFor(Isolate* isolate, const void* pointer);
 
-// A Swift iterator owned by the step function JS calls; released when that
-// function is collected.
+// A Swift iterator owned by the step function JS calls; released when the
+// iteration finishes (the end, or `return()` after `break`) or that function
+// is collected.
 struct IteratorBox {
   Global<v8::Function> step;
   const ModuleInfo* module;
@@ -3060,13 +3266,25 @@ struct IteratorBox {
   MemberInfo member;
 };
 
+// Releases the Swift iterator, which ends a stream Swift still produces
+// (AsyncStream's onTermination sees `.cancelled`). A step in flight keeps
+// its own reference until it settles.
+void FinishCallback(const FunctionCallbackInfo<Value>& info) {
+  auto* box = static_cast<IteratorBox*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+  if (box->iterator != nullptr) {
+    box->module->release(box->iterator);
+    box->iterator = nullptr;
+  }
+}
+
 void StepCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   auto* box = static_cast<IteratorBox*>(
       info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
   auto* state = Caches::StateFor<IsolateState>(isolate);
   LoadedModule* loaded = LoadedFor(isolate, box->module);
-  if (state == nullptr || loaded == nullptr) {
+  if (state == nullptr || loaded == nullptr || box->iterator == nullptr) {
     return;
   }
   NSSwiftValue slot{};
@@ -3094,14 +3312,28 @@ void StepCallback(const FunctionCallbackInfo<Value>& info) {
 
 // Turns a step function (a Promise of `[element]`, or `[]` at the end) into
 // an async iterator, one step at a time.
-constexpr const char* kIteratorFactory = R"js((function (step) {
+// `finish` releases the Swift iterator at the end, or on `return()` when a
+// `for await` loop exits early.
+constexpr const char* kIteratorFactory = R"js((function (step, finish) {
   let pending = Promise.resolve();
+  let done = false;
+  const end = () => {
+    if (!done) {
+      done = true;
+      finish();
+    }
+    return { value: undefined, done: true };
+  };
   return {
     next() {
-      const result = pending.then(() => step()).then((values) =>
-        values.length ? { value: values[0], done: false } : { value: undefined, done: true });
+      const result = pending.then(() => (done ? [] : step())).then((values) =>
+        values.length ? { value: values[0], done: false } : end());
       pending = result.then(() => undefined, () => undefined);
       return result;
+    },
+    return(value) {
+      end();
+      return Promise.resolve({ value, done: true });
     },
     [Symbol.asyncIterator]() {
       return this;
@@ -3137,18 +3369,26 @@ MaybeLocal<Value> MakeAsyncIterator(Isolate* isolate, Local<Context> context,
     delete box;
     return MaybeLocal<Value>();
   }
+  Local<v8::Function> finish;
+  if (!v8::Function::New(context, FinishCallback, DataFor(isolate, box)).ToLocal(&finish)) {
+    module->release(iterator);
+    delete box;
+    return MaybeLocal<Value>();
+  }
   box->step.Reset(isolate, step);
   box->step.SetWeak(
       box,
       [](const WeakCallbackInfo<IteratorBox>& info) {
         IteratorBox* collected = info.GetParameter();
         collected->step.Reset();
-        collected->module->release(collected->iterator);
+        if (collected->iterator != nullptr) {
+          collected->module->release(collected->iterator);
+        }
         delete collected;
       },
       WeakCallbackType::kParameter);
-  Local<Value> argv[] = {step};
-  return state->iteratorFactory.Get(isolate)->Call(context, v8::Undefined(isolate), 1, argv);
+  Local<Value> argv[] = {step, finish};
+  return state->iteratorFactory.Get(isolate)->Call(context, v8::Undefined(isolate), 2, argv);
 }
 
 LoadedModule* LoadedFor(Isolate* isolate, const ModuleInfo* module) {
@@ -3164,7 +3404,7 @@ LoadedModule* LoadedFor(Isolate* isolate, const ModuleInfo* module) {
 // `receiver` (empty for non-instance members) and `arguments`.
 MaybeLocal<Value> Invoke(Isolate* isolate, const MemberGroup& group, const MemberInfo& member,
                          Local<Value> receiver, const std::vector<Local<Value>>& arguments,
-                         bool setter, Local<Object> constructTarget) {
+                         bool setter, Local<Object> constructTarget, uint64_t* asyncId = nullptr) {
   Local<Context> context = isolate->GetCurrentContext();
   const ModuleInfo& module = *group.module;
   auto* state = Caches::StateFor<IsolateState>(isolate);
@@ -3245,6 +3485,9 @@ MaybeLocal<Value> Invoke(Isolate* isolate, const MemberGroup& group, const Membe
   state->calls.push_back(&call);
   thunk(&call, slots.empty() ? nullptr : slots.data(), static_cast<intptr_t>(slots.size()));
   state->calls.pop_back();
+  if (asyncId != nullptr) {
+    *asyncId = call.asyncId;
+  }
 
   // A JS exception thrown while the thunk ran caused whatever error the
   // thunk reported, so it is the one JS sees.
@@ -3305,6 +3548,96 @@ const MemberGroup& ForReceiver(Isolate* isolate, const MemberGroup& group, Local
   return storage.overloads.empty() ? group : storage;
 }
 
+// Takes a trailing AbortSignal off a call of an async member; empty when
+// there is none.
+Local<Object> TakeSignal(Isolate* isolate, Local<Context> context, const MemberGroup& group,
+                         std::vector<Local<Value>>& arguments) {
+  bool async = std::any_of(group.overloads.begin(), group.overloads.end(),
+                           [](const MemberInfo* m) { return m->flags & NSSwiftMemberAsync; });
+  Local<Value> type;
+  if (!async || arguments.empty() || !arguments.back()->IsObject() ||
+      !context->Global()->Get(context, tns::ToV8String(isolate, "AbortSignal")).ToLocal(&type) ||
+      !type->IsFunction() ||
+      !arguments.back()->InstanceOf(context, type.As<Object>()).FromMaybe(false)) {
+    return Local<Object>();
+  }
+  Local<Object> signal = arguments.back().As<Object>();
+  arguments.pop_back();
+  return signal;
+}
+
+// Rejects pending call `id` with `reason` and cancels its Swift task; a
+// result it reports later finds no entry.
+void AbortPending(Isolate* isolate, Local<Context> context, uint64_t id, Local<Value> reason) {
+  auto* state = Caches::StateFor<IsolateState>(isolate);
+  if (state == nullptr) {
+    return;
+  }
+  auto it = state->pending.find(id);
+  if (it == state->pending.end()) {
+    return;
+  }
+  std::unique_ptr<PendingAsync> pending = std::move(it->second);
+  state->pending.erase(it);
+  if (pending->cancel != nullptr) {
+    pending->cancel(pending->cancelContext);
+  }
+  pending->resolver.Get(isolate)->Reject(context, reason).Check();
+}
+
+// The signal's abort listener; its data is [call id, signal].
+void AbortListener(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<v8::Array> data = info.Data().As<v8::Array>();
+  Local<Value> id;
+  Local<Value> signal;
+  Local<Value> reason;
+  if (data->Get(context, 0).ToLocal(&id) && data->Get(context, 1).ToLocal(&signal) &&
+      signal.As<Object>()->Get(context, tns::ToV8String(isolate, "reason")).ToLocal(&reason)) {
+    AbortPending(isolate, context, static_cast<uint64_t>(id.As<v8::Number>()->Value()), reason);
+  }
+}
+
+// Ties async call `id` to `signal`: aborting rejects its Promise with the
+// signal's reason and cancels the Swift task.
+void WatchSignal(Isolate* isolate, Local<Context> context, uint64_t id, Local<Object> signal) {
+  if (id == 0) {
+    return;
+  }
+  Local<v8::Array> data = v8::Array::New(isolate, 2);
+  data->Set(context, 0, v8::Number::New(isolate, static_cast<double>(id))).Check();
+  data->Set(context, 1, signal).Check();
+  Local<v8::Function> listener;
+  Local<Value> add;
+  if (!v8::Function::New(context, AbortListener, data).ToLocal(&listener) ||
+      !signal->Get(context, tns::ToV8String(isolate, "addEventListener")).ToLocal(&add) ||
+      !add->IsFunction()) {
+    return;
+  }
+  Local<Object> options = Object::New(isolate);
+  options->Set(context, tns::ToV8String(isolate, "once"), v8::True(isolate)).Check();
+  Local<Value> argv[] = {tns::ToV8String(isolate, "abort"), listener, options};
+  (void)add.As<v8::Function>()->Call(context, signal, 3, argv);
+}
+
+// A Promise already rejected with an aborted signal's reason, or empty when
+// `signal` is not aborted.
+MaybeLocal<Value> AlreadyAborted(Isolate* isolate, Local<Context> context, Local<Object> signal) {
+  Local<Value> aborted;
+  Local<Value> reason;
+  Local<Promise::Resolver> resolver;
+  if (signal.IsEmpty() ||
+      !signal->Get(context, tns::ToV8String(isolate, "aborted")).ToLocal(&aborted) ||
+      !aborted->BooleanValue(isolate) ||
+      !signal->Get(context, tns::ToV8String(isolate, "reason")).ToLocal(&reason) ||
+      !Promise::Resolver::New(context).ToLocal(&resolver)) {
+    return MaybeLocal<Value>();
+  }
+  resolver->Reject(context, reason).Check();
+  return resolver->GetPromise();
+}
+
 void MethodCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   const MemberGroup& all = *GroupOf(info);
@@ -3326,17 +3659,27 @@ void MethodCallback(const FunctionCallbackInfo<Value>& info) {
   const MemberGroup& group = ForReceiver(isolate, all, receiver, storage);
 
   std::vector<Local<Value>> arguments = ArgumentsOf(info, first);
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> signal = TakeSignal(isolate, context, group, arguments);
   Selection selection;
   if (group.kind == NSSwiftMemberInstanceProperty) {
     // Enum instance properties are exposed as functions of the case name.
     selection.member = group.overloads[0];
-  } else if (!Select(isolate, isolate->GetCurrentContext(), group, arguments, selection)) {
+  } else if (!Select(isolate, context, group, arguments, selection)) {
     return;
   }
   Local<Value> result;
+  if (AlreadyAborted(isolate, context, signal).ToLocal(&result)) {
+    info.GetReturnValue().Set(result);
+    return;
+  }
+  uint64_t asyncId = 0;
   if (Invoke(isolate, group, *selection.member, receiver, selection.arguments, false,
-             Local<Object>())
+             Local<Object>(), &asyncId)
           .ToLocal(&result)) {
+    if (!signal.IsEmpty()) {
+      WatchSignal(isolate, context, asyncId, signal);
+    }
     info.GetReturnValue().Set(result);
   }
 }
@@ -3356,6 +3699,8 @@ void ExactCallback(const FunctionCallbackInfo<Value>& info) {
     receiver = info.This();
   }
   std::vector<Local<Value>> arguments = ArgumentsOf(info, first);
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> signal = TakeSignal(isolate, context, group, arguments);
   if (arguments.size() != member.signature.parameters.size()) {
     isolate->ThrowException(Exception::TypeError(tns::ToV8String(
         isolate, member.swiftName + " expects " +
@@ -3363,8 +3708,16 @@ void ExactCallback(const FunctionCallbackInfo<Value>& info) {
     return;
   }
   Local<Value> result;
-  if (Invoke(isolate, group, member, receiver, arguments, false, Local<Object>())
+  if (AlreadyAborted(isolate, context, signal).ToLocal(&result)) {
+    info.GetReturnValue().Set(result);
+    return;
+  }
+  uint64_t asyncId = 0;
+  if (Invoke(isolate, group, member, receiver, arguments, false, Local<Object>(), &asyncId)
           .ToLocal(&result)) {
+    if (!signal.IsEmpty()) {
+      WatchSignal(isolate, context, asyncId, signal);
+    }
     info.GetReturnValue().Set(result);
   }
 }
@@ -3679,7 +4032,10 @@ class Builder {
   }
 
   void InstallOnTemplate(Local<FunctionTemplate> tmpl, const MemberGroup& group) {
-    Local<v8::String> name = tns::ToV8String(_isolate, group.jsName);
+    // An AsyncSequence type's iterator (see SwiftSurface's kAsyncIteratorKey).
+    Local<v8::Name> name = group.jsName == "@@asyncIterator"
+                               ? Local<v8::Name>(v8::Symbol::GetAsyncIterator(_isolate))
+                               : Local<v8::Name>(tns::ToV8String(_isolate, group.jsName));
     switch (group.kind) {
       case NSSwiftMemberInitializer:
         // Reached through `new`; see ConstructorCallback.

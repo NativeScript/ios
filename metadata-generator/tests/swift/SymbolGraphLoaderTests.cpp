@@ -98,6 +98,8 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "topRank(_:)",
                                        "greetInBackground(_:)",
                                        "GreetingHolder",
+                                       "WeakGreetingHolder",
+                                       "GreetingRegistry",
                                        "starterWallet(for:)",
                                        "sum(of:)",
                                        "flip(_:)",
@@ -128,6 +130,11 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "countDown(from:failingAt:)",
                                        "letters(of:)",
                                        "pages(_:)",
+                                       "Countdown",
+                                       "WordStream",
+                                       "Thermometer",
+                                       "StreamLog",
+                                       "ticker()",
                                        "checkedSide(_:)",
                                        "echoInt8(_:)",
                                        "echoUInt64(_:)",
@@ -206,6 +213,16 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "shoutAll(_:)",
                                        "describeValue(_:)",
                                        "greetOnce(_:_:)",
+                                       "CancelLog",
+                                       "waitForCancel(_:)",
+                                       "Shelf",
+                                       "Grid",
+                                       "Vector2",
+                                       "Version",
+                                       "sumAll(_:)",
+                                       "longestWord(_:)",
+                                       "joinAll(_:)",
+                                       "evens(below:)",
                                        "describe(_:)",
                                        "makeLabel(_:)",
                                        "tags(_:)",
@@ -620,7 +637,12 @@ TEST(GenericFunctionInstantiations) {
   CHECK(standIns("greetOnce(_:_:)") == List({"some Greeting=any Greeting"}));
   CHECK(standIns("tagOf(_:)") == List({"some UIView=UIView"}));
   CHECK(standIns("decodeJSON(_:from:)").empty());
-  CHECK(standIns("firstElement(_:)").empty());
+  // Collection protocols: arrays of the element's stand-ins.
+  CHECK(standIns("firstElement(_:)") ==
+        List({"C=[Bool],C.Element=Bool", "C=[Double],C.Element=Double",
+              "C=[String],C.Element=String"}));
+  CHECK(standIns("longestWord(_:)") == List({"C=[String],C.Element=String"}));
+  CHECK(standIns("sumAll(_:)") == List({"some Sequence<Int>=[Int]"}));
   // 3 x 3 combinations.
   CHECK(standIns("joined(_:_:)").empty());
 }

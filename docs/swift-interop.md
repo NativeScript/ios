@@ -132,8 +132,15 @@ the instantiation its arguments convert to; an array decides by its first
 element, so `largest([])` throws a `TypeError` naming the overloads' keys.
 At most one number type stands in, since a JS number converts to every one.
 
+Collection protocols take JS arrays: a type parameter constrained to
+`Sequence`, `Collection` or another protocol arrays conform to stands in as
+`[X]` for `where C.Element == X`, or as arrays of the element's own stand-ins
+(`C.Element` follows), and `some Sequence<Int>` as `[Int]`. A parameter typed
+`any Sequence<E>` (or another such protocol) takes an array, and a result of
+that type is copied out as one.
+
 A generic function is left out when a type parameter appears as a metatype
-(`T.Type`) or through an associated type (`C.Element`), when it is
+(`T.Type`) or through an associated type other than a collection's `Element`, when it is
 constrained by another module's protocol, when its arguments could not tell
 several instantiations apart (a type parameter only in the result or in a
 closure), or when it would need more than six instantiations (sixteen from a
@@ -203,6 +210,18 @@ holds.
   the overloads' keys; call one directly by key: `polygon["scale(by: Int)"](2)`.
   Every overload is also reachable by its Swift name when that is unique
   (`demo["greet(name:times:)"]("a", 2)`).
+- Operators are methods named for what they do: `a.plus(b)`, `a.minus(b)`,
+  `times`, `dividedBy`, `remainder`, `equals`, `lessThan`,
+  `lessThanOrEqualTo`, `greaterThan`, `greaterThanOrEqualTo`, and prefix
+  `negated()` / `not()`. One whose left operand is its own type is an instance
+  method of that operand; any other is static (`Vector2.times(2, v)`).
+  Compound assignment, bitwise and custom operators are not exposed.
+- `Equatable` classes and structs (also through `Hashable` or `Comparable`)
+  get `equals(other)`, and `Comparable` ones `compare(other)` (-1, 0 or 1),
+  so `list.sort((a, b) => a.compare(b))` sorts by Swift's `<`.
+- Subscripts are methods: `shelf.subscript("apples")` reads one and
+  `shelf.setSubscript("apples", 3)` assigns it (settable subscripts only),
+  overloaded like any method by their indices.
 - Initializers run through `new` and also accept one object naming every
   argument label: `new Point({ x: 2, y: 3 })`. A failable initializer that
   returns `nil` throws.
@@ -306,8 +325,17 @@ the type has none.
 
 A protocol value returned to JS is the JS object it came from, a Swift
 object of its own registered class, or else a boxed value of the protocol.
-Swift holds the adapter, and through it the JS object, as long as it keeps
-the value; a `weak` reference does not keep it.
+
+A JS object has one adapter per protocol, so Swift sees one identity for it
+(`===`, `removeAll { $0 === listener }`). Its lifetime follows NativeScript's
+rule for the JS side of Objective-C objects:
+
+- While Swift holds the adapter strongly (`var delegate`), it keeps the JS
+  object alive.
+- A `weak` reference (`weak var delegate`) keeps it only as long as JS does:
+  keep the delegate referenced from JS, as for Objective-C delegates. Once
+  the JS object is collected, the weak reference becomes `nil`.
+- Once neither side holds it, both are collected.
 
 Protocols with associated types, `Self` requirements, static or `async`
 requirements, initializers, or more than one refined module protocol stay
@@ -344,8 +372,17 @@ for await (const value of SwiftDemo.countUp(3)) {
 
 Each `next()` advances the Swift iterator in a `Task` and settles on the JS
 thread; calls run one at a time, in order. A sequence that throws rejects
-the pending `next()` with the Swift error. Other `AsyncSequence` types,
-sequences as parameters, and cancelling an iteration are not supported yet.
+the pending `next()` with the Swift error. Leaving a `for await` loop early
+(`break`, `return`, a throw) releases the Swift iterator, which ends a stream
+Swift still produces (`onTermination` sees `.cancelled`).
+
+A class or struct conforming to `AsyncSequence` stays a JS class with its
+other members and is also async-iterable (`for await (const x of countdown)`).
+A Combine `AnyPublisher`, `PassthroughSubject` or `CurrentValueSubject` is an
+async iterator over its `values` (iOS 15+, `null` before): like `values`, it
+asks for one element at a time, so a subject drops what it sends while JS is
+not waiting; buffer in Swift (`.buffer(...)`) when that matters. Sequences as
+parameters are not supported yet.
 
 ## Observation
 
@@ -374,6 +411,12 @@ Both need a loaded Swift module (its thunks carry the tracking code).
   synchronously, runs in a Swift `Task`, and settles the Promise on the
   calling isolate's thread (main or Worker); a `throw` rejects it with the
   Swift error. If the isolate is gone by then, the outcome is dropped.
+- An `async` call takes an `AbortSignal` after its arguments:
+  `await fetchItems(query, controller.signal)`. Aborting rejects the Promise
+  at once with the signal's reason and cancels the Swift task, which stops
+  where it checks for cancellation (`Task.sleep`, `try Task.checkCancellation()`,
+  URLSession); whatever it reports afterwards is dropped. A signal already
+  aborted rejects without calling Swift.
 - Members of an `actor` are awaited from outside it, exactly as in Swift:
   `await counter.increment()`, `await counter.value`. Actor properties are
   never assignable from JavaScript. `nonisolated` members stay synchronous.
@@ -432,10 +475,10 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 ## Not yet supported
 
-Async cancellation, Combine publishers, concrete `AsyncSequence` types,
-generic methods of generic types, other standard library generics,
-protocols with associated types, subscripts and operators. Each appears in
-the coverage report with its reason.
+Generic methods of generic types, other standard library generics,
+protocols with associated types as values or JS implementations (beyond the
+collection protocols above), and Swift overlay members of SDK Objective-C
+classes. Each appears in the coverage report with its reason.
 
 ## Swift language mode
 

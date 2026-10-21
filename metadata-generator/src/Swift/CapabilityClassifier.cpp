@@ -156,6 +156,13 @@ const char* frameworkOfCStruct(const std::string& name) {
   return info ? info->framework : nullptr;
 }
 
+static bool isArrayProtocolUSR(const std::string& usr) {
+  // Sequence, Collection, BidirectionalCollection, RandomAccessCollection,
+  // MutableCollection, RangeReplaceableCollection.
+  return usr == "s:ST" || usr == "s:Sl" || usr == "s:SK" || usr == "s:Sk" ||
+         usr == "s:SM" || usr == "s:Sm";
+}
+
 bool hasAssociatedValues(const Module& module, const Symbol& symbol) {
   if (symbol.kind != SymbolKind::Enum) {
     return false;
@@ -257,6 +264,7 @@ class Classifier {
     }
     rejectUnbridgedPayloads();
     rejectUnadoptableProtocols();
+    classifyAsyncSequences();
     for (const auto& entry : _module.symbols) {
       if (!isNominalType(entry.second.kind)) {
         _result.bySymbol[entry.first] = classifyOther(entry.second);
@@ -347,7 +355,18 @@ class Classifier {
     if (llvm::StringRef(symbol.declarationText).contains("~Escapable")) {
       return make(Tier::Unsupported, "nonescapable");
     }
-    return make(Tier::SwiftGenerated);
+    Capability generated = make(Tier::SwiftGenerated);
+    if (symbol.kind == SymbolKind::Struct || symbol.kind == SymbolKind::Class) {
+      auto conforms = [&](const char* usr) {
+        return std::find(symbol.conformances.begin(), symbol.conformances.end(),
+                         usr) != symbol.conformances.end();
+      };
+      generated.comparable = conforms(KnownTypes::kComparable);
+      generated.equatable = generated.comparable ||
+                            conforms(KnownTypes::kEquatable) ||
+                            conforms(KnownTypes::kHashable);
+    }
+    return generated;
   }
 
   // A protocol JS objects can implement: every requirement is an instance
@@ -590,11 +609,16 @@ class Classifier {
       }
     }
 
+    std::string operatorName;
     if (symbol.kind == SymbolKind::Operator) {
-      return make(Tier::Unsupported, "operator");
+      operatorName = jsOperatorName(symbol);
+      if (operatorName.empty() || !owner) {
+        return make(Tier::Unsupported, "operator");
+      }
     }
-    if (symbol.kind == SymbolKind::InstanceSubscript ||
-        symbol.kind == SymbolKind::TypeSubscript) {
+    if ((symbol.kind == SymbolKind::InstanceSubscript ||
+         symbol.kind == SymbolKind::TypeSubscript) &&
+        symbol.parameters.empty()) {
       return make(Tier::Unsupported, "subscript");
     }
     if (symbol.kind == SymbolKind::EnumCase) {
@@ -712,6 +736,17 @@ class Classifier {
     capability.jsName = symbol.kind == SymbolKind::Initializer
                             ? "constructor"
                             : symbol.baseName;
+    if (!operatorName.empty()) {
+      capability.jsName = operatorName;
+      // `lhs OP rhs` and `OP operand` on the owner become its methods.
+      if (!capability.parameters.empty() &&
+          capability.parameters[0].symbolId == owner->preciseId &&
+          !capability.parameters[0].optional &&
+          !capability.parameters[0].isInout) {
+        capability.operatorInstance = true;
+        capability.parameters.erase(capability.parameters.begin());
+      }
+    }
     if (owner && owner->kind == SymbolKind::Protocol) {
       capability.isRequirement = symbol.isProtocolRequirement;
       // Assigning through a value of a protocol that is not class-bound
@@ -751,6 +786,112 @@ class Classifier {
       return false;
     }
     return false;
+  }
+
+  // The element of each bridged class or struct conforming to AsyncSequence:
+  // its `Element` typealias, or what its iterator's `next()` returns.
+  void classifyAsyncSequences() {
+    for (auto& entry : _result.bySymbol) {
+      const Symbol* symbol = _module.find(entry.first);
+      Capability& capability = entry.second;
+      if (!symbol || capability.tier != Tier::SwiftGenerated ||
+          (symbol->kind != SymbolKind::Struct &&
+           symbol->kind != SymbolKind::Class) ||
+          std::find(symbol->conformances.begin(), symbol->conformances.end(),
+                    KnownTypes::kAsyncSequence) == symbol->conformances.end()) {
+        continue;
+      }
+      const TypeRef* element = memberType(*symbol, "Element");
+      if (!element) {
+        const TypeRef* iterator = memberType(*symbol, "AsyncIterator");
+        const Symbol* iteratorType = nullptr;
+        if (iterator) {
+          for (const auto& fragment : iterator->fragments) {
+            if (!fragment.preciseIdentifier.empty()) {
+              iteratorType = _module.find(fragment.preciseIdentifier);
+            }
+          }
+        }
+        for (const auto& id : iteratorType ? iteratorType->memberIds
+                                           : std::vector<std::string>()) {
+          // Its own next(), not the protocol's default implementation.
+          const Symbol* next = _module.find(id);
+          if (next && next->name == "next()" && next->returnType &&
+              !next->isSynthesized) {
+            element = &*next->returnType;
+          }
+        }
+      }
+      if (!element) {
+        continue;
+      }
+      _substitutions = substitutionsOf(*symbol);
+      std::vector<std::string> reasons;
+      BridgedType bridged =
+          bridge(*element, genericNamesInScope(_module, *symbol), reasons);
+      // An iterator's `next()` returns the element as an optional.
+      if (!memberType(*symbol, "Element")) {
+        bridged.optional = false;
+        if (bridged.node.kind == TypeNode::Kind::Optional &&
+            !bridged.node.children.empty()) {
+          bridged.node = bridged.node.children[0];
+        }
+      }
+      if (reasons.empty() && !bridged.optional &&
+          bridged.bridge != Bridge::Void && bridged.bridge != Bridge::Closure &&
+          bridged.bridge != Bridge::AsyncSequence) {
+        capability.asyncElement = std::move(bridged);
+      }
+    }
+  }
+
+  // The type a member typealias of `type` named `name` (or, for
+  // `AsyncIterator`, the nested type or method declaring it) stands for.
+  const TypeRef* memberType(const Symbol& type, const std::string& name) const {
+    for (const auto& id : type.memberIds) {
+      const Symbol* member = _module.find(id);
+      if (!member) {
+        continue;
+      }
+      if (member->kind == SymbolKind::TypeAlias && member->name == name &&
+          member->aliasedType) {
+        return &*member->aliasedType;
+      }
+      if (name == "AsyncIterator" && member->name == "makeAsyncIterator()" &&
+          member->returnType) {
+        return &*member->returnType;
+      }
+    }
+    return nullptr;
+  }
+
+  // JS method names for operators JS can call by name; "" for the rest
+  // (compound assignment, bitwise, custom operators, and `!=`, which
+  // `equals` covers).
+  static std::string jsOperatorName(const Symbol& symbol) {
+    llvm::StringRef op = llvm::StringRef(symbol.name).split('(').first;
+    bool prefix = symbol.parameters.size() == 1 &&
+                  std::find(symbol.modifiers.begin(), symbol.modifiers.end(),
+                            "postfix") == symbol.modifiers.end();
+    if (prefix) {
+      return op == "-" ? "negated" : op == "!" ? "not" : "";
+    }
+    if (symbol.parameters.size() != 2) {
+      return "";
+    }
+    static const std::pair<const char*, const char*> kNames[] = {
+        {"+", "plus"},        {"-", "minus"},
+        {"*", "times"},       {"/", "dividedBy"},
+        {"%", "remainder"},   {"==", "equals"},
+        {"<", "lessThan"},    {"<=", "lessThanOrEqualTo"},
+        {">", "greaterThan"}, {">=", "greaterThanOrEqualTo"},
+    };
+    for (const auto& name : kNames) {
+      if (op == name.first) {
+        return name.second;
+      }
+    }
+    return "";
   }
 
   BridgedType bridgeOwner(const Symbol& owner) const {
@@ -946,6 +1087,14 @@ class Classifier {
           bridged.bridge = Bridge::Error;
           return "";
         }
+        // `any Sequence<E>` and the other collection protocols arrays
+        // conform to: an array in, a copy out.
+        if (inner && inner->kind == TypeNode::Kind::Nominal &&
+            isArrayProtocolUSR(inner->usr()) &&
+            inner->components.back().arguments.size() == 1) {
+          bridged.bridge = Bridge::Array;
+          return bridgeElement(inner->components.back().arguments[0], bridged);
+        }
         const Symbol* protocol = inner && inner->kind == TypeNode::Kind::Nominal
                                      ? _module.find(inner->usr())
                                      : nullptr;
@@ -1033,6 +1182,16 @@ class Classifier {
       }
       bridged.elements.push_back(std::move(failure));
       return "";
+    }
+    // Combine publishers as async sequences of their output.
+    if ((usr == KnownTypes::kAnyPublisher ||
+         usr == KnownTypes::kPassthroughSubject ||
+         usr == KnownTypes::kCurrentValueSubject) &&
+        node.components.size() == 1 &&
+        node.components[0].arguments.size() == 2) {
+      bridged.bridge = Bridge::AsyncSequence;
+      bridged.publisher = true;
+      return bridgeElement(node.components[0].arguments[0], bridged, false);
     }
     if (usr == KnownTypes::kSet && node.components.size() == 1 &&
         node.components[0].arguments.size() == 1) {
@@ -1194,7 +1353,7 @@ class Classifier {
                         symbol->kind == SymbolKind::TypeProperty ||
                         symbol->kind == SymbolKind::Variable ||
                         symbol->kind == SymbolKind::EnumCase;
-      bool isStatic = symbol->isStatic ||
+      bool isStatic = (symbol->isStatic && !capability.operatorInstance) ||
                       symbol->kind == SymbolKind::EnumCase ||
                       symbol->kind == SymbolKind::Initializer;
       std::string signature = std::to_string(capability.parameters.size());

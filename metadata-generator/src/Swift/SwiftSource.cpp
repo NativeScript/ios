@@ -192,18 +192,25 @@ const char* frameworkOfObjCClass(llvm::StringRef name) {
   return best;
 }
 
-void collectObjCClasses(const BridgedType& type, std::set<std::string>& out,
-                        std::set<std::string>& structs) {
+// The Objective-C classes `type` names, and the frameworks its C structs and
+// Combine publishers need.
+void collectImports(const BridgedType& type, std::set<std::string>& classes,
+                    std::set<std::string>& frameworks) {
   if (type.bridge == Bridge::ObjCObject &&
       type.objcClass.find('.') == std::string::npos) {
-    out.insert(type.objcClass);
+    classes.insert(type.objcClass);
   }
   if (type.bridge == Bridge::CStruct) {
-    structs.insert(type.objcClass);
+    if (const char* framework = frameworkOfCStruct(type.objcClass)) {
+      frameworks.insert(framework);
+    }
+  }
+  if (type.publisher) {
+    frameworks.insert("Combine");
   }
   for (const auto* list : {&type.elements, &type.results}) {
     for (const auto& element : *list) {
-      collectObjCClasses(element, out, structs);
+      collectImports(element, classes, frameworks);
     }
   }
 }
@@ -214,7 +221,7 @@ std::string swiftImports(const Module& module,
                          const Classification& classification) {
   std::set<std::string> overlays;
   std::set<std::string> classes;
-  std::set<std::string> structs;
+  std::set<std::string> frameworks;
   for (const auto& entry : module.symbols) {
     const Capability* capability = classification.find(entry.first);
     if (!capability || capability->tier != Tier::SwiftGenerated) {
@@ -224,11 +231,11 @@ std::string swiftImports(const Module& module,
       overlays.insert(entry.second.declaringModule);
     }
     for (const auto& parameter : capability->parameters) {
-      collectObjCClasses(parameter, classes, structs);
+      collectImports(parameter, classes, frameworks);
     }
-    collectObjCClasses(capability->result, classes, structs);
+    collectImports(capability->result, classes, frameworks);
   }
-  std::set<std::string> frameworks;
+  frameworks.erase("Foundation");
   for (const auto& entry : module.symbols) {
     const Capability* capability = classification.find(entry.first);
     if (capability && capability->tier == Tier::SwiftGenerated &&
@@ -237,12 +244,6 @@ std::string swiftImports(const Module& module,
       // hostingController() (SwiftSurface).
       frameworks.insert("SwiftUI");
       frameworks.insert("UIKit");
-    }
-  }
-  for (const auto& name : structs) {
-    const char* framework = frameworkOfCStruct(name);
-    if (framework && llvm::StringRef(framework) != "Foundation") {
-      frameworks.insert(framework);
     }
   }
   for (const auto& name : classes) {
@@ -279,14 +280,17 @@ Invocation describeInvocation(const Module& module, const Symbol& symbol,
   invocation.isMainActor = capability.isMainActor && !capability.isAsync;
   invocation.isSettable = capability.isSettable;
 
-  for (size_t i = 0; i < symbol.parameters.size(); i++) {
+  // An instance operator's receiver is its first parameter.
+  size_t skipped = capability.operatorInstance ? 1 : 0;
+  for (size_t i = skipped; i < symbol.parameters.size(); i++) {
     invocation.labels.push_back(symbol.parameters[i].label);
-    std::string type = i < capability.parameters.size()
-                           ? typeText(capability.parameters[i], module)
+    size_t k = i - skipped;
+    std::string type = k < capability.parameters.size()
+                           ? typeText(capability.parameters[k], module)
                            : "";
     bool isInout =
-        i < capability.parameters.size() && capability.parameters[i].isInout;
-    if (i < capability.parameters.size() && capability.parameters[i].escaping) {
+        k < capability.parameters.size() && capability.parameters[k].isInout;
+    if (k < capability.parameters.size() && capability.parameters[k].escaping) {
       type = "@escaping " + type;
     }
     invocation.parameterTypes.push_back(isInout ? "inout " + type : type);
@@ -329,6 +333,20 @@ Invocation describeInvocation(const Module& module, const Symbol& symbol,
       invocation.form = Invocation::Form::EnumCase;
       invocation.resultType = invocation.owner;
       break;
+    case SymbolKind::InstanceSubscript:
+      invocation.form = Invocation::Form::InstanceSubscript;
+      invocation.needsReceiver = true;
+      invocation.receiverIsInout = valueOwner && symbol.isSettable;
+      break;
+    case SymbolKind::TypeSubscript:
+      invocation.form = Invocation::Form::StaticSubscript;
+      break;
+    case SymbolKind::Operator:
+      invocation.form = symbol.parameters.size() == 1
+                            ? Invocation::Form::PrefixOperator
+                            : Invocation::Form::InfixOperator;
+      invocation.needsReceiver = capability.operatorInstance;
+      break;
     default:
       break;
   }
@@ -340,9 +358,10 @@ Invocation describeInvocation(const Module& module, const Symbol& symbol,
   return invocation;
 }
 
-std::string invocationExpression(const Invocation& invocation,
-                                 const std::string& receiver,
-                                 const std::vector<std::string>& arguments) {
+namespace {
+
+std::string argumentListOf(const Invocation& invocation,
+                           const std::vector<std::string>& arguments) {
   std::string argumentList;
   for (size_t i = 0; i < arguments.size(); i++) {
     if (i > 0) {
@@ -357,7 +376,15 @@ std::string invocationExpression(const Invocation& invocation,
         arguments[i];
     argumentList += label.empty() ? argument : label + ": " + argument;
   }
+  return argumentList;
+}
 
+}  // namespace
+
+std::string invocationExpression(const Invocation& invocation,
+                                 const std::string& receiver,
+                                 const std::vector<std::string>& arguments) {
+  std::string argumentList = argumentListOf(invocation, arguments);
   std::string expression;
   std::string member = swiftIdentifier(invocation.member);
   switch (invocation.form) {
@@ -382,6 +409,24 @@ std::string invocationExpression(const Invocation& invocation,
       expression = invocation.owner + "." + member +
                    (arguments.empty() ? "" : "(" + argumentList + ")");
       break;
+    case Invocation::Form::InstanceSubscript:
+      expression = receiver + "[" + argumentList + "]";
+      break;
+    case Invocation::Form::StaticSubscript:
+      expression = invocation.owner + "[" + argumentList + "]";
+      break;
+    case Invocation::Form::InfixOperator:
+    case Invocation::Form::PrefixOperator: {
+      std::vector<std::string> operands = arguments;
+      if (invocation.needsReceiver) {
+        operands.insert(operands.begin(), receiver);
+      }
+      expression = invocation.form == Invocation::Form::PrefixOperator
+                       ? invocation.member + "(" + operands.at(0) + ")"
+                       : "(" + operands.at(0) + ") " + invocation.member +
+                             " (" + operands.at(1) + ")";
+      break;
+    }
   }
   std::string effects = std::string(invocation.isThrowing ? "try " : "") +
                         (invocation.isAsync ? "await " : "");
@@ -390,10 +435,16 @@ std::string invocationExpression(const Invocation& invocation,
 
 std::string assignmentStatement(const Invocation& invocation,
                                 const std::string& receiver,
-                                const std::string& value) {
-  std::string target = invocation.form == Invocation::Form::InstanceProperty
-                           ? receiver
-                           : invocation.owner;
+                                const std::string& value,
+                                const std::vector<std::string>& arguments) {
+  bool instance = invocation.form == Invocation::Form::InstanceProperty ||
+                  invocation.form == Invocation::Form::InstanceSubscript;
+  std::string target = instance ? receiver : invocation.owner;
+  if (invocation.form == Invocation::Form::InstanceSubscript ||
+      invocation.form == Invocation::Form::StaticSubscript) {
+    return target + "[" + argumentListOf(invocation, arguments) +
+           "] = " + value;
+  }
   return target + "." + swiftIdentifier(invocation.member) + " = " + value;
 }
 

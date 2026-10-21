@@ -669,9 +669,14 @@ TypeNode substitute(
     const TypeNode& node,
     const std::vector<std::pair<std::string, TypeNode>>& substitutions) {
   if (node.kind == TypeNode::Kind::GenericParameter &&
-      node.components.size() == 1) {
+      !node.components.empty()) {
+    // `T`, or a member path such as `C.Element`.
+    std::string path = node.components[0].name;
+    for (size_t i = 1; i < node.components.size(); i++) {
+      path += "." + node.components[i].name;
+    }
     for (const auto& substitution : substitutions) {
-      if (substitution.first == node.components[0].name) {
+      if (substitution.first == path) {
         TypeNode result = substitution.second;
         result.attributes.insert(result.attributes.end(),
                                  node.attributes.begin(),
@@ -849,9 +854,11 @@ struct ParameterUse {
   // In an argument outside closures, so the arguments JS passes tell its
   // instantiations apart.
   bool inArgument = false;
-  // As a metatype (`T.Type`) or through an associated type (`T.Element`),
-  // which no stand-in substitutes.
+  // As a metatype (`T.Type`) or through an associated type other than a
+  // collection's `T.Element`, which no stand-in substitutes.
   bool unsupported = false;
+  // Through `T.Element`, which an array stand-in substitutes.
+  bool element = false;
   // As an argument of a generic type in an argument (`Box<T>`): the type's
   // USR and the argument's position.
   std::vector<std::pair<std::string, size_t>> families;
@@ -861,8 +868,11 @@ void collectUse(const TypeNode& node, const std::string& name, bool argument,
                 bool inClosure, bool inMetatype, ParameterUse& use) {
   if (node.kind == TypeNode::Kind::GenericParameter &&
       !node.components.empty() && node.components[0].name == name) {
-    if (node.components.size() > 1 || inMetatype) {
+    if (inMetatype || node.components.size() > 2 ||
+        (node.components.size() == 2 && node.components[1].name != "Element")) {
       use.unsupported = true;
+    } else if (node.components.size() == 2) {
+      use.element = true;
     } else if (argument && !inClosure) {
       use.inArgument = true;
     }
@@ -1075,6 +1085,16 @@ std::optional<GenericConstraint> opaqueConstraint(const Module& module,
 // A declaration's spelling of a stand-in: a nominal, or a protocol's
 // existential.
 TypeRef typeRefOf(const TypeNode& node) {
+  if (node.kind == TypeNode::Kind::Array) {
+    TypeRef element = typeRefOf(node.children[0]);
+    TypeRef ref;
+    ref.spelling = spelling(node);
+    ref.fragments.push_back(Fragment{"text", "[", ""});
+    ref.fragments.insert(ref.fragments.end(), element.fragments.begin(),
+                         element.fragments.end());
+    ref.fragments.push_back(Fragment{"text", "]", ""});
+    return ref;
+  }
   TypeRef ref;
   ref.spelling = spelling(node);
   const TypeNode* nominal = &node;
@@ -1093,6 +1113,96 @@ TypeRef typeRefOf(const TypeNode& node) {
         i + 1 == nominal->components.size() ? component.usr : std::string()});
   }
   return ref;
+}
+
+// Standard library collection protocols an array conforms to.
+bool isArrayProtocol(llvm::StringRef name) {
+  name = name.substr(name.rfind('.') + 1);
+  return name == "Sequence" || name == "Collection" ||
+         name == "BidirectionalCollection" ||
+         name == "RandomAccessCollection" || name == "MutableCollection" ||
+         name == "RangeReplaceableCollection";
+}
+
+TypeNode arrayOf(const TypeNode& element) {
+  TypeNode array;
+  array.kind = TypeNode::Kind::Array;
+  array.children.push_back(element);
+  return array;
+}
+
+// Arrays standing in for `parameter` when it is constrained to a collection
+// protocol: `[X]` for `parameter.Element == X`, otherwise arrays of the
+// element's own stand-ins. `applies` is false for other parameters.
+std::vector<TypeNode> collectionStandIns(
+    const Module& module, const std::string& parameter,
+    const std::vector<GenericConstraint>& constraints, bool& applies) {
+  applies = false;
+  std::string element = parameter + ".Element";
+  std::vector<GenericConstraint> onElement;
+  const GenericConstraint* same = nullptr;
+  bool other = false;
+  for (const auto& constraint : constraints) {
+    if (constraint.lhs == parameter) {
+      if (constraint.kind == "conformance" &&
+          isStandardLibraryUSR(constraint.rhsPrecise) &&
+          isArrayProtocol(constraint.rhs)) {
+        applies = true;
+      } else {
+        other = true;
+      }
+    } else if (constraint.lhs == element) {
+      if (constraint.kind == "sameType") {
+        same = &constraint;
+      } else {
+        GenericConstraint renamed = constraint;
+        renamed.lhs = "Element";
+        onElement.push_back(renamed);
+      }
+    } else if (llvm::StringRef(constraint.lhs).startswith(parameter + ".")) {
+      other = true;
+    }
+  }
+  if (!applies || other) {
+    return {};
+  }
+  std::vector<TypeNode> elements;
+  if (same) {
+    if (same->rhsPrecise.empty() ||
+        same->rhs.find_first_of(".<[ ") != std::string::npos) {
+      return {};
+    }
+    elements.push_back(nominalNode(same->rhs, same->rhsPrecise));
+  } else {
+    elements = standIns(module, "Element", onElement);
+  }
+  std::vector<TypeNode> result;
+  for (const auto& node : elements) {
+    result.push_back(arrayOf(node));
+  }
+  return result;
+}
+
+// Arrays standing in for `some Sequence<X>` (or another collection
+// protocol): `[X]`, or arrays of the default stand-ins without an argument.
+std::optional<std::vector<TypeNode>> opaqueCollection(const Module& module,
+                                                      const TypeNode& node) {
+  if (node.children.size() != 1 ||
+      node.children[0].kind != TypeNode::Kind::Nominal ||
+      !isStandardLibraryUSR(node.children[0].usr()) ||
+      !isArrayProtocol(node.children[0].components.back().name)) {
+    return std::nullopt;
+  }
+  const auto& arguments = node.children[0].components.back().arguments;
+  std::vector<TypeNode> result;
+  if (arguments.size() == 1 && isConcrete(arguments[0])) {
+    result.push_back(arrayOf(arguments[0]));
+  } else if (arguments.empty()) {
+    for (const auto& element : standIns(module, "Element", {})) {
+      result.push_back(arrayOf(element));
+    }
+  }
+  return result;
 }
 
 bool isGenericFunctionKind(SymbolKind kind) {
@@ -1174,8 +1284,11 @@ void instantiateGenericFunctions(Module& module) {
         continue;
       }
       std::vector<TypeNode> candidates;
-      if (const auto constraint = opaqueConstraint(module, node);
-          constraint && source.parameters[i].modifier.empty()) {
+      if (!source.parameters[i].modifier.empty()) {
+        // inout and ownership modifiers keep the opaque type.
+      } else if (auto arrays = opaqueCollection(module, node)) {
+        candidates = std::move(*arrays);
+      } else if (const auto constraint = opaqueConstraint(module, node)) {
         candidates = standIns(module, constraint->lhs, {*constraint});
       }
       if (candidates.empty()) {
@@ -1205,12 +1318,18 @@ void instantiateGenericFunctions(Module& module) {
                                      use.families[0].second);
         fromFamilies |= !candidates.empty();
       }
-      if (candidates.empty() &&
+      bool collection = false;
+      if (candidates.empty()) {
+        candidates = collectionStandIns(module, parameter.name,
+                                        source.genericConstraints, collection);
+      }
+      if (candidates.empty() && !collection &&
           !llvm::StringRef(parameter.name).contains(' ')) {
         candidates =
             standIns(module, parameter.name, source.genericConstraints);
       }
       if (use.unsupported || candidates.empty() ||
+          (use.element && !collection) ||
           (candidates.size() > 1 && !use.inArgument)) {
         combinations = 0;
         break;
@@ -1239,6 +1358,10 @@ void instantiateGenericFunctions(Module& module) {
         // A `some P` parameter's entry only marks the copy an
         // instantiation: its type is rewritten instead.
         copy.substitutions.emplace_back(targets[i].first, argument);
+        if (argument.kind == TypeNode::Kind::Array && targets[i].second < 0) {
+          copy.substitutions.emplace_back(targets[i].first + ".Element",
+                                          argument.children[0]);
+        }
         if (targets[i].second >= 0) {
           copy.parameters[targets[i].second].type = typeRefOf(argument);
         }

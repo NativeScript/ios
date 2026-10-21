@@ -253,3 +253,61 @@ public func describeError(_ error: (any Error)?) -> String { error.map { "\($0)"
 public func shoutAll(_ value: some StringProtocol) -> String { value.uppercased() }
 public func describeValue(_ value: some CustomStringConvertible) -> String { value.description }
 public func greetOnce(_ greeting: some Greeting, _ other: String) -> String { greeting.greet(other) }
+
+// Cancellation: an AbortSignal after the arguments cancels the Swift task.
+public final class CancelLog {
+    public static var cancellations = 0
+}
+public func waitForCancel(_ seconds: Double) async -> Bool {
+    do {
+        try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+        return false
+    } catch {
+        CancelLog.cancellations += 1
+        return true
+    }
+}
+
+// Subscripts: `subscript(...)` and `setSubscript(..., value)` in JS.
+public final class Shelf {
+    private var counts: [String: Int] = [:]
+    public init() {}
+    public subscript(name: String) -> Int? {
+        get { counts[name] }
+        set { counts[name] = newValue }
+    }
+    public subscript(row: Int, column: Int) -> String { "\(row),\(column)" }
+}
+public struct Grid {
+    public var cells: [Int]
+    public init(size: Int) { cells = Array(repeating: 0, count: size) }
+    public subscript(index: Int) -> Int {
+        get { cells[index] }
+        set { cells[index] = newValue }
+    }
+}
+
+// Operators as named methods, and equals()/compare() from Equatable and
+// Comparable.
+public struct Vector2: Equatable {
+    public var x: Double
+    public var y: Double
+    public init(x: Double, y: Double) { self.x = x; self.y = y }
+    public static func + (lhs: Vector2, rhs: Vector2) -> Vector2 { Vector2(x: lhs.x + rhs.x, y: lhs.y + rhs.y) }
+    public static prefix func - (vector: Vector2) -> Vector2 { Vector2(x: -vector.x, y: -vector.y) }
+    public static func * (scale: Double, vector: Vector2) -> Vector2 { Vector2(x: scale * vector.x, y: scale * vector.y) }
+}
+public struct Version: Comparable, Hashable {
+    public let major: Int
+    public let minor: Int
+    public init(major: Int, minor: Int) { self.major = major; self.minor = minor }
+    public static func < (lhs: Version, rhs: Version) -> Bool { (lhs.major, lhs.minor) < (rhs.major, rhs.minor) }
+}
+
+// Collection protocols as parameters: JS arrays stand in.
+public func sumAll(_ values: some Sequence<Int>) -> Int { values.reduce(0, +) }
+public func longestWord<C: Collection>(_ words: C) -> Int where C.Element == String {
+    words.map(\.count).max() ?? 0
+}
+public func joinAll(_ parts: any Sequence<String>) -> String { parts.joined(separator: ",") }
+public func evens(below limit: Int) -> any Sequence<Int> { stride(from: 0, to: limit, by: 2) }

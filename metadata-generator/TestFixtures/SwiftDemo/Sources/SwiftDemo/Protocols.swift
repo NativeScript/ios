@@ -63,3 +63,20 @@ public final class GreetingHolder {
     public init() {}
     public func greet(_ other: String) -> String? { greeting?.greet(other) }
 }
+
+// A delegate held weakly, as UIKit-style APIs hold theirs.
+public final class WeakGreetingHolder {
+    public weak var greeting: (any Greeting)?
+    public init() {}
+    public func greet(_ other: String) -> String? { greeting?.greet(other) }
+}
+
+// Listeners removed by identity.
+public final class GreetingRegistry {
+    private var greetings: [any Greeting] = []
+    public init() {}
+    public var count: Int { greetings.count }
+    public func add(_ greeting: any Greeting) { greetings.append(greeting) }
+    public func remove(_ greeting: any Greeting) { greetings.removeAll { $0 === greeting } }
+    public func contains(_ greeting: any Greeting) -> Bool { greetings.contains { $0 === greeting } }
+}

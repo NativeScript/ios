@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module", "observe", "track"]);
-            expect(swift.abiVersion).toBe(13);
+            expect(swift.abiVersion).toBe(15);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(13);
+            expect(info.abiVersion).toBe(15);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -462,6 +462,99 @@ describe("ns:swift", function () {
         });
     });
 
+    describe("operators and comparisons", function () {
+        it("calls operators as named methods", function () {
+            var a = new SwiftDemo.Vector2(1, 2);
+            var b = new SwiftDemo.Vector2(3, 4);
+            var sum = a.plus(b);
+            expect([sum.x, sum.y]).toEqual([4, 6]);
+            var negated = a.negated();
+            expect([negated.x, negated.y]).toEqual([-1, -2]);
+            var scaled = SwiftDemo.Vector2.times(2, b);
+            expect([scaled.x, scaled.y]).toEqual([6, 8]);
+            var ring = new SwiftDemo.Ring(new SwiftDemo.Point(0, 0), new SwiftDemo.Point(1, 1));
+            expect(ring.plus(ring) instanceof SwiftDemo.Ring).toBe(true);
+        });
+
+        it("compares values with equals() and compare()", function () {
+            expect(new SwiftDemo.Vector2(1, 2).equals(new SwiftDemo.Vector2(1, 2))).toBe(true);
+            expect(new SwiftDemo.Vector2(1, 2).equals(new SwiftDemo.Vector2(2, 1))).toBe(false);
+            var versions = [new SwiftDemo.Version(2, 0), new SwiftDemo.Version(1, 5), new SwiftDemo.Version(1, 10)];
+            versions.sort(function (x, y) { return x.compare(y); });
+            expect(versions.map(function (v) { return v.major + "." + v.minor; }))
+                .toEqual(["1.5", "1.10", "2.0"]);
+            expect(versions[0].lessThan(versions[1])).toBe(true);
+            expect(versions[1].equals(new SwiftDemo.Version(1, 10))).toBe(true);
+        });
+    });
+
+    describe("subscripts", function () {
+        it("reads and assigns subscripts through subscript() and setSubscript()", function () {
+            var shelf = new SwiftDemo.Shelf();
+            expect(shelf.subscript("apples")).toBeNull();
+            shelf.setSubscript("apples", 3);
+            expect(shelf.subscript("apples")).toBe(3);
+            shelf.setSubscript("apples", null);
+            expect(shelf.subscript("apples")).toBeNull();
+            expect(shelf.subscript(2, 5)).toBe("2,5");
+        });
+
+        it("assigns a struct's subscript in place", function () {
+            var grid = new SwiftDemo.Grid(3);
+            grid.setSubscript(1, 7);
+            expect(grid.subscript(1)).toBe(7);
+            expect(grid.cells).toEqual([0, 7, 0]);
+        });
+
+        it("has no setter for a read-only subscript", function () {
+            var square = new SwiftDemo.Square(2);
+            expect(square.subscript(3).x).toBe(3);
+            expect(square.setSubscript).toBeUndefined();
+        });
+    });
+
+    describe("cancellation", function () {
+        it("rejects an aborted call with the signal's reason and cancels the task", function (done) {
+            var controller = new AbortController();
+            var before = SwiftDemo.CancelLog.cancellations;
+            SwiftDemo.waitForCancel(10, controller.signal).then(function () {
+                done.fail("the call resolved");
+            }, function (reason) {
+                expect(reason).toBe(controller.signal.reason);
+                setTimeout(function () {
+                    expect(SwiftDemo.CancelLog.cancellations).toBe(before + 1);
+                    done();
+                }, 300);
+            });
+            controller.abort();
+        });
+
+        it("rejects at once when the signal is already aborted", function (done) {
+            var controller = new AbortController();
+            controller.abort(new Error("stop"));
+            SwiftDemo.delayedEcho("x", 0.01, controller.signal).then(function () {
+                done.fail("the call resolved");
+            }, function (reason) {
+                expect(reason.message).toBe("stop");
+                done();
+            });
+        });
+
+        it("resolves calls whose signal is not aborted", function (done) {
+            var controller = new AbortController();
+            SwiftDemo.delayedEcho("kept", 0.01, controller.signal).then(function (value) {
+                expect(value).toBe("kept");
+                controller.abort();
+                done();
+            }, done.fail);
+        });
+
+        it("passes no signal to members that are not async", function () {
+            expect(function () { SwiftDemo.shout("a", new AbortController().signal); })
+                .toThrowError(TypeError);
+        });
+    });
+
     describe("enums with associated values", function () {
         it("returns cases as objects naming the case", function () {
             expect(SwiftDemo.measure(2, 3)).toEqual({ case: "area", width: 2, height: 3 });
@@ -686,6 +779,79 @@ describe("ns:swift", function () {
         });
     });
 
+    describe("JS implementations held by Swift", function () {
+        function makeGreeting(name) {
+            return {
+                name: name,
+                punctuation: "!",
+                greet: function (other) { return name + " greets " + other; },
+                reset: function () {}
+            };
+        }
+
+        it("gives one JS object one Swift identity", function () {
+            var registry = new SwiftDemo.GreetingRegistry();
+            var a = makeGreeting("a");
+            var b = makeGreeting("b");
+            registry.add(a);
+            registry.add(b);
+            registry.add(a);
+            expect(registry.count).toBe(3);
+            registry.remove(a);
+            expect(registry.count).toBe(1);
+            expect(registry.contains(a)).toBe(false);
+            expect(registry.contains(b)).toBe(true);
+        });
+
+        it("keeps a weakly held delegate while JS keeps it", function () {
+            var holder = new SwiftDemo.WeakGreetingHolder();
+            var delegate = makeGreeting("weak");
+            holder.greeting = delegate;
+            gc();
+            gc();
+            expect(holder.greet("x")).toBe("weak greets x");
+            expect(holder.greeting).toBe(delegate);
+        });
+
+        it("lets a weakly held delegate go with its JS object", function (done) {
+            var holder = new SwiftDemo.WeakGreetingHolder();
+            (function () { holder.greeting = makeGreeting("gone"); })();
+            gc();
+            setTimeout(function () {
+                gc();
+                setTimeout(function () {
+                    expect(holder.greet("x")).toBeNull();
+                    expect(holder.greeting).toBeNull();
+                    done();
+                }, 0);
+            }, 0);
+        });
+
+        it("keeps a strongly held JS object alive until Swift lets it go", function (done) {
+            var holder = new SwiftDemo.GreetingHolder();
+            var weak;
+            (function () {
+                var greeting = makeGreeting("strong");
+                weak = new WeakRef(greeting);
+                holder.greeting = greeting;
+            })();
+            setTimeout(function () {
+                gc();
+                gc();
+                expect(holder.greet("x")).toBe("strong greets x");
+                holder.greeting = null;
+                setTimeout(function () {
+                    gc();
+                    setTimeout(function () {
+                        gc();
+                        expect(weak.deref()).toBeUndefined();
+                        done();
+                    }, 0);
+                }, 0);
+            }, 0);
+        });
+    });
+
     describe("observation", function () {
         it("calls onChange once when a property read is about to change", function () {
             var thermostat = new SwiftDemo.Thermostat();
@@ -788,6 +954,70 @@ describe("ns:swift", function () {
                     expect(results[0].value).toBe(1);
                     expect(results[1].value).toBe(2);
                 }), done);
+        });
+    });
+
+    describe("AsyncSequence types and publishers", function () {
+        it("iterates an AsyncSequence type with for await", function (done) {
+            var countdown = new SwiftDemo.Countdown(3);
+            expect(countdown.label).toBe("countdown from 3");
+            (async function () {
+                var values = [];
+                for await (var value of countdown) {
+                    values.push(value);
+                }
+                var words = [];
+                for await (var word of new SwiftDemo.WordStream("a b c")) {
+                    words.push(word);
+                }
+                return [values, words];
+            })().then(function (result) {
+                expect(result).toEqual([[3, 2, 1], ["a", "b", "c"]]);
+                done();
+            }, done.fail);
+        });
+
+        it("ends the Swift stream when a for await loop breaks", function (done) {
+            var before = SwiftDemo.StreamLog.terminations;
+            (async function () {
+                var seen = [];
+                for await (var tick of SwiftDemo.ticker()) {
+                    seen.push(tick);
+                    if (tick === 3) {
+                        break;
+                    }
+                }
+                return seen;
+            })().then(function (seen) {
+                expect(seen).toEqual([1, 2, 3]);
+                setTimeout(function () {
+                    expect(SwiftDemo.StreamLog.terminations).toBe(before + 1);
+                    done();
+                }, 200);
+            }, done.fail);
+        });
+
+        it("iterates a Combine publisher's values", function (done) {
+            var thermometer = new SwiftDemo.Thermometer();
+            var readings = thermometer.readings;
+            var received = [];
+            (async function () {
+                for await (var reading of readings) {
+                    received.push(reading);
+                }
+            })().then(function () {
+                expect(received).toEqual([20.5, 21]);
+                done();
+            }, done.fail);
+            // A subject drops what it sends while nothing waits for a value,
+            // so each value goes out once the loop is waiting again.
+            setTimeout(function () {
+                thermometer.record(20.5);
+                setTimeout(function () {
+                    thermometer.record(21);
+                    setTimeout(function () { thermometer.finish(); }, 150);
+                }, 150);
+            }, 200);
         });
     });
 
@@ -1045,9 +1275,18 @@ describe("ns:swift", function () {
             expect(SwiftDemo.tagOf(label)).toBe(4);
         });
 
+        it("takes arrays for collection protocols", function () {
+            expect(SwiftDemo.sumAll([1, 2, 3])).toBe(6);
+            expect(SwiftDemo.longestWord(["a", "abcd", "ab"])).toBe(4);
+            expect(SwiftDemo.firstElement(["x", "y"])).toBe("x");
+            expect(SwiftDemo.firstElement([2.5])).toBe(2.5);
+            expect(SwiftDemo.firstElement([true])).toBe(true);
+            expect(SwiftDemo.joinAll(["a", "b"])).toBe("a,b");
+            expect(SwiftDemo.evens(7)).toEqual([0, 2, 4, 6]);
+        });
+
         it("leaves functions without known stand-ins out", function () {
             expect(SwiftDemo.decodeJSON).toBeUndefined();
-            expect(SwiftDemo.firstElement).toBeUndefined();
             expect(SwiftDemo.joined).toBeUndefined();
         });
     });

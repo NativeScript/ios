@@ -35,6 +35,8 @@
     "s:9SwiftDemo7topRankySSAA12RankedScorer_pKF",
     "s:9SwiftDemo17greetInBackgroundySSAA8Greeting_pYaF",
     "s:9SwiftDemo14GreetingHolderC",
+    "s:9SwiftDemo18WeakGreetingHolderC",
+    "s:9SwiftDemo16GreetingRegistryC",
     "s:9SwiftDemo13starterWallet3for0aB3Kit0D0CSS_tF",
     "s:9SwiftDemo3sum2of0aB3Kit5MoneyVSayAFG_tF",
     "s:9SwiftDemo4flipy0aB3Kit4CoinOAEF",
@@ -71,6 +73,11 @@
     "s:9SwiftDemo9countDown4from9failingAtScsySis5Error_pGSi_SiSgtF",
     "s:9SwiftDemo7letters2ofQrSS_tF",
     "s:9SwiftDemo5pagesyScSySaySSGGSiF",
+    "s:9SwiftDemo9CountdownV",
+    "s:9SwiftDemo10WordStreamC",
+    "s:9SwiftDemo11ThermometerC",
+    "s:9SwiftDemo9StreamLogC",
+    "s:9SwiftDemo6tickerScSySiGyF",
     "s:9SwiftDemo11checkedSideyS2dKF",
     "s:9SwiftDemo8echoInt8ys0D0VADF",
     "s:9SwiftDemo10echoUInt64ys0D0VADF",
@@ -136,6 +143,9 @@
     "s:9SwiftDemo10greetTwiceySSx_SStAA8GreetingRzlF@<any Greeting>",
     "s:9SwiftDemo10decodeJSON_4fromxSgxm_SStSeRzlF",
     "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF",
+    "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF@<[s:Sd]>",
+    "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF@<[s:SS]>",
+    "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF@<[s:Sb]>",
     "s:9SwiftDemo6joinedySSx_q_tr0_lF",
     "s:9SwiftDemo7compactySaySiGSaySiSgGF",
     "s:9SwiftDemo5holesySaySSSgGSiF",
@@ -162,6 +172,18 @@
     "s:9SwiftDemo13describeValueySSxs23CustomStringConvertibleRzlF@<s:Sb>",
     "s:9SwiftDemo9greetOnceySSx_SStAA8GreetingRzlF",
     "s:9SwiftDemo9greetOnceySSx_SStAA8GreetingRzlF@<any Greeting>",
+    "s:9SwiftDemo9CancelLogC",
+    "s:9SwiftDemo13waitForCancelySbSdYaF",
+    "s:9SwiftDemo5ShelfC",
+    "s:9SwiftDemo4GridV",
+    "s:9SwiftDemo7Vector2V",
+    "s:9SwiftDemo7VersionV",
+    "s:9SwiftDemo6sumAllySixSTRzSi7ElementRtzlF",
+    "s:9SwiftDemo6sumAllySixSTRzSi7ElementRtzlF@<[s:Si]>",
+    "s:9SwiftDemo11longestWordySixSlRzSS7ElementRtzlF",
+    "s:9SwiftDemo11longestWordySixSlRzSS7ElementRtzlF@<[s:SS]>",
+    "s:9SwiftDemo7joinAllySSST_pSS7ElementSTRts_XPF",
+    "s:9SwiftDemo5evens5belowST_pSi7ElementSTRts_XPSi_tF",
     "s:9SwiftDemo8describeySSSo6UIViewCF",
     "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
     "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
@@ -234,11 +256,14 @@
     "s:5UIKit23UITraitChangeObservableP": "UIKit.UITraitChangeObservable",
     "s:7SwiftUI4ViewP": "SwiftUICore.View",
     "s:SH": "Swift.Hashable",
+    "s:SL": "Swift.Comparable",
     "s:SQ": "Swift.Equatable",
     "s:SS": "Swift.String",
     "s:SY": "Swift.RawRepresentable",
     "s:Sa": "Swift.Array",
     "s:ScA": "_Concurrency.Actor",
+    "s:ScI": "_Concurrency.AsyncIteratorProtocol",
+    "s:Sci": "_Concurrency.AsyncSequence",
     "s:s16SendableMetatypeP": "Swift.SendableMetatype",
     "s:s23CustomStringConvertibleP": "Swift.CustomStringConvertible",
     "s:s28CustomDebugStringConvertibleP": "Swift.CustomDebugStringConvertible",
@@ -66723,6 +66748,133 @@
       "parent": "s:9SwiftDemo10ThermostatC"
     },
     {
+      "id": "s:9SwiftDemo10WordStreamC",
+      "kind": "class",
+      "path": "WordStream",
+      "name": "WordStream",
+      "access": "public",
+      "declaration": "final class WordStream",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Streams.swift:71:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo10WordStreamCyACSScfc",
+        "s:9SwiftDemo10WordStreamC8IteratorV",
+        "s:9SwiftDemo10WordStreamC17makeAsyncIteratorAC0G0VyF",
+        "s:Sci12_ConcurrencyE10allSatisfyyS2b7ElementQzYaKXEYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE10compactMapyAA012AsyncCompactC8SequenceVyxqd__Gqd__Sg7ElementQzYaclF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE10compactMapyAA020AsyncThrowingCompactC8SequenceVyxqd__Gqd__Sg7ElementQzYaKclF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE3mapyAA16AsyncMapSequenceVyxqd__Gqd__7ElementQzYaclF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE3mapyAA24AsyncThrowingMapSequenceVyxqd__Gqd__7ElementQzYaKclF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE3max2by7ElementQzSgSbAE_AEtYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE3min2by7ElementQzSgSbAE_AEtYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE4drop5whileAA22AsyncDropWhileSequenceVyxGSb7ElementQzYac_tF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE5first5where7ElementQzSgSbAEYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE6filteryAA19AsyncFilterSequenceVyxGSb7ElementQzYacF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE6prefix5whileAA24AsyncPrefixWhileSequenceVyxGSb7ElementQzYac_tKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE6prefixyAA19AsyncPrefixSequenceVyxGSiF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE6reduce4into_qd__qd__n_yqd__z_7ElementQztYaKXEtYaKlF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE6reduceyqd__qd___qd__qd___7ElementQztYaKXEtYaKlF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE7flatMapyAA017AsyncThrowingFlatC8SequenceVyxqd__Gqd__7ElementQzYaKcSciRd__lF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__7FailureQyd__AHRtzlF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__s5NeverO7FailureRtd__lF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__s5NeverO7FailureRtzAiJRtd__lF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE8contains5whereS2b7ElementQzYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencyE9dropFirstyAA09AsyncDropC8SequenceVyxGSiF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencySL7ElementRpzrlE3maxACSgyYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencySL7ElementRpzrlE3minACSgyYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+        "s:Sci12_ConcurrencySQ7ElementRpzrlE8containsySbACYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC"
+      ],
+      "conformances": [
+        "s:Sci"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo10WordStreamC17makeAsyncIteratorAC0G0VyF",
+      "kind": "instanceMethod",
+      "path": "WordStream.makeAsyncIterator()",
+      "name": "makeAsyncIterator()",
+      "access": "public",
+      "declaration": "func makeAsyncIterator() -> Iterator",
+      "returns": {
+        "spelling": "WordStream.Iterator",
+        "references": [
+          "s:9SwiftDemo10WordStreamC",
+          "s:9SwiftDemo10WordStreamC8IteratorV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Streams.swift:79:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci17makeAsyncIterator0bC0QzyF"
+    },
+    {
+      "id": "s:9SwiftDemo10WordStreamC8IteratorV",
+      "kind": "struct",
+      "path": "WordStream.Iterator",
+      "name": "Iterator",
+      "access": "public",
+      "declaration": "struct Iterator",
+      "location": "file://Sources/SwiftDemo/Streams.swift:75:18",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "members": [
+        "s:9SwiftDemo10WordStreamC8IteratorV4nextSSSgyYaKF",
+        "s:ScI12_ConcurrencyE4next7ElementQzSgyYa7FailureQzYKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC8IteratorV",
+        "s:ScI12_ConcurrencyE4next9isolation7ElementQzSgScA_pSgYi_tYa7FailureQzYKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC8IteratorV"
+      ],
+      "conformances": [
+        "s:ScI"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo10WordStreamC8IteratorV4nextSSSgyYaKF",
+      "kind": "instanceMethod",
+      "path": "WordStream.Iterator.next()",
+      "name": "next()",
+      "access": "public",
+      "declaration": "mutating func next() async throws -> String?",
+      "modifiers": [
+        "mutating"
+      ],
+      "returns": {
+        "spelling": "String?",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "location": "file://Sources/SwiftDemo/Streams.swift:77:29",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC8IteratorV",
+      "sourceOrigin": "s:ScI4next7ElementQzSgyYaKF"
+    },
+    {
+      "id": "s:9SwiftDemo10WordStreamCyACSScfc",
+      "kind": "initializer",
+      "path": "WordStream.init(_:)",
+      "name": "init(_:)",
+      "access": "public",
+      "declaration": "init(_ text: String)",
+      "parameters": [
+        {
+          "internalName": "text",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Streams.swift:73:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC"
+    },
+    {
       "id": "s:9SwiftDemo10allFlavorsSayAA6FlavorOGyF",
       "kind": "function",
       "path": "allFlavors()",
@@ -67445,6 +67597,89 @@
       "parent": "s:9SwiftDemo11MeasurementO"
     },
     {
+      "id": "s:9SwiftDemo11ThermometerC",
+      "kind": "class",
+      "path": "Thermometer",
+      "name": "Thermometer",
+      "access": "public",
+      "declaration": "final class Thermometer",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Streams.swift:83:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo11ThermometerCACycfc",
+        "s:9SwiftDemo11ThermometerC8readings7Combine12AnyPublisherVySds5NeverOGvp",
+        "s:9SwiftDemo11ThermometerC6recordyySdF",
+        "s:9SwiftDemo11ThermometerC6finishyyF"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo11ThermometerC6finishyyF",
+      "kind": "instanceMethod",
+      "path": "Thermometer.finish()",
+      "name": "finish()",
+      "access": "public",
+      "declaration": "func finish()",
+      "location": "file://Sources/SwiftDemo/Streams.swift:88:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo11ThermometerC"
+    },
+    {
+      "id": "s:9SwiftDemo11ThermometerC6recordyySdF",
+      "kind": "instanceMethod",
+      "path": "Thermometer.record(_:)",
+      "name": "record(_:)",
+      "access": "public",
+      "declaration": "func record(_ value: Double)",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Streams.swift:87:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo11ThermometerC"
+    },
+    {
+      "id": "s:9SwiftDemo11ThermometerC8readings7Combine12AnyPublisherVySds5NeverOGvp",
+      "kind": "instanceProperty",
+      "path": "Thermometer.readings",
+      "name": "readings",
+      "access": "public",
+      "declaration": "var readings: AnyPublisher<Double, Never> { get }",
+      "valueType": {
+        "spelling": "AnyPublisher<Double, Never>",
+        "references": [
+          "s:7Combine12AnyPublisherV",
+          "s:Sd",
+          "s:s5NeverO"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Streams.swift:86:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo11ThermometerC"
+    },
+    {
+      "id": "s:9SwiftDemo11ThermometerCACycfc",
+      "kind": "initializer",
+      "path": "Thermometer.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "location": "file://Sources/SwiftDemo/Streams.swift:85:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo11ThermometerC"
+    },
+    {
       "id": "s:9SwiftDemo11checkedSideyS2dKF",
       "kind": "function",
       "path": "checkedSide(_:)",
@@ -67566,6 +67801,81 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:217:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo11longestWordySixSlRzSS7ElementRtzlF",
+      "kind": "function",
+      "path": "longestWord(_:)",
+      "name": "longestWord(_:)",
+      "access": "public",
+      "declaration": "func longestWord<C>(_ words: C) -> Int where C : Collection, C.Element == String",
+      "parameters": [
+        {
+          "internalName": "words",
+          "type": {
+            "spelling": "C",
+            "references": [
+              "s:9SwiftDemo11longestWordySixSlRzSS7ElementRtzlF1CL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "C",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "C",
+          "rhs": "Collection",
+          "rhsPrecise": "s:Sl"
+        },
+        {
+          "kind": "sameType",
+          "lhs": "C.Element",
+          "rhs": "String",
+          "rhsPrecise": "s:SS"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:308:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo11longestWordySixSlRzSS7ElementRtzlF@<[s:SS]>",
+      "kind": "function",
+      "path": "longestWord(_:)",
+      "name": "longestWord(_:)",
+      "access": "public",
+      "declaration": "func longestWord<C>(_ words: C) -> Int where C : Collection, C.Element == String",
+      "parameters": [
+        {
+          "internalName": "words",
+          "type": {
+            "spelling": "C",
+            "references": [
+              "s:9SwiftDemo11longestWordySixSlRzSS7ElementRtzlF1CL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:308:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -67769,6 +68079,87 @@
           "rhsPrecise": "s:Sl"
         }
       ],
+      "location": "file://Sources/SwiftDemo/Values.swift:211:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF@<[s:SS]>",
+      "kind": "function",
+      "path": "firstElement(_:)",
+      "name": "firstElement(_:)",
+      "access": "public",
+      "declaration": "func firstElement<C>(_ values: C) -> C.Element? where C : Collection",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "C",
+            "references": [
+              "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF1CL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "C.Element?",
+        "references": [
+          "s:ST7ElementQa"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:211:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF@<[s:Sb]>",
+      "kind": "function",
+      "path": "firstElement(_:)",
+      "name": "firstElement(_:)",
+      "access": "public",
+      "declaration": "func firstElement<C>(_ values: C) -> C.Element? where C : Collection",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "C",
+            "references": [
+              "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF1CL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "C.Element?",
+        "references": [
+          "s:ST7ElementQa"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:211:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF@<[s:Sd]>",
+      "kind": "function",
+      "path": "firstElement(_:)",
+      "name": "firstElement(_:)",
+      "access": "public",
+      "declaration": "func firstElement<C>(_ values: C) -> C.Element? where C : Collection",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "C",
+            "references": [
+              "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF1CL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "C.Element?",
+        "references": [
+          "s:ST7ElementQa"
+        ]
+      },
       "location": "file://Sources/SwiftDemo/Values.swift:211:12",
       "graph": "SwiftDemo.symbols.json"
     },
@@ -68229,13 +68620,41 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo13waitForCancelySbSdYaF",
+      "kind": "function",
+      "path": "waitForCancel(_:)",
+      "name": "waitForCancel(_:)",
+      "access": "public",
+      "declaration": "func waitForCancel(_ seconds: Double) async -> Bool",
+      "parameters": [
+        {
+          "internalName": "seconds",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "async": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:260:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo14CountdownErrorV",
       "kind": "struct",
       "path": "CountdownError",
       "name": "CountdownError",
       "access": "public",
       "declaration": "struct CountdownError",
-      "location": "file://Sources/SwiftDemo/Streams.swift:13:14",
+      "location": "file://Sources/SwiftDemo/Streams.swift:14:14",
       "graph": "SwiftDemo.symbols.json",
       "members": [
         "s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo14CountdownErrorV"
@@ -68506,6 +68925,127 @@
       "parent": "s:9SwiftDemo14GreetingHolderC"
     },
     {
+      "id": "s:9SwiftDemo16GreetingRegistryC",
+      "kind": "class",
+      "path": "GreetingRegistry",
+      "name": "GreetingRegistry",
+      "access": "public",
+      "declaration": "final class GreetingRegistry",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Protocols.swift:74:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo16GreetingRegistryCACycfc",
+        "s:9SwiftDemo16GreetingRegistryC5countSivp",
+        "s:9SwiftDemo16GreetingRegistryC3addyyAA0C0_pF",
+        "s:9SwiftDemo16GreetingRegistryC6removeyyAA0C0_pF",
+        "s:9SwiftDemo16GreetingRegistryC8containsySbAA0C0_pF"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo16GreetingRegistryC3addyyAA0C0_pF",
+      "kind": "instanceMethod",
+      "path": "GreetingRegistry.add(_:)",
+      "name": "add(_:)",
+      "access": "public",
+      "declaration": "func add(_ greeting: any Greeting)",
+      "parameters": [
+        {
+          "internalName": "greeting",
+          "type": {
+            "spelling": "any Greeting",
+            "references": [
+              "s:9SwiftDemo8GreetingP"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Protocols.swift:78:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo16GreetingRegistryC"
+    },
+    {
+      "id": "s:9SwiftDemo16GreetingRegistryC5countSivp",
+      "kind": "instanceProperty",
+      "path": "GreetingRegistry.count",
+      "name": "count",
+      "access": "public",
+      "declaration": "var count: Int { get }",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Protocols.swift:77:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo16GreetingRegistryC"
+    },
+    {
+      "id": "s:9SwiftDemo16GreetingRegistryC6removeyyAA0C0_pF",
+      "kind": "instanceMethod",
+      "path": "GreetingRegistry.remove(_:)",
+      "name": "remove(_:)",
+      "access": "public",
+      "declaration": "func remove(_ greeting: any Greeting)",
+      "parameters": [
+        {
+          "internalName": "greeting",
+          "type": {
+            "spelling": "any Greeting",
+            "references": [
+              "s:9SwiftDemo8GreetingP"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Protocols.swift:79:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo16GreetingRegistryC"
+    },
+    {
+      "id": "s:9SwiftDemo16GreetingRegistryC8containsySbAA0C0_pF",
+      "kind": "instanceMethod",
+      "path": "GreetingRegistry.contains(_:)",
+      "name": "contains(_:)",
+      "access": "public",
+      "declaration": "func contains(_ greeting: any Greeting) -> Bool",
+      "parameters": [
+        {
+          "internalName": "greeting",
+          "type": {
+            "spelling": "any Greeting",
+            "references": [
+              "s:9SwiftDemo8GreetingP"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Protocols.swift:80:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo16GreetingRegistryC"
+    },
+    {
+      "id": "s:9SwiftDemo16GreetingRegistryCACycfc",
+      "kind": "initializer",
+      "path": "GreetingRegistry.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:76:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo16GreetingRegistryC"
+    },
+    {
       "id": "s:9SwiftDemo16makeDefaultPointAA0E0VyF",
       "kind": "function",
       "path": "makeDefaultPoint()",
@@ -68577,6 +69117,84 @@
       "async": true,
       "location": "file://Sources/SwiftDemo/Protocols.swift:55:12",
       "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo18WeakGreetingHolderC",
+      "kind": "class",
+      "path": "WeakGreetingHolder",
+      "name": "WeakGreetingHolder",
+      "access": "public",
+      "declaration": "final class WeakGreetingHolder",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Protocols.swift:67:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo18WeakGreetingHolderC8greetingAA0D0_pSgvp",
+        "s:9SwiftDemo18WeakGreetingHolderCACycfc",
+        "s:9SwiftDemo18WeakGreetingHolderC5greetySSSgSSF"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo18WeakGreetingHolderC5greetySSSgSSF",
+      "kind": "instanceMethod",
+      "path": "WeakGreetingHolder.greet(_:)",
+      "name": "greet(_:)",
+      "access": "public",
+      "declaration": "func greet(_ other: String) -> String?",
+      "parameters": [
+        {
+          "internalName": "other",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String?",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Protocols.swift:70:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo18WeakGreetingHolderC"
+    },
+    {
+      "id": "s:9SwiftDemo18WeakGreetingHolderC8greetingAA0D0_pSgvp",
+      "kind": "instanceProperty",
+      "path": "WeakGreetingHolder.greeting",
+      "name": "greeting",
+      "access": "public",
+      "declaration": "weak var greeting: (any Greeting)?",
+      "modifiers": [
+        "weak"
+      ],
+      "valueType": {
+        "spelling": "(any Greeting)?",
+        "references": [
+          "s:9SwiftDemo8GreetingP"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Protocols.swift:68:20",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo18WeakGreetingHolderC"
+    },
+    {
+      "id": "s:9SwiftDemo18WeakGreetingHolderCACycfc",
+      "kind": "initializer",
+      "path": "WeakGreetingHolder.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "location": "file://Sources/SwiftDemo/Protocols.swift:69:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo18WeakGreetingHolderC"
     },
     {
       "id": "s:9SwiftDemo19computeInBackgroundyS2iyYbcYaF",
@@ -68740,6 +69358,97 @@
       },
       "location": "file://Sources/SwiftDemo/Purse.swift:10:12",
       "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo4GridV",
+      "kind": "struct",
+      "path": "Grid",
+      "name": "Grid",
+      "access": "public",
+      "declaration": "struct Grid",
+      "location": "file://Sources/SwiftDemo/Values.swift:280:14",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo4GridV5cellsSaySiGvp",
+        "s:9SwiftDemo4GridV4sizeACSi_tcfc",
+        "s:9SwiftDemo4GridVyS2icip"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo4GridV4sizeACSi_tcfc",
+      "kind": "initializer",
+      "path": "Grid.init(size:)",
+      "name": "init(size:)",
+      "access": "public",
+      "declaration": "init(size: Int)",
+      "parameters": [
+        {
+          "label": "size",
+          "internalName": "size",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:282:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo4GridV"
+    },
+    {
+      "id": "s:9SwiftDemo4GridV5cellsSaySiGvp",
+      "kind": "instanceProperty",
+      "path": "Grid.cells",
+      "name": "cells",
+      "access": "public",
+      "declaration": "var cells: [Int]",
+      "valueType": {
+        "spelling": "[Int]",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:281:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo4GridV"
+    },
+    {
+      "id": "s:9SwiftDemo4GridVyS2icip",
+      "kind": "instanceSubscript",
+      "path": "Grid.subscript(_:)",
+      "name": "subscript(_:)",
+      "access": "public",
+      "declaration": "subscript(index: Int) -> Int { get set }",
+      "parameters": [
+        {
+          "internalName": "index",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:283:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo4GridV"
     },
     {
       "id": "s:9SwiftDemo4NoteC4tagsShySSGvp",
@@ -70649,6 +71358,114 @@
       "parent": "s:9SwiftDemo5ShapeP"
     },
     {
+      "id": "s:9SwiftDemo5ShelfC",
+      "kind": "class",
+      "path": "Shelf",
+      "name": "Shelf",
+      "access": "public",
+      "declaration": "final class Shelf",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:271:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo5ShelfCACycfc",
+        "s:9SwiftDemo5ShelfCySiSgSScip",
+        "s:9SwiftDemo5ShelfCySSSi_Sitcip"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo5ShelfCACycfc",
+      "kind": "initializer",
+      "path": "Shelf.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "location": "file://Sources/SwiftDemo/Values.swift:273:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5ShelfC"
+    },
+    {
+      "id": "s:9SwiftDemo5ShelfCySSSi_Sitcip",
+      "kind": "instanceSubscript",
+      "path": "Shelf.subscript(_:_:)",
+      "name": "subscript(_:_:)",
+      "access": "public",
+      "declaration": "subscript(row: Int, column: Int) -> String { get }",
+      "parameters": [
+        {
+          "internalName": "row",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "internalName": "column",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Values.swift:278:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5ShelfC"
+    },
+    {
+      "id": "s:9SwiftDemo5ShelfCySiSgSScip",
+      "kind": "instanceSubscript",
+      "path": "Shelf.subscript(_:)",
+      "name": "subscript(_:)",
+      "access": "public",
+      "declaration": "subscript(name: String) -> Int? { get set }",
+      "parameters": [
+        {
+          "internalName": "name",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int?",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "valueType": {
+        "spelling": "Int?",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:274:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5ShelfC"
+    },
+    {
       "id": "s:9SwiftDemo5boxedy0aB3Kit3BoxCyAC5MoneyVGAGF",
       "kind": "function",
       "path": "boxed(_:)",
@@ -70696,6 +71513,35 @@
         }
       ],
       "location": "file://Sources/SwiftDemo/Values.swift:171:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo5evens5belowST_pSi7ElementSTRts_XPSi_tF",
+      "kind": "function",
+      "path": "evens(below:)",
+      "name": "evens(below:)",
+      "access": "public",
+      "declaration": "func evens(below limit: Int) -> any Sequence<Int>",
+      "parameters": [
+        {
+          "label": "below",
+          "internalName": "limit",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "any Sequence<Int>",
+        "references": [
+          "s:ST",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:312:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -70837,7 +71683,7 @@
           "s:SS"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Streams.swift:41:12",
+      "location": "file://Sources/SwiftDemo/Streams.swift:42:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -72101,6 +72947,92 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo6sumAllySixSTRzSi7ElementRtzlF",
+      "kind": "function",
+      "path": "sumAll(_:)",
+      "name": "sumAll(_:)",
+      "access": "public",
+      "declaration": "func sumAll(_ values: some Sequence<Int>) -> Int",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "some Sequence<Int>",
+            "references": [
+              "s:ST",
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "some Sequence<Int>",
+          "rhs": "Sequence",
+          "rhsPrecise": "s:ST"
+        },
+        {
+          "kind": "sameType",
+          "lhs": "(some Sequence<Int>).Element",
+          "rhs": "Int",
+          "rhsPrecise": "s:Si"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:307:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo6sumAllySixSTRzSi7ElementRtzlF@<[s:Si]>",
+      "kind": "function",
+      "path": "sumAll(_:)",
+      "name": "sumAll(_:)",
+      "access": "public",
+      "declaration": "func sumAll(_ values: some Sequence<Int>) -> Int",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "[Int]",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:307:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo6tickerScSySiGyF",
+      "kind": "function",
+      "path": "ticker()",
+      "name": "ticker()",
+      "access": "public",
+      "declaration": "func ticker() -> AsyncStream<Int>",
+      "returns": {
+        "spelling": "AsyncStream<Int>",
+        "references": [
+          "s:ScS",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Streams.swift:95:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo6unwrapySSs6ResultOySSs5Error_pGKF",
       "kind": "function",
       "path": "unwrap(_:)",
@@ -73222,6 +74154,354 @@
       "parent": "s:9SwiftDemo7TrackerC"
     },
     {
+      "id": "s:9SwiftDemo7Vector2V",
+      "kind": "struct",
+      "path": "Vector2",
+      "name": "Vector2",
+      "access": "public",
+      "declaration": "struct Vector2",
+      "location": "file://Sources/SwiftDemo/Values.swift:291:14",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo7Vector2V1xSdvp",
+        "s:9SwiftDemo7Vector2V1ySdvp",
+        "s:9SwiftDemo7Vector2V1x1yACSd_Sdtcfc",
+        "s:9SwiftDemo7Vector2V1poiyA2C_ACtFZ",
+        "s:9SwiftDemo7Vector2V1sopyA2CFZ",
+        "s:9SwiftDemo7Vector2V1moiyACSd_ACtFZ",
+        "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7Vector2V"
+      ],
+      "conformances": [
+        "s:SQ"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo7Vector2V1moiyACSd_ACtFZ",
+      "kind": "operator",
+      "path": "Vector2.*(_:_:)",
+      "name": "*(_:_:)",
+      "access": "public",
+      "declaration": "static func * (scale: Double, vector: Vector2) -> Vector2",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "scale",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        },
+        {
+          "internalName": "vector",
+          "type": {
+            "spelling": "Vector2",
+            "references": [
+              "s:9SwiftDemo7Vector2V"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Vector2",
+        "references": [
+          "s:9SwiftDemo7Vector2V"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:297:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7Vector2V"
+    },
+    {
+      "id": "s:9SwiftDemo7Vector2V1poiyA2C_ACtFZ",
+      "kind": "operator",
+      "path": "Vector2.+(_:_:)",
+      "name": "+(_:_:)",
+      "access": "public",
+      "declaration": "static func + (lhs: Vector2, rhs: Vector2) -> Vector2",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Vector2",
+            "references": [
+              "s:9SwiftDemo7Vector2V"
+            ]
+          }
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Vector2",
+            "references": [
+              "s:9SwiftDemo7Vector2V"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Vector2",
+        "references": [
+          "s:9SwiftDemo7Vector2V"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:295:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7Vector2V"
+    },
+    {
+      "id": "s:9SwiftDemo7Vector2V1sopyA2CFZ",
+      "kind": "operator",
+      "path": "Vector2.-(_:)",
+      "name": "-(_:)",
+      "access": "public",
+      "declaration": "static func - (vector: Vector2) -> Vector2",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "vector",
+          "type": {
+            "spelling": "Vector2",
+            "references": [
+              "s:9SwiftDemo7Vector2V"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Vector2",
+        "references": [
+          "s:9SwiftDemo7Vector2V"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:296:30",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7Vector2V"
+    },
+    {
+      "id": "s:9SwiftDemo7Vector2V1x1yACSd_Sdtcfc",
+      "kind": "initializer",
+      "path": "Vector2.init(x:y:)",
+      "name": "init(x:y:)",
+      "access": "public",
+      "declaration": "init(x: Double, y: Double)",
+      "parameters": [
+        {
+          "label": "x",
+          "internalName": "x",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        },
+        {
+          "label": "y",
+          "internalName": "y",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:294:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7Vector2V"
+    },
+    {
+      "id": "s:9SwiftDemo7Vector2V1xSdvp",
+      "kind": "instanceProperty",
+      "path": "Vector2.x",
+      "name": "x",
+      "access": "public",
+      "declaration": "var x: Double",
+      "valueType": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:292:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7Vector2V"
+    },
+    {
+      "id": "s:9SwiftDemo7Vector2V1ySdvp",
+      "kind": "instanceProperty",
+      "path": "Vector2.y",
+      "name": "y",
+      "access": "public",
+      "declaration": "var y: Double",
+      "valueType": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:293:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7Vector2V"
+    },
+    {
+      "id": "s:9SwiftDemo7VersionV",
+      "kind": "struct",
+      "path": "Version",
+      "name": "Version",
+      "access": "public",
+      "declaration": "struct Version",
+      "location": "file://Sources/SwiftDemo/Values.swift:299:14",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo7VersionV5majorSivp",
+        "s:9SwiftDemo7VersionV5minorSivp",
+        "s:9SwiftDemo7VersionV5major5minorACSi_Sitcfc",
+        "s:9SwiftDemo7VersionV1loiySbAC_ACtFZ",
+        "s:SLsE3zzloiySnyxGx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SLsE3zzlopys16PartialRangeUpToVyxGxFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SLsE3zzzoPys16PartialRangeFromVyxGxFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SLsE3zzzoiySNyxGx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SLsE3zzzopys19PartialRangeThroughVyxGxFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SLsRi_zRi0_zrlE1goiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SLsRi_zRi0_zrlE2geoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SLsRi_zRi0_zrlE2leoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV"
+      ],
+      "conformances": [
+        "s:SH",
+        "s:SL",
+        "s:SQ"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo7VersionV1loiySbAC_ACtFZ",
+      "kind": "operator",
+      "path": "Version.<(_:_:)",
+      "name": "<(_:_:)",
+      "access": "public",
+      "declaration": "static func < (lhs: Version, rhs: Version) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Version",
+            "references": [
+              "s:9SwiftDemo7VersionV"
+            ]
+          }
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Version",
+            "references": [
+              "s:9SwiftDemo7VersionV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:303:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SL1loiySbx_xtFZ"
+    },
+    {
+      "id": "s:9SwiftDemo7VersionV5major5minorACSi_Sitcfc",
+      "kind": "initializer",
+      "path": "Version.init(major:minor:)",
+      "name": "init(major:minor:)",
+      "access": "public",
+      "declaration": "init(major: Int, minor: Int)",
+      "parameters": [
+        {
+          "label": "major",
+          "internalName": "major",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "label": "minor",
+          "internalName": "minor",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:302:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV"
+    },
+    {
+      "id": "s:9SwiftDemo7VersionV5majorSivp",
+      "kind": "instanceProperty",
+      "path": "Version.major",
+      "name": "major",
+      "access": "public",
+      "declaration": "let major: Int",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "let": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:300:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV"
+    },
+    {
+      "id": "s:9SwiftDemo7VersionV5minorSivp",
+      "kind": "instanceProperty",
+      "path": "Version.minor",
+      "name": "minor",
+      "access": "public",
+      "declaration": "let minor: Int",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "let": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:301:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV"
+    },
+    {
       "id": "s:9SwiftDemo7compactySaySiGSaySiSgGF",
       "kind": "function",
       "path": "compact(_:)",
@@ -73274,7 +74554,7 @@
           "s:Si"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Streams.swift:4:12",
+      "location": "file://Sources/SwiftDemo/Streams.swift:5:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -73501,6 +74781,34 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo7joinAllySSST_pSS7ElementSTRts_XPF",
+      "kind": "function",
+      "path": "joinAll(_:)",
+      "name": "joinAll(_:)",
+      "access": "public",
+      "declaration": "func joinAll(_ parts: any Sequence<String>) -> String",
+      "parameters": [
+        {
+          "internalName": "parts",
+          "type": {
+            "spelling": "any Sequence<String>",
+            "references": [
+              "s:ST",
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:311:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo7largestyxSgSayxGSLRzlF",
       "kind": "function",
       "path": "largest(_:)",
@@ -73649,7 +74957,7 @@
           "introduced": "18.0.0"
         }
       ],
-      "location": "file://Sources/SwiftDemo/Streams.swift:32:12",
+      "location": "file://Sources/SwiftDemo/Streams.swift:33:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -74800,6 +76108,265 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo9CancelLogC",
+      "kind": "class",
+      "path": "CancelLog",
+      "name": "CancelLog",
+      "access": "public",
+      "declaration": "final class CancelLog",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:257:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo9CancelLogC13cancellationsSivpZ"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo9CancelLogC13cancellationsSivpZ",
+      "kind": "typeProperty",
+      "path": "CancelLog.cancellations",
+      "name": "cancellations",
+      "access": "public",
+      "declaration": "static var cancellations: Int",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:258:22",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CancelLogC"
+    },
+    {
+      "id": "s:9SwiftDemo9CountdownV",
+      "kind": "struct",
+      "path": "Countdown",
+      "name": "Countdown",
+      "access": "public",
+      "declaration": "struct Countdown",
+      "location": "file://Sources/SwiftDemo/Streams.swift:53:14",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo9CountdownV7Elementa",
+        "s:9SwiftDemo9CountdownV5startSivp",
+        "s:9SwiftDemo9CountdownV4fromACSi_tcfc",
+        "s:9SwiftDemo9CountdownV5labelSSvp",
+        "s:9SwiftDemo9CountdownV13AsyncIteratorV",
+        "s:9SwiftDemo9CountdownV17makeAsyncIteratorAC0eF0VyF",
+        "s:Sci12_ConcurrencyE10allSatisfyyS2b7ElementQzYaKXEYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE10compactMapyAA012AsyncCompactC8SequenceVyxqd__Gqd__Sg7ElementQzYaclF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE10compactMapyAA020AsyncThrowingCompactC8SequenceVyxqd__Gqd__Sg7ElementQzYaKclF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE3mapyAA16AsyncMapSequenceVyxqd__Gqd__7ElementQzYaclF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE3mapyAA24AsyncThrowingMapSequenceVyxqd__Gqd__7ElementQzYaKclF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE3max2by7ElementQzSgSbAE_AEtYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE3min2by7ElementQzSgSbAE_AEtYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE4drop5whileAA22AsyncDropWhileSequenceVyxGSb7ElementQzYac_tF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE5first5where7ElementQzSgSbAEYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE6filteryAA19AsyncFilterSequenceVyxGSb7ElementQzYacF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE6prefix5whileAA24AsyncPrefixWhileSequenceVyxGSb7ElementQzYac_tKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE6prefixyAA19AsyncPrefixSequenceVyxGSiF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE6reduce4into_qd__qd__n_yqd__z_7ElementQztYaKXEtYaKlF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE6reduceyqd__qd___qd__qd___7ElementQztYaKXEtYaKlF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE7flatMapyAA017AsyncThrowingFlatC8SequenceVyxqd__Gqd__7ElementQzYaKcSciRd__lF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__7FailureQyd__AHRtzlF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__s5NeverO7FailureRtd__lF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__s5NeverO7FailureRtzAiJRtd__lF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE8contains5whereS2b7ElementQzYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencyE9dropFirstyAA09AsyncDropC8SequenceVyxGSiF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencySL7ElementRpzrlE3maxACSgyYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencySL7ElementRpzrlE3minACSgyYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+        "s:Sci12_ConcurrencySQ7ElementRpzrlE8containsySbACYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV"
+      ],
+      "conformances": [
+        "s:Sci"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo9CountdownV13AsyncIteratorV",
+      "kind": "struct",
+      "path": "Countdown.AsyncIterator",
+      "name": "AsyncIterator",
+      "access": "public",
+      "declaration": "struct AsyncIterator",
+      "location": "file://Sources/SwiftDemo/Streams.swift:59:18",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "members": [
+        "s:9SwiftDemo9CountdownV13AsyncIteratorV4nextSiSgyYaF",
+        "s:ScI12_ConcurrencyE4next7ElementQzSgyYa7FailureQzYKF::SYNTHESIZED::s:9SwiftDemo9CountdownV13AsyncIteratorV",
+        "s:ScI12_ConcurrencyE4next9isolation7ElementQzSgScA_pSgYi_tYa7FailureQzYKF::SYNTHESIZED::s:9SwiftDemo9CountdownV13AsyncIteratorV"
+      ],
+      "conformances": [
+        "s:ScI"
+      ],
+      "sourceOrigin": "s:Sci13AsyncIteratorQa"
+    },
+    {
+      "id": "s:9SwiftDemo9CountdownV13AsyncIteratorV4nextSiSgyYaF",
+      "kind": "instanceMethod",
+      "path": "Countdown.AsyncIterator.next()",
+      "name": "next()",
+      "access": "public",
+      "declaration": "mutating func next() async -> Int?",
+      "modifiers": [
+        "mutating"
+      ],
+      "returns": {
+        "spelling": "Int?",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "async": true,
+      "location": "file://Sources/SwiftDemo/Streams.swift:61:29",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV13AsyncIteratorV",
+      "sourceOrigin": "s:ScI4next7ElementQzSgyYaKF"
+    },
+    {
+      "id": "s:9SwiftDemo9CountdownV17makeAsyncIteratorAC0eF0VyF",
+      "kind": "instanceMethod",
+      "path": "Countdown.makeAsyncIterator()",
+      "name": "makeAsyncIterator()",
+      "access": "public",
+      "declaration": "func makeAsyncIterator() -> AsyncIterator",
+      "returns": {
+        "spelling": "Countdown.AsyncIterator",
+        "references": [
+          "s:9SwiftDemo9CountdownV",
+          "s:9SwiftDemo9CountdownV13AsyncIteratorV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Streams.swift:67:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci17makeAsyncIterator0bC0QzyF"
+    },
+    {
+      "id": "s:9SwiftDemo9CountdownV4fromACSi_tcfc",
+      "kind": "initializer",
+      "path": "Countdown.init(from:)",
+      "name": "init(from:)",
+      "access": "public",
+      "declaration": "init(from start: Int)",
+      "parameters": [
+        {
+          "label": "from",
+          "internalName": "start",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Streams.swift:56:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV"
+    },
+    {
+      "id": "s:9SwiftDemo9CountdownV5labelSSvp",
+      "kind": "instanceProperty",
+      "path": "Countdown.label",
+      "name": "label",
+      "access": "public",
+      "declaration": "var label: String { get }",
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Streams.swift:57:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV"
+    },
+    {
+      "id": "s:9SwiftDemo9CountdownV5startSivp",
+      "kind": "instanceProperty",
+      "path": "Countdown.start",
+      "name": "start",
+      "access": "public",
+      "declaration": "let start: Int",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "let": true,
+      "location": "file://Sources/SwiftDemo/Streams.swift:55:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV"
+    },
+    {
+      "id": "s:9SwiftDemo9CountdownV7Elementa",
+      "kind": "typeAlias",
+      "path": "Countdown.Element",
+      "name": "Element",
+      "access": "public",
+      "declaration": "typealias Element = Int",
+      "aliasedType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Streams.swift:54:21",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci7ElementQa"
+    },
+    {
+      "id": "s:9SwiftDemo9StreamLogC",
+      "kind": "class",
+      "path": "StreamLog",
+      "name": "StreamLog",
+      "access": "public",
+      "declaration": "final class StreamLog",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Streams.swift:92:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo9StreamLogC12terminationsSivpZ"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo9StreamLogC12terminationsSivpZ",
+      "kind": "typeProperty",
+      "path": "StreamLog.terminations",
+      "name": "terminations",
+      "access": "public",
+      "declaration": "static var terminations: Int",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Streams.swift:93:22",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9StreamLogC"
+    },
+    {
       "id": "s:9SwiftDemo9countDown4from9failingAtScsySis5Error_pGSi_SiSgtF",
       "kind": "function",
       "path": "countDown(from:failingAt:)",
@@ -74836,7 +76403,7 @@
           "s:s5ErrorP"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Streams.swift:15:12",
+      "location": "file://Sources/SwiftDemo/Streams.swift:16:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -75180,6 +76747,314 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:SLsE3zzloiySnyxGx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version...<(_:_:)",
+      "name": "..<(_:_:)",
+      "access": "public",
+      "declaration": "static func ..< (minimum: Self, maximum: Self) -> Range<Self>",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "minimum",
+          "type": {
+            "spelling": "Self"
+          }
+        },
+        {
+          "internalName": "maximum",
+          "type": {
+            "spelling": "Self"
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Range<Self>",
+        "references": [
+          "s:Sn"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsE3zzloiySnyxGx_xtFZ"
+    },
+    {
+      "id": "s:SLsE3zzlopys16PartialRangeUpToVyxGxFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version...<(_:)",
+      "name": "..<(_:)",
+      "access": "public",
+      "declaration": "static func ..< (maximum: Self) -> PartialRangeUpTo<Self>",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "maximum",
+          "type": {
+            "spelling": "Self"
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "PartialRangeUpTo<Self>",
+        "references": [
+          "s:s16PartialRangeUpToV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsE3zzlopys16PartialRangeUpToVyxGxFZ"
+    },
+    {
+      "id": "s:SLsE3zzzoPys16PartialRangeFromVyxGxFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version....(_:)",
+      "name": "...(_:)",
+      "access": "public",
+      "declaration": "static func ... (minimum: Self) -> PartialRangeFrom<Self>",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "minimum",
+          "type": {
+            "spelling": "Self"
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "PartialRangeFrom<Self>",
+        "references": [
+          "s:s16PartialRangeFromV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsE3zzzoPys16PartialRangeFromVyxGxFZ"
+    },
+    {
+      "id": "s:SLsE3zzzoiySNyxGx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version....(_:_:)",
+      "name": "...(_:_:)",
+      "access": "public",
+      "declaration": "static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self>",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "minimum",
+          "type": {
+            "spelling": "Self"
+          }
+        },
+        {
+          "internalName": "maximum",
+          "type": {
+            "spelling": "Self"
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "ClosedRange<Self>",
+        "references": [
+          "s:SN"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsE3zzzoiySNyxGx_xtFZ"
+    },
+    {
+      "id": "s:SLsE3zzzopys19PartialRangeThroughVyxGxFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version....(_:)",
+      "name": "...(_:)",
+      "access": "public",
+      "declaration": "static func ... (maximum: Self) -> PartialRangeThrough<Self>",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "maximum",
+          "type": {
+            "spelling": "Self"
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "PartialRangeThrough<Self>",
+        "references": [
+          "s:s19PartialRangeThroughV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsE3zzzopys19PartialRangeThroughVyxGxFZ"
+    },
+    {
+      "id": "s:SLsRi_zRi0_zrlE1goiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version.>(_:_:)",
+      "name": ">(_:_:)",
+      "access": "public",
+      "declaration": "static func > (lhs: borrowing Self, rhs: borrowing Self) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsRi_zRi0_zrlE1goiySbx_xtFZ"
+    },
+    {
+      "id": "s:SLsRi_zRi0_zrlE2geoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version.>=(_:_:)",
+      "name": ">=(_:_:)",
+      "access": "public",
+      "declaration": "static func >= (lhs: borrowing Self, rhs: borrowing Self) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsRi_zRi0_zrlE2geoiySbx_xtFZ"
+    },
+    {
+      "id": "s:SLsRi_zRi0_zrlE2leoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version.<=(_:_:)",
+      "name": "<=(_:_:)",
+      "access": "public",
+      "declaration": "static func <= (lhs: borrowing Self, rhs: borrowing Self) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsRi_zRi0_zrlE2leoiySbx_xtFZ"
+    },
+    {
       "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:12SwiftDemoKit4CoinO",
       "kind": "operator",
       "path": "Coin.!=(_:_:)",
@@ -75345,6 +77220,90 @@
       },
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7PolygonC5StyleO",
+      "sourceOrigin": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ"
+    },
+    {
+      "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7Vector2V",
+      "kind": "operator",
+      "path": "Vector2.!=(_:_:)",
+      "name": "!=(_:_:)",
+      "access": "public",
+      "declaration": "static func != (lhs: borrowing Self, rhs: borrowing Self) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7Vector2V",
+      "sourceOrigin": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ"
+    },
+    {
+      "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version.!=(_:_:)",
+      "name": "!=(_:_:)",
+      "access": "public",
+      "declaration": "static func != (lhs: borrowing Self, rhs: borrowing Self) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
       "sourceOrigin": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ"
     },
     {
@@ -76457,6 +78416,3138 @@
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7CounterC",
       "sourceOrigin": "s:ScA12_ConcurrencyE20preconditionIsolated_4file4lineySSyXK_s12StaticStringVSutF"
+    },
+    {
+      "id": "s:ScI12_ConcurrencyE4next7ElementQzSgyYa7FailureQzYKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC8IteratorV",
+      "kind": "instanceMethod",
+      "path": "WordStream.Iterator.next()",
+      "name": "next()",
+      "access": "public",
+      "declaration": "mutating func next() async throws(Self.Failure) -> Self.Element?",
+      "modifiers": [
+        "mutating"
+      ],
+      "synthesized": true,
+      "returns": {
+        "spelling": "Self.Element?",
+        "references": [
+          "s:ScI7ElementQa"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "thrownType": {
+        "spelling": "Self.Failure",
+        "references": [
+          "s:ScI7FailureQa"
+        ]
+      },
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "15.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "2.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "11.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC8IteratorV",
+      "sourceOrigin": "s:ScI12_ConcurrencyE4next7ElementQzSgyYa7FailureQzYKF"
+    },
+    {
+      "id": "s:ScI12_ConcurrencyE4next7ElementQzSgyYa7FailureQzYKF::SYNTHESIZED::s:9SwiftDemo9CountdownV13AsyncIteratorV",
+      "kind": "instanceMethod",
+      "path": "Countdown.AsyncIterator.next()",
+      "name": "next()",
+      "access": "public",
+      "declaration": "mutating func next() async throws(Self.Failure) -> Self.Element?",
+      "modifiers": [
+        "mutating"
+      ],
+      "synthesized": true,
+      "returns": {
+        "spelling": "Self.Element?",
+        "references": [
+          "s:ScI7ElementQa"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "thrownType": {
+        "spelling": "Self.Failure",
+        "references": [
+          "s:ScI7FailureQa"
+        ]
+      },
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "15.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "2.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "11.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV13AsyncIteratorV",
+      "sourceOrigin": "s:ScI12_ConcurrencyE4next7ElementQzSgyYa7FailureQzYKF"
+    },
+    {
+      "id": "s:ScI12_ConcurrencyE4next9isolation7ElementQzSgScA_pSgYi_tYa7FailureQzYKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC8IteratorV",
+      "kind": "instanceMethod",
+      "path": "WordStream.Iterator.next(isolation:)",
+      "name": "next(isolation:)",
+      "access": "public",
+      "declaration": "mutating func next(isolation actor: isolated (any Actor)?) async throws(Self.Failure) -> Self.Element?",
+      "modifiers": [
+        "mutating"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "isolation",
+          "internalName": "actor",
+          "type": {
+            "spelling": "isolated (any Actor)?",
+            "references": [
+              "s:ScA"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Self.Element?",
+        "references": [
+          "s:ScI7ElementQa"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "thrownType": {
+        "spelling": "Self.Failure",
+        "references": [
+          "s:ScI7FailureQa"
+        ]
+      },
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "15.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "2.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "11.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC8IteratorV",
+      "sourceOrigin": "s:ScI12_ConcurrencyE4next9isolation7ElementQzSgScA_pSgYi_tYa7FailureQzYKF"
+    },
+    {
+      "id": "s:ScI12_ConcurrencyE4next9isolation7ElementQzSgScA_pSgYi_tYa7FailureQzYKF::SYNTHESIZED::s:9SwiftDemo9CountdownV13AsyncIteratorV",
+      "kind": "instanceMethod",
+      "path": "Countdown.AsyncIterator.next(isolation:)",
+      "name": "next(isolation:)",
+      "access": "public",
+      "declaration": "mutating func next(isolation actor: isolated (any Actor)?) async throws(Self.Failure) -> Self.Element?",
+      "modifiers": [
+        "mutating"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "isolation",
+          "internalName": "actor",
+          "type": {
+            "spelling": "isolated (any Actor)?",
+            "references": [
+              "s:ScA"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Self.Element?",
+        "references": [
+          "s:ScI7ElementQa"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "thrownType": {
+        "spelling": "Self.Failure",
+        "references": [
+          "s:ScI7FailureQa"
+        ]
+      },
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "15.0.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "18.0.0"
+        },
+        {
+          "domain": "visionOS",
+          "introduced": "2.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "11.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV13AsyncIteratorV",
+      "sourceOrigin": "s:ScI12_ConcurrencyE4next9isolation7ElementQzSgScA_pSgYi_tYa7FailureQzYKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE10allSatisfyyS2b7ElementQzYaKXEYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.allSatisfy(_:)",
+      "name": "allSatisfy(_:)",
+      "access": "public",
+      "declaration": "func allSatisfy(_ predicate: (Self.Element) async throws -> Bool) async rethrows -> Bool",
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "predicate",
+          "type": {
+            "spelling": "(Self.Element) async throws -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE10allSatisfyyS2b7ElementQzYaKXEYaKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE10allSatisfyyS2b7ElementQzYaKXEYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.allSatisfy(_:)",
+      "name": "allSatisfy(_:)",
+      "access": "public",
+      "declaration": "func allSatisfy(_ predicate: (Self.Element) async throws -> Bool) async rethrows -> Bool",
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "predicate",
+          "type": {
+            "spelling": "(Self.Element) async throws -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE10allSatisfyyS2b7ElementQzYaKXEYaKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE10compactMapyAA012AsyncCompactC8SequenceVyxqd__Gqd__Sg7ElementQzYaclF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.compactMap(_:)",
+      "name": "compactMap(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func compactMap<ElementOfResult>(_ transform: @escaping @Sendable (Self.Element) async -> ElementOfResult?) -> AsyncCompactMapSequence<Self, ElementOfResult>",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async -> ElementOfResult?",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncCompactMapSequence<Self, ElementOfResult>",
+        "references": [
+          "s:12_Concurrency23AsyncCompactMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "ElementOfResult",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE10compactMapyAA012AsyncCompactC8SequenceVyxqd__Gqd__Sg7ElementQzYaclF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE10compactMapyAA012AsyncCompactC8SequenceVyxqd__Gqd__Sg7ElementQzYaclF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.compactMap(_:)",
+      "name": "compactMap(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func compactMap<ElementOfResult>(_ transform: @escaping @Sendable (Self.Element) async -> ElementOfResult?) -> AsyncCompactMapSequence<Self, ElementOfResult>",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async -> ElementOfResult?",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncCompactMapSequence<Self, ElementOfResult>",
+        "references": [
+          "s:12_Concurrency23AsyncCompactMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "ElementOfResult",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE10compactMapyAA012AsyncCompactC8SequenceVyxqd__Gqd__Sg7ElementQzYaclF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE10compactMapyAA020AsyncThrowingCompactC8SequenceVyxqd__Gqd__Sg7ElementQzYaKclF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.compactMap(_:)",
+      "name": "compactMap(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func compactMap<ElementOfResult>(_ transform: @escaping @Sendable (Self.Element) async throws -> ElementOfResult?) -> AsyncThrowingCompactMapSequence<Self, ElementOfResult>",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async throws -> ElementOfResult?",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncThrowingCompactMapSequence<Self, ElementOfResult>",
+        "references": [
+          "s:12_Concurrency31AsyncThrowingCompactMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "ElementOfResult",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE10compactMapyAA020AsyncThrowingCompactC8SequenceVyxqd__Gqd__Sg7ElementQzYaKclF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE10compactMapyAA020AsyncThrowingCompactC8SequenceVyxqd__Gqd__Sg7ElementQzYaKclF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.compactMap(_:)",
+      "name": "compactMap(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func compactMap<ElementOfResult>(_ transform: @escaping @Sendable (Self.Element) async throws -> ElementOfResult?) -> AsyncThrowingCompactMapSequence<Self, ElementOfResult>",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async throws -> ElementOfResult?",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncThrowingCompactMapSequence<Self, ElementOfResult>",
+        "references": [
+          "s:12_Concurrency31AsyncThrowingCompactMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "ElementOfResult",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE10compactMapyAA020AsyncThrowingCompactC8SequenceVyxqd__Gqd__Sg7ElementQzYaKclF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE3mapyAA16AsyncMapSequenceVyxqd__Gqd__7ElementQzYaclF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.map(_:)",
+      "name": "map(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func map<Transformed>(_ transform: @escaping @Sendable (Self.Element) async -> Transformed) -> AsyncMapSequence<Self, Transformed>",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async -> Transformed",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncMapSequence<Self, Transformed>",
+        "references": [
+          "s:12_Concurrency16AsyncMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "Transformed",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE3mapyAA16AsyncMapSequenceVyxqd__Gqd__7ElementQzYaclF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE3mapyAA16AsyncMapSequenceVyxqd__Gqd__7ElementQzYaclF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.map(_:)",
+      "name": "map(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func map<Transformed>(_ transform: @escaping @Sendable (Self.Element) async -> Transformed) -> AsyncMapSequence<Self, Transformed>",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async -> Transformed",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncMapSequence<Self, Transformed>",
+        "references": [
+          "s:12_Concurrency16AsyncMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "Transformed",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE3mapyAA16AsyncMapSequenceVyxqd__Gqd__7ElementQzYaclF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE3mapyAA24AsyncThrowingMapSequenceVyxqd__Gqd__7ElementQzYaKclF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.map(_:)",
+      "name": "map(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func map<Transformed>(_ transform: @escaping @Sendable (Self.Element) async throws -> Transformed) -> AsyncThrowingMapSequence<Self, Transformed>",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async throws -> Transformed",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncThrowingMapSequence<Self, Transformed>",
+        "references": [
+          "s:12_Concurrency24AsyncThrowingMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "Transformed",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE3mapyAA24AsyncThrowingMapSequenceVyxqd__Gqd__7ElementQzYaKclF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE3mapyAA24AsyncThrowingMapSequenceVyxqd__Gqd__7ElementQzYaKclF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.map(_:)",
+      "name": "map(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func map<Transformed>(_ transform: @escaping @Sendable (Self.Element) async throws -> Transformed) -> AsyncThrowingMapSequence<Self, Transformed>",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async throws -> Transformed",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncThrowingMapSequence<Self, Transformed>",
+        "references": [
+          "s:12_Concurrency24AsyncThrowingMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "Transformed",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE3mapyAA24AsyncThrowingMapSequenceVyxqd__Gqd__7ElementQzYaKclF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE3max2by7ElementQzSgSbAE_AEtYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.max(by:)",
+      "name": "max(by:)",
+      "access": "public",
+      "declaration": "@warn_unqualified_access func max(by areInIncreasingOrder: (Self.Element, Self.Element) async throws -> Bool) async rethrows -> Self.Element?",
+      "attributes": [
+        "@warn_unqualified_access"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "by",
+          "internalName": "areInIncreasingOrder",
+          "type": {
+            "spelling": "(Self.Element, Self.Element) async throws -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Self.Element?",
+        "references": [
+          "s:Sci7ElementQa"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE3max2by7ElementQzSgSbAE_AEtYaKXE_tYaKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE3max2by7ElementQzSgSbAE_AEtYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.max(by:)",
+      "name": "max(by:)",
+      "access": "public",
+      "declaration": "@warn_unqualified_access func max(by areInIncreasingOrder: (Self.Element, Self.Element) async throws -> Bool) async rethrows -> Self.Element?",
+      "attributes": [
+        "@warn_unqualified_access"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "by",
+          "internalName": "areInIncreasingOrder",
+          "type": {
+            "spelling": "(Self.Element, Self.Element) async throws -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Self.Element?",
+        "references": [
+          "s:Sci7ElementQa"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE3max2by7ElementQzSgSbAE_AEtYaKXE_tYaKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE3min2by7ElementQzSgSbAE_AEtYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.min(by:)",
+      "name": "min(by:)",
+      "access": "public",
+      "declaration": "@warn_unqualified_access func min(by areInIncreasingOrder: (Self.Element, Self.Element) async throws -> Bool) async rethrows -> Self.Element?",
+      "attributes": [
+        "@warn_unqualified_access"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "by",
+          "internalName": "areInIncreasingOrder",
+          "type": {
+            "spelling": "(Self.Element, Self.Element) async throws -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Self.Element?",
+        "references": [
+          "s:Sci7ElementQa"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE3min2by7ElementQzSgSbAE_AEtYaKXE_tYaKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE3min2by7ElementQzSgSbAE_AEtYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.min(by:)",
+      "name": "min(by:)",
+      "access": "public",
+      "declaration": "@warn_unqualified_access func min(by areInIncreasingOrder: (Self.Element, Self.Element) async throws -> Bool) async rethrows -> Self.Element?",
+      "attributes": [
+        "@warn_unqualified_access"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "by",
+          "internalName": "areInIncreasingOrder",
+          "type": {
+            "spelling": "(Self.Element, Self.Element) async throws -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Self.Element?",
+        "references": [
+          "s:Sci7ElementQa"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE3min2by7ElementQzSgSbAE_AEtYaKXE_tYaKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE4drop5whileAA22AsyncDropWhileSequenceVyxGSb7ElementQzYac_tF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.drop(while:)",
+      "name": "drop(while:)",
+      "access": "public",
+      "declaration": "@preconcurrency func drop(while predicate: @escaping @Sendable (Self.Element) async -> Bool) -> AsyncDropWhileSequence<Self>",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "while",
+          "internalName": "predicate",
+          "type": {
+            "spelling": "(Self.Element) async -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncDropWhileSequence<Self>",
+        "references": [
+          "s:12_Concurrency22AsyncDropWhileSequenceV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE4drop5whileAA22AsyncDropWhileSequenceVyxGSb7ElementQzYac_tF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE4drop5whileAA22AsyncDropWhileSequenceVyxGSb7ElementQzYac_tF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.drop(while:)",
+      "name": "drop(while:)",
+      "access": "public",
+      "declaration": "@preconcurrency func drop(while predicate: @escaping @Sendable (Self.Element) async -> Bool) -> AsyncDropWhileSequence<Self>",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "while",
+          "internalName": "predicate",
+          "type": {
+            "spelling": "(Self.Element) async -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncDropWhileSequence<Self>",
+        "references": [
+          "s:12_Concurrency22AsyncDropWhileSequenceV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE4drop5whileAA22AsyncDropWhileSequenceVyxGSb7ElementQzYac_tF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE5first5where7ElementQzSgSbAEYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.first(where:)",
+      "name": "first(where:)",
+      "access": "public",
+      "declaration": "func first(where predicate: (Self.Element) async throws -> Bool) async rethrows -> Self.Element?",
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "where",
+          "internalName": "predicate",
+          "type": {
+            "spelling": "(Self.Element) async throws -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Self.Element?",
+        "references": [
+          "s:Sci7ElementQa"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE5first5where7ElementQzSgSbAEYaKXE_tYaKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE5first5where7ElementQzSgSbAEYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.first(where:)",
+      "name": "first(where:)",
+      "access": "public",
+      "declaration": "func first(where predicate: (Self.Element) async throws -> Bool) async rethrows -> Self.Element?",
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "where",
+          "internalName": "predicate",
+          "type": {
+            "spelling": "(Self.Element) async throws -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Self.Element?",
+        "references": [
+          "s:Sci7ElementQa"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE5first5where7ElementQzSgSbAEYaKXE_tYaKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE6filteryAA19AsyncFilterSequenceVyxGSb7ElementQzYacF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.filter(_:)",
+      "name": "filter(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func filter(_ isIncluded: @escaping @Sendable (Self.Element) async -> Bool) -> AsyncFilterSequence<Self>",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "isIncluded",
+          "type": {
+            "spelling": "(Self.Element) async -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncFilterSequence<Self>",
+        "references": [
+          "s:12_Concurrency19AsyncFilterSequenceV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE6filteryAA19AsyncFilterSequenceVyxGSb7ElementQzYacF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE6filteryAA19AsyncFilterSequenceVyxGSb7ElementQzYacF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.filter(_:)",
+      "name": "filter(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func filter(_ isIncluded: @escaping @Sendable (Self.Element) async -> Bool) -> AsyncFilterSequence<Self>",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "isIncluded",
+          "type": {
+            "spelling": "(Self.Element) async -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncFilterSequence<Self>",
+        "references": [
+          "s:12_Concurrency19AsyncFilterSequenceV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE6filteryAA19AsyncFilterSequenceVyxGSb7ElementQzYacF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE6prefix5whileAA24AsyncPrefixWhileSequenceVyxGSb7ElementQzYac_tKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.prefix(while:)",
+      "name": "prefix(while:)",
+      "access": "public",
+      "declaration": "@preconcurrency func prefix(while predicate: @escaping @Sendable (Self.Element) async -> Bool) rethrows -> AsyncPrefixWhileSequence<Self>",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "while",
+          "internalName": "predicate",
+          "type": {
+            "spelling": "(Self.Element) async -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncPrefixWhileSequence<Self>",
+        "references": [
+          "s:12_Concurrency24AsyncPrefixWhileSequenceV"
+        ]
+      },
+      "throws": true,
+      "rethrows": true,
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE6prefix5whileAA24AsyncPrefixWhileSequenceVyxGSb7ElementQzYac_tKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE6prefix5whileAA24AsyncPrefixWhileSequenceVyxGSb7ElementQzYac_tKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.prefix(while:)",
+      "name": "prefix(while:)",
+      "access": "public",
+      "declaration": "@preconcurrency func prefix(while predicate: @escaping @Sendable (Self.Element) async -> Bool) rethrows -> AsyncPrefixWhileSequence<Self>",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "while",
+          "internalName": "predicate",
+          "type": {
+            "spelling": "(Self.Element) async -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncPrefixWhileSequence<Self>",
+        "references": [
+          "s:12_Concurrency24AsyncPrefixWhileSequenceV"
+        ]
+      },
+      "throws": true,
+      "rethrows": true,
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE6prefix5whileAA24AsyncPrefixWhileSequenceVyxGSb7ElementQzYac_tKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE6prefixyAA19AsyncPrefixSequenceVyxGSiF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.prefix(_:)",
+      "name": "prefix(_:)",
+      "access": "public",
+      "declaration": "func prefix(_ count: Int) -> AsyncPrefixSequence<Self>",
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncPrefixSequence<Self>",
+        "references": [
+          "s:12_Concurrency19AsyncPrefixSequenceV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE6prefixyAA19AsyncPrefixSequenceVyxGSiF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE6prefixyAA19AsyncPrefixSequenceVyxGSiF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.prefix(_:)",
+      "name": "prefix(_:)",
+      "access": "public",
+      "declaration": "func prefix(_ count: Int) -> AsyncPrefixSequence<Self>",
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncPrefixSequence<Self>",
+        "references": [
+          "s:12_Concurrency19AsyncPrefixSequenceV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE6prefixyAA19AsyncPrefixSequenceVyxGSiF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE6reduce4into_qd__qd__n_yqd__z_7ElementQztYaKXEtYaKlF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.reduce(into:_:)",
+      "name": "reduce(into:_:)",
+      "access": "public",
+      "declaration": "func reduce<Result>(into initialResult: Result, _ updateAccumulatingResult: (inout Result, Self.Element) async throws -> Void) async rethrows -> Result",
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "into",
+          "internalName": "initialResult",
+          "type": {
+            "spelling": "Result"
+          }
+        },
+        {
+          "internalName": "updateAccumulatingResult",
+          "type": {
+            "spelling": "(inout Result, Self.Element) async throws -> Void",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:s4Voida"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Result"
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "genericParameters": [
+        {
+          "name": "Result",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE6reduce4into_qd__qd__n_yqd__z_7ElementQztYaKXEtYaKlF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE6reduce4into_qd__qd__n_yqd__z_7ElementQztYaKXEtYaKlF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.reduce(into:_:)",
+      "name": "reduce(into:_:)",
+      "access": "public",
+      "declaration": "func reduce<Result>(into initialResult: Result, _ updateAccumulatingResult: (inout Result, Self.Element) async throws -> Void) async rethrows -> Result",
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "into",
+          "internalName": "initialResult",
+          "type": {
+            "spelling": "Result"
+          }
+        },
+        {
+          "internalName": "updateAccumulatingResult",
+          "type": {
+            "spelling": "(inout Result, Self.Element) async throws -> Void",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:s4Voida"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Result"
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "genericParameters": [
+        {
+          "name": "Result",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE6reduce4into_qd__qd__n_yqd__z_7ElementQztYaKXEtYaKlF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE6reduceyqd__qd___qd__qd___7ElementQztYaKXEtYaKlF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.reduce(_:_:)",
+      "name": "reduce(_:_:)",
+      "access": "public",
+      "declaration": "func reduce<Result>(_ initialResult: Result, _ nextPartialResult: (Result, Self.Element) async throws -> Result) async rethrows -> Result",
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "initialResult",
+          "type": {
+            "spelling": "Result"
+          }
+        },
+        {
+          "internalName": "nextPartialResult",
+          "type": {
+            "spelling": "(Result, Self.Element) async throws -> Result",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Result"
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "genericParameters": [
+        {
+          "name": "Result",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE6reduceyqd__qd___qd__qd___7ElementQztYaKXEtYaKlF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE6reduceyqd__qd___qd__qd___7ElementQztYaKXEtYaKlF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.reduce(_:_:)",
+      "name": "reduce(_:_:)",
+      "access": "public",
+      "declaration": "func reduce<Result>(_ initialResult: Result, _ nextPartialResult: (Result, Self.Element) async throws -> Result) async rethrows -> Result",
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "initialResult",
+          "type": {
+            "spelling": "Result"
+          }
+        },
+        {
+          "internalName": "nextPartialResult",
+          "type": {
+            "spelling": "(Result, Self.Element) async throws -> Result",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Result"
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "genericParameters": [
+        {
+          "name": "Result",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE6reduceyqd__qd___qd__qd___7ElementQztYaKXEtYaKlF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE7flatMapyAA017AsyncThrowingFlatC8SequenceVyxqd__Gqd__7ElementQzYaKcSciRd__lF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.flatMap(_:)",
+      "name": "flatMap(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func flatMap<SegmentOfResult>(_ transform: @escaping @Sendable (Self.Element) async throws -> SegmentOfResult) -> AsyncThrowingFlatMapSequence<Self, SegmentOfResult> where SegmentOfResult : AsyncSequence",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async throws -> SegmentOfResult",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncThrowingFlatMapSequence<Self, SegmentOfResult>",
+        "references": [
+          "s:12_Concurrency28AsyncThrowingFlatMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "SegmentOfResult",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE7flatMapyAA017AsyncThrowingFlatC8SequenceVyxqd__Gqd__7ElementQzYaKcSciRd__lF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE7flatMapyAA017AsyncThrowingFlatC8SequenceVyxqd__Gqd__7ElementQzYaKcSciRd__lF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.flatMap(_:)",
+      "name": "flatMap(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func flatMap<SegmentOfResult>(_ transform: @escaping @Sendable (Self.Element) async throws -> SegmentOfResult) -> AsyncThrowingFlatMapSequence<Self, SegmentOfResult> where SegmentOfResult : AsyncSequence",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async throws -> SegmentOfResult",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncThrowingFlatMapSequence<Self, SegmentOfResult>",
+        "references": [
+          "s:12_Concurrency28AsyncThrowingFlatMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "SegmentOfResult",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE7flatMapyAA017AsyncThrowingFlatC8SequenceVyxqd__Gqd__7ElementQzYaKcSciRd__lF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__7FailureQyd__AHRtzlF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.flatMap(_:)",
+      "name": "flatMap(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func flatMap<SegmentOfResult>(_ transform: @escaping @Sendable (Self.Element) async -> SegmentOfResult) -> AsyncFlatMapSequence<Self, SegmentOfResult> where SegmentOfResult : AsyncSequence, Self.Failure == SegmentOfResult.Failure",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async -> SegmentOfResult",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncFlatMapSequence<Self, SegmentOfResult>",
+        "references": [
+          "s:12_Concurrency20AsyncFlatMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "SegmentOfResult",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "sameType",
+          "lhs": "Self.Failure",
+          "rhs": "SegmentOfResult.Failure"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__7FailureQyd__AHRtzlF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__7FailureQyd__AHRtzlF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.flatMap(_:)",
+      "name": "flatMap(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func flatMap<SegmentOfResult>(_ transform: @escaping @Sendable (Self.Element) async -> SegmentOfResult) -> AsyncFlatMapSequence<Self, SegmentOfResult> where SegmentOfResult : AsyncSequence, Self.Failure == SegmentOfResult.Failure",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async -> SegmentOfResult",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncFlatMapSequence<Self, SegmentOfResult>",
+        "references": [
+          "s:12_Concurrency20AsyncFlatMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "SegmentOfResult",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "sameType",
+          "lhs": "Self.Failure",
+          "rhs": "SegmentOfResult.Failure"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__7FailureQyd__AHRtzlF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__s5NeverO7FailureRtd__lF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.flatMap(_:)",
+      "name": "flatMap(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func flatMap<SegmentOfResult>(_ transform: @escaping @Sendable (Self.Element) async -> SegmentOfResult) -> AsyncFlatMapSequence<Self, SegmentOfResult> where SegmentOfResult : AsyncSequence, SegmentOfResult.Failure == Never",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async -> SegmentOfResult",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncFlatMapSequence<Self, SegmentOfResult>",
+        "references": [
+          "s:12_Concurrency20AsyncFlatMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "SegmentOfResult",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "sameType",
+          "lhs": "SegmentOfResult.Failure",
+          "rhs": "Never",
+          "rhsPrecise": "s:s5NeverO"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__s5NeverO7FailureRtd__lF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__s5NeverO7FailureRtd__lF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.flatMap(_:)",
+      "name": "flatMap(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func flatMap<SegmentOfResult>(_ transform: @escaping @Sendable (Self.Element) async -> SegmentOfResult) -> AsyncFlatMapSequence<Self, SegmentOfResult> where SegmentOfResult : AsyncSequence, SegmentOfResult.Failure == Never",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async -> SegmentOfResult",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncFlatMapSequence<Self, SegmentOfResult>",
+        "references": [
+          "s:12_Concurrency20AsyncFlatMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "SegmentOfResult",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "sameType",
+          "lhs": "SegmentOfResult.Failure",
+          "rhs": "Never",
+          "rhsPrecise": "s:s5NeverO"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__s5NeverO7FailureRtd__lF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__s5NeverO7FailureRtzAiJRtd__lF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.flatMap(_:)",
+      "name": "flatMap(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func flatMap<SegmentOfResult>(_ transform: @escaping @Sendable (Self.Element) async -> SegmentOfResult) -> AsyncFlatMapSequence<Self, SegmentOfResult> where SegmentOfResult : AsyncSequence, Self.Failure == Never, SegmentOfResult.Failure == Never",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async -> SegmentOfResult",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncFlatMapSequence<Self, SegmentOfResult>",
+        "references": [
+          "s:12_Concurrency20AsyncFlatMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "SegmentOfResult",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "sameType",
+          "lhs": "Self.Failure",
+          "rhs": "Never",
+          "rhsPrecise": "s:s5NeverO"
+        },
+        {
+          "kind": "sameType",
+          "lhs": "SegmentOfResult.Failure",
+          "rhs": "Never",
+          "rhsPrecise": "s:s5NeverO"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__s5NeverO7FailureRtzAiJRtd__lF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__s5NeverO7FailureRtzAiJRtd__lF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.flatMap(_:)",
+      "name": "flatMap(_:)",
+      "access": "public",
+      "declaration": "@preconcurrency func flatMap<SegmentOfResult>(_ transform: @escaping @Sendable (Self.Element) async -> SegmentOfResult) -> AsyncFlatMapSequence<Self, SegmentOfResult> where SegmentOfResult : AsyncSequence, Self.Failure == Never, SegmentOfResult.Failure == Never",
+      "attributes": [
+        "@preconcurrency"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "transform",
+          "type": {
+            "spelling": "(Self.Element) async -> SegmentOfResult",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncFlatMapSequence<Self, SegmentOfResult>",
+        "references": [
+          "s:12_Concurrency20AsyncFlatMapSequenceV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "SegmentOfResult",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "sameType",
+          "lhs": "Self.Failure",
+          "rhs": "Never",
+          "rhsPrecise": "s:s5NeverO"
+        },
+        {
+          "kind": "sameType",
+          "lhs": "SegmentOfResult.Failure",
+          "rhs": "Never",
+          "rhsPrecise": "s:s5NeverO"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE7flatMapyAA09AsyncFlatC8SequenceVyxqd__Gqd__7ElementQzYacSciRd__s5NeverO7FailureRtzAiJRtd__lF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE8contains5whereS2b7ElementQzYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.contains(where:)",
+      "name": "contains(where:)",
+      "access": "public",
+      "declaration": "func contains(where predicate: (Self.Element) async throws -> Bool) async rethrows -> Bool",
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "where",
+          "internalName": "predicate",
+          "type": {
+            "spelling": "(Self.Element) async throws -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE8contains5whereS2b7ElementQzYaKXE_tYaKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE8contains5whereS2b7ElementQzYaKXE_tYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.contains(where:)",
+      "name": "contains(where:)",
+      "access": "public",
+      "declaration": "func contains(where predicate: (Self.Element) async throws -> Bool) async rethrows -> Bool",
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "where",
+          "internalName": "predicate",
+          "type": {
+            "spelling": "(Self.Element) async throws -> Bool",
+            "references": [
+              "s:Sci7ElementQa",
+              "s:Sb"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE8contains5whereS2b7ElementQzYaKXE_tYaKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE9dropFirstyAA09AsyncDropC8SequenceVyxGSiF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.dropFirst(_:)",
+      "name": "dropFirst(_:)",
+      "access": "public",
+      "declaration": "func dropFirst(_ count: Int = 1) -> AsyncDropFirstSequence<Self>",
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          },
+          "default": "1"
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncDropFirstSequence<Self>",
+        "references": [
+          "s:12_Concurrency22AsyncDropFirstSequenceV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencyE9dropFirstyAA09AsyncDropC8SequenceVyxGSiF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencyE9dropFirstyAA09AsyncDropC8SequenceVyxGSiF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.dropFirst(_:)",
+      "name": "dropFirst(_:)",
+      "access": "public",
+      "declaration": "func dropFirst(_ count: Int = 1) -> AsyncDropFirstSequence<Self>",
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          },
+          "default": "1"
+        }
+      ],
+      "returns": {
+        "spelling": "AsyncDropFirstSequence<Self>",
+        "references": [
+          "s:12_Concurrency22AsyncDropFirstSequenceV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencyE9dropFirstyAA09AsyncDropC8SequenceVyxGSiF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencySL7ElementRpzrlE3maxACSgyYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.max()",
+      "name": "max()",
+      "access": "public",
+      "declaration": "@warn_unqualified_access func max() async rethrows -> Self.Element?",
+      "attributes": [
+        "@warn_unqualified_access"
+      ],
+      "synthesized": true,
+      "returns": {
+        "spelling": "Self.Element?",
+        "references": [
+          "s:Sci7ElementQa"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "Self.Element",
+          "rhs": "Comparable",
+          "rhsPrecise": "s:SL"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self.Element",
+            "rhs": "Comparable",
+            "rhsPrecise": "s:SL"
+          }
+        ]
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencySL7ElementRpzrlE3maxACSgyYaKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencySL7ElementRpzrlE3maxACSgyYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.max()",
+      "name": "max()",
+      "access": "public",
+      "declaration": "@warn_unqualified_access func max() async rethrows -> Self.Element?",
+      "attributes": [
+        "@warn_unqualified_access"
+      ],
+      "synthesized": true,
+      "returns": {
+        "spelling": "Self.Element?",
+        "references": [
+          "s:Sci7ElementQa"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "Self.Element",
+          "rhs": "Comparable",
+          "rhsPrecise": "s:SL"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self.Element",
+            "rhs": "Comparable",
+            "rhsPrecise": "s:SL"
+          }
+        ]
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencySL7ElementRpzrlE3maxACSgyYaKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencySL7ElementRpzrlE3minACSgyYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.min()",
+      "name": "min()",
+      "access": "public",
+      "declaration": "@warn_unqualified_access func min() async rethrows -> Self.Element?",
+      "attributes": [
+        "@warn_unqualified_access"
+      ],
+      "synthesized": true,
+      "returns": {
+        "spelling": "Self.Element?",
+        "references": [
+          "s:Sci7ElementQa"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "Self.Element",
+          "rhs": "Comparable",
+          "rhsPrecise": "s:SL"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self.Element",
+            "rhs": "Comparable",
+            "rhsPrecise": "s:SL"
+          }
+        ]
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencySL7ElementRpzrlE3minACSgyYaKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencySL7ElementRpzrlE3minACSgyYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.min()",
+      "name": "min()",
+      "access": "public",
+      "declaration": "@warn_unqualified_access func min() async rethrows -> Self.Element?",
+      "attributes": [
+        "@warn_unqualified_access"
+      ],
+      "synthesized": true,
+      "returns": {
+        "spelling": "Self.Element?",
+        "references": [
+          "s:Sci7ElementQa"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "Self.Element",
+          "rhs": "Comparable",
+          "rhsPrecise": "s:SL"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self.Element",
+            "rhs": "Comparable",
+            "rhsPrecise": "s:SL"
+          }
+        ]
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencySL7ElementRpzrlE3minACSgyYaKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencySQ7ElementRpzrlE8containsySbACYaKF::SYNTHESIZED::s:9SwiftDemo10WordStreamC",
+      "kind": "instanceMethod",
+      "path": "WordStream.contains(_:)",
+      "name": "contains(_:)",
+      "access": "public",
+      "declaration": "func contains(_ search: Self.Element) async rethrows -> Bool",
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "search",
+          "type": {
+            "spelling": "Self.Element",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "Self.Element",
+          "rhs": "Equatable",
+          "rhsPrecise": "s:SQ"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self.Element",
+            "rhs": "Equatable",
+            "rhsPrecise": "s:SQ"
+          }
+        ]
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10WordStreamC",
+      "sourceOrigin": "s:Sci12_ConcurrencySQ7ElementRpzrlE8containsySbACYaKF"
+    },
+    {
+      "id": "s:Sci12_ConcurrencySQ7ElementRpzrlE8containsySbACYaKF::SYNTHESIZED::s:9SwiftDemo9CountdownV",
+      "kind": "instanceMethod",
+      "path": "Countdown.contains(_:)",
+      "name": "contains(_:)",
+      "access": "public",
+      "declaration": "func contains(_ search: Self.Element) async rethrows -> Bool",
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "search",
+          "type": {
+            "spelling": "Self.Element",
+            "references": [
+              "s:Sci7ElementQa"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "rethrows": true,
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "Self.Element",
+          "rhs": "Equatable",
+          "rhsPrecise": "s:SQ"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self.Element",
+            "rhs": "Equatable",
+            "rhsPrecise": "s:SQ"
+          }
+        ]
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CountdownV",
+      "sourceOrigin": "s:Sci12_ConcurrencySQ7ElementRpzrlE8containsySbACYaKF"
     },
     {
       "id": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo10ShapeErrorO",
