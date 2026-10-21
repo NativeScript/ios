@@ -40,7 +40,7 @@
 // calls it by reporting the arguments as an array: callbackBegin, each
 // argument through the complete* entries, then completeArrayEnd.
 
-#define NS_SWIFT_ABI_VERSION 11
+#define NS_SWIFT_ABI_VERSION 12
 
 #ifdef __cplusplus
 extern "C" {
@@ -166,8 +166,8 @@ enum {
 //   B           Data: bytes (NSSwiftTagString) <-> Uint8Array copy
 //   [<code>]    array (NSSwiftTagArray) <-> JS array copy
 //   {<code>}    [String: <code>] (NSSwiftTagMap) <-> plain JS object copy
-//   (<code>,...)
-//               closure returning Void, of the listed parameters
+//   (<code>,...) or (<code>,...><result>)
+//               closure of the listed parameters, returning Void or <result>
 //               (NSSwiftTagFunction) <- JS function; parameters only
 //   p<n>        value of protocol type index n: a Swift object (tag Object)
 //               or a JS object implementing it (NSSwiftTagJSObject)
@@ -312,6 +312,11 @@ struct NSSwiftAPI {
                                        NSSwiftThunk next);
   /* 50 */ void (*completeAsyncSequence)(void* token, void* iterator,
                                          NSSwiftThunk next);
+
+  // Ends a callbackBegin invocation of a closure that returns a value (or
+  // throws): runs the function on the isolate's thread, waiting for it from
+  // any other thread, and returns its result like objectCallEnd.
+  /* 51 */ const NSSwiftValue* (*callbackCallEnd)(void* token);
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);

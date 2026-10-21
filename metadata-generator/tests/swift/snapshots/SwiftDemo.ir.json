@@ -108,6 +108,11 @@
     "s:9SwiftDemo7echoIntyS2iF",
     "s:9SwiftDemo10echoStringyS2SF",
     "s:9SwiftDemo5BenchC",
+    "s:9SwiftDemo9transformySaySSGSaySiG_SSSiXEtF",
+    "s:9SwiftDemo11sortedNames_2bySaySSGAD_SbSS_SStXEtF",
+    "s:9SwiftDemo10firstMatch_5whereSiSgSaySiG_SbSiKXEtKF",
+    "s:9SwiftDemo6lookupySiSS_SiSgSSXEtF",
+    "s:9SwiftDemo19computeInBackgroundyS2iyYbcYaF",
     "s:9SwiftDemo8describeySSSo6UIViewCF",
     "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
     "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
@@ -65667,6 +65672,45 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo10firstMatch_5whereSiSgSaySiG_SbSiKXEtKF",
+      "kind": "function",
+      "path": "firstMatch(_:where:)",
+      "name": "firstMatch(_:where:)",
+      "access": "public",
+      "declaration": "func firstMatch(_ values: [Int], where predicate: (Int) throws -> Bool) throws -> Int?",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "[Int]",
+            "references": [
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "label": "where",
+          "internalName": "predicate",
+          "type": {
+            "spelling": "(Int) throws -> Bool",
+            "references": [
+              "s:Si",
+              "s:Sb"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int?",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "throws": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:190:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo10greetLater_10completionySSSg_yADYbctF",
       "kind": "function",
       "path": "greetLater(_:completion:)",
@@ -66028,6 +66072,45 @@
       "async": true,
       "throws": true,
       "location": "file://Sources/SwiftDemo/Values.swift:29:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo11sortedNames_2bySaySSGAD_SbSS_SStXEtF",
+      "kind": "function",
+      "path": "sortedNames(_:by:)",
+      "name": "sortedNames(_:by:)",
+      "access": "public",
+      "declaration": "func sortedNames(_ names: [String], by less: (String, String) -> Bool) -> [String]",
+      "parameters": [
+        {
+          "internalName": "names",
+          "type": {
+            "spelling": "[String]",
+            "references": [
+              "s:SS"
+            ]
+          }
+        },
+        {
+          "label": "by",
+          "internalName": "less",
+          "type": {
+            "spelling": "(String, String) -> Bool",
+            "references": [
+              "s:SS",
+              "s:SS",
+              "s:Sb"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[String]",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:187:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -66690,6 +66773,38 @@
       },
       "async": true,
       "location": "file://Sources/SwiftDemo/Protocols.swift:55:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo19computeInBackgroundyS2iyYbcYaF",
+      "kind": "function",
+      "path": "computeInBackground(_:)",
+      "name": "computeInBackground(_:)",
+      "access": "public",
+      "declaration": "func computeInBackground(_ provider: @escaping @Sendable () -> Int) async -> Int",
+      "parameters": [
+        {
+          "internalName": "provider",
+          "type": {
+            "spelling": "() -> Int",
+            "references": [
+              "s:Si"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "async": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:194:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -69521,6 +69636,43 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo6lookupySiSS_SiSgSSXEtF",
+      "kind": "function",
+      "path": "lookup(_:_:)",
+      "name": "lookup(_:_:)",
+      "access": "public",
+      "declaration": "func lookup(_ key: String, _ resolve: (String) -> Int?) -> Int",
+      "parameters": [
+        {
+          "internalName": "key",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        },
+        {
+          "internalName": "resolve",
+          "type": {
+            "spelling": "(String) -> Int?",
+            "references": [
+              "s:SS",
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:193:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo6settley0aB3Kit7OutcomeOySiGSiF",
       "kind": "function",
       "path": "settle(_:)",
@@ -71750,6 +71902,43 @@
         }
       ],
       "location": "file://Sources/SwiftDemo/Values.swift:118:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo9transformySaySSGSaySiG_SSSiXEtF",
+      "kind": "function",
+      "path": "transform(_:_:)",
+      "name": "transform(_:_:)",
+      "access": "public",
+      "declaration": "func transform(_ values: [Int], _ body: (Int) -> String) -> [String]",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "[Int]",
+            "references": [
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "internalName": "body",
+          "type": {
+            "spelling": "(Int) -> String",
+            "references": [
+              "s:Si",
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[String]",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:186:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {

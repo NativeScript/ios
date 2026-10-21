@@ -690,14 +690,33 @@ class Classifier {
         }
         return "generic";
       case TypeNode::Kind::Function: {
-        // JS functions stand in for closures that return nothing: a Swift
-        // caller cannot wait for a value from another thread's JS.
-        if (node.isAsync || node.isThrowing ||
-            (!node.result.empty() &&
-             node.result[0].kind != TypeNode::Kind::Void)) {
+        // JS functions stand in for closures. A caller on another thread
+        // waits for the JS thread to run one that returns a value.
+        if (node.isAsync) {
           return "closure";
         }
         bridged.bridge = Bridge::Closure;
+        bridged.throwing = node.isThrowing;
+        if (!node.result.empty() &&
+            node.result[0].kind != TypeNode::Kind::Void) {
+          BridgedType result;
+          result.node = node.result[0];
+          const TypeNode* inner = &node.result[0];
+          if (inner->kind == TypeNode::Kind::Optional ||
+              inner->kind == TypeNode::Kind::ImplicitlyUnwrappedOptional) {
+            result.optional = true;
+            inner = &inner->children[0];
+          }
+          std::string reason = bridgeNonOptional(*inner, result);
+          if (reason.empty() && (result.bridge == Bridge::Closure ||
+                                 result.bridge == Bridge::AsyncSequence)) {
+            reason = "closure";
+          }
+          if (!reason.empty()) {
+            return reason;
+          }
+          bridged.results.push_back(std::move(result));
+        }
         for (const auto& parameter : node.children) {
           BridgedType element;
           element.node = parameter;

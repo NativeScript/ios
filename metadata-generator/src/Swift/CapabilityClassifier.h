@@ -58,8 +58,8 @@ enum class Bridge {
   Array,
   // [String: T]: a plain JS object copy; `elements` holds T.
   Dictionary,
-  // A closure parameter returning Void: a JS function. `elements` holds the
-  // closure's parameters.
+  // A closure parameter (not async): a JS function. `elements` holds the
+  // closure's parameters, `results` its result.
   Closure,
   // An Objective-C class instance: NativeScript's ordinary Objective-C
   // wrapper, with the same identity Objective-C calls give it.
@@ -98,6 +98,9 @@ struct BridgedType {
   // An inout parameter: JS passes a reference object, `{ value }`, whose
   // value is the argument and receives the final value.
   bool isInout = false;
+  // Closure: its result (empty for Void), and whether it throws.
+  std::vector<BridgedType> results;
+  bool throwing = false;
 };
 
 struct Capability {

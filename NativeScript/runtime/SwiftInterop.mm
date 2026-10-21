@@ -71,7 +71,24 @@ struct ValueCode {
   Class objcClass = nil;
   // Array and Map: the element (value) code. Function: its parameter codes.
   std::vector<ValueCode> element;
+  // Function: its result code; empty for Void.
+  std::vector<ValueCode> returns;
 };
+
+// The '>' before the result in "params>result": the last one outside
+// brackets, since closure parameters carry their own.
+size_t ResultArrow(const std::string& text) {
+  int depth = 0;
+  size_t arrow = std::string::npos;
+  for (size_t i = 0; i < text.size(); i++) {
+    char c = text[i];
+    depth += (c == '[' || c == '{' || c == '(') - (c == ']' || c == '}' || c == ')');
+    if (c == '>' && depth == 0) {
+      arrow = i;
+    }
+  }
+  return arrow;
+}
 
 // Splits "a,[b],(c,d)" at its top-level commas.
 bool SplitCodes(const std::string& text, std::vector<std::string>& parts) {
@@ -124,8 +141,19 @@ bool ParseCode(std::string text, ValueCode& code) {
   }
   if (text.front() == '(' && text.back() == ')') {
     code.kind = ValueCode::Kind::Function;
+    std::string inner = text.substr(1, text.size() - 2);
+    size_t arrow = ResultArrow(inner);
+    if (arrow != std::string::npos) {
+      code.returns.emplace_back();
+      if (!ParseCode(inner.substr(arrow + 1), code.returns.back()) ||
+          code.returns.back().kind == ValueCode::Kind::Function ||
+          code.returns.back().kind == ValueCode::Kind::Void) {
+        return false;
+      }
+      inner = inner.substr(0, arrow);
+    }
     std::vector<std::string> parts;
-    if (!SplitCodes(text.substr(1, text.size() - 2), parts)) {
+    if (!SplitCodes(inner, parts)) {
       return false;
     }
     for (const std::string& part : parts) {
@@ -215,7 +243,7 @@ struct Signature {
 };
 
 bool ParseSignature(const std::string& text, Signature& signature) {
-  size_t arrow = text.find('>');
+  size_t arrow = ResultArrow(text);
   if (arrow == std::string::npos) {
     return false;
   }
@@ -400,7 +428,8 @@ std::string TypeDisplayName(const ModuleInfo& module, const ValueCode& code) {
       for (size_t i = 0; i < code.element.size(); i++) {
         name += (i > 0 ? ", " : "") + TypeDisplayName(module, code.element[i]);
       }
-      name += ") -> Void";
+      name += ") -> " + (code.returns.empty() ? std::string("Void")
+                                              : TypeDisplayName(module, code.returns[0]));
       if (code.optional) {
         name = "(" + name + ")";
       }
@@ -560,6 +589,7 @@ void ApiObjectResultRelease(const NSSwiftValue* result);
 void ApiReturnJSObject(NSSwiftCall* call, void* object);
 void ApiCompleteJSObject(void* token, void* object);
 void ApiRegisterTracker(NSSwiftRegistrar* registrar, NSSwiftTracker tracker);
+const NSSwiftValue* ApiCallbackCallEnd(void* token);
 void ApiReturnAsyncSequence(NSSwiftCall* call, void* iterator, NSSwiftThunk next);
 void ApiCompleteAsyncSequence(void* token, void* iterator, NSSwiftThunk next);
 struct IsolateState;
@@ -589,6 +619,7 @@ const NSSwiftAPI kAPI = {
     ApiRegisterUnitModule,   ApiObjectCallBegin,      ApiObjectCallEnd,
     ApiObjectResultRelease,  ApiReturnJSObject,       ApiCompleteJSObject,
     ApiRegisterTracker,      ApiReturnAsyncSequence,  ApiCompleteAsyncSequence,
+    ApiCallbackCallEnd,
 };
 
 // "Polygon.Style" -> "Style".
@@ -2503,58 +2534,133 @@ ObjectResult* RunObjectCall(SwiftCallback* handle, AsyncOutcome& arguments, intp
   return nullptr;
 }
 
+// Runs `run` on `handle`'s isolate thread, waiting for it from any other
+// thread; null when it fails or cannot run.
+ObjectResult* RunAndWait(SwiftCallback* handle, std::function<ObjectResult*()> run) {
+  if (Isolate::TryGetCurrent() == handle->isolate) {
+    v8::Locker locker(handle->isolate);
+    return handle->wrapper.IsValid() ? run() : nullptr;
+  }
+  // The guard ends the wait when the loop drops the task without running it.
+  struct Wait {
+    std::mutex mutex;
+    std::condition_variable condition;
+    bool done = false;
+    ObjectResult* result = nullptr;
+    void Finish(ObjectResult* value) {
+      std::lock_guard<std::mutex> lock(mutex);
+      if (!done) {
+        done = true;
+        result = value;
+      } else {
+        delete value;
+      }
+      condition.notify_all();
+    }
+  };
+  struct Guard {
+    std::shared_ptr<Wait> wait;
+    ~Guard() { wait->Finish(nullptr); }
+  };
+  auto wait = std::make_shared<Wait>();
+  std::shared_ptr<Guard> guard(new Guard{wait});
+  NativeScriptPlatform* platform = NativeScriptPlatform::Instance();
+  std::shared_ptr<EventLoop> loop =
+      platform ? platform->LookupEventLoop(handle->isolate) : std::shared_ptr<EventLoop>();
+  IsolateWrapper isolateWrapper = handle->wrapper;
+  bool posted = loop && loop->PostInternal([guard, run, isolateWrapper]() {
+    guard->wait->Finish(isolateWrapper.IsValid() ? run() : nullptr);
+  });
+  guard.reset();
+  if (!posted) {
+    return nullptr;
+  }
+  std::unique_lock<std::mutex> lock(wait->mutex);
+  wait->condition.wait(lock, [&] { return wait->done; });
+  return wait->result;
+}
+
 const NSSwiftValue* ApiObjectCallEnd(void* rawToken) {
   std::unique_ptr<AsyncToken> token(static_cast<AsyncToken*>(rawToken));
   SwiftCallback* handle = token->callback;
   std::shared_ptr<AsyncOutcome> arguments = token->root;
   intptr_t encoded = token->requirement;
-  ObjectResult* result = nullptr;
+  ObjectResult* result = RunAndWait(handle, [handle, arguments, encoded]() {
+    return RunObjectCall(handle, *arguments, encoded);
+  });
+  ReleaseCallback(handle);
+  return result ? &result->value : nullptr;
+}
 
-  if (Isolate::TryGetCurrent() == handle->isolate) {
-    v8::Locker locker(handle->isolate);
-    if (handle->wrapper.IsValid()) {
-      result = RunObjectCall(handle, *arguments, encoded);
+// Calls the JS function `handle` holds with `arguments` and converts what it
+// returns; null when it threw or returned a value that does not convert.
+ObjectResult* RunFunctionCall(SwiftCallback* handle, AsyncOutcome& arguments) {
+  Isolate* isolate = handle->isolate;
+  Isolate::Scope isolateScope(isolate);
+  HandleScope handleScope(isolate);
+  auto* state = Caches::StateFor<IsolateState>(isolate);
+  if (state == nullptr) {
+    return nullptr;
+  }
+  Local<Context> context = Caches::Get(isolate)->GetContext();
+  Context::Scope contextScope(context);
+  CallContext* call = state->calls.empty() ? nullptr : state->calls.back();
+  if (call != nullptr && !call->callbackException.IsEmpty()) {
+    return nullptr;
+  }
+
+  TryCatch tryCatch(isolate);
+  Local<Value> exception;
+  const ValueCode& code = handle->code;
+  std::vector<Local<Value>> argv;
+  for (size_t i = 0; i < code.element.size() && i < arguments.children.size(); i++) {
+    Local<Value> value;
+    if (!OutcomeToJS(isolate, context, state, handle->name, *arguments.children[i], code.element[i],
+                     value, exception)) {
+      break;
     }
-  } else {
-    // Run on the isolate's thread and wait. The guard ends the wait when the
-    // loop drops the task without running it.
-    struct Wait {
-      std::mutex mutex;
-      std::condition_variable condition;
-      bool done = false;
-      ObjectResult* result = nullptr;
-      void Finish(ObjectResult* value) {
-        std::lock_guard<std::mutex> lock(mutex);
-        if (!done) {
-          done = true;
-          result = value;
-        } else {
-          delete value;
-        }
-        condition.notify_all();
-      }
-    };
-    struct Guard {
-      std::shared_ptr<Wait> wait;
-      ~Guard() { wait->Finish(nullptr); }
-    };
-    auto wait = std::make_shared<Wait>();
-    std::shared_ptr<Guard> guard(new Guard{wait});
-    NativeScriptPlatform* platform = NativeScriptPlatform::Instance();
-    std::shared_ptr<EventLoop> loop =
-        platform ? platform->LookupEventLoop(handle->isolate) : std::shared_ptr<EventLoop>();
-    IsolateWrapper isolateWrapper = handle->wrapper;
-    bool posted = loop && loop->PostInternal([guard, handle, arguments, encoded, isolateWrapper]() {
-      guard->wait->Finish(isolateWrapper.IsValid() ? RunObjectCall(handle, *arguments, encoded)
-                                                   : nullptr);
-    });
-    guard.reset();
-    if (posted) {
-      std::unique_lock<std::mutex> lock(wait->mutex);
-      wait->condition.wait(lock, [&] { return wait->done; });
-      result = wait->result;
+    argv.push_back(value);
+  }
+  auto result = std::make_unique<ObjectResult>();
+  bool done = false;
+  if (exception.IsEmpty()) {
+    Local<Value> returned;
+    done = handle->target.Get(isolate)
+               .As<v8::Function>()
+               ->Call(context, v8::Undefined(isolate), static_cast<int>(argv.size()), argv.data())
+               .ToLocal(&returned);
+    if (done && code.returns.empty()) {
+      result->value.tag = NSSwiftTagNull;
+    } else if (done) {
+      MemberInfo member;
+      member.swiftName = handle->name + " (closure)";
+      done = Convert(isolate, context, *handle->module, member, kReturnedValue, code.returns[0],
+                     returned, result->value, result->arena);
     }
   }
+  if (done) {
+    return result.release();
+  }
+  if (exception.IsEmpty()) {
+    if (!tryCatch.HasCaught() || !tryCatch.CanContinue()) {
+      return nullptr;
+    }
+    exception = tryCatch.Exception();
+  }
+  if (call != nullptr) {
+    call->callbackException.Reset(isolate, exception);
+  } else {
+    NativeScriptException::ReportToJsHandlersAndLog(isolate, exception, tryCatch.Message());
+  }
+  return nullptr;
+}
+
+const NSSwiftValue* ApiCallbackCallEnd(void* rawToken) {
+  std::unique_ptr<AsyncToken> token(static_cast<AsyncToken*>(rawToken));
+  SwiftCallback* handle = token->callback;
+  std::shared_ptr<AsyncOutcome> arguments = token->root;
+  ObjectResult* result =
+      RunAndWait(handle, [handle, arguments]() { return RunFunctionCall(handle, *arguments); });
   ReleaseCallback(handle);
   return result ? &result->value : nullptr;
 }

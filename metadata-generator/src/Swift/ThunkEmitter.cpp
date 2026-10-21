@@ -163,13 +163,37 @@ class Emitter {
                                 : report);
         }
         std::string closureType = swiftTypeText(unwrappedNode(type), _module);
-        std::string body =
-            reports.empty() ? "_ in" : "r in " + llvm::join(reports, "; ");
-        return {"{ () -> " + closureType +
-                    " in let callback = __NSCallback(api: rt.api, handle: " +
-                    read("callback") + "); return { (" +
-                    llvm::join(parameters, ", ") + ") in callback.invoke { " +
-                    body + " } } }()",
+        std::string head =
+            "{ () -> " + closureType +
+            " in let callback = __NSCallback(api: rt.api, handle: " +
+            read("callback") + "); return { (" + llvm::join(parameters, ", ") +
+            ")";
+        if (type.results.empty() && !type.throwing) {
+          std::string body =
+              reports.empty() ? "_ in" : "r in " + llvm::join(reports, "; ");
+          return {head + " in callback.invoke { " + body + " } } }()", false};
+        }
+        // Waits for the JS function's result.
+        BridgedType result;
+        result.bridge = Bridge::Void;
+        if (!type.results.empty()) {
+          result = type.results[0];
+        }
+        std::string resultType = result.bridge == Bridge::Void
+                                     ? "Void"
+                                     : swiftTypeText(result.node, _module);
+        std::string zero = zeroValue(result);
+        std::string failure =
+            type.throwing ? "throw __NSJSError(requirement: \"a closure\")"
+            : zero.empty()
+                ? "fatalError(\"a JavaScript closure implementation failed\")"
+                : "return " + zero;
+        return {head + (type.throwing ? " throws" : "") + " -> " + resultType +
+                    " in let result: " + resultType +
+                    "? = callback.call({ r in " + llvm::join(reports, "; ") +
+                    " }, " + resultReader(result) +
+                    "); guard let result else { " + failure +
+                    " }; return result } }()",
                 false};
       }
       case Bridge::Void:
@@ -904,6 +928,22 @@ private final class __NSCallback: @unchecked Sendable {
     api.load(fromByteOffset: 33 * 8, as: (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(handle)
   }
 
+  // Calls the function and waits for its result; nil when it threw or
+  // returned a value `read` cannot convert.
+  func call<T>(_ arguments: (__NSCompletion) -> Void, _ read: (__NSSlots) -> T?) -> T? {
+    let begin = api.load(fromByteOffset: 31 * 8,
+                         as: (@convention(c) (UnsafeMutableRawPointer) -> UnsafeMutableRawPointer).self)
+    let completion = __NSCompletion(api: api, token: begin(handle))
+    arguments(completion)
+    let end = api.load(fromByteOffset: 51 * 8,
+                       as: (@convention(c) (UnsafeMutableRawPointer) -> UnsafeRawPointer?).self)
+    guard let result = end(completion.token) else { return nil }
+    defer {
+      api.load(fromByteOffset: 45 * 8, as: (@convention(c) (UnsafeRawPointer) -> Void).self)(result)
+    }
+    return read(__NSSlots(base: result, api: api))
+  }
+
   // `arguments` reports each argument through the ordinary return entries.
   func invoke(_ arguments: (__NSCompletion) -> Void) {
     let begin = api.load(fromByteOffset: 31 * 8,
@@ -1314,6 +1354,25 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
     return result;
   }
 
+  // A closure converting the one result slot a JS call returns to `result`,
+  // nil when it does not convert.
+  std::string resultReader(const BridgedType& result) const {
+    if (result.bridge == Bridge::Void) {
+      return "{ (_: __NSSlots) -> Void? in () }";
+    }
+    std::string resultType = swiftTypeText(result.node, _module);
+    ValueExpression value = valueExpression(result, "s", "0");
+    if (!result.optional) {
+      return "{ (s: __NSSlots) -> " + resultType + "? in " + value.code + " }";
+    }
+    std::string inner = swiftTypeText(unwrappedNode(result), _module);
+    return "{ (s: __NSSlots) -> " + inner +
+           "?? in if s.isNull(0) { return .some(nil) }; " +
+           (value.failable ? "return (" + value.code + ").map { .some($0) }"
+                           : "return .some(" + value.code + ")") +
+           " }";
+  }
+
   // What a requirement returns when its JS implementation fails, or "" when
   // its type has no such value.
   static std::string zeroValue(const BridgedType& type) {
@@ -1354,22 +1413,7 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
                                  : swiftTypeText(result.node, _module);
     std::string owner = llvm::join(symbol.pathComponents, ".");
 
-    auto readClosure = [&]() -> std::string {
-      if (result.bridge == Bridge::Void) {
-        return "{ (_: __NSSlots) -> Void? in () }";
-      }
-      ValueExpression value = valueExpression(result, "s", "0");
-      if (!result.optional) {
-        return "{ (s: __NSSlots) -> " + resultType + "? in " + value.code +
-               " }";
-      }
-      std::string inner = swiftTypeText(unwrappedNode(result), _module);
-      return "{ (s: __NSSlots) -> " + inner +
-             "?? in if s.isNull(0) { return .some(nil) }; " +
-             (value.failable ? "return (" + value.code + ").map { .some($0) }"
-                             : "return .some(" + value.code + ")") +
-             " }";
-    };
+    auto readClosure = [&]() { return resultReader(result); };
     auto body = [&](int index, const std::string& reports,
                     const std::string& indent) {
       std::string zero = zeroValue(result);

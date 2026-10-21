@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 1166,
+      "total": 1171,
       "objc-direct": 1,
-      "swift-generated": 268,
+      "swift-generated": 273,
       "swift-specialized": 368,
       "type-only": 5,
       "unsupported": 524,
       "not-applicable": 0
     },
     "callable": {
-      "total": 1118,
+      "total": 1123,
       "objc-direct": 0,
-      "swift-generated": 228,
+      "swift-generated": 233,
       "swift-specialized": 365,
       "type-only": 2,
       "unsupported": 523,
       "not-applicable": 0
     },
-    "effectiveCallable": 228,
+    "effectiveCallable": 233,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -62,9 +62,9 @@
       "not-applicable": 0
     },
     "function": {
-      "total": 67,
+      "total": 72,
       "objc-direct": 0,
-      "swift-generated": 67,
+      "swift-generated": 72,
       "swift-specialized": 0,
       "type-only": 0,
       "unsupported": 0,
@@ -171,7 +171,7 @@
     }
   },
   "reasons": {
-    "closure": 33,
+    "closure": 8,
     "enum-associated-values": 1,
     "existential": 4,
     "external-type-extension": 2,
@@ -182,7 +182,7 @@
     "subscript": 1,
     "tuple": 1,
     "unavailable": 5,
-    "unbridged-type": 545,
+    "unbridged-type": 558,
     "variadic-parameter": 8
   },
   "symbols": [
@@ -914,10 +914,10 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
         "unbridged-type:Foundation.CharacterSet",
-        "unbridged-type:KeyPress.Phases"
+        "unbridged-type:KeyPress.Phases",
+        "unbridged-type:KeyPress.Result"
       ]
     },
     {
@@ -926,9 +926,9 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
         "unbridged-type:KeyPress.Phases",
+        "unbridged-type:KeyPress.Result",
         "unbridged-type:Swift.Set"
       ]
     },
@@ -938,9 +938,9 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
-        "unbridged-type:KeyPress.Phases"
+        "unbridged-type:KeyPress.Phases",
+        "unbridged-type:KeyPress.Result"
       ]
     },
     {
@@ -949,8 +949,8 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
+        "unbridged-type:KeyPress.Result",
         "unbridged-type:SwiftUI.KeyEquivalent"
       ]
     },
@@ -960,9 +960,9 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
         "unbridged-type:KeyPress.Phases",
+        "unbridged-type:KeyPress.Result",
         "unbridged-type:SwiftUI.KeyEquivalent"
       ]
     },
@@ -1361,8 +1361,8 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
+        "unbridged-type:SwiftUI.ActionSheet",
         "unbridged-type:SwiftUI.Binding"
       ]
     },
@@ -1619,7 +1619,6 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
         "unbridged-type:SwiftUI.HorizontalAlignment",
         "unbridged-type:SwiftUI.VerticalEdge"
@@ -1631,7 +1630,6 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
         "unbridged-type:SwiftUI.HorizontalEdge",
         "unbridged-type:SwiftUI.VerticalAlignment"
@@ -1986,7 +1984,6 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type"
       ]
     },
@@ -2152,7 +2149,6 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
         "unbridged-type:SwiftUI.HorizontalEdge"
       ]
@@ -2217,7 +2213,6 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type"
       ]
     },
@@ -2591,9 +2586,9 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
-        "unbridged-type:SwiftUI.VerticalAlignment"
+        "unbridged-type:SwiftUI.VerticalAlignment",
+        "unbridged-type:SwiftUI.ViewDimensions"
       ]
     },
     {
@@ -2602,9 +2597,9 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
-        "unbridged-type:SwiftUI.HorizontalAlignment"
+        "unbridged-type:SwiftUI.HorizontalAlignment",
+        "unbridged-type:SwiftUI.ViewDimensions"
       ]
     },
     {
@@ -3451,7 +3446,6 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
         "unbridged-type:SwiftUI.Axis",
         "unbridged-type:SwiftUI.ScrollTransitionConfiguration"
@@ -3463,7 +3457,6 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
         "unbridged-type:SwiftUI.Axis",
         "unbridged-type:SwiftUI.ScrollTransitionConfiguration"
@@ -3629,8 +3622,8 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
-        "opaque-type"
+        "opaque-type",
+        "unbridged-type:SwiftUI.DropConfiguration"
       ]
     },
     {
@@ -5853,10 +5846,10 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
         "unbridged-type:Axis.Set",
-        "unbridged-type:SwiftUI.Alignment"
+        "unbridged-type:SwiftUI.Alignment",
+        "unbridged-type:SwiftUI.Axis"
       ]
     },
     {
@@ -6173,7 +6166,6 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
         "unbridged-type:Namespace.ID"
       ]
@@ -6756,7 +6748,6 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type"
       ]
     },
@@ -7539,8 +7530,8 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
+        "unbridged-type:SwiftUI.Alert",
         "unbridged-type:SwiftUI.Binding"
       ]
     },
@@ -7952,7 +7943,6 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type"
       ]
     },
@@ -7962,8 +7952,8 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
+        "unbridged-type:CGPoint",
         "unbridged-type:SwiftUI.Binding",
         "unbridged-type:UniformTypeIdentifiers.UTType"
       ]
@@ -7974,7 +7964,6 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
         "unbridged-type:SwiftUI.Binding",
         "unbridged-type:UniformTypeIdentifiers.UTType"
@@ -7986,8 +7975,8 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
+        "unbridged-type:CGPoint",
         "unbridged-type:SwiftUI.Binding"
       ]
     },
@@ -7997,7 +7986,6 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "closure",
         "opaque-type",
         "unbridged-type:SwiftUI.Binding"
       ]
@@ -8881,6 +8869,14 @@
       "location": "file://Sources/SwiftDemo/Values.swift:12"
     },
     {
+      "id": "s:9SwiftDemo10firstMatch_5whereSiSgSaySiG_SbSiKXEtKF",
+      "path": "firstMatch(_:where:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "firstMatch",
+      "location": "file://Sources/SwiftDemo/Values.swift:191"
+    },
+    {
       "id": "s:9SwiftDemo10greetLater_10completionySSSg_yADYbctF",
       "path": "greetLater(_:completion:)",
       "kind": "function",
@@ -9007,6 +9003,14 @@
       "tier": "swift-generated",
       "jsName": "delayedEcho",
       "location": "file://Sources/SwiftDemo/Values.swift:30"
+    },
+    {
+      "id": "s:9SwiftDemo11sortedNames_2bySaySSGAD_SbSS_SStXEtF",
+      "path": "sortedNames(_:by:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "sortedNames",
+      "location": "file://Sources/SwiftDemo/Values.swift:188"
     },
     {
       "id": "s:9SwiftDemo12RankedScorerP",
@@ -9256,6 +9260,14 @@
       "tier": "swift-generated",
       "jsName": "greetInBackground",
       "location": "file://Sources/SwiftDemo/Protocols.swift:56"
+    },
+    {
+      "id": "s:9SwiftDemo19computeInBackgroundyS2iyYbcYaF",
+      "path": "computeInBackground(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "computeInBackground",
+      "location": "file://Sources/SwiftDemo/Values.swift:195"
     },
     {
       "id": "s:9SwiftDemo3JobO",
@@ -9948,6 +9960,14 @@
       "tier": "swift-generated",
       "jsName": "excite",
       "location": "file://Sources/SwiftDemo/Protocols.swift:42"
+    },
+    {
+      "id": "s:9SwiftDemo6lookupySiSS_SiSgSSXEtF",
+      "path": "lookup(_:_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "lookup",
+      "location": "file://Sources/SwiftDemo/Values.swift:194"
     },
     {
       "id": "s:9SwiftDemo6settley0aB3Kit7OutcomeOySiGSiF",
@@ -10676,6 +10696,14 @@
       "tier": "swift-generated",
       "jsName": "onMeasure",
       "location": "file://Sources/SwiftDemo/Values.swift:119"
+    },
+    {
+      "id": "s:9SwiftDemo9transformySaySSGSaySiG_SSSiXEtF",
+      "path": "transform(_:_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "transform",
+      "location": "file://Sources/SwiftDemo/Values.swift:187"
     },
     {
       "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:12SwiftDemoKit4CoinO",

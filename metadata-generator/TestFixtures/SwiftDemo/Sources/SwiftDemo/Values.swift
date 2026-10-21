@@ -182,3 +182,16 @@ public final class Bench {
     public static func echo(_ value: Int) -> Int { value }
     public func echo(_ value: Int) -> Int { value }
 }
+
+// Closures returning values (JS functions whose result Swift waits for).
+public func transform(_ values: [Int], _ body: (Int) -> String) -> [String] { values.map(body) }
+public func sortedNames(_ names: [String], by less: (String, String) -> Bool) -> [String] {
+    names.sorted(by: less)
+}
+public func firstMatch(_ values: [Int], where predicate: (Int) throws -> Bool) throws -> Int? {
+    try values.first(where: predicate)
+}
+public func lookup(_ key: String, _ resolve: (String) -> Int?) -> Int { resolve(key) ?? -1 }
+public func computeInBackground(_ provider: @escaping @Sendable () -> Int) async -> Int {
+    await Task.detached { provider() * 2 }.value
+}

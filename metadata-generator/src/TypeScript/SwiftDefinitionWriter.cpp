@@ -125,7 +125,9 @@ std::string codeDisplayName(const SwiftSurface& surface,
       for (const auto& element : type.elements) {
         parameters.push_back(codeDisplayName(surface, element));
       }
-      name = "(" + llvm::join(parameters, ", ") + ") -> Void";
+      name = "(" + llvm::join(parameters, ", ") + ") -> " +
+             (type.results.empty() ? "Void"
+                                   : codeDisplayName(surface, type.results[0]));
       break;
     }
     case Bridge::AsyncSequence:
@@ -491,7 +493,9 @@ class Writer {
           parameters.push_back("arg" + std::to_string(i) + ": " +
                                outputType(type.elements[i]));
         }
-        ts = "(" + llvm::join(parameters, ", ") + ") => void";
+        // What JS returns is converted like an argument: input types.
+        ts = "(" + llvm::join(parameters, ", ") + ") => " +
+             (type.results.empty() ? "void" : inputType(type.results[0]));
         break;
       }
       default:

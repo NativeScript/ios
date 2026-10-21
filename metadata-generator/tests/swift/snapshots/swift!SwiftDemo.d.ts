@@ -299,6 +299,7 @@ declare module "ns:swift/SwiftDemo" {
   export function allFlavors(): (Flavor)[];
   export function echoString(value: string): string;
   export function echoUInt64(value: number | bigint): number;
+  export function firstMatch(values: readonly (number | bigint)[], predicate: (arg0: number) => boolean): number | null;
   export function greetLater(name: (string) | null | undefined, completion: (arg0: string | null) => void): void;
   export function largestInt(): number;
   export function makeScorer(): Scorer;
@@ -306,6 +307,7 @@ declare module "ns:swift/SwiftDemo" {
   export function wordCounts(words: readonly (string)[]): Record<string, number>;
   export function checkedSide(side: number): number;
   export function delayedEcho(text: string, seconds: number): Promise<string>;
+  export function sortedNames(names: readonly (string)[], less: (arg0: string, arg1: string) => boolean): (string)[];
   export function firstSubview(view: UIView): UIView | null;
   export function makeGreeting(name: string): Greeting;
   export function measureLater(width: number): Promise<Measurement>;
@@ -317,6 +319,7 @@ declare module "ns:swift/SwiftDemo" {
   export function makeDefaultPoint(): Point;
   export function makeTrackerLater(id: number | bigint): Promise<Tracker>;
   export function greetInBackground(greeting: Greeting): Promise<string>;
+  export function computeInBackground(provider: () => number | bigint): Promise<number>;
   export function sum(amounts: readonly (import("ns:swift/SwiftDemoKit").Money)[]): import("ns:swift/SwiftDemoKit").Money;
   export function area(measurement: Measurement): number;
   export function bump(value: { value: number | bigint }): void;
@@ -336,6 +339,7 @@ declare module "ns:swift/SwiftDemo" {
   export function total(values: readonly (number)[]): number;
   export function append(word: string, words: { value: readonly (string)[] }): void;
   export function excite(greeting: Greeting): void;
+  export function lookup(key: string, resolve: (arg0: string) => (number | bigint) | null | undefined): number;
   export function settle(value: number | bigint): import("ns:swift/SwiftDemoKit").Outcome<number>;
   export function countUp(limit: number | bigint): AsyncIterableIterator<number>;
   export function echoInt(value: number | bigint): number;
@@ -367,6 +371,7 @@ declare module "ns:swift/SwiftDemo" {
   export function makeScore(name: string, points: number | bigint): import("ns:swift/SwiftDemoKit").Pair<string, number>;
   export function noteLater(text: string): Promise<NSObject>;
   export function onMeasure(body: (arg0: Measurement) => void): void;
+  export function transform(values: readonly (number | bigint)[], body: (arg0: number) => string): (string)[];
 }
 
 declare module "ns:swift" {

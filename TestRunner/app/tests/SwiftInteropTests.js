@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module", "observe", "track"]);
-            expect(swift.abiVersion).toBe(11);
+            expect(swift.abiVersion).toBe(12);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(11);
+            expect(info.abiVersion).toBe(12);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -887,6 +887,43 @@ describe("ns:swift", function () {
         it("refuses values that are not functions", function () {
             expect(function () { SwiftDemo.countdown(1, 5); })
                 .toThrowError(TypeError, /countdown.*\(Int, Bool\) -> Void/);
+        });
+
+        it("returns JS functions' results to Swift", function () {
+            expect(SwiftDemo.transform([1, 2, 3], function (n) { return "#" + n; }))
+                .toEqual(["#1", "#2", "#3"]);
+            expect(SwiftDemo.sortedNames(["b", "c", "a"], function (x, y) { return x > y; }))
+                .toEqual(["c", "b", "a"]);
+            expect(SwiftDemo.lookup("seven", function (key) { return key.length; })).toBe(5);
+            expect(SwiftDemo.lookup("none", function () { return null; })).toBe(-1);
+        });
+
+        it("throws when a function's result does not convert", function () {
+            expect(function () { SwiftDemo.transform([1], function () { return 5; }); })
+                .toThrowError(TypeError, /transform/);
+        });
+
+        it("throws a JS exception from a throwing closure into Swift and back", function () {
+            expect(SwiftDemo.firstMatch([1, 4, 9], function (n) { return n > 3; })).toBe(4);
+            expect(SwiftDemo.firstMatch([1], function () { return false; })).toBeNull();
+            var calls = 0;
+            expect(function () {
+                SwiftDemo.firstMatch([1, 2, 3], function () {
+                    calls++;
+                    throw new Error("no match");
+                });
+            }).toThrowError("no match");
+            expect(calls).toBe(1);
+        });
+
+        it("waits for functions called from other threads", function (done) {
+            SwiftDemo.computeInBackground(function () {
+                expect(NSThread.isMainThread).toBe(true);
+                return 21;
+            }).then(function (value) {
+                expect(value).toBe(42);
+                done();
+            }, done.fail);
         });
 
         it("runs closures called from other threads on the JS thread", function (done) {

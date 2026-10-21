@@ -184,8 +184,8 @@ holds.
 
 ## Closures
 
-A closure parameter that returns `Void` takes a JS function; its arguments
-follow the value table. The Swift closure keeps the function alive for as long
+A closure parameter takes a JS function; its arguments and its result follow
+the value table. The Swift closure keeps the function alive for as long
 as Swift holds the closure, and drops it when Swift releases the closure.
 
 - Called on the JS thread, the closure runs the function before returning.
@@ -196,9 +196,18 @@ as Swift holds the closure, and drops it when Swift releases the closure.
 - Called from any other thread (a completion handler run by a background
   queue), the invocation is queued to the isolate's thread and Swift does not
   wait for it. A throw there is reported as an uncaught error.
-- Closures that return a value, throw, or are `async`, `@autoclosure`
-  parameters, closures with `inout` parameters, and closures returned from
-  Swift are not bridged yet.
+- A closure that returns a value (`transform([1, 2], (n) => "#" + n)`) always
+  waits for the function, on any thread: from another thread, the call is
+  queued to the isolate's thread and the Swift thread blocks until it ran.
+  When the function throws or returns a value that does not convert, the
+  exception (a `TypeError` for the conversion) is thrown from the Swift call
+  in progress, or reported as an uncaught error otherwise. A `throws` closure
+  then throws into Swift; any other closure returns `nil`, `false`, `0`, an
+  empty string or collection, and stops the process when its result type has
+  none of these.
+- `async` closures, `@autoclosure` parameters, closures with `inout`
+  parameters, closures returning closures or sequences, and closures returned
+  from Swift are not bridged yet.
 
 ## Protocols
 
@@ -353,7 +362,7 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 ## Not yet supported
 
-Closures that return values, async cancellation, Combine publishers,
+Async cancellation, Combine publishers,
 concrete `AsyncSequence` types, generic functions,
 `Result` and other standard library generics, protocols with associated
 types, tuples, sets, optional collection

@@ -157,6 +157,9 @@ std::string signatureCode(const SwiftSurface& surface,
       for (size_t i = 0; i < type.elements.size(); i++) {
         code += (i > 0 ? "," : "") + signatureCode(surface, type.elements[i]);
       }
+      if (!type.results.empty()) {
+        code += ">" + signatureCode(surface, type.results[0]);
+      }
       code += ")";
       break;
     }
