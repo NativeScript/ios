@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module", "observe", "track"]);
-            expect(swift.abiVersion).toBe(15);
+            expect(swift.abiVersion).toBe(16);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(15);
+            expect(info.abiVersion).toBe(16);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -1076,6 +1076,53 @@ describe("ns:swift", function () {
             expect(view.configure(1, null)).toBe(2);
             expect(view.configure(5, 3)).toBe(8);
             expect(view.count).toBe(8);
+        });
+    });
+
+    describe("Any and Foundation values", function () {
+        it("passes JS values as Swift's Any", function () {
+            expect(SwiftDemo.describeAny(3)).toBe("Int:3");
+            expect(SwiftDemo.describeAny(2.5)).toBe("Double:2.5");
+            expect(SwiftDemo.describeAny("x")).toBe("String:x");
+            expect(SwiftDemo.describeAny(true)).toBe("Bool:true");
+            expect(SwiftDemo.describeAny(null)).toBe("null");
+            expect(SwiftDemo.describeAny([1, "a", null])).toBe("Array:3");
+            expect(SwiftDemo.describeAny({ b: 1, a: [2] })).toBe("Dictionary:a,b");
+            expect(SwiftDemo.describeAny(new SwiftDemo.Point(1, 2))).toBe("Point:1.0,2.0");
+            expect(function () { SwiftDemo.describeAny(function () {}); }).toThrowError(TypeError);
+        });
+
+        it("returns Swift's Any as JS values", function () {
+            var payload = SwiftDemo.samplePayload();
+            expect(payload.name).toBe("ada");
+            expect(payload.age).toBe(36);
+            expect(payload.score).toBe(9.5);
+            expect(payload.admin).toBe(true);
+            expect(payload.tags).toEqual(["a", "b"]);
+            expect(payload.nested).toEqual({ ok: true });
+            expect(payload.none).toBeNull();
+            expect(payload.point instanceof SwiftDemo.Point).toBe(true);
+            var value = { list: [1, 2.5, "three", false, null], deep: { x: { y: "z" } } };
+            expect(SwiftDemo.echoAny(value)).toEqual(value);
+        });
+
+        it("resolves Any from async calls", function (done) {
+            SwiftDemo.echoAnyLater({ ok: [1, "two"] }).then(function (value) {
+                expect(value).toEqual({ ok: [1, "two"] });
+                done();
+            }, done.fail);
+        });
+
+        it("passes UUID and Character as strings and Decimal as a number", function () {
+            var text = "E621E1F8-C36C-495A-93FC-0C247A3E6E5F";
+            expect(SwiftDemo.makeIdentifier(text)).toBe(text);
+            expect(SwiftDemo.makeIdentifier("nope")).toBeNull();
+            expect(SwiftDemo.identifierText(text)).toBe(text.toLowerCase());
+            expect(function () { SwiftDemo.identifierText("nope"); }).toThrowError(TypeError);
+            expect(SwiftDemo.initial("swift")).toBe("s");
+            expect(SwiftDemo.repeatCharacter("ab".charAt(1), 3)).toBe("bbb");
+            expect(function () { SwiftDemo.repeatCharacter("ab", 1); }).toThrowError(TypeError);
+            expect(SwiftDemo.halve(9.5)).toBe(4.75);
         });
     });
 

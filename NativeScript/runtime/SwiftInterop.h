@@ -40,7 +40,7 @@
 // calls it by reporting the arguments as an array: callbackBegin, each
 // argument through the complete* entries, then completeArrayEnd.
 
-#define NS_SWIFT_ABI_VERSION 15
+#define NS_SWIFT_ABI_VERSION 16
 
 #ifdef __cplusplus
 extern "C" {
@@ -172,6 +172,10 @@ enum {
 //   B           Data: bytes (NSSwiftTagString) <-> Uint8Array copy
 //   [<code>]    array (NSSwiftTagArray) <-> JS array copy
 //   {<code>}    [String: <code>] (NSSwiftTagMap) <-> plain JS object copy
+//   a           Any: a slot of whatever tag the JS value needs (Null, Bool,
+//               Int64 for integral numbers, Double, String, Array, Map with
+//               string keys, Object, ObjC) <-> the value, reported by type;
+//               containers of Any hold Any
 //   !           Error: its message (NSSwiftTagString) <- any JS value (an
 //               Error's message); returnErrorValue -> JS Error named
 //               "SwiftError"

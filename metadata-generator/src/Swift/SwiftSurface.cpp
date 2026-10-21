@@ -240,6 +240,9 @@ std::string signatureCode(const SwiftSurface& surface,
     case Bridge::Error:
       code = "!";
       break;
+    case Bridge::Any:
+      code = "a";
+      break;
     case Bridge::Result:
       code = "R(" + signatureCode(surface, type.elements.at(0)) + "," +
              signatureCode(surface, type.elements.at(1)) + ")";

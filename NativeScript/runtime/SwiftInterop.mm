@@ -60,6 +60,9 @@ struct ValueCode {
     Tuple,
     Error,
     Result,
+    // Any value: converted by its JS type, and back by its Swift type; its
+    // containers' elements are Any too.
+    Any,
     Function,
     Tagged,
     ObjC,
@@ -151,6 +154,10 @@ bool ParseCode(std::string text, ValueCode& code) {
   }
   if (text == "!") {
     code.kind = ValueCode::Kind::Error;
+    return true;
+  }
+  if (text == "a") {
+    code.kind = ValueCode::Kind::Any;
     return true;
   }
   if (text.size() > 3 && text.compare(0, 2, "R(") == 0 && text.back() == ')') {
@@ -499,6 +506,9 @@ std::string TypeDisplayName(const ModuleInfo& module, const ValueCode& code) {
       break;
     case ValueCode::Kind::Error:
       name = "Error";
+      break;
+    case ValueCode::Kind::Any:
+      name = "Any";
       break;
     case ValueCode::Kind::Result: {
       const auto& success = (*code.cases)[0].codes;
@@ -1403,7 +1413,9 @@ void BeginContainer(CallContext* context, bool isMap, intptr_t count) {
       (code->kind == ValueCode::Kind::AsyncSequence || code->kind == ValueCode::Kind::Set ||
        (code->kind == ValueCode::Kind::Tuple &&
         static_cast<size_t>(count) == code->element.size()));
-  if (code == nullptr || (code->kind != expected && !arrayLike) || code->element.empty()) {
+  bool any = code != nullptr && code->kind == ValueCode::Kind::Any;
+  if (code == nullptr || (code->kind != expected && !arrayLike && !any) ||
+      (code->element.empty() && !any)) {
     Fail(context);
     context->isolate->ThrowException(Exception::Error(tns::ToV8String(
         context->isolate, context->member->swiftName + " reported an unexpected collection")));
@@ -1420,7 +1432,7 @@ void BeginContainer(CallContext* context, bool isMap, intptr_t count) {
                  : frame.isSet
                      ? Local<Object>(v8::Set::New(context->isolate))
                      : Local<Object>(v8::Array::New(context->isolate, static_cast<int>(count)));
-  frame.element = &code->element[0];
+  frame.element = any ? code : &code->element[0];
   context->frames.push_back(frame);
 }
 
@@ -1789,7 +1801,7 @@ bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
              failed("returned an object JavaScript cannot wrap");
     }
     case AsyncOutcome::Kind::Array: {
-      if (code.element.empty()) {
+      if (code.element.empty() && code.kind != ValueCode::Kind::Any) {
         return failed("returned an unexpected array");
       }
       if (code.kind == ValueCode::Kind::Tuple) {
@@ -1829,7 +1841,8 @@ bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
       Local<v8::Array> array = v8::Array::New(isolate, static_cast<int>(node.children.size()));
       for (uint32_t i = 0; i < node.children.size(); i++) {
         Local<Value> element;
-        if (!OutcomeToJS(isolate, context, state, name, *node.children[i], code.element[0], element,
+        if (!OutcomeToJS(isolate, context, state, name, *node.children[i],
+                         code.kind == ValueCode::Kind::Any ? code : code.element[0], element,
                          rejection) ||
             !array->Set(context, i, element).FromMaybe(false)) {
           return false;
@@ -1839,17 +1852,18 @@ bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
       return true;
     }
     case AsyncOutcome::Kind::Map: {
-      if (code.element.empty()) {
+      if (code.element.empty() && code.kind != ValueCode::Kind::Any) {
         return failed("returned an unexpected map");
       }
+      const ValueCode& valueCode = code.kind == ValueCode::Kind::Any ? code : code.element[0];
       Local<Object> object = Object::New(isolate);
       for (size_t i = 0; i + 1 < node.children.size(); i += 2) {
         Local<Value> key;
         Local<Value> value;
         if (!OutcomeToJS(isolate, context, state, name, *node.children[i], KeyCode(), key,
                          rejection) ||
-            !OutcomeToJS(isolate, context, state, name, *node.children[i + 1], code.element[0],
-                         value, rejection) ||
+            !OutcomeToJS(isolate, context, state, name, *node.children[i + 1], valueCode, value,
+                         rejection) ||
             !object->Set(context, key, value).FromMaybe(false)) {
           return false;
         }
@@ -2401,6 +2415,9 @@ bool Accepts(Isolate* isolate, const ModuleInfo& module, const ValueCode& code,
   if (code.inout) {
     return IsRecord(isolate, value);
   }
+  if (code.kind == ValueCode::Kind::Any) {
+    return !value->IsFunction() && !value->IsSymbol();
+  }
   if (value->IsNullOrUndefined()) {
     return code.optional;
   }
@@ -2459,6 +2476,7 @@ bool Accepts(Isolate* isolate, const ModuleInfo& module, const ValueCode& code,
                  ? wrapper->Module() == &module
                  : value->IsObject() && !value->IsArray() && ObjCObjectOf(isolate, value) == nil;
     }
+    case ValueCode::Kind::Any:  // handled before the switch
     case ValueCode::Kind::AsyncSequence:
     case ValueCode::Kind::Void:
       return false;
@@ -2524,6 +2542,98 @@ bool WriteString(Isolate* isolate, Local<v8::String> string, NSSwiftValue& slot,
 }
 
 // Writes `value` into `slot`; `index` names the argument in errors.
+// A JS value as Any: null and undefined as NSNull, booleans, integral numbers
+// as Int and others as Double, strings, arrays, plain objects as
+// [String: Any], and Swift and Objective-C objects.
+bool ConvertAny(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
+                const MemberInfo& member, size_t index, const ValueCode& code, Local<Value> value,
+                NSSwiftValue& slot, SlotArena& arena) {
+  if (value->IsNullOrUndefined()) {
+    slot.tag = NSSwiftTagNull;
+    return true;
+  }
+  if (value->IsBoolean()) {
+    slot.tag = NSSwiftTagBool;
+    slot.payload.int64 = value->BooleanValue(isolate) ? 1 : 0;
+    return true;
+  }
+  if (value->IsBigInt()) {
+    slot.tag = NSSwiftTagInt64;
+    slot.payload.int64 = value.As<v8::BigInt>()->Int64Value();
+    return true;
+  }
+  if (value->IsNumber()) {
+    double number = value.As<v8::Number>()->Value();
+    if (std::isfinite(number) && std::trunc(number) == number &&
+        std::fabs(number) <= kMaxSafeInteger) {
+      slot.tag = NSSwiftTagInt64;
+      slot.payload.int64 = static_cast<int64_t>(number);
+    } else {
+      slot.tag = NSSwiftTagDouble;
+      slot.payload.float64 = number;
+    }
+    return true;
+  }
+  if (value->IsString()) {
+    return WriteString(isolate, value.As<v8::String>(), slot, arena);
+  }
+  if (SwiftObjectWrapper* wrapper = SwiftWrapperOf(isolate, value)) {
+    slot.tag = NSSwiftTagObject;
+    slot.payload.object = wrapper->Object();
+    return true;
+  }
+  if (id object = ObjCObjectOf(isolate, value)) {
+    slot.tag = NSSwiftTagObjC;
+    slot.payload.object = object;
+    return true;
+  }
+  if (value->IsArray()) {
+    Local<v8::Array> array = value.As<v8::Array>();
+    uint32_t length = array->Length();
+    arena.slots.emplace_back(length);
+    std::vector<NSSwiftValue>& elements = arena.slots.back();
+    for (uint32_t i = 0; i < length; i++) {
+      Local<Value> element;
+      if (!array->Get(context, i).ToLocal(&element) ||
+          !ConvertAny(isolate, context, module, member, index, code, element, elements[i], arena)) {
+        return false;
+      }
+    }
+    slot.tag = NSSwiftTagArray;
+    slot.payload.object = elements.data();
+    slot.length = length;
+    return true;
+  }
+  if (IsRecord(isolate, value)) {
+    Local<Object> object = value.As<Object>();
+    Local<v8::Array> keys;
+    if (!object->GetOwnPropertyNames(context).ToLocal(&keys)) {
+      return false;
+    }
+    uint32_t count = keys->Length();
+    arena.slots.emplace_back(2 * count);
+    std::vector<NSSwiftValue>& entries = arena.slots.back();
+    for (uint32_t i = 0; i < count; i++) {
+      Local<Value> key;
+      Local<Value> entry;
+      Local<v8::String> name;
+      if (!keys->Get(context, i).ToLocal(&key) || !key->ToString(context).ToLocal(&name) ||
+          !WriteString(isolate, name, entries[2 * i], arena) ||
+          !object->Get(context, key).ToLocal(&entry) ||
+          !ConvertAny(isolate, context, module, member, index, code, entry, entries[2 * i + 1],
+                      arena)) {
+        return false;
+      }
+    }
+    slot.tag = NSSwiftTagMap;
+    slot.payload.object = entries.data();
+    slot.length = count;
+    return true;
+  }
+  return ThrowArgument(isolate, member, index,
+                       "must be a value Swift's Any holds (not a function or symbol)");
+}
+
 bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
              const MemberInfo& member, size_t index, const ValueCode& code, Local<Value> value,
              NSSwiftValue& slot, SlotArena& arena) {
@@ -2545,6 +2655,9 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
     }
     arena.references[index] = value.As<Object>();
     return Convert(isolate, context, module, member, index, inner, current, slot, arena);
+  }
+  if (code.kind == ValueCode::Kind::Any) {
+    return ConvertAny(isolate, context, module, member, index, code, value, slot, arena);
   }
   if (value->IsNullOrUndefined()) {
     if (!code.optional) {
@@ -2913,6 +3026,7 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
       return true;
     }
 
+    case ValueCode::Kind::Any:  // handled before the switch
     case ValueCode::Kind::AsyncSequence:
     case ValueCode::Kind::Void:
       break;

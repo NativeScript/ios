@@ -170,6 +170,9 @@ methods of generic types are not instantiated yet.
 | `Set<T>` | `Set` copy (inputs also accept an array) |
 | `(A, B)` | array copy, `[a, b]` |
 | `(x: A, y: B)` | plain object copy, `{ x: a, y: b }` |
+| `Any`, `[Any]`, `[String: Any]` | the JS value: `null` (`NSNull`), booleans, numbers (integral ones as `Int`), strings, arrays, plain objects; Swift values of the module's types and Objective-C objects as themselves. Back from Swift by the value's type (`Date` as milliseconds, `URL` and `UUID` as strings); TypeScript sees `unknown` |
+| `UUID`, `Character` | string (an invalid UUID or a string of other than one character throws `TypeError`) |
+| `Decimal` | number |
 | `any Error` | `Error` named `SwiftError` (with `swiftType`); inputs accept any value, an `Error`'s message describing it |
 | `CGPoint`, `CGSize`, `CGRect`, `CGVector`, `CGAffineTransform`, `UIEdgeInsets`, `NSDirectionalEdgeInsets`, `UIOffset`, `NSRange`, `CLLocationCoordinate2D`, `MKCoordinateSpan`, `MKCoordinateRegion` | plain object copy of the fields, `{ x, y }` (inputs also accept NativeScript's struct values, `CGPointMake(1, 2)`) |
 | `Result<S, F>` | `{ case: "success", value }` or `{ case: "failure", value }` (no `value` for `Result<Void, F>`) |

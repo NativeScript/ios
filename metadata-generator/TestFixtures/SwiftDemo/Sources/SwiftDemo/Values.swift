@@ -311,3 +311,31 @@ public func longestWord<C: Collection>(_ words: C) -> Int where C.Element == Str
 }
 public func joinAll(_ parts: any Sequence<String>) -> String { parts.joined(separator: ",") }
 public func evens(below limit: Int) -> any Sequence<Int> { stride(from: 0, to: limit, by: 2) }
+
+// Any, [Any] and [String: Any]: JSON-like payloads.
+public func describeAny(_ value: Any) -> String {
+    switch value {
+    case is NSNull: return "null"
+    case let v as Bool: return "Bool:\(v)"
+    case let v as Int: return "Int:\(v)"
+    case let v as Double: return "Double:\(v)"
+    case let v as String: return "String:\(v)"
+    case let v as [Any]: return "Array:\(v.count)"
+    case let v as [String: Any]: return "Dictionary:\(v.keys.sorted().joined(separator: ","))"
+    case let v as Point: return "Point:\(v.x),\(v.y)"
+    default: return "other:\(type(of: value))"
+    }
+}
+public func samplePayload() -> [String: Any] {
+    ["name": "ada", "age": 36, "score": 9.5, "admin": true, "tags": ["a", "b"],
+     "nested": ["ok": true], "none": NSNull(), "point": Point(x: 1, y: 2)]
+}
+public func echoAny(_ value: Any) -> Any { value }
+public func echoAnyLater(_ value: Any) async -> Any { value }
+
+// Foundation values as JS strings and numbers.
+public func makeIdentifier(_ text: String) -> UUID? { UUID(uuidString: text) }
+public func identifierText(_ id: UUID) -> String { id.uuidString.lowercased() }
+public func initial(of text: String) -> Character? { text.first }
+public func repeatCharacter(_ character: Character, _ count: Int) -> String { String(repeating: character, count: count) }
+public func halve(price: Decimal) -> Decimal { price / 2 }

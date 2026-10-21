@@ -53,7 +53,8 @@ class Emitter {
     result.fingerprint = fingerprint(_registrations);
     result.thunkCount = _thunkCount;
     result.source = header() + support() + enumHelpers() + protocolHelpers() +
-                    typeIndexFunction() + thunks + registration(result);
+                    typeIndexFunction() + anyObjectFunction() + thunks +
+                    registration(result);
     return result;
   }
 
@@ -101,10 +102,23 @@ class Emitter {
         if (usr == KnownTypes::kCGFloat) {
           return {"CGFloat(" + read("double") + ")", false};
         }
+        if (type.scalar == BridgedType::Scalar::Decimal) {
+          return {"Decimal(" + read("double") + ")", false};
+        }
         return {read("double"), false};
       }
       case Bridge::String:
+        if (type.scalar == BridgedType::Scalar::UUID) {
+          return {"UUID(uuidString: " + read("string") + ")", true};
+        }
+        if (type.scalar == BridgedType::Scalar::Character) {
+          return {"({ () -> Character? in let text = " + read("string") +
+                      "; return text.count == 1 ? text.first : nil })()",
+                  true};
+        }
         return {read("string"), false};
+      case Bridge::Any:
+        return {"__nsReadAny(" + slots + ", " + index + ")", false};
       case Bridge::Date:
         return {"Date(timeIntervalSince1970: " + read("double") + " / 1000)",
                 false};
@@ -373,9 +387,21 @@ class Emitter {
         return reporter + ".returnInt64(Int64(" + value + "))";
       }
       case Bridge::Floating:
+        if (type.scalar == BridgedType::Scalar::Decimal) {
+          return reporter + ".returnDouble(NSDecimalNumber(decimal: " + value +
+                 ").doubleValue)";
+        }
         return reporter + ".returnDouble(Double(" + value + "))";
       case Bridge::String:
+        if (type.scalar == BridgedType::Scalar::UUID) {
+          return reporter + ".returnString(" + value + ".uuidString)";
+        }
+        if (type.scalar == BridgedType::Scalar::Character) {
+          return reporter + ".returnString(String(" + value + "))";
+        }
         return reporter + ".returnString(" + value + ")";
+      case Bridge::Any:
+        return "__nsReportAny(" + reporter + ", " + value + ")";
       case Bridge::ClassHandle:
         return reporter + ".returnObject(" + value + ", __nsTypeIndex(" +
                value + ", " + std::to_string(typeIndexOf(type.symbolId)) + "))";
@@ -854,6 +880,66 @@ extension __NSBox: __NSAnyBox { var anyValue: Any { value } }
 private struct __NSJSError: Error, CustomStringConvertible {
   let requirement: String
   var description: String { "the JavaScript implementation of \(requirement) failed" }
+}
+
+// A JS value as Any: NSNull for null, Int for integral numbers.
+private func __nsReadAny(_ s: __NSSlots, _ i: Int) -> Any {
+  switch s.tag(i) {
+  case 1: return s.bool(i)
+  case 2: return Int(truncatingIfNeeded: s.int64(i))
+  case 3: return UInt(truncatingIfNeeded: s.uint64(i))
+  case 4: return s.double(i)
+  case 5: return s.string(i)
+  case 6:
+    let object = s.object(i)
+    if let box = object as? __NSAnyBox { return box.anyValue }
+    return object
+  case 7:
+    let (elements, count) = s.elements(i)
+    return (0..<count).map { __nsReadAny(elements, $0) }
+  case 8:
+    let (entries, count) = s.elements(i)
+    var result: [String: Any] = [:]
+    for j in 0..<count { result[entries.string(2 * j)] = __nsReadAny(entries, 2 * j + 1) }
+    return result
+  case 11: return s.object(i)
+  default: return NSNull()
+  }
+}
+
+// Reports a value held as Any by its type: Foundation's bridged NSNumbers
+// keep their booleans apart from their numbers, and the unit's own types
+// come back as themselves.
+private func __nsReportAny<R: __NSReporter>(_ r: R, _ value: Any) {
+  let mirror = Mirror(reflecting: value)
+  if mirror.displayStyle == .optional {
+    if let wrapped = mirror.children.first?.value { return __nsReportAny(r, wrapped) }
+    return r.returnNull()
+  }
+  if value is NSNull { return r.returnNull() }
+  if let number = value as? NSNumber, type(of: value) is NSNumber.Type {
+    if CFGetTypeID(number) == CFBooleanGetTypeID() { return r.returnBool(number.boolValue) }
+    if CFNumberIsFloatType(number) { return r.returnDouble(number.doubleValue) }
+    return r.returnInt64(number.int64Value)
+  }
+  switch value {
+  case let v as Bool: return r.returnBool(v)
+  case let v as any BinaryInteger: return r.returnInt64(Int64(truncatingIfNeeded: v))
+  case let v as any BinaryFloatingPoint: return r.returnDouble(Double(v))
+  case let v as String: return r.returnString(v)
+  case let v as Substring: return r.returnString(String(v))
+  case let v as Character: return r.returnString(String(v))
+  case let v as UUID: return r.returnString(v.uuidString)
+  case let v as URL: return r.returnString(v.absoluteString)
+  case let v as Date: return r.returnDouble(v.timeIntervalSince1970 * 1000)
+  case let v as Data: return r.returnBytes(v)
+  case let v as [String: Any]: return r.returnMap(v) { key, element in r.returnString(key); __nsReportAny(r, element) }
+  case let v as [Any]: return r.returnArray(v) { __nsReportAny(r, $0) }
+  default: break
+  }
+  if __nsReportAnyObject(r, value) { return }
+  if let object = value as? NSObject { return r.returnObjC(object) }
+  r.returnString(String(describing: value))
 }
 
 // An error JavaScript passes as a value; it describes itself by the JS
@@ -1775,8 +1861,9 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
   std::string typeIndexFunction() const {
     std::vector<const SwiftSurface::Type*> classes;
     for (const auto& type : _surface.types) {
-      if (type.symbol->kind == SymbolKind::Class ||
-          type.symbol->kind == SymbolKind::Actor) {
+      if ((type.symbol->kind == SymbolKind::Class ||
+           type.symbol->kind == SymbolKind::Actor) &&
+          type.kind != SwiftSurface::kObjCClass) {
         classes.push_back(&type);
       }
     }
@@ -1814,6 +1901,61 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
       }
     }
     return out + "  return declared\n}\n\n";
+  }
+
+  // Reports a value held as Any that is one of the unit's types, as that
+  // type (subclasses before their superclasses); false for other values.
+  std::string anyObjectFunction() const {
+    std::vector<const SwiftSurface::Type*> types;
+    for (const auto& type : _surface.types) {
+      if (type.kind != SwiftSurface::kProtocol &&
+          type.kind != SwiftSurface::kObjCClass) {
+        types.push_back(&type);
+      }
+    }
+    auto depth = [&](const Symbol* symbol) {
+      int value = 0;
+      for (const Symbol* current = symbol;
+           current && !current->superclassId.empty();
+           current = _module.find(current->superclassId)) {
+        value++;
+      }
+      return value;
+    };
+    std::stable_sort(
+        types.begin(), types.end(),
+        [&](const SwiftSurface::Type* a, const SwiftSurface::Type* b) {
+          return depth(a->symbol) > depth(b->symbol);
+        });
+    std::string out =
+        "private func __nsReportAnyObject<R: __NSReporter>(_ r: R, _ value: "
+        "Any) -> Bool {\n";
+    for (const SwiftSurface::Type* type : types) {
+      std::string name = qualifiedTypeName(_module, *type->symbol);
+      std::string index = std::to_string(type->index);
+      std::string report;
+      switch (type->kind) {
+        case SwiftSurface::kStruct:
+          report = "r.returnObject(__NSBox(v), " + index + ")";
+          break;
+        case SwiftSurface::kEnum:
+          report = "r.returnString(__nsEnumName" + index + "(v))";
+          break;
+        case SwiftSurface::kTaggedEnum:
+          report = "__nsReportCase" + index + "(r, v)";
+          break;
+        default:
+          report = "r.returnObject(v, " + index + ")";
+          break;
+      }
+      std::string check =
+          "if let v = value as? " + name + " { " + report + "; return true }";
+      std::string availability = availabilityCondition(_module, *type->symbol);
+      out += availability.empty()
+                 ? "  " + check + "\n"
+                 : "  if #available(" + availability + ") { " + check + " }\n";
+    }
+    return out + "  return false\n}\n\n";
   }
 
   std::string registration(const ThunkSource& result) const {

@@ -129,6 +129,9 @@ std::string codeDisplayName(const SwiftSurface& surface,
     case Bridge::Error:
       name = "Error";
       break;
+    case Bridge::Any:
+      name = "Any";
+      break;
     case Bridge::Result:
       name = "Result<" + codeDisplayName(surface, type.elements.at(0)) + ", " +
              codeDisplayName(surface, type.elements.at(1)) + ">";
@@ -361,7 +364,8 @@ class Writer {
       return bridge == Bridge::String || bridge == Bridge::EnumCase ||
              bridge == Bridge::URL;
     };
-    if (a.bridge == Bridge::Error || b.bridge == Bridge::Error) {
+    if (a.bridge == Bridge::Error || b.bridge == Bridge::Error ||
+        a.bridge == Bridge::Any || b.bridge == Bridge::Any) {
       // Any object or string converts to an error.
       return true;
     }
@@ -547,6 +551,9 @@ class Writer {
       case Bridge::Error:
         ts = "Error | string";
         break;
+      case Bridge::Any:
+        ts = "unknown";
+        break;
       case Bridge::Result:
         ts = resultType(type, true);
         break;
@@ -651,6 +658,9 @@ class Writer {
         break;
       case Bridge::Error:
         ts = "Error";
+        break;
+      case Bridge::Any:
+        ts = "unknown";
         break;
       case Bridge::Result:
         ts = resultType(type, false);

@@ -189,6 +189,15 @@
     "s:9SwiftDemo11longestWordySixSlRzSS7ElementRtzlF@<[s:SS]>",
     "s:9SwiftDemo7joinAllySSST_pSS7ElementSTRts_XPF",
     "s:9SwiftDemo5evens5belowST_pSi7ElementSTRts_XPSi_tF",
+    "s:9SwiftDemo11describeAnyySSypF",
+    "s:9SwiftDemo13samplePayloadSDySSypGyF",
+    "s:9SwiftDemo7echoAnyyypypF",
+    "s:9SwiftDemo12echoAnyLateryypypYaF",
+    "s:9SwiftDemo14makeIdentifiery10Foundation4UUIDVSgSSF",
+    "s:9SwiftDemo14identifierTextySS10Foundation4UUIDVF",
+    "s:9SwiftDemo7initial2ofSJSgSS_tF",
+    "s:9SwiftDemo15repeatCharacterySSSJ_SitF",
+    "s:9SwiftDemo5halve5priceSo9NSDecimalaAE_tF",
     "s:9SwiftDemo8describeySSSo6UIViewCF",
     "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
     "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
@@ -67889,6 +67898,30 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo11describeAnyySSypF",
+      "kind": "function",
+      "path": "describeAny(_:)",
+      "name": "describeAny(_:)",
+      "access": "public",
+      "declaration": "func describeAny(_ value: Any) -> String",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Any"
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:315:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo11knownScoresySDySSSiSgGADF",
       "kind": "function",
       "path": "knownScores(_:)",
@@ -68153,6 +68186,28 @@
       "location": "file://Sources/SwiftDemo/Protocols.swift:15:8",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo12RankedScorerP"
+    },
+    {
+      "id": "s:9SwiftDemo12echoAnyLateryypypYaF",
+      "kind": "function",
+      "path": "echoAnyLater(_:)",
+      "name": "echoAnyLater(_:)",
+      "access": "public",
+      "declaration": "func echoAnyLater(_ value: Any) async -> Any",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Any"
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Any"
+      },
+      "async": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:333:12",
+      "graph": "SwiftDemo.symbols.json"
     },
     {
       "id": "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF",
@@ -68706,6 +68761,22 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo13samplePayloadSDySSypGyF",
+      "kind": "function",
+      "path": "samplePayload()",
+      "name": "samplePayload()",
+      "access": "public",
+      "declaration": "func samplePayload() -> [String : Any]",
+      "returns": {
+        "spelling": "[String : Any]",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:328:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo13starterWallet3for0aB3Kit0D0CSS_tF",
       "kind": "function",
       "path": "starterWallet(for:)",
@@ -69123,6 +69194,60 @@
       "parent": "s:9SwiftDemo14GreetingHolderC"
     },
     {
+      "id": "s:9SwiftDemo14identifierTextySS10Foundation4UUIDVF",
+      "kind": "function",
+      "path": "identifierText(_:)",
+      "name": "identifierText(_:)",
+      "access": "public",
+      "declaration": "func identifierText(_ id: UUID) -> String",
+      "parameters": [
+        {
+          "internalName": "id",
+          "type": {
+            "spelling": "UUID",
+            "references": [
+              "s:10Foundation4UUIDV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:337:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo14makeIdentifiery10Foundation4UUIDVSgSSF",
+      "kind": "function",
+      "path": "makeIdentifier(_:)",
+      "name": "makeIdentifier(_:)",
+      "access": "public",
+      "declaration": "func makeIdentifier(_ text: String) -> UUID?",
+      "parameters": [
+        {
+          "internalName": "text",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "UUID?",
+        "references": [
+          "s:10Foundation4UUIDV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:336:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo15BenchmarkRecordV",
       "kind": "struct",
       "path": "BenchmarkRecord",
@@ -69190,6 +69315,42 @@
       "location": "file://Sources/SwiftDemo/Benchmark.swift:12:15",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo15BenchmarkRecordV"
+    },
+    {
+      "id": "s:9SwiftDemo15repeatCharacterySSSJ_SitF",
+      "kind": "function",
+      "path": "repeatCharacter(_:_:)",
+      "name": "repeatCharacter(_:_:)",
+      "access": "public",
+      "declaration": "func repeatCharacter(_ character: Character, _ count: Int) -> String",
+      "parameters": [
+        {
+          "internalName": "character",
+          "type": {
+            "spelling": "Character",
+            "references": [
+              "s:SJ"
+            ]
+          }
+        },
+        {
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:339:12",
+      "graph": "SwiftDemo.symbols.json"
     },
     {
       "id": "s:9SwiftDemo16BenchmarkFailureV",
@@ -71870,6 +72031,34 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:312:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo5halve5priceSo9NSDecimalaAE_tF",
+      "kind": "function",
+      "path": "halve(price:)",
+      "name": "halve(price:)",
+      "access": "public",
+      "declaration": "func halve(price: Decimal) -> Decimal",
+      "parameters": [
+        {
+          "label": "price",
+          "internalName": "price",
+          "type": {
+            "spelling": "Decimal",
+            "references": [
+              "c:@SA@NSDecimal"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Decimal",
+        "references": [
+          "c:@SA@NSDecimal"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:340:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -74886,6 +75075,27 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo7echoAnyyypypF",
+      "kind": "function",
+      "path": "echoAny(_:)",
+      "name": "echoAny(_:)",
+      "access": "public",
+      "declaration": "func echoAny(_ value: Any) -> Any",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Any"
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Any"
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:332:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo7echoIntyS2iF",
       "kind": "function",
       "path": "echoInt(_:)",
@@ -75106,6 +75316,34 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Views.swift:58:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo7initial2ofSJSgSS_tF",
+      "kind": "function",
+      "path": "initial(of:)",
+      "name": "initial(of:)",
+      "access": "public",
+      "declaration": "func initial(of text: String) -> Character?",
+      "parameters": [
+        {
+          "label": "of",
+          "internalName": "text",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Character?",
+        "references": [
+          "s:SJ"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:338:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
