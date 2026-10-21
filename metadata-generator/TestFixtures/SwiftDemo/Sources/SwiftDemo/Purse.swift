@@ -30,3 +30,8 @@ public func describe(_ pair: Pair<Int, String>) -> String { "\(pair.first):\(pai
 public func boxed(_ money: Money) -> Box<Money> { Box(money) }
 public func countBox(_ value: Int) -> Box<Int> { Box(value) }
 public func settle(_ value: Int) -> Outcome<Int> { value >= 0 ? .done(value) : .failed(reason: "negative") }
+
+// Generic functions over the unit's generic types: instantiated with the
+// arguments of Box's and Pair's instantiations.
+public func unbox<T>(_ box: Box<T>) -> T { box.value }
+public func firstOf<A, B>(_ pair: Pair<A, B>) -> A { pair.first }

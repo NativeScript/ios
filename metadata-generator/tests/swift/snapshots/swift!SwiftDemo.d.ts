@@ -345,6 +345,8 @@ declare module "ns:swift/SwiftDemo" {
   export function pages(count: number | bigint): AsyncIterableIterator<(string)[]>;
   export function shout(name: (string) | null | undefined): string | null;
   export function total(values: readonly (number)[]): number;
+  export function unbox(box: import("ns:swift/SwiftDemoKit").Box<import("ns:swift/SwiftDemoKit").Money>): import("ns:swift/SwiftDemoKit").Money;
+  export function unbox(box: import("ns:swift/SwiftDemoKit").Box<number>): number;
   export function append(word: string, words: { value: readonly (string)[] }): void;
   export function excite(greeting: Greeting): void;
   export function lookup(key: string, resolve: (arg0: string) => (number | bigint) | null | undefined): number;
@@ -352,6 +354,8 @@ declare module "ns:swift/SwiftDemo" {
   export function countUp(limit: number | bigint): AsyncIterableIterator<number>;
   export function echoInt(value: number | bigint): number;
   export function explain(error: ShapeError): string;
+  export function firstOf(pair: import("ns:swift/SwiftDemoKit").Pair<string, number>): string;
+  export function firstOf(pair: import("ns:swift/SwiftDemoKit").Pair<number, string>): number;
   export function largest(values: readonly (string)[]): string | null;
   export function largest(values: readonly (number)[]): number | null;
   export function lengths(table: Readonly<Record<string, string>>): Record<string, number>;

@@ -852,6 +852,9 @@ struct ParameterUse {
   // As a metatype (`T.Type`) or through an associated type (`T.Element`),
   // which no stand-in substitutes.
   bool unsupported = false;
+  // As an argument of a generic type in an argument (`Box<T>`): the type's
+  // USR and the argument's position.
+  std::vector<std::pair<std::string, size_t>> families;
 };
 
 void collectUse(const TypeNode& node, const std::string& name, bool argument,
@@ -867,6 +870,17 @@ void collectUse(const TypeNode& node, const std::string& name, bool argument,
   }
   bool closure = inClosure || node.kind == TypeNode::Kind::Function;
   bool metatype = inMetatype || node.kind == TypeNode::Kind::Metatype;
+  if (node.kind == TypeNode::Kind::Nominal && argument && !closure &&
+      !metatype) {
+    const auto& arguments = node.components.back().arguments;
+    for (size_t i = 0; i < arguments.size(); i++) {
+      if (arguments[i].kind == TypeNode::Kind::GenericParameter &&
+          arguments[i].components.size() == 1 &&
+          arguments[i].components[0].name == name) {
+        use.families.emplace_back(node.usr(), i);
+      }
+    }
+  }
   for (const auto* list : {&node.children, &node.result, &node.thrownType}) {
     for (const auto& child : *list) {
       collectUse(child, name, argument, closure, metatype, use);
@@ -1012,17 +1026,36 @@ std::vector<TypeNode> standIns(
   return result;
 }
 
+// The arguments at `position` of the unit's instantiations of the generic
+// type `usr`, which stand in for a type parameter the function passes to it.
+std::vector<TypeNode> familyArguments(const Module& module,
+                                      const std::string& usr, size_t position) {
+  std::vector<TypeNode> result;
+  std::set<std::string> seen;
+  for (const auto& entry : module.symbols) {
+    const Symbol& type = entry.second;
+    if (isNominalType(type.kind) && type.genericBase == usr &&
+        position < type.typeArguments.size() &&
+        seen.insert(typeKey(type.typeArguments[position])).second) {
+      result.push_back(type.typeArguments[position]);
+    }
+  }
+  return result;
+}
+
 bool isGenericFunctionKind(SymbolKind kind) {
   return kind == SymbolKind::Function || kind == SymbolKind::InstanceMethod ||
          kind == SymbolKind::TypeMethod || kind == SymbolKind::Initializer;
 }
 
 // Adds a synthetic copy of every generic function, method and initializer
-// for each combination of its type parameters' stand-ins (see standIns).
-// Members of generic types and protocols are left generic.
+// for each combination of its type parameters' stand-ins (see standIns and
+// familyArguments). Members of generic types and protocols are left generic.
 void instantiateGenericFunctions(Module& module) {
-  // Each combination becomes one overload of the function's JS name.
+  // Each combination becomes one overload of the function's JS name. The
+  // unit's own instantiations bound the combinations of family arguments.
   constexpr size_t kMaxInstantiations = 6;
+  constexpr size_t kMaxFamilyInstantiations = 16;
   std::vector<std::string> ids;
   for (const auto& entry : module.symbols) {
     if (isGenericFunctionKind(entry.second.kind) &&
@@ -1074,15 +1107,23 @@ void instantiateGenericFunctions(Module& module) {
 
     std::vector<std::vector<TypeNode>> options;
     size_t combinations = 1;
+    bool fromFamilies = false;
     for (const auto& parameter : source.genericParameters) {
       ParameterUse use;
       for (size_t i = 0; i < types.size(); i++) {
         collectUse(types[i], parameter.name, isArgument[i], false, false, use);
       }
-      std::vector<TypeNode> candidates =
-          llvm::StringRef(parameter.name).contains(' ')
-              ? std::vector<TypeNode>()
-              : standIns(module, parameter.name, source.genericConstraints);
+      std::vector<TypeNode> candidates;
+      if (!use.families.empty()) {
+        candidates = familyArguments(module, use.families[0].first,
+                                     use.families[0].second);
+        fromFamilies |= !candidates.empty();
+      }
+      if (candidates.empty() &&
+          !llvm::StringRef(parameter.name).contains(' ')) {
+        candidates =
+            standIns(module, parameter.name, source.genericConstraints);
+      }
       if (use.unsupported || candidates.empty() ||
           (candidates.size() > 1 && !use.inArgument)) {
         combinations = 0;
@@ -1091,7 +1132,9 @@ void instantiateGenericFunctions(Module& module) {
       combinations *= candidates.size();
       options.push_back(std::move(candidates));
     }
-    if (combinations == 0 || combinations > kMaxInstantiations) {
+    if (combinations == 0 ||
+        combinations >
+            (fromFamilies ? kMaxFamilyInstantiations : kMaxInstantiations)) {
       continue;
     }
 

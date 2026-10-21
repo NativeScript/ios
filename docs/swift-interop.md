@@ -115,15 +115,19 @@ A generic function, method or initializer is instantiated once for each
 concrete stand-in of its type parameters, and every instantiation is an
 overload of its JS name:
 
-| Constraint on `T` | Stand-ins |
+| Use or constraint of `T` | Stand-ins |
 |---|---|
+| an argument of a unit generic type (`Box<T>`, `WeatherQuery<T>`) | the arguments of the unit's instantiations of that type |
 | none | `Double`, `String`, `Bool` |
 | standard library protocols (`Comparable`, `Numeric`, `StringProtocol`, ...) | those of `Double` (or `Int` for integer protocols), `String` and `Bool` that conform |
 | one protocol of the unit (`G: Greeting`) | `any Greeting`, which Swift opens at the call: Swift values and JS objects implementing it |
 | a superclass (`V: UIView`) | the superclass, which also takes its subclasses' instances |
 
 `largest<T: Comparable>(_ values: [T]) -> T?` takes `largest([3, 9])` and
-`largest(["b", "a"])`, and TypeScript declares both overloads. A call picks
+`largest(["b", "a"])`, and TypeScript declares both overloads. WeatherKit's
+`weather(for:including:)` gets one overload per `WeatherQuery`
+instantiation: `service.weather(location, WeatherQuery.daily)` returns a
+`Forecast<DayWeather>`. A call picks
 the instantiation its arguments convert to; an array decides by its first
 element, so `largest([])` throws a `TypeError` naming the overloads' keys.
 At most one number type stands in, since a JS number converts to every one.
@@ -132,7 +136,8 @@ A generic function is left out when a type parameter appears as a metatype
 (`T.Type`) or through an associated type (`C.Element`), when it is
 constrained by another module's protocol, when its arguments could not tell
 several instantiations apart (a type parameter only in the result or in a
-closure), or when it would need more than six instantiations. Generic
+closure), or when it would need more than six instantiations (sixteen from a
+generic type's instantiations). Generic
 methods of generic types, and `some P` parameters, are not instantiated yet.
 
 ## Value model

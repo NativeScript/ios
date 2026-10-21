@@ -894,6 +894,15 @@ describe("ns:swift", function () {
                 .toThrowError(TypeError, /No overload of largest/);
         });
 
+        it("instantiates with the arguments of the unit's generic types", function () {
+            var Kit = swift.module("SwiftDemoKit");
+            expect(SwiftDemo.unbox(SwiftDemo.countBox(3))).toBe(3);
+            expect(SwiftDemo.unbox(SwiftDemo.boxed(new Kit.Money(2, "EUR"))).amount).toBe(2);
+            expect(SwiftDemo.unbox(Kit.Box.sample)).toBe(7);
+            expect(SwiftDemo.firstOf(SwiftDemo.makeScore("ada", 3))).toBe("ada");
+            expect(SwiftDemo.firstOf(new Kit.Pair(2, "two"))).toBe(2);
+        });
+
         it("leaves functions without known stand-ins out", function () {
             expect(SwiftDemo.decodeJSON).toBeUndefined();
             expect(SwiftDemo.firstElement).toBeUndefined();

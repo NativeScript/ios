@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 1180,
+      "total": 1185,
       "objc-direct": 1,
-      "swift-generated": 280,
-      "swift-specialized": 370,
+      "swift-generated": 284,
+      "swift-specialized": 371,
       "type-only": 5,
       "unsupported": 524,
       "not-applicable": 0
     },
     "callable": {
-      "total": 1132,
+      "total": 1137,
       "objc-direct": 0,
-      "swift-generated": 240,
-      "swift-specialized": 367,
+      "swift-generated": 244,
+      "swift-specialized": 368,
       "type-only": 2,
       "unsupported": 523,
       "not-applicable": 0
     },
-    "effectiveCallable": 240,
+    "effectiveCallable": 244,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -62,9 +62,9 @@
       "not-applicable": 0
     },
     "function": {
-      "total": 81,
+      "total": 83,
       "objc-direct": 0,
-      "swift-generated": 78,
+      "swift-generated": 80,
       "swift-specialized": 3,
       "type-only": 0,
       "unsupported": 0,
@@ -152,10 +152,10 @@
       "not-applicable": 0
     },
     "typeProperty": {
-      "total": 5,
+      "total": 8,
       "objc-direct": 0,
-      "swift-generated": 4,
-      "swift-specialized": 0,
+      "swift-generated": 6,
+      "swift-specialized": 1,
       "type-only": 1,
       "unsupported": 0,
       "not-applicable": 0
@@ -178,7 +178,7 @@
     "generic": 364,
     "opaque-type": 413,
     "operator": 5,
-    "owner-not-bridged": 13,
+    "owner-not-bridged": 14,
     "subscript": 1,
     "tuple": 1,
     "unavailable": 5,
@@ -231,6 +231,32 @@
       "tier": "swift-generated",
       "jsName": "value",
       "location": "file://Sources/SwiftDemoKit/Money.swift:52"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC6sampleACySiGvpZ",
+      "path": "Box.sample",
+      "kind": "typeProperty",
+      "tier": "swift-specialized",
+      "reasons": [
+        "owner-not-bridged"
+      ],
+      "location": "file://Sources/SwiftDemoKit/Money.swift:56"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC6sampleACySiGvpZ@s:12SwiftDemoKit3BoxC<s:12SwiftDemoKit5MoneyV>",
+      "path": "Box.sample",
+      "kind": "typeProperty",
+      "tier": "swift-generated",
+      "jsName": "sample",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:56"
+    },
+    {
+      "id": "s:12SwiftDemoKit3BoxC6sampleACySiGvpZ@s:12SwiftDemoKit3BoxC<s:Si>",
+      "path": "Box.sample",
+      "kind": "typeProperty",
+      "tier": "swift-generated",
+      "jsName": "sample",
+      "location": "file://Sources/SwiftDemoKit/Money.swift:56"
     },
     {
       "id": "s:12SwiftDemoKit3BoxC8replaced4withACyxGx_tF",
@@ -559,7 +585,7 @@
       "reasons": [
         "generic"
       ],
-      "location": "file://Sources/SwiftDemoKit/Money.swift:57"
+      "location": "file://Sources/SwiftDemoKit/Money.swift:59"
     },
     {
       "id": "s:12SwiftDemoKit7OutcomeO4doneyACyxGxcAEmlF",
@@ -569,7 +595,7 @@
       "reasons": [
         "owner-not-bridged"
       ],
-      "location": "file://Sources/SwiftDemoKit/Money.swift:58"
+      "location": "file://Sources/SwiftDemoKit/Money.swift:60"
     },
     {
       "id": "s:12SwiftDemoKit7OutcomeO4doneyACyxGxcAEmlF@s:12SwiftDemoKit7OutcomeO<s:Si>",
@@ -577,7 +603,7 @@
       "kind": "enumCase",
       "tier": "swift-generated",
       "jsName": "done",
-      "location": "file://Sources/SwiftDemoKit/Money.swift:58"
+      "location": "file://Sources/SwiftDemoKit/Money.swift:60"
     },
     {
       "id": "s:12SwiftDemoKit7OutcomeO6failedyACyxGSS_tcAEmlF",
@@ -587,7 +613,7 @@
       "reasons": [
         "owner-not-bridged"
       ],
-      "location": "file://Sources/SwiftDemoKit/Money.swift:59"
+      "location": "file://Sources/SwiftDemoKit/Money.swift:61"
     },
     {
       "id": "s:12SwiftDemoKit7OutcomeO6failedyACyxGSS_tcAEmlF@s:12SwiftDemoKit7OutcomeO<s:Si>",
@@ -595,14 +621,14 @@
       "kind": "enumCase",
       "tier": "swift-generated",
       "jsName": "failed",
-      "location": "file://Sources/SwiftDemoKit/Money.swift:59"
+      "location": "file://Sources/SwiftDemoKit/Money.swift:61"
     },
     {
       "id": "s:12SwiftDemoKit7OutcomeO<s:Si>",
       "path": "Outcome",
       "kind": "enum",
       "tier": "swift-generated",
-      "location": "file://Sources/SwiftDemoKit/Money.swift:57"
+      "location": "file://Sources/SwiftDemoKit/Money.swift:59"
     },
     {
       "id": "s:12SwiftDemoKit9formattedySSAA5MoneyVF",
@@ -9746,6 +9772,29 @@
       "location": "file://Sources/SwiftDemo/Values.swift:56"
     },
     {
+      "id": "s:9SwiftDemo5unboxyx0aB3Kit3BoxCyxGlF",
+      "path": "unbox(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Purse.swift:36"
+    },
+    {
+      "id": "s:9SwiftDemo5unboxyx0aB3Kit3BoxCyxGlF@<s:12SwiftDemoKit5MoneyV>",
+      "path": "unbox(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "unbox",
+      "location": "file://Sources/SwiftDemo/Purse.swift:36"
+    },
+    {
+      "id": "s:9SwiftDemo5unboxyx0aB3Kit3BoxCyxGlF@<s:Si>",
+      "path": "unbox(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "unbox",
+      "location": "file://Sources/SwiftDemo/Purse.swift:36"
+    },
+    {
       "id": "s:9SwiftDemo6CanvasC",
       "path": "Canvas",
       "kind": "class",
@@ -10475,6 +10524,29 @@
       "tier": "swift-generated",
       "jsName": "explain",
       "location": "file://Sources/SwiftDemo/Values.swift:121"
+    },
+    {
+      "id": "s:9SwiftDemo7firstOfyx0aB3Kit4PairVyxq_Gr0_lF",
+      "path": "firstOf(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Purse.swift:37"
+    },
+    {
+      "id": "s:9SwiftDemo7firstOfyx0aB3Kit4PairVyxq_Gr0_lF@<s:SS,s:Si>",
+      "path": "firstOf(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "firstOf",
+      "location": "file://Sources/SwiftDemo/Purse.swift:37"
+    },
+    {
+      "id": "s:9SwiftDemo7firstOfyx0aB3Kit4PairVyxq_Gr0_lF@<s:Si,s:SS>",
+      "path": "firstOf(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "firstOf",
+      "location": "file://Sources/SwiftDemo/Purse.swift:37"
     },
     {
       "id": "s:9SwiftDemo7largestyxSgSayxGSLRzlF",

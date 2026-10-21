@@ -107,6 +107,8 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "boxed(_:)",
                                        "countBox(_:)",
                                        "settle(_:)",
+                                       "unbox(_:)",
+                                       "firstOf(_:)",
                                        "Shape",
                                        "Polygon",
                                        "Square",
@@ -580,6 +582,9 @@ TEST(GenericFunctionInstantiations) {
   CHECK(standIns("greetTwice(_:_:)") == List({"G=any Greeting"}));
   CHECK(standIns("viewTag(_:)") == List({"V=UIView"}));
   CHECK(standIns("Loader.first(of:)") == List({"Element=Bool", "Element=Double", "Element=String"}));
+  // The arguments of the unit's Box and Pair instantiations.
+  CHECK(standIns("unbox(_:)").size() == 2);
+  CHECK(standIns("firstOf(_:)").size() == 4);
   CHECK(standIns("decodeJSON(_:from:)").empty());
   CHECK(standIns("firstElement(_:)").empty());
   // 3 x 3 combinations.
