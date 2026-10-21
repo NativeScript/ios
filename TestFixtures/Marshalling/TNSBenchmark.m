@@ -103,9 +103,13 @@
   return total;
 }
 
+// Shaped like a nonisolated Swift async function: the work runs on a global
+// queue and the result reaches JS on the main queue.
 + (void)echoLater:(NSInteger)value completion:(void (^)(NSInteger))completion {
-  dispatch_async(dispatch_get_main_queue(), ^{
-    completion(value);
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    dispatch_async(dispatch_get_main_queue(), ^{
+      completion(value);
+    });
   });
 }
 
