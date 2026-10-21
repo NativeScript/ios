@@ -449,8 +449,12 @@ declare module "ns:swift/SwiftDemo" {
   export function countUnique(values: ReadonlySet<number | bigint> | readonly (number | bigint)[]): number;
   export function delayedEcho(text: string, seconds: number, signal?: AbortSignal): Promise<string>;
   export function knownScores(scores: Readonly<Record<string, (number | bigint) | null | undefined>>): Record<string, number | null>;
+  export function longestWord(words: readonly (string)[]): number;
   export function parseNumber(text: string): { case: "success"; value: number } | { case: "failure"; value: Error };
   export function sortedNames(names: readonly (string)[], less: (arg0: string, arg1: string) => boolean): (string)[];
+  export function firstElement(values: readonly (string)[]): string | null;
+  export function firstElement(values: readonly (boolean)[]): boolean | null;
+  export function firstElement(values: readonly (number)[]): number | null;
   export function firstSubview(view: UIView): UIView | null;
   export function latitudeSpan(a: { readonly latitude: number; readonly longitude: number }, b: { readonly latitude: number; readonly longitude: number }): number;
   export function makeGreeting(name: string): Greeting;
@@ -483,6 +487,7 @@ declare module "ns:swift/SwiftDemo" {
   export function zero(): number;
   export function boxed(money: import("ns:swift/SwiftDemoKit").Money): import("ns:swift/SwiftDemoKit").Box<import("ns:swift/SwiftDemoKit").Money>;
   export function clear(name: { value: (string) | null | undefined }): void;
+  export function evens(limit: number | bigint): (number)[];
   export function halve(value: { value: number | bigint }): void;
   export function holes(count: number | bigint): (string | null)[];
   export function inset(rect: { readonly origin: { readonly x: number; readonly y: number }; readonly size: { readonly width: number; readonly height: number } }, insets: { readonly top: number; readonly left: number; readonly bottom: number; readonly right: number }): { origin: { x: number; y: number }; size: { width: number; height: number } };
@@ -499,6 +504,7 @@ declare module "ns:swift/SwiftDemo" {
   export function excite(greeting: Greeting): void;
   export function lookup(key: string, resolve: (arg0: string) => (number | bigint) | null | undefined): number;
   export function settle(value: number | bigint): import("ns:swift/SwiftDemoKit").Outcome<number>;
+  export function sumAll(values: readonly (number | bigint)[]): number;
   export function ticker(): AsyncIterableIterator<number>;
   export function unwrap(result: { readonly case: "success"; readonly value: string } | { readonly case: "failure"; readonly value: Error | string }): string;
   export function compact(values: readonly ((number | bigint) | null | undefined)[]): (number)[];
@@ -508,6 +514,7 @@ declare module "ns:swift/SwiftDemo" {
   export function firstOf(pair: import("ns:swift/SwiftDemoKit").Pair<string, number>): string;
   export function firstOf(pair: import("ns:swift/SwiftDemoKit").Pair<number, string>): number;
   export function fitting(size: ({ readonly width: number; readonly height: number }) | null | undefined): { width: number; height: number } | null;
+  export function joinAll(parts: readonly (string)[]): string;
   export function largest(values: readonly (string)[]): string | null;
   export function largest(values: readonly (number)[]): number | null;
   export function lengths(table: Readonly<Record<string, string>>): Record<string, number>;

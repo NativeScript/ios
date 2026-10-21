@@ -416,9 +416,13 @@ class Emitter {
       case Bridge::Data:
         return reporter + ".returnBytes(" + value + ")";
       case Bridge::Array:
-      case Bridge::Set:
-        return reporter + ".returnArray(" + value + ") { element in " +
+      case Bridge::Set: {
+        // `any Sequence<E>` is copied out as an array.
+        bool sequence = unwrappedNode(type).kind == TypeNode::Kind::Existential;
+        return reporter + ".returnArray(" +
+               (sequence ? "Array(" + value + ")" : value) + ") { element in " +
                returnElement(type.elements.at(0), reporter) + " }";
+      }
       case Bridge::Error:
         return reporter + ".returnErrorValue(" + value + ")";
       case Bridge::Result: {

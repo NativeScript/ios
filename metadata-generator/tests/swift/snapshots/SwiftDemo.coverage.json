@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 1335,
+      "total": 1339,
       "objc-direct": 3,
-      "swift-generated": 376,
-      "swift-specialized": 402,
+      "swift-generated": 381,
+      "swift-specialized": 401,
       "type-only": 6,
       "unsupported": 548,
       "not-applicable": 0
     },
     "callable": {
-      "total": 1271,
+      "total": 1275,
       "objc-direct": 1,
-      "swift-generated": 322,
-      "swift-specialized": 399,
+      "swift-generated": 327,
+      "swift-specialized": 398,
       "type-only": 2,
       "unsupported": 547,
       "not-applicable": 0
     },
-    "effectiveCallable": 323,
+    "effectiveCallable": 328,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -62,10 +62,10 @@
       "not-applicable": 0
     },
     "function": {
-      "total": 109,
+      "total": 113,
       "objc-direct": 0,
-      "swift-generated": 106,
-      "swift-specialized": 3,
+      "swift-generated": 111,
+      "swift-specialized": 2,
       "type-only": 0,
       "unsupported": 0,
       "not-applicable": 0
@@ -175,7 +175,7 @@
     "enum-associated-values": 1,
     "existential": 6,
     "external-type-extension": 2,
-    "generic": 403,
+    "generic": 402,
     "opaque-type": 413,
     "operator": 11,
     "owner-not-bridged": 12,
@@ -9193,6 +9193,21 @@
       "location": "file://Sources/SwiftDemo/Values.swift:218"
     },
     {
+      "id": "s:9SwiftDemo11longestWordySixSlRzSS7ElementRtzlF",
+      "path": "longestWord(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Values.swift:309"
+    },
+    {
+      "id": "s:9SwiftDemo11longestWordySixSlRzSS7ElementRtzlF@<[s:SS]>",
+      "path": "longestWord(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "longestWord",
+      "location": "file://Sources/SwiftDemo/Values.swift:309"
+    },
+    {
       "id": "s:9SwiftDemo11parseNumberys6ResultOySis5Error_pGSSF",
       "path": "parseNumber(_:)",
       "kind": "function",
@@ -9250,10 +9265,31 @@
       "id": "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF",
       "path": "firstElement(_:)",
       "kind": "function",
-      "tier": "swift-specialized",
-      "reasons": [
-        "generic"
-      ],
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Values.swift:212"
+    },
+    {
+      "id": "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF@<[s:SS]>",
+      "path": "firstElement(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "firstElement",
+      "location": "file://Sources/SwiftDemo/Values.swift:212"
+    },
+    {
+      "id": "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF@<[s:Sb]>",
+      "path": "firstElement(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "firstElement",
+      "location": "file://Sources/SwiftDemo/Values.swift:212"
+    },
+    {
+      "id": "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF@<[s:Sd]>",
+      "path": "firstElement(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "firstElement",
       "location": "file://Sources/SwiftDemo/Values.swift:212"
     },
     {
@@ -10129,6 +10165,14 @@
       "location": "file://Sources/SwiftDemo/Values.swift:172"
     },
     {
+      "id": "s:9SwiftDemo5evens5belowST_pSi7ElementSTRts_XPSi_tF",
+      "path": "evens(below:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "evens",
+      "location": "file://Sources/SwiftDemo/Values.swift:313"
+    },
+    {
       "id": "s:9SwiftDemo5halveyySizKF",
       "path": "halve(_:)",
       "kind": "function",
@@ -10548,6 +10592,21 @@
       "tier": "swift-generated",
       "jsName": "settle",
       "location": "file://Sources/SwiftDemo/Purse.swift:32"
+    },
+    {
+      "id": "s:9SwiftDemo6sumAllySixSTRzSi7ElementRtzlF",
+      "path": "sumAll(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Values.swift:308"
+    },
+    {
+      "id": "s:9SwiftDemo6sumAllySixSTRzSi7ElementRtzlF@<[s:Si]>",
+      "path": "sumAll(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "sumAll",
+      "location": "file://Sources/SwiftDemo/Values.swift:308"
     },
     {
       "id": "s:9SwiftDemo6tickerScSySiGyF",
@@ -11113,6 +11172,14 @@
       "tier": "swift-generated",
       "jsName": "fitting",
       "location": "file://Sources/SwiftDemo/Views.swift:59"
+    },
+    {
+      "id": "s:9SwiftDemo7joinAllySSST_pSS7ElementSTRts_XPF",
+      "path": "joinAll(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "joinAll",
+      "location": "file://Sources/SwiftDemo/Values.swift:312"
     },
     {
       "id": "s:9SwiftDemo7largestyxSgSayxGSLRzlF",

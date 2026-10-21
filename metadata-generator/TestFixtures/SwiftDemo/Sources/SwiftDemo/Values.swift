@@ -303,3 +303,11 @@ public struct Version: Comparable, Hashable {
     public init(major: Int, minor: Int) { self.major = major; self.minor = minor }
     public static func < (lhs: Version, rhs: Version) -> Bool { (lhs.major, lhs.minor) < (rhs.major, rhs.minor) }
 }
+
+// Collection protocols as parameters: JS arrays stand in.
+public func sumAll(_ values: some Sequence<Int>) -> Int { values.reduce(0, +) }
+public func longestWord<C: Collection>(_ words: C) -> Int where C.Element == String {
+    words.map(\.count).max() ?? 0
+}
+public func joinAll(_ parts: any Sequence<String>) -> String { parts.joined(separator: ",") }
+public func evens(below limit: Int) -> any Sequence<Int> { stride(from: 0, to: limit, by: 2) }

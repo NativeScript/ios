@@ -156,6 +156,13 @@ const char* frameworkOfCStruct(const std::string& name) {
   return info ? info->framework : nullptr;
 }
 
+static bool isArrayProtocolUSR(const std::string& usr) {
+  // Sequence, Collection, BidirectionalCollection, RandomAccessCollection,
+  // MutableCollection, RangeReplaceableCollection.
+  return usr == "s:ST" || usr == "s:Sl" || usr == "s:SK" || usr == "s:Sk" ||
+         usr == "s:SM" || usr == "s:Sm";
+}
+
 bool hasAssociatedValues(const Module& module, const Symbol& symbol) {
   if (symbol.kind != SymbolKind::Enum) {
     return false;
@@ -1079,6 +1086,14 @@ class Classifier {
             inner->usr() == KnownTypes::kError) {
           bridged.bridge = Bridge::Error;
           return "";
+        }
+        // `any Sequence<E>` and the other collection protocols arrays
+        // conform to: an array in, a copy out.
+        if (inner && inner->kind == TypeNode::Kind::Nominal &&
+            isArrayProtocolUSR(inner->usr()) &&
+            inner->components.back().arguments.size() == 1) {
+          bridged.bridge = Bridge::Array;
+          return bridgeElement(inner->components.back().arguments[0], bridged);
         }
         const Symbol* protocol = inner && inner->kind == TypeNode::Kind::Nominal
                                      ? _module.find(inner->usr())

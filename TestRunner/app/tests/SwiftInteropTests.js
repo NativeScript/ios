@@ -1275,9 +1275,18 @@ describe("ns:swift", function () {
             expect(SwiftDemo.tagOf(label)).toBe(4);
         });
 
+        it("takes arrays for collection protocols", function () {
+            expect(SwiftDemo.sumAll([1, 2, 3])).toBe(6);
+            expect(SwiftDemo.longestWord(["a", "abcd", "ab"])).toBe(4);
+            expect(SwiftDemo.firstElement(["x", "y"])).toBe("x");
+            expect(SwiftDemo.firstElement([2.5])).toBe(2.5);
+            expect(SwiftDemo.firstElement([true])).toBe(true);
+            expect(SwiftDemo.joinAll(["a", "b"])).toBe("a,b");
+            expect(SwiftDemo.evens(7)).toEqual([0, 2, 4, 6]);
+        });
+
         it("leaves functions without known stand-ins out", function () {
             expect(SwiftDemo.decodeJSON).toBeUndefined();
-            expect(SwiftDemo.firstElement).toBeUndefined();
             expect(SwiftDemo.joined).toBeUndefined();
         });
     });

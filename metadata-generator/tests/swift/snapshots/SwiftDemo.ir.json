@@ -143,6 +143,9 @@
     "s:9SwiftDemo10greetTwiceySSx_SStAA8GreetingRzlF@<any Greeting>",
     "s:9SwiftDemo10decodeJSON_4fromxSgxm_SStSeRzlF",
     "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF",
+    "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF@<[s:Sd]>",
+    "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF@<[s:SS]>",
+    "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF@<[s:Sb]>",
     "s:9SwiftDemo6joinedySSx_q_tr0_lF",
     "s:9SwiftDemo7compactySaySiGSaySiSgGF",
     "s:9SwiftDemo5holesySaySSSgGSiF",
@@ -175,6 +178,12 @@
     "s:9SwiftDemo4GridV",
     "s:9SwiftDemo7Vector2V",
     "s:9SwiftDemo7VersionV",
+    "s:9SwiftDemo6sumAllySixSTRzSi7ElementRtzlF",
+    "s:9SwiftDemo6sumAllySixSTRzSi7ElementRtzlF@<[s:Si]>",
+    "s:9SwiftDemo11longestWordySixSlRzSS7ElementRtzlF",
+    "s:9SwiftDemo11longestWordySixSlRzSS7ElementRtzlF@<[s:SS]>",
+    "s:9SwiftDemo7joinAllySSST_pSS7ElementSTRts_XPF",
+    "s:9SwiftDemo5evens5belowST_pSi7ElementSTRts_XPSi_tF",
     "s:9SwiftDemo8describeySSSo6UIViewCF",
     "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
     "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
@@ -67795,6 +67804,81 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo11longestWordySixSlRzSS7ElementRtzlF",
+      "kind": "function",
+      "path": "longestWord(_:)",
+      "name": "longestWord(_:)",
+      "access": "public",
+      "declaration": "func longestWord<C>(_ words: C) -> Int where C : Collection, C.Element == String",
+      "parameters": [
+        {
+          "internalName": "words",
+          "type": {
+            "spelling": "C",
+            "references": [
+              "s:9SwiftDemo11longestWordySixSlRzSS7ElementRtzlF1CL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "C",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "C",
+          "rhs": "Collection",
+          "rhsPrecise": "s:Sl"
+        },
+        {
+          "kind": "sameType",
+          "lhs": "C.Element",
+          "rhs": "String",
+          "rhsPrecise": "s:SS"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:308:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo11longestWordySixSlRzSS7ElementRtzlF@<[s:SS]>",
+      "kind": "function",
+      "path": "longestWord(_:)",
+      "name": "longestWord(_:)",
+      "access": "public",
+      "declaration": "func longestWord<C>(_ words: C) -> Int where C : Collection, C.Element == String",
+      "parameters": [
+        {
+          "internalName": "words",
+          "type": {
+            "spelling": "C",
+            "references": [
+              "s:9SwiftDemo11longestWordySixSlRzSS7ElementRtzlF1CL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:308:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo11parseNumberys6ResultOySis5Error_pGSSF",
       "kind": "function",
       "path": "parseNumber(_:)",
@@ -67995,6 +68079,87 @@
           "rhsPrecise": "s:Sl"
         }
       ],
+      "location": "file://Sources/SwiftDemo/Values.swift:211:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF@<[s:SS]>",
+      "kind": "function",
+      "path": "firstElement(_:)",
+      "name": "firstElement(_:)",
+      "access": "public",
+      "declaration": "func firstElement<C>(_ values: C) -> C.Element? where C : Collection",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "C",
+            "references": [
+              "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF1CL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "C.Element?",
+        "references": [
+          "s:ST7ElementQa"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:211:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF@<[s:Sb]>",
+      "kind": "function",
+      "path": "firstElement(_:)",
+      "name": "firstElement(_:)",
+      "access": "public",
+      "declaration": "func firstElement<C>(_ values: C) -> C.Element? where C : Collection",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "C",
+            "references": [
+              "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF1CL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "C.Element?",
+        "references": [
+          "s:ST7ElementQa"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:211:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF@<[s:Sd]>",
+      "kind": "function",
+      "path": "firstElement(_:)",
+      "name": "firstElement(_:)",
+      "access": "public",
+      "declaration": "func firstElement<C>(_ values: C) -> C.Element? where C : Collection",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "C",
+            "references": [
+              "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF1CL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "C.Element?",
+        "references": [
+          "s:ST7ElementQa"
+        ]
+      },
       "location": "file://Sources/SwiftDemo/Values.swift:211:12",
       "graph": "SwiftDemo.symbols.json"
     },
@@ -71351,6 +71516,35 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo5evens5belowST_pSi7ElementSTRts_XPSi_tF",
+      "kind": "function",
+      "path": "evens(below:)",
+      "name": "evens(below:)",
+      "access": "public",
+      "declaration": "func evens(below limit: Int) -> any Sequence<Int>",
+      "parameters": [
+        {
+          "label": "below",
+          "internalName": "limit",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "any Sequence<Int>",
+        "references": [
+          "s:ST",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:312:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo5halveyySizKF",
       "kind": "function",
       "path": "halve(_:)",
@@ -72750,6 +72944,75 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Purse.swift:31:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo6sumAllySixSTRzSi7ElementRtzlF",
+      "kind": "function",
+      "path": "sumAll(_:)",
+      "name": "sumAll(_:)",
+      "access": "public",
+      "declaration": "func sumAll(_ values: some Sequence<Int>) -> Int",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "some Sequence<Int>",
+            "references": [
+              "s:ST",
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "some Sequence<Int>",
+          "rhs": "Sequence",
+          "rhsPrecise": "s:ST"
+        },
+        {
+          "kind": "sameType",
+          "lhs": "(some Sequence<Int>).Element",
+          "rhs": "Int",
+          "rhsPrecise": "s:Si"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:307:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo6sumAllySixSTRzSi7ElementRtzlF@<[s:Si]>",
+      "kind": "function",
+      "path": "sumAll(_:)",
+      "name": "sumAll(_:)",
+      "access": "public",
+      "declaration": "func sumAll(_ values: some Sequence<Int>) -> Int",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "[Int]",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:307:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -74515,6 +74778,34 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Views.swift:58:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo7joinAllySSST_pSS7ElementSTRts_XPF",
+      "kind": "function",
+      "path": "joinAll(_:)",
+      "name": "joinAll(_:)",
+      "access": "public",
+      "declaration": "func joinAll(_ parts: any Sequence<String>) -> String",
+      "parameters": [
+        {
+          "internalName": "parts",
+          "type": {
+            "spelling": "any Sequence<String>",
+            "references": [
+              "s:ST",
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:311:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {

@@ -132,8 +132,15 @@ the instantiation its arguments convert to; an array decides by its first
 element, so `largest([])` throws a `TypeError` naming the overloads' keys.
 At most one number type stands in, since a JS number converts to every one.
 
+Collection protocols take JS arrays: a type parameter constrained to
+`Sequence`, `Collection` or another protocol arrays conform to stands in as
+`[X]` for `where C.Element == X`, or as arrays of the element's own stand-ins
+(`C.Element` follows), and `some Sequence<Int>` as `[Int]`. A parameter typed
+`any Sequence<E>` (or another such protocol) takes an array, and a result of
+that type is copied out as one.
+
 A generic function is left out when a type parameter appears as a metatype
-(`T.Type`) or through an associated type (`C.Element`), when it is
+(`T.Type`) or through an associated type other than a collection's `Element`, when it is
 constrained by another module's protocol, when its arguments could not tell
 several instantiations apart (a type parameter only in the result or in a
 closure), or when it would need more than six instantiations (sixteen from a
@@ -468,9 +475,10 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 ## Not yet supported
 
-Generic methods of generic types, other standard library generics, and
-protocols with associated types. Each appears in the coverage report with its
-reason.
+Generic methods of generic types, other standard library generics,
+protocols with associated types as values or JS implementations (beyond the
+collection protocols above), and Swift overlay members of SDK Objective-C
+classes. Each appears in the coverage report with its reason.
 
 ## Swift language mode
 
