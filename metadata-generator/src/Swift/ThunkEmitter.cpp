@@ -156,6 +156,29 @@ class Emitter {
                     body + " })",
                 true};
       }
+      case Bridge::Set: {
+        BridgedType array = type;
+        array.bridge = Bridge::Array;
+        return {valueExpression(array, slots, index).code + ".map({ Set($0) })",
+                true};
+      }
+      case Bridge::Tuple: {
+        // Its own slots name: element readers may nest another tuple's.
+        std::string own = "t" + std::to_string(_tupleCount++);
+        std::string lines;
+        std::vector<std::string> names;
+        for (size_t k = 0; k < type.elements.size(); k++) {
+          names.push_back(own + "e" + std::to_string(k));
+          lines += readCaseElement(type.elements[k], k, names.back(), own);
+        }
+        return {"({ () -> " + swiftTypeText(unwrappedNode(type), _module) +
+                    "? in\n    let (" + own + ", " + own + "n) = " + slots +
+                    ".elements(" + index + ")\n    guard " + own +
+                    "n == " + std::to_string(type.elements.size()) +
+                    " else { return nil }\n" + lines + "    return (" +
+                    llvm::join(names, ", ") + ")\n  })()",
+                true};
+      }
       case Bridge::Closure: {
         // A closure that reports its arguments to the JS function; the
         // explicit type keeps attributes (@Sendable, @MainActor) the
@@ -340,8 +363,24 @@ class Emitter {
       case Bridge::Data:
         return reporter + ".returnBytes(" + value + ")";
       case Bridge::Array:
+      case Bridge::Set:
         return reporter + ".returnArray(" + value + ") { element in " +
                returnElement(type.elements.at(0), reporter) + " }";
+      case Bridge::Tuple: {
+        std::vector<std::string> reports;
+        for (size_t k = 0; k < type.elements.size(); k++) {
+          const BridgedType& element = type.elements[k];
+          std::string field = value + "." + std::to_string(k);
+          reports.push_back(
+              element.optional ? "if let element = " + field + " { " +
+                                     returnValue(element, reporter, "element") +
+                                     " } else { " + reporter + ".returnNull() }"
+                               : returnValue(element, reporter, field));
+        }
+        return reporter + ".returnTuple(" +
+               std::to_string(type.elements.size()) + ") { " +
+               llvm::join(reports, "; ") + " }";
+      }
       case Bridge::Dictionary:
         return reporter + ".returnMap(" + value + ") { key, element in " +
                reporter + ".returnString(key); " +
@@ -660,6 +699,7 @@ private protocol __NSReporter {
   func returnMap<Value>(_ values: [String: Value], _ each: (String, Value) -> Void)
   func returnObject(_ object: AnyObject, _ typeIndex: UInt32)
   func returnCase(_ index: Int, _ values: () -> Void)
+  func returnTuple(_ count: Int, _ values: () -> Void)
   func returnObjC(_ object: AnyObject)
   func returnJSObject(_ object: __NSJSObject)
   func returnAsyncSequence(_ iterator: __NSAsyncIterator)
@@ -797,6 +837,12 @@ private struct __NSCall: __NSReporter {
     values()
     slot(36, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(call)
   }
+  // An array of `count` values of their own types, which `values` reports.
+  func returnTuple(_ count: Int, _ values: () -> Void) {
+    slot(23, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(call, count)
+    values()
+    slot(24, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(call)
+  }
   // `value` reports the final value of inout argument `index`.
   func writeBack(_ index: Int, _ value: () -> Void) {
     slot(38, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(call, index)
@@ -907,6 +953,11 @@ private struct __NSCompletion: @unchecked Sendable, __NSReporter {
     slot(35, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(token, index)
     values()
     slot(37, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(token)
+  }
+  func returnTuple(_ count: Int, _ values: () -> Void) {
+    slot(27, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(token, count)
+    values()
+    slot(28, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(token)
   }
   func returnObject(_ object: AnyObject, _ typeIndex: UInt32) {
     slot(21, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer, UInt32) -> Void).self)(
@@ -1246,9 +1297,10 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
   // Lines binding `name` to associated value slot `slot` of `s`, returning
   // nil when it does not convert.
   std::string readCaseElement(const BridgedType& type, size_t slot,
-                              const std::string& name) const {
+                              const std::string& name,
+                              const std::string& slots = "s") const {
     std::string index = std::to_string(slot);
-    ValueExpression value = valueExpression(type, "s", index);
+    ValueExpression value = valueExpression(type, slots, index);
     std::string typeText = valueTypeName(type);
     if (!type.optional) {
       return value.failable ? "    guard let " + name + " = " + value.code +
@@ -1256,11 +1308,11 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
                             : "    let " + name + " = " + value.code + "\n";
     }
     if (!value.failable) {
-      return "    let " + name + ": " + typeText + "? = s.isNull(" + index +
-             ") ? nil : " + value.code + "\n";
+      return "    let " + name + ": " + typeText + "? = " + slots + ".isNull(" +
+             index + ") ? nil : " + value.code + "\n";
     }
-    return "    var " + name + ": " + typeText + "? = nil\n    if !s.isNull(" +
-           index + ") {\n      guard let value = " + value.code +
+    return "    var " + name + ": " + typeText + "? = nil\n    if !" + slots +
+           ".isNull(" + index + ") {\n      guard let value = " + value.code +
            " else { return nil }\n      " + name + " = value\n    }\n";
   }
 
@@ -1631,6 +1683,8 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
   SwiftSurface _surface;
   std::vector<std::string> _registrations;
   int _thunkCount = 0;
+  // Names the slots each tuple reader binds.
+  mutable int _tupleCount = 0;
 };
 
 }  // namespace

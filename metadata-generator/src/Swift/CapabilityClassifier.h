@@ -58,6 +58,13 @@ enum class Bridge {
   Array,
   // [String: T]: a plain JS object copy; `elements` holds T.
   Dictionary,
+  // Set<T>: a JS Set copy (an array is accepted as input); `elements` holds
+  // T.
+  Set,
+  // A tuple of two or more values: a JS array copy, or a plain object copy
+  // when every element is labeled; `elements` holds the element types and
+  // `labels` their labels.
+  Tuple,
   // A closure parameter (not async): a JS function. `elements` holds the
   // closure's parameters, `results` its result.
   Closure,
@@ -89,9 +96,11 @@ struct BridgedType {
   // string>`).
   std::vector<BridgedType> typeArguments;
   TypeNode node;
-  // Array and Dictionary: the element (value) type. Closure: its
-  // parameters.
+  // Array, Dictionary and Set: the element (value) type. Tuple: the element
+  // types. Closure: its parameters.
   std::vector<BridgedType> elements;
+  // Tuple: the element labels, or empty when none is labeled.
+  std::vector<std::string> labels;
   // Closure parameters declared @escaping (valid only in parameter
   // position, so kept out of `node`).
   bool escaping = false;

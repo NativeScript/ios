@@ -4,7 +4,7 @@
 import * as swift from "ns:swift";
 import * as Kit from "ns:swift/SwiftDemoKit";
 import type * as SwiftDemoTypes from "ns:swift/SwiftDemo";
-import { Demo, Point, Flavor, Polygon, Measurement, Square, Tracker, Counter, Palette, shout, globalCounter, delayedEcho, makeTrackerLater, countdown, greetLater, transform, lookup, largest, repeated, holes, Notifier, measure, area, simplify, echo, Formula, bump, append, describe, firstSubview, makeNote } from "ns:swift/SwiftDemo";
+import { Demo, Point, Flavor, Polygon, Measurement, Square, Tracker, Counter, Palette, shout, globalCounter, delayedEcho, makeTrackerLater, countdown, greetLater, transform, lookup, largest, repeated, holes, divide, swapPair, uniqueTags, Notifier, measure, area, simplify, echo, Formula, bump, append, describe, firstSubview, makeNote } from "ns:swift/SwiftDemo";
 
 const SwiftDemo = swift.module("SwiftDemo");
 const demo: Demo = new SwiftDemo.Demo();
@@ -39,6 +39,9 @@ lookup("k", () => null).toFixed();
 (largest([1, 2]) ?? 0).toFixed();
 repeated("x", 2).concat(["y"]);
 holes(2).map((value) => value ?? "-");
+divide(7, 2).quotient.toFixed();
+swapPair([1, "a"])[0].toUpperCase();
+uniqueTags(["a"]).has("a");
 greetLater(null, (greeting) => greeting?.toUpperCase());
 const notifier = new Notifier();
 notifier.subscribe((message) => message.length);
@@ -90,6 +93,8 @@ transform([1], (n) => n);
 largest([true]);
 // @ts-expect-error  optional elements may be null
 holes(2)[0].length;
+// @ts-expect-error  tuple elements are typed by position
+swapPair(["a", 1]);
 // @ts-expect-error  actor state is not assignable from outside the actor
 new Counter().step = 2;
 // @ts-expect-error  description is read-only

@@ -158,6 +158,9 @@ methods of generic types, and `some P` parameters, are not instantiated yet.
 | `Data` | `Uint8Array` copy (inputs accept any `ArrayBuffer` or view) |
 | `[T]` | array copy |
 | `[String: T]` | plain object copy |
+| `Set<T>` | `Set` copy (inputs also accept an array) |
+| `(A, B)` | array copy, `[a, b]` |
+| `(x: A, y: B)` | plain object copy, `{ x: a, y: b }` |
 | `(A, B) -> Void` (parameters only) | `function (a, b)` |
 | Objective-C class (`UIView`, an `NSObject` subclass) | NativeScript's ordinary Objective-C wrapper, with the identity Objective-C calls give it |
 
@@ -395,8 +398,7 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 Async cancellation, Combine publishers, concrete `AsyncSequence` types,
 generic methods of generic types, `Result` and other standard library
-generics, protocols with associated types, tuples, sets, subscripts and
-operators. Each appears in the coverage report with
+generics, protocols with associated types, subscripts and operators. Each appears in the coverage report with
 its reason.
 
 ## Swift language mode

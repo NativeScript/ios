@@ -166,6 +166,11 @@ enum {
 //   B           Data: bytes (NSSwiftTagString) <-> Uint8Array copy
 //   [<code>]    array (NSSwiftTagArray) <-> JS array copy
 //   {<code>}    [String: <code>] (NSSwiftTagMap) <-> plain JS object copy
+//   S[<code>]   Set (NSSwiftTagArray, reported as an array) <-> JS Set copy
+//               (arrays accepted as input)
+//   *(<code>,...) or *(<label>:<code>,...)
+//               tuple (NSSwiftTagArray of its elements, reported as an array)
+//               <-> JS array copy, or plain JS object copy when labeled
 //   (<code>,...) or (<code>,...><result>)
 //               closure of the listed parameters, returning Void or <result>
 //               (NSSwiftTagFunction) <- JS function; parameters only

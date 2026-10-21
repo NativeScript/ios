@@ -749,8 +749,26 @@ class Classifier {
         }
         return "";
       }
-      case TypeNode::Kind::Tuple:
-        return "tuple";
+      case TypeNode::Kind::Tuple: {
+        bridged.bridge = Bridge::Tuple;
+        size_t labeled = std::count_if(
+            node.labels.begin(), node.labels.end(),
+            [](const std::string& label) { return !label.empty(); });
+        if (node.children.size() < 2 ||
+            (labeled != 0 && labeled != node.children.size())) {
+          return "tuple";
+        }
+        if (labeled != 0) {
+          bridged.labels = node.labels;
+        }
+        for (const auto& child : node.children) {
+          std::string reason = bridgeElement(child, bridged);
+          if (!reason.empty()) {
+            return reason;
+          }
+        }
+        return "";
+      }
       case TypeNode::Kind::Array:
         bridged.bridge = Bridge::Array;
         return bridgeElement(node.children[0], bridged);
@@ -809,6 +827,11 @@ class Classifier {
     if (node.components.size() == 1 && node.components[0].arguments.empty() &&
         isPrimitive(usr, bridged.bridge)) {
       return "";
+    }
+    if (usr == KnownTypes::kSet && node.components.size() == 1 &&
+        node.components[0].arguments.size() == 1) {
+      bridged.bridge = Bridge::Set;
+      return bridgeElement(node.components[0].arguments[0], bridged, false);
     }
     if ((usr == KnownTypes::kAsyncStream ||
          usr == KnownTypes::kAsyncThrowingStream) &&
@@ -1033,7 +1056,14 @@ class Classifier {
       case Bridge::Data:
         kind = "bytes";
         break;
+      case Bridge::Tuple:
+        if (!type.labels.empty()) {
+          kind = "record";
+          break;
+        }
+        [[fallthrough]];
       case Bridge::Array:
+      case Bridge::Set:
         // The runtime tells arrays apart by their first element.
         kind = "array:" + (type.elements.empty() ? std::string()
                                                  : jsKind(type.elements[0]));

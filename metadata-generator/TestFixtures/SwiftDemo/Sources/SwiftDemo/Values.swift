@@ -216,3 +216,14 @@ public func joined<A, B>(_ first: A, _ second: B) -> String { "\(first)/\(second
 public func compact(_ values: [Int?]) -> [Int] { values.compactMap { $0 } }
 public func holes(_ count: Int) -> [String?] { (0..<count).map { $0 % 2 == 0 ? "x" : nil } }
 public func knownScores(_ scores: [String: Int?]) -> [String: Int?] { scores.filter { $0.value != nil } }
+
+// Tuples (JS arrays, or objects when labeled) and sets (JS Sets).
+public func divide(_ a: Int, by b: Int) -> (quotient: Int, remainder: Int) { (a / b, a % b) }
+public func swapPair(_ pair: (Int, String)) -> (String, Int) { (pair.1, pair.0) }
+public func plot(_ point: (x: Double, y: Double)?) -> String? { point.map { "\($0.x),\($0.y)" } }
+public func spans() -> [(String, Int?)] { [("a", 1), ("b", nil)] }
+public func uniqueTags(_ tags: [String]) -> Set<String> { Set(tags) }
+public func countUnique(_ values: Set<Int>) -> Int { values.count }
+public func tallyLater(_ words: [String]) async -> (unique: Set<String>, count: Int) {
+    (Set(words), words.count)
+}

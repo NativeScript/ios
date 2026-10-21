@@ -140,6 +140,13 @@
     "s:9SwiftDemo7compactySaySiGSaySiSgGF",
     "s:9SwiftDemo5holesySaySSSgGSiF",
     "s:9SwiftDemo11knownScoresySDySSSiSgGADF",
+    "s:9SwiftDemo6divide_2bySi8quotient_Si9remaindertSi_SitF",
+    "s:9SwiftDemo8swapPairySS_SitSi_SSt_tF",
+    "s:9SwiftDemo4plotySSSgSd1x_Sd1ytSgF",
+    "s:9SwiftDemo5spansSaySS_SiSgtGyF",
+    "s:9SwiftDemo10uniqueTagsyShySSGSaySSGF",
+    "s:9SwiftDemo11countUniqueySiShySiGF",
+    "s:9SwiftDemo10tallyLateryShySSG6unique_Si5counttSaySSGYaF",
     "s:9SwiftDemo8describeySSSo6UIViewCF",
     "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
     "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
@@ -66044,6 +66051,64 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo10tallyLateryShySSG6unique_Si5counttSaySSGYaF",
+      "kind": "function",
+      "path": "tallyLater(_:)",
+      "name": "tallyLater(_:)",
+      "access": "public",
+      "declaration": "func tallyLater(_ words: [String]) async -> (unique: Set<String>, count: Int)",
+      "parameters": [
+        {
+          "internalName": "words",
+          "type": {
+            "spelling": "[String]",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "(unique: Set<String>, count: Int)",
+        "references": [
+          "s:Sh",
+          "s:SS",
+          "s:Si"
+        ]
+      },
+      "async": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:226:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo10uniqueTagsyShySSGSaySSGF",
+      "kind": "function",
+      "path": "uniqueTags(_:)",
+      "name": "uniqueTags(_:)",
+      "access": "public",
+      "declaration": "func uniqueTags(_ tags: [String]) -> Set<String>",
+      "parameters": [
+        {
+          "internalName": "tags",
+          "type": {
+            "spelling": "[String]",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Set<String>",
+        "references": [
+          "s:Sh",
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:224:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo10wordCountsySDySSSiGSaySSGF",
       "kind": "function",
       "path": "wordCounts(_:)",
@@ -66270,6 +66335,34 @@
       },
       "throws": true,
       "location": "file://Sources/SwiftDemo/Values.swift:5:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo11countUniqueySiShySiGF",
+      "kind": "function",
+      "path": "countUnique(_:)",
+      "name": "countUnique(_:)",
+      "access": "public",
+      "declaration": "func countUnique(_ values: Set<Int>) -> Int",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "Set<Int>",
+            "references": [
+              "s:Sh",
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:225:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -67571,6 +67664,34 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:65:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo4plotySSSgSd1x_Sd1ytSgF",
+      "kind": "function",
+      "path": "plot(_:)",
+      "name": "plot(_:)",
+      "access": "public",
+      "declaration": "func plot(_ point: (x: Double, y: Double)?) -> String?",
+      "parameters": [
+        {
+          "internalName": "point",
+          "type": {
+            "spelling": "(x: Double, y: Double)?",
+            "references": [
+              "s:Sd",
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String?",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:222:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -69198,6 +69319,23 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo5spansSaySS_SiSgtGyF",
+      "kind": "function",
+      "path": "spans()",
+      "name": "spans()",
+      "access": "public",
+      "declaration": "func spans() -> [(String, Int?)]",
+      "returns": {
+        "spelling": "[(String, Int?)]",
+        "references": [
+          "s:SS",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:223:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo5totalySdSaySdGF",
       "kind": "function",
       "path": "total(_:)",
@@ -70177,6 +70315,44 @@
         }
       ],
       "location": "file://Sources/SwiftDemo/Values.swift:166:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo6divide_2bySi8quotient_Si9remaindertSi_SitF",
+      "kind": "function",
+      "path": "divide(_:by:)",
+      "name": "divide(_:by:)",
+      "access": "public",
+      "declaration": "func divide(_ a: Int, by b: Int) -> (quotient: Int, remainder: Int)",
+      "parameters": [
+        {
+          "internalName": "a",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "label": "by",
+          "internalName": "b",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "(quotient: Int, remainder: Int)",
+        "references": [
+          "s:Si",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:220:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -72799,6 +72975,35 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:142:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8swapPairySS_SitSi_SSt_tF",
+      "kind": "function",
+      "path": "swapPair(_:)",
+      "name": "swapPair(_:)",
+      "access": "public",
+      "declaration": "func swapPair(_ pair: (Int, String)) -> (String, Int)",
+      "parameters": [
+        {
+          "internalName": "pair",
+          "type": {
+            "spelling": "(Int, String)",
+            "references": [
+              "s:Si",
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "(String, Int)",
+        "references": [
+          "s:SS",
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:221:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {

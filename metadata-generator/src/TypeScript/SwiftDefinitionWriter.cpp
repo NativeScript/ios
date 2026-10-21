@@ -120,6 +120,18 @@ std::string codeDisplayName(const SwiftSurface& surface,
     case Bridge::Dictionary:
       name = "[String: " + codeDisplayName(surface, type.elements.at(0)) + "]";
       break;
+    case Bridge::Set:
+      name = "Set<" + codeDisplayName(surface, type.elements.at(0)) + ">";
+      break;
+    case Bridge::Tuple: {
+      std::vector<std::string> elements;
+      for (size_t i = 0; i < type.elements.size(); i++) {
+        elements.push_back((type.labels.empty() ? "" : type.labels[i] + ": ") +
+                           codeDisplayName(surface, type.elements[i]));
+      }
+      name = "(" + llvm::join(elements, ", ") + ")";
+      break;
+    }
     case Bridge::Closure: {
       std::vector<std::string> parameters;
       for (const auto& element : type.elements) {
@@ -333,9 +345,14 @@ class Writer {
              bridge == Bridge::URL;
     };
     auto record = [](Bridge bridge) {
-      return bridge == Bridge::Dictionary || bridge == Bridge::TaggedEnum;
+      return bridge == Bridge::Dictionary || bridge == Bridge::TaggedEnum ||
+             bridge == Bridge::Tuple;
     };
-    if (a.bridge == Bridge::Array && b.bridge == Bridge::Array) {
+    auto arrayLike = [](const BridgedType& type) {
+      return type.bridge == Bridge::Array || type.bridge == Bridge::Set ||
+             (type.bridge == Bridge::Tuple && type.labels.empty());
+    };
+    if (arrayLike(a) && arrayLike(b)) {
       // The runtime tells arrays apart by their first element; an empty
       // array still matches both.
       return a.elements.empty() || b.elements.empty() ||
@@ -492,6 +509,14 @@ class Writer {
       case Bridge::Dictionary:
         ts = "Readonly<Record<string, " + inputType(type.elements.at(0)) + ">>";
         break;
+      case Bridge::Set: {
+        std::string element = inputType(type.elements.at(0));
+        ts = "ReadonlySet<" + element + "> | readonly (" + element + ")[]";
+        break;
+      }
+      case Bridge::Tuple:
+        ts = tupleType(type, true);
+        break;
       case Bridge::Closure: {
         // The function receives what Swift passes: output types.
         std::vector<std::string> parameters;
@@ -509,6 +534,23 @@ class Writer {
         break;
     }
     return type.optional ? "(" + ts + ") | null | undefined" : ts;
+  }
+
+  // `[A, B]`, or `{ latitude: A; longitude: B }` when labeled.
+  std::string tupleType(const BridgedType& type, bool input) const {
+    std::vector<std::string> elements;
+    for (size_t i = 0; i < type.elements.size(); i++) {
+      std::string element =
+          input ? inputType(type.elements[i]) : outputType(type.elements[i]);
+      elements.push_back(type.labels.empty()
+                             ? element
+                             : (input ? "readonly " : "") + type.labels[i] +
+                                   ": " + element);
+    }
+    if (type.labels.empty()) {
+      return (input ? "readonly [" : "[") + llvm::join(elements, ", ") + "]";
+    }
+    return "{ " + llvm::join(elements, "; ") + " }";
   }
 
   std::string outputType(const BridgedType& type) const {
@@ -553,6 +595,12 @@ class Writer {
         break;
       case Bridge::Dictionary:
         ts = "Record<string, " + outputType(type.elements.at(0)) + ">";
+        break;
+      case Bridge::Set:
+        ts = "Set<" + outputType(type.elements.at(0)) + ">";
+        break;
+      case Bridge::Tuple:
+        ts = tupleType(type, false);
         break;
       case Bridge::Closure:
         ts = "never";

@@ -302,6 +302,7 @@ declare module "ns:swift/SwiftDemo" {
   }
 
   export type Score = import("ns:swift/SwiftDemoKit").Pair<string, number>;
+  export type Coordinates = { latitude: number; longitude: number };
   export function allFlavors(): (Flavor)[];
   export function echoString(value: string): string;
   export function echoUInt64(value: number | bigint): number;
@@ -311,8 +312,11 @@ declare module "ns:swift/SwiftDemo" {
   export function largestInt(): number;
   export function makeScorer(): Scorer;
   export function namesLater(count: number | bigint): Promise<(string)[]>;
+  export function tallyLater(words: readonly (string)[]): Promise<{ unique: Set<string>; count: number }>;
+  export function uniqueTags(tags: readonly (string)[]): Set<string>;
   export function wordCounts(words: readonly (string)[]): Record<string, number>;
   export function checkedSide(side: number): number;
+  export function countUnique(values: ReadonlySet<number | bigint> | readonly (number | bigint)[]): number;
   export function delayedEcho(text: string, seconds: number): Promise<string>;
   export function knownScores(scores: Readonly<Record<string, (number | bigint) | null | undefined>>): Record<string, number | null>;
   export function sortedNames(names: readonly (string)[], less: (arg0: string, arg1: string) => boolean): (string)[];
@@ -334,6 +338,7 @@ declare module "ns:swift/SwiftDemo" {
   export function echo(payload: Payload): Payload;
   export function flip(coin: import("ns:swift/SwiftDemoKit").Coin): import("ns:swift/SwiftDemoKit").Coin;
   export function host(url: string | URL): string | null;
+  export function plot(point: ({ readonly x: number; readonly y: number }) | null | undefined): string | null;
   export function ramp(count: number | bigint): Uint8Array;
   export function same(greeting: Greeting): Greeting;
   export function tags(views: readonly (UIView)[]): (number)[];
@@ -346,10 +351,12 @@ declare module "ns:swift/SwiftDemo" {
   export function names(count: number | bigint): (string)[];
   export function pages(count: number | bigint): AsyncIterableIterator<(string)[]>;
   export function shout(name: (string) | null | undefined): string | null;
+  export function spans(): ([string, number | null])[];
   export function total(values: readonly (number)[]): number;
   export function unbox(box: import("ns:swift/SwiftDemoKit").Box<import("ns:swift/SwiftDemoKit").Money>): import("ns:swift/SwiftDemoKit").Money;
   export function unbox(box: import("ns:swift/SwiftDemoKit").Box<number>): number;
   export function append(word: string, words: { value: readonly (string)[] }): void;
+  export function divide(a: number | bigint, b: number | bigint): { quotient: number; remainder: number };
   export function excite(greeting: Greeting): void;
   export function lookup(key: string, resolve: (arg0: string) => (number | bigint) | null | undefined): number;
   export function settle(value: number | bigint): import("ns:swift/SwiftDemoKit").Outcome<number>;
@@ -385,6 +392,7 @@ declare module "ns:swift/SwiftDemo" {
   export function repeated(value: number, times: number | bigint): (number)[];
   export function scoreAll(scorer: Scorer, values: readonly (number | bigint)[]): (number)[];
   export function simplify(formula: Formula): Formula;
+  export function swapPair(pair: readonly [number | bigint, string]): [string, number];
   export function trackers(ids: readonly (number | bigint)[]): (Tracker)[];
   export function countDown(start: number | bigint, failure: (number | bigint) | null | undefined): AsyncIterableIterator<number>;
   export function countdown(start: number | bigint, tick: (arg0: number, arg1: boolean) => void): void;

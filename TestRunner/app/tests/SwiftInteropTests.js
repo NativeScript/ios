@@ -272,6 +272,35 @@ describe("ns:swift", function () {
     });
 
     describe("collections and Foundation values", function () {
+        it("copies tuples as arrays, or objects when labeled", function () {
+            expect(SwiftDemo.divide(7, 2)).toEqual({ quotient: 3, remainder: 1 });
+            expect(SwiftDemo.swapPair([1, "one"])).toEqual(["one", 1]);
+            expect(SwiftDemo.plot({ x: 1, y: 2.5 })).toBe("1.0,2.5");
+            expect(SwiftDemo.plot(null)).toBeNull();
+            expect(SwiftDemo.spans()).toEqual([["a", 1], ["b", null]]);
+            expect(function () { SwiftDemo.swapPair([1]); })
+                .toThrowError(TypeError, /swapPair\(_: \(Int, String\)\)/);
+            expect(function () { SwiftDemo.swapPair(["one", 1]); }).toThrowError(TypeError);
+        });
+
+        it("copies sets as JS Sets, accepting arrays", function () {
+            var tags = SwiftDemo.uniqueTags(["a", "b", "a"]);
+            expect(tags instanceof Set).toBe(true);
+            expect(Array.from(tags).sort()).toEqual(["a", "b"]);
+            expect(SwiftDemo.countUnique(new Set([1, 2, 3]))).toBe(3);
+            expect(SwiftDemo.countUnique([1, 1, 2])).toBe(2);
+            expect(function () { SwiftDemo.countUnique("abc"); }).toThrowError(TypeError);
+        });
+
+        it("resolves tuples and sets from async calls", function (done) {
+            SwiftDemo.tallyLater(["a", "b", "a"]).then(function (tally) {
+                expect(tally.count).toBe(3);
+                expect(tally.unique instanceof Set).toBe(true);
+                expect(tally.unique.size).toBe(2);
+                done();
+            }, done.fail);
+        });
+
         it("passes optional elements as nulls", function () {
             expect(SwiftDemo.compact([1, null, 3, undefined])).toEqual([1, 3]);
             expect(SwiftDemo.holes(3)).toEqual(["x", null, "x"]);

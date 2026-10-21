@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 1188,
+      "total": 1195,
       "objc-direct": 1,
-      "swift-generated": 287,
+      "swift-generated": 294,
       "swift-specialized": 371,
       "type-only": 5,
       "unsupported": 524,
       "not-applicable": 0
     },
     "callable": {
-      "total": 1140,
+      "total": 1147,
       "objc-direct": 0,
-      "swift-generated": 247,
+      "swift-generated": 254,
       "swift-specialized": 368,
       "type-only": 2,
       "unsupported": 523,
       "not-applicable": 0
     },
-    "effectiveCallable": 247,
+    "effectiveCallable": 254,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -62,9 +62,9 @@
       "not-applicable": 0
     },
     "function": {
-      "total": 86,
+      "total": 93,
       "objc-direct": 0,
-      "swift-generated": 83,
+      "swift-generated": 90,
       "swift-specialized": 3,
       "type-only": 0,
       "unsupported": 0,
@@ -180,9 +180,8 @@
     "operator": 5,
     "owner-not-bridged": 14,
     "subscript": 1,
-    "tuple": 1,
     "unavailable": 5,
-    "unbridged-type": 558,
+    "unbridged-type": 557,
     "variadic-parameter": 8
   },
   "symbols": [
@@ -955,7 +954,7 @@
         "opaque-type",
         "unbridged-type:KeyPress.Phases",
         "unbridged-type:KeyPress.Result",
-        "unbridged-type:Swift.Set"
+        "unbridged-type:SwiftUI.KeyEquivalent"
       ]
     },
     {
@@ -3450,7 +3449,6 @@
       "tier": "unsupported",
       "reasons": [
         "opaque-type",
-        "tuple",
         "unbridged-type:SwiftUI.Angle",
         "unbridged-type:SwiftUI.UnitPoint"
       ]
@@ -5076,8 +5074,8 @@
       "tier": "unsupported",
       "reasons": [
         "opaque-type",
-        "unbridged-type:Swift.Set",
-        "unbridged-type:SwiftUI.Binding"
+        "unbridged-type:SwiftUI.Binding",
+        "unbridged-type:SwiftUI.PresentationDetent"
       ]
     },
     {
@@ -5087,7 +5085,7 @@
       "tier": "unsupported",
       "reasons": [
         "opaque-type",
-        "unbridged-type:Swift.Set"
+        "unbridged-type:SwiftUI.PresentationDetent"
       ]
     },
     {
@@ -5529,8 +5527,7 @@
       "kind": "instanceMethod",
       "tier": "unsupported",
       "reasons": [
-        "opaque-type",
-        "unbridged-type:Swift.Set"
+        "opaque-type"
       ]
     },
     {
@@ -8960,6 +8957,22 @@
       "location": "file://Sources/SwiftDemo/Values.swift:70"
     },
     {
+      "id": "s:9SwiftDemo10tallyLateryShySSG6unique_Si5counttSaySSGYaF",
+      "path": "tallyLater(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "tallyLater",
+      "location": "file://Sources/SwiftDemo/Values.swift:227"
+    },
+    {
+      "id": "s:9SwiftDemo10uniqueTagsyShySSGSaySSGF",
+      "path": "uniqueTags(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "uniqueTags",
+      "location": "file://Sources/SwiftDemo/Values.swift:225"
+    },
+    {
       "id": "s:9SwiftDemo10wordCountsySDySSSiGSaySSGF",
       "path": "wordCounts(_:)",
       "kind": "function",
@@ -9046,6 +9059,14 @@
       "tier": "swift-generated",
       "jsName": "checkedSide",
       "location": "file://Sources/SwiftDemo/Values.swift:6"
+    },
+    {
+      "id": "s:9SwiftDemo11countUniqueySiShySiGF",
+      "path": "countUnique(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "countUnique",
+      "location": "file://Sources/SwiftDemo/Values.swift:226"
     },
     {
       "id": "s:9SwiftDemo11delayedEcho_5afterS2S_SdtYaKF",
@@ -9510,6 +9531,14 @@
       "location": "file://Sources/SwiftDemo/Values.swift:66"
     },
     {
+      "id": "s:9SwiftDemo4plotySSSgSd1x_Sd1ytSgF",
+      "path": "plot(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "plot",
+      "location": "file://Sources/SwiftDemo/Values.swift:223"
+    },
+    {
       "id": "s:9SwiftDemo4rampy10Foundation4DataVSiF",
       "path": "ramp(_:)",
       "kind": "function",
@@ -9778,6 +9807,14 @@
       "tier": "swift-generated",
       "jsName": "shout",
       "location": "file://Sources/SwiftDemo/Values.swift:14"
+    },
+    {
+      "id": "s:9SwiftDemo5spansSaySS_SiSgtGyF",
+      "path": "spans()",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "spans",
+      "location": "file://Sources/SwiftDemo/Values.swift:224"
     },
     {
       "id": "s:9SwiftDemo5totalySdSaySdGF",
@@ -10088,6 +10125,14 @@
       "tier": "swift-generated",
       "jsName": "append",
       "location": "file://Sources/SwiftDemo/Values.swift:167"
+    },
+    {
+      "id": "s:9SwiftDemo6divide_2bySi8quotient_Si9remaindertSi_SitF",
+      "path": "divide(_:by:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "divide",
+      "location": "file://Sources/SwiftDemo/Values.swift:221"
     },
     {
       "id": "s:9SwiftDemo6exciteyyAA8Greeting_pF",
@@ -10893,6 +10938,14 @@
       "tier": "swift-generated",
       "jsName": "simplify",
       "location": "file://Sources/SwiftDemo/Values.swift:143"
+    },
+    {
+      "id": "s:9SwiftDemo8swapPairySS_SitSi_SSt_tF",
+      "path": "swapPair(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "swapPair",
+      "location": "file://Sources/SwiftDemo/Values.swift:222"
     },
     {
       "id": "s:9SwiftDemo8trackersySayAA7TrackerCGSaySiGF",

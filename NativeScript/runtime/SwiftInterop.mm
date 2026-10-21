@@ -54,6 +54,8 @@ struct ValueCode {
     Data,
     Array,
     Map,
+    Set,
+    Tuple,
     Function,
     Tagged,
     ObjC,
@@ -73,6 +75,9 @@ struct ValueCode {
   std::vector<ValueCode> element;
   // Function: its result code; empty for Void.
   std::vector<ValueCode> returns;
+  // Tuple: its element codes are `element`; its labels, or empty when none
+  // is labeled (a JS array rather than an object).
+  std::vector<std::string> labels;
 };
 
 // The '>' before the result in "params>result": the last one outside
@@ -130,6 +135,43 @@ bool ParseCode(std::string text, ValueCode& code) {
     ValueCode& element = code.element.back();
     return ParseCode(text.substr(1), element) && element.kind != ValueCode::Kind::Void &&
            element.kind != ValueCode::Kind::Function && !element.optional;
+  }
+  if (text.size() > 3 && text.compare(0, 2, "S[") == 0 && text.back() == ']') {
+    code.kind = ValueCode::Kind::Set;
+    code.element.emplace_back();
+    ValueCode& element = code.element.back();
+    return ParseCode(text.substr(2, text.size() - 3), element) &&
+           element.kind != ValueCode::Kind::Void && element.kind != ValueCode::Kind::Function &&
+           !element.optional;
+  }
+  if (text.size() > 3 && text.compare(0, 2, "*(") == 0 && text.back() == ')') {
+    code.kind = ValueCode::Kind::Tuple;
+    std::vector<std::string> parts;
+    if (!SplitCodes(text.substr(2, text.size() - 3), parts) || parts.size() < 2) {
+      return false;
+    }
+    for (std::string part : parts) {
+      // "label:code"; codes themselves start with no identifier and colon.
+      size_t colon = part.find(':');
+      bool labeled = colon != std::string::npos && colon > 0 &&
+                     std::all_of(part.begin(), part.begin() + colon,
+                                 [](char c) { return std::isalnum(c) || c == '_'; });
+      // Every element is labeled, or none is.
+      if (!code.element.empty() && labeled == code.labels.empty()) {
+        return false;
+      }
+      if (labeled) {
+        code.labels.push_back(part.substr(0, colon));
+        part = part.substr(colon + 1);
+      }
+      code.element.emplace_back();
+      if (!ParseCode(part, code.element.back()) ||
+          code.element.back().kind == ValueCode::Kind::Void ||
+          code.element.back().kind == ValueCode::Kind::Function) {
+        return false;
+      }
+    }
+    return true;
   }
   if ((text.front() == '[' && text.back() == ']') || (text.front() == '{' && text.back() == '}')) {
     code.kind = text.front() == '[' ? ValueCode::Kind::Array : ValueCode::Kind::Map;
@@ -413,6 +455,17 @@ std::string TypeDisplayName(const ModuleInfo& module, const ValueCode& code) {
       break;
     case ValueCode::Kind::Map:
       name = "[String: " + TypeDisplayName(module, code.element.at(0)) + "]";
+      break;
+    case ValueCode::Kind::Set:
+      name = "Set<" + TypeDisplayName(module, code.element.at(0)) + ">";
+      break;
+    case ValueCode::Kind::Tuple:
+      name = "(";
+      for (size_t i = 0; i < code.element.size(); i++) {
+        name += (i > 0 ? ", " : "") + (code.labels.empty() ? "" : code.labels[i] + ": ") +
+                TypeDisplayName(module, code.element[i]);
+      }
+      name += ")";
       break;
     case ValueCode::Kind::Object:
     case ValueCode::Kind::Enum:
@@ -946,6 +999,10 @@ struct ResultFrame {
   const ValueCode* element = nullptr;
   // Set for a case: its values' keys and codes.
   const CaseInfo* tagged = nullptr;
+  // Set for a tuple: its element codes and labels (an object when labeled).
+  const ValueCode* tuple = nullptr;
+  // `target` is a JS Set, filled by Add.
+  bool isSet = false;
   // An inout argument's reference object, whose `value` receives the one
   // value reported (of code `element`).
   bool writeBack = false;
@@ -989,6 +1046,9 @@ const ValueCode* CurrentCode(CallContext* context) {
   if (frame.tagged != nullptr) {
     return frame.next < frame.tagged->codes.size() ? &frame.tagged->codes[frame.next] : nullptr;
   }
+  if (frame.tuple != nullptr) {
+    return frame.next < frame.tuple->element.size() ? &frame.tuple->element[frame.next] : nullptr;
+  }
   return frame.isMap && frame.expectKey ? &KeyCode() : frame.element;
 }
 
@@ -1014,6 +1074,14 @@ void Complete(CallContext* context, Local<Value> value) {
                  ->Set(context->context,
                        tns::ToV8String(context->isolate, frame.tagged->keys[frame.next++]), value)
                  .FromMaybe(false);
+  } else if (frame.tuple != nullptr && !frame.tuple->labels.empty()) {
+    stored = frame.next < frame.tuple->labels.size() &&
+             frame.target
+                 ->Set(context->context,
+                       tns::ToV8String(context->isolate, frame.tuple->labels[frame.next++]), value)
+                 .FromMaybe(false);
+  } else if (frame.isSet) {
+    stored = !frame.target.As<v8::Set>()->Add(context->context, value).IsEmpty();
   } else if (!frame.isMap) {
     stored = frame.target->Set(context->context, frame.next++, value).FromMaybe(false);
   } else if (frame.expectKey) {
@@ -1200,9 +1268,14 @@ void ApiReturnNull(NSSwiftCall* call) {
 void BeginContainer(CallContext* context, bool isMap, intptr_t count) {
   const ValueCode* code = CurrentCode(context);
   ValueCode::Kind expected = isMap ? ValueCode::Kind::Map : ValueCode::Kind::Array;
-  // An iterator step reports its element as an array.
-  bool step = !isMap && code != nullptr && code->kind == ValueCode::Kind::AsyncSequence;
-  if (code == nullptr || (code->kind != expected && !step) || code->element.empty()) {
+  // An iterator step reports its element as an array, and so do sets and
+  // tuples.
+  bool arrayLike =
+      !isMap && code != nullptr &&
+      (code->kind == ValueCode::Kind::AsyncSequence || code->kind == ValueCode::Kind::Set ||
+       (code->kind == ValueCode::Kind::Tuple &&
+        static_cast<size_t>(count) == code->element.size()));
+  if (code == nullptr || (code->kind != expected && !arrayLike) || code->element.empty()) {
     Fail(context);
     context->isolate->ThrowException(Exception::Error(tns::ToV8String(
         context->isolate, context->member->swiftName + " reported an unexpected collection")));
@@ -1210,8 +1283,15 @@ void BeginContainer(CallContext* context, bool isMap, intptr_t count) {
   }
   ResultFrame frame;
   frame.isMap = isMap;
-  frame.target = isMap ? Local<Object>(Object::New(context->isolate))
-                       : Local<Object>(v8::Array::New(context->isolate, static_cast<int>(count)));
+  frame.isSet = code->kind == ValueCode::Kind::Set;
+  if (code->kind == ValueCode::Kind::Tuple) {
+    frame.tuple = code;
+  }
+  frame.target = isMap || (frame.tuple != nullptr && !code->labels.empty())
+                     ? Local<Object>(Object::New(context->isolate))
+                 : frame.isSet
+                     ? Local<Object>(v8::Set::New(context->isolate))
+                     : Local<Object>(v8::Array::New(context->isolate, static_cast<int>(count)));
   frame.element = &code->element[0];
   context->frames.push_back(frame);
 }
@@ -1561,6 +1641,40 @@ bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
     case AsyncOutcome::Kind::Array: {
       if (code.element.empty()) {
         return failed("returned an unexpected array");
+      }
+      if (code.kind == ValueCode::Kind::Tuple) {
+        if (node.children.size() != code.element.size()) {
+          return failed("returned an unexpected tuple");
+        }
+        bool labeled = !code.labels.empty();
+        Local<Object> tuple =
+            labeled ? Object::New(isolate)
+                    : v8::Array::New(isolate, static_cast<int>(code.element.size())).As<Object>();
+        for (uint32_t i = 0; i < code.element.size(); i++) {
+          Local<Value> element;
+          Local<Value> key = labeled ? tns::ToV8String(isolate, code.labels[i]).As<Value>()
+                                     : v8::Integer::New(isolate, i).As<Value>();
+          if (!OutcomeToJS(isolate, context, state, name, *node.children[i], code.element[i],
+                           element, rejection) ||
+              !tuple->Set(context, key, element).FromMaybe(false)) {
+            return false;
+          }
+        }
+        out = tuple;
+        return true;
+      }
+      if (code.kind == ValueCode::Kind::Set) {
+        Local<v8::Set> set = v8::Set::New(isolate);
+        for (const auto& child : node.children) {
+          Local<Value> element;
+          if (!OutcomeToJS(isolate, context, state, name, *child, code.element[0], element,
+                           rejection) ||
+              set->Add(context, element).IsEmpty()) {
+            return false;
+          }
+        }
+        out = set;
+        return true;
       }
       Local<v8::Array> array = v8::Array::New(isolate, static_cast<int>(node.children.size()));
       for (uint32_t i = 0; i < node.children.size(); i++) {
@@ -2009,6 +2123,12 @@ bool Accepts(Isolate* isolate, const ModuleInfo& module, const ValueCode& code,
       return value->IsArrayBuffer() || value->IsArrayBufferView();
     case ValueCode::Kind::Array:
       return value->IsArray();
+    case ValueCode::Kind::Set:
+      return value->IsSet() || value->IsArray();
+    case ValueCode::Kind::Tuple:
+      return code.labels.empty()
+                 ? value->IsArray() && value.As<v8::Array>()->Length() == code.element.size()
+                 : IsRecord(isolate, value);
     case ValueCode::Kind::Map:
     case ValueCode::Kind::Tagged:
       return IsRecord(isolate, value);
@@ -2251,9 +2371,45 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
       }
       return ThrowArgument(isolate, member, index, "must be an ArrayBuffer or a typed array");
 
+    case ValueCode::Kind::Tuple: {
+      size_t count = code.element.size();
+      bool labeled = !code.labels.empty();
+      if (!Accepts(isolate, module, code, value)) {
+        return ThrowArgument(isolate, member, index,
+                             labeled ? "must be an object, " + TypeDisplayName(module, code)
+                                     : "must be an array of " + std::to_string(count) +
+                                           " values, " + TypeDisplayName(module, code));
+      }
+      arena.slots.emplace_back(count);
+      std::vector<NSSwiftValue>& elements = arena.slots.back();
+      for (size_t i = 0; i < count; i++) {
+        Local<Value> element;
+        bool read =
+            labeled
+                ? value.As<Object>()
+                      ->Get(context, tns::ToV8String(isolate, code.labels[i]))
+                      .ToLocal(&element)
+                : value.As<v8::Array>()->Get(context, static_cast<uint32_t>(i)).ToLocal(&element);
+        if (!read || !Convert(isolate, context, module, member, index, code.element[i], element,
+                              elements[i], arena)) {
+          return false;
+        }
+      }
+      slot.tag = NSSwiftTagArray;
+      slot.payload.object = elements.data();
+      slot.length = count;
+      return true;
+    }
+
+    case ValueCode::Kind::Set:
     case ValueCode::Kind::Array: {
+      if (code.kind == ValueCode::Kind::Set && value->IsSet()) {
+        value = value.As<v8::Set>()->AsArray();
+      }
       if (!value->IsArray()) {
-        return ThrowArgument(isolate, member, index, "must be an array");
+        return ThrowArgument(
+            isolate, member, index,
+            code.kind == ValueCode::Kind::Set ? "must be a Set or an array" : "must be an array");
       }
       Local<v8::Array> array = value.As<v8::Array>();
       uint32_t length = array->Length();
