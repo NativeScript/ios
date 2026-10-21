@@ -55,14 +55,25 @@ def main(arch):
     target = "{}-{}-{}{}{}".format(arch, env("LLVM_TARGET_TRIPLE_VENDOR", "apple"), os_name,
                                    deployment, env("LLVM_TARGET_TRIPLE_SUFFIX"))
 
-    # Where the app's module and its packages' modules are.
+    # Build settings hold paths relative to the project; this runs elsewhere.
+    def resolve(paths):
+        resolved = []
+        for path in paths:
+            path = os.path.normpath(os.path.join(env("SRCROOT"), path))
+            if path not in resolved:
+                resolved.append(path)
+        return resolved
+
+    # Where the app's module, its packages' modules and the clang modules
+    # they import (plugin sources' module maps) are.
     search = [env("CONFIGURATION_BUILD_DIR"), env("BUILT_PRODUCTS_DIR")]
     if env("OBJECT_FILE_DIR_normal"):
         search.append(os.path.join(env("OBJECT_FILE_DIR_normal"), arch))
-    search += shlex.split(env("SWIFT_INCLUDE_PATHS"))
-    search = [path for i, path in enumerate(search) if path and path not in search[:i]]
-    frameworks = shlex.split(env("FRAMEWORK_SEARCH_PATHS")) + [
-        os.path.join(sdk, "System/Library/SubFrameworks")]
+    for setting in ("SWIFT_INCLUDE_PATHS", "HEADER_SEARCH_PATHS", "USER_HEADER_SEARCH_PATHS"):
+        search += shlex.split(env(setting))
+    search = resolve(path for path in search if path)
+    frameworks = resolve(shlex.split(env("FRAMEWORK_SEARCH_PATHS")) +
+                         [os.path.join(sdk, "System/Library/SubFrameworks")])
     search_flags = [flag for path in search for flag in ("-I", path)] + \
         [flag for path in frameworks for flag in ("-F", path)]
 
