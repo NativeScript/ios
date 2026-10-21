@@ -209,10 +209,11 @@ Local<Value> Interop::CallFunction(ObjCMethodCall& methodCall) {
 }
 
 id Interop::CallInitializer(Local<Context> context, const MethodMeta* methodMeta, id target,
-                            Class clazz, V8Args& args) {
+                            Class clazz, V8Args& args, Class superclass) {
   const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
   SEL selector = methodMeta->selector();
-  void* functionPointer = (void*)objc_msgSend;
+  void* functionPointer = superclass != nil ? (void*)objc_msgSendSuper : (void*)objc_msgSend;
+  objc_super sup = {target, superclass};
 
   int initialParameterIndex = 2;
   int argsCount = initialParameterIndex + (int)args.Length();
@@ -221,7 +222,11 @@ id Interop::CallInitializer(Local<Context> context, const MethodMeta* methodMeta
       ParametrizedCall::Get(typeEncoding, initialParameterIndex, argsCount);
   FFICall call(parametrizedCall);
 
-  Interop::SetValue(call.ArgumentBuffer(0), target);
+  if (superclass != nil) {
+    Interop::SetValue(call.ArgumentBuffer(0), &sup);
+  } else {
+    Interop::SetValue(call.ArgumentBuffer(0), target);
+  }
   Interop::SetValue(call.ArgumentBuffer(1), selector);
   Interop::SetFFIParams(context, typeEncoding, &call, argsCount, initialParameterIndex, args);
 

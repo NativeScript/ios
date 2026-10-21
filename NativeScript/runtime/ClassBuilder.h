@@ -70,12 +70,6 @@ class ClassBuilder {
   // read.
   static bool MayBeESClass(v8::Local<v8::Value> function);
 
-  // True when a construct call's new.target is a plain ES class registered by
-  // EnsureExtendedClass, whose super(...) follows the interop.initializer
-  // contract rather than the legacy constructor-argument matching.
-  static bool IsESDerivedConstructor(v8::Isolate* isolate,
-                                     v8::Local<v8::Value> newTarget);
-
   // The native end of super(...) for an ES class. Binds info.This() to the
   // object being initialized before the initializer runs, so overrides the
   // initializer calls see the instance under construction:

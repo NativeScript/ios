@@ -35,14 +35,53 @@ void ScopeClassNameToIsolate(std::string& name, int isolateId) {
   }
 }
 
+struct ESClassState {
+  // Classes registered from plain ES `class X extends Native {}` constructors.
+  robin_hood::unordered_set<Class> classes;
+  // The ES class each class wrapped so far belongs to (nil for none), so an object's first wrap
+  // costs one lookup. A negative entry stays valid: ES classes are always new classes, so no
+  // class seen before one was registered can ever descend from it.
+  robin_hood::unordered_map<Class, Class> esClassOf;
+  robin_hood::unordered_map<Class, Global<v8::Function>> constructors;
+  Global<Object> objectPrototype;
+  // Handles every construction would otherwise create again.
+  Global<Symbol> argsSymbol;
+  Global<Symbol> nativeSymbol;
+  Global<v8::String> selectorKey;
+  Global<v8::String> argsKey;
+  robin_hood::unordered_map<SEL, Global<v8::String>> selectorNames;
+  robin_hood::unordered_map<const MethodMeta*, std::vector<Global<v8::String>>> tokenKeys;
+};
+
+Local<v8::String> CachedString(Isolate* isolate, Global<v8::String>& slot, const char* text) {
+  if (slot.IsEmpty()) {
+    slot.Reset(isolate, tns::ToV8String(isolate, text));
+  }
+  return slot.Get(isolate);
+}
+
 // API-registry symbols: shared by every context of an isolate, and unreachable through JS's
 // Symbol.for, so interop.initializer is the only way to obtain them.
+Local<Symbol> CachedApiSymbol(Isolate* isolate, Global<Symbol>* slot, const char* name) {
+  if (slot == nullptr) {
+    return Symbol::ForApi(isolate, tns::ToV8String(isolate, name));
+  }
+  if (slot->IsEmpty()) {
+    slot->Reset(isolate, Symbol::ForApi(isolate, tns::ToV8String(isolate, name)));
+  }
+  return slot->Get(isolate);
+}
+
 Local<Symbol> InitializerArgsSymbol(Isolate* isolate) {
-  return Symbol::ForApi(isolate, tns::ToV8String(isolate, "interop.initializer.args"));
+  ESClassState* state = Caches::StateFor<ESClassState>(isolate);
+  return CachedApiSymbol(isolate, state != nullptr ? &state->argsSymbol : nullptr,
+                         "interop.initializer.args");
 }
 
 Local<Symbol> InitializerNativeSymbol(Isolate* isolate) {
-  return Symbol::ForApi(isolate, tns::ToV8String(isolate, "interop.initializer.native"));
+  ESClassState* state = Caches::StateFor<ESClassState>(isolate);
+  return CachedApiSymbol(isolate, state != nullptr ? &state->nativeSymbol : nullptr,
+                         "interop.initializer.native");
 }
 
 struct InitializerHook {
@@ -92,16 +131,6 @@ class NativeConstructionScope {
     nativeConstructions.push_back(construction);
   }
   ~NativeConstructionScope() { nativeConstructions.pop_back(); }
-};
-
-struct ESClassState {
-  // Classes registered from plain ES `class X extends Native {}` constructors.
-  robin_hood::unordered_set<Class> classes;
-  // The ES class each class wrapped so far belongs to (nil for none), so an object's first wrap
-  // costs one lookup. A negative entry stays valid: ES classes are always new classes, so no
-  // class seen before one was registered can ever descend from it.
-  robin_hood::unordered_map<Class, Class> esClassOf;
-  Global<Object> objectPrototype;
 };
 
 // The ES class object belongs to: its own class, or the one a runtime-created dynamic subclass
@@ -155,48 +184,73 @@ std::vector<Local<Value>> NativeInitializerArgs(Local<Context> context, const Me
   return args;
 }
 
-Local<Object> NewInitializerInfo(Local<Context> context, SEL selector,
+Local<Object> NewInitializerInfo(Local<Context> context, ESClassState* state, SEL selector,
                                  std::vector<Local<Value>> args) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  Local<Value> selectorValue = v8::Null(isolate);
+  if (selector != nullptr) {
+    auto name = state->selectorNames.find(selector);
+    if (name == state->selectorNames.end()) {
+      name = state->selectorNames
+                 .emplace(selector, Global<v8::String>(
+                                        isolate, tns::ToV8String(isolate, sel_getName(selector))))
+                 .first;
+    }
+    selectorValue = name->second.Get(isolate);
+  }
   Local<Object> info = Object::New(isolate);
-  Local<Value> selectorValue = selector != nullptr
-                                   ? Local<Value>(tns::ToV8String(isolate, sel_getName(selector)))
-                                   : Local<Value>(v8::Null(isolate));
   bool success =
-      info->Set(context, tns::ToV8String(isolate, "selector"), selectorValue).FromMaybe(false) &&
-      info->Set(context, tns::ToV8String(isolate, "args"),
-                v8::Array::New(isolate, args.data(), args.size()))
+      info->CreateDataProperty(context, CachedString(isolate, state->selectorKey, "selector"),
+                               selectorValue)
+          .FromMaybe(false) &&
+      info->CreateDataProperty(context, CachedString(isolate, state->argsKey, "args"),
+                               v8::Array::New(isolate, args.data(), args.size()))
           .FromMaybe(false) &&
       info->SetIntegrityLevel(context, IntegrityLevel::kFrozen).FromMaybe(false);
   tns::Assert(success, isolate);
   return info;
 }
 
-Local<Object> NewTokensObject(Local<Context> context, const MethodMeta* meta,
+Local<Object> NewTokensObject(Local<Context> context, ESClassState* state, const MethodMeta* meta,
                               const std::vector<Local<Value>>& args) {
   Isolate* isolate = v8::Isolate::GetCurrent();
-  std::vector<std::string> tokens = ArgConverter::ConstructorTokens(meta);
+  auto keys = state->tokenKeys.find(meta);
+  if (keys == state->tokenKeys.end()) {
+    std::vector<Global<v8::String>> tokenKeys;
+    for (const std::string& token : ArgConverter::ConstructorTokens(meta)) {
+      tokenKeys.emplace_back(isolate, tns::ToV8String(isolate, token));
+    }
+    keys = state->tokenKeys.emplace(meta, std::move(tokenKeys)).first;
+  }
   Local<Object> tokensObject = Object::New(isolate);
   // Every token is a key, even a parameterless initializer's (initWithEmpty -> { empty }), so a
   // copy of this object names the same initializer.
-  for (size_t i = 0; i < tokens.size(); i++) {
+  for (size_t i = 0; i < keys->second.size(); i++) {
     Local<Value> value = i < args.size() ? args[i] : Local<Value>(v8::Undefined(isolate));
-    tns::Assert(
-        tokensObject->Set(context, tns::ToV8String(isolate, tokens[i]), value).FromMaybe(false),
-        isolate);
+    tns::Assert(tokensObject->CreateDataProperty(context, keys->second[i].Get(isolate), value)
+                    .FromMaybe(false),
+                isolate);
   }
   return tokensObject;
 }
 
+// The class an ES class's initializers end up in: the superclass of the first ES class above
+// its native (or legacy) base, which is where that class's hooks pass through to.
+Class InitializerSuperclass(ESClassState* state, Class klass) {
+  Class root = klass;
+  for (Class c = class_getSuperclass(klass); c != nil && state->classes.count(c) != 0;
+       c = class_getSuperclass(c)) {
+    root = c;
+  }
+  return class_getSuperclass(root);
+}
+
 // An object literal or a spread of one; a class instance passed straight to super(...) is the
 // positional form this contract replaces.
-bool IsOptionsObject(Isolate* isolate, Local<Value> value) {
-  if (!value->IsObject() || value->IsFunction() || value->IsArray() ||
-      tns::GetValue(isolate, value) != nullptr) {
-    return false;
-  }
-  ESClassState* state = Caches::StateFor<ESClassState>(isolate);
-  if (state == nullptr) {
+bool IsOptionsObject(Isolate* isolate, ESClassState* state, Local<Value> value) {
+  // Native wrappers and struct objects are built from templates with an internal field.
+  if (!value->IsObject() || value->IsFunction() || value->IsArray() || value->IsProxy() ||
+      value.As<Object>()->InternalFieldCount() > 0) {
     return false;
   }
   if (state->objectPrototype.IsEmpty()) {
@@ -235,25 +289,31 @@ void InitializerHookCallback(ffi_cif* cif, void* retValue, void** argValues, voi
     Local<Context> context = cache->GetContext();
     Context::Scope context_scope(context);
 
+    ESClassState* state = Caches::StateFor<ESClassState>(isolate);
     Class klass = FindESClass(isolate, self);
-    auto ctorIt =
-        klass != nil ? cache->CtorFuncs.find(class_getName(klass)) : cache->CtorFuncs.end();
-    if (ctorIt == cache->CtorFuncs.end()) {
+    if (state == nullptr || klass == nil) {
       CallSuperInitializer(cif, retValue, argValues, hook->hookClass);
       return;
     }
-    Local<v8::Function> ctor = ctorIt->second->Get(isolate);
+    auto ctorIt = state->constructors.find(klass);
+    if (ctorIt == state->constructors.end()) {
+      CallSuperInitializer(cif, retValue, argValues, hook->hookClass);
+      return;
+    }
+    Local<v8::Function> ctor = ctorIt->second.Get(isolate);
 
     std::vector<Local<Value>> args = NativeInitializerArgs(context, hook->meta, argValues);
-    Local<Object> info = NewInitializerInfo(context, hook->meta->selector(), args);
+    Local<Object> info = NewInitializerInfo(context, state, hook->meta->selector(), args);
     // Frozen: super(...) forwards Objective-C's own arguments while this object is passed on
     // unchanged, so an edit in place would be silently dropped. A replacement object is honored.
-    Local<Object> prefill = NewTokensObject(context, hook->meta, args);
+    Local<Object> prefill = NewTokensObject(context, state, hook->meta, args);
     tns::Assert(prefill->SetIntegrityLevel(context, IntegrityLevel::kFrozen).FromMaybe(false),
                 isolate);
     Local<Object> options = Object::New(isolate);
-    tns::Assert(options->Set(context, InitializerNativeSymbol(isolate), info).FromMaybe(false) &&
-                    options->Set(context, InitializerArgsSymbol(isolate), prefill).FromMaybe(false),
+    tns::Assert(options->CreateDataProperty(context, InitializerNativeSymbol(isolate), info)
+                        .FromMaybe(false) &&
+                    options->CreateDataProperty(context, InitializerArgsSymbol(isolate), prefill)
+                        .FromMaybe(false),
                 isolate);
 
     NativeConstruction construction{self, klass, hook, cif, argValues, info, prefill};
@@ -830,6 +890,7 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context, Local<v8::Functi
   if (ESClassState* esClasses = Caches::StateFor<ESClassState>(isolate)) {
     esClasses->classes.insert(extendedClass);
     esClasses->esClassOf[extendedClass] = extendedClass;
+    esClasses->constructors.emplace(extendedClass, Global<v8::Function>(isolate, ctorFunc));
   }
 
   cache->ClassPrototypes.emplace(
@@ -880,23 +941,19 @@ Class ClassBuilder::ResolveConstructedClass(Local<Context> context, Local<Value>
   return classWrapper->Klass();
 }
 
-bool ClassBuilder::IsESDerivedConstructor(Isolate* isolate, Local<Value> newTarget) {
-  if (!MayBeESClass(newTarget)) {
-    return false;
-  }
-  BaseDataWrapper* wrapper = tns::GetValue(isolate, newTarget);
-  return wrapper != nullptr && wrapper->Type() == WrapperType::ObjCClass &&
-         static_cast<ObjCClassWrapper*>(wrapper)->ESDerivedClass();
-}
-
 void ClassBuilder::ConstructESObject(Local<Context> context,
                                      const FunctionCallbackInfo<Value>& info, Class klass) {
   Isolate* isolate = info.GetIsolate();
   auto cache = Caches::Get(isolate);
 
   Local<Object> options;
+  ESClassState* state = Caches::StateFor<ESClassState>(isolate);
+  if (state == nullptr) {
+    throw NativeScriptException("The runtime is shutting down");
+  }
+
   if (info.Length() > 0 && !(info.Length() == 1 && info[0]->IsUndefined())) {
-    if (info.Length() > 1 || !IsOptionsObject(isolate, info[0])) {
+    if (info.Length() > 1 || !IsOptionsObject(isolate, state, info[0])) {
       throw NativeScriptException(
           std::string("super(...) in ") + class_getName(klass) +
           " takes no arguments or a single options object; choose the initializer with "
@@ -979,16 +1036,25 @@ void ClassBuilder::ConstructESObject(Local<Context> context,
     try {
       UnderInitScope underInit(self);
       @try {
+        // Sent straight to the implementation the hooks pass through to: going through
+        // objc_msgSend would land in the hook only to be forwarded there again.
+        Class superclass = construction != nullptr
+                               ? class_getSuperclass(construction->hook->hookClass)
+                               : InitializerSuperclass(state, klass);
         if (construction != nullptr &&
             (!hasSelection || selection->StrictEquals(construction->prefill))) {
           // The initializer Objective-C sent, with its own arguments.
+          SEL selector = *static_cast<SEL*>(construction->argValues[1]);
           ffi_arg returned = 0;
-          ffi_call(construction->cif, FFI_FN(objc_msgSend), &returned, construction->argValues);
+          ffi_call(construction->cif, FFI_FN(class_getMethodImplementation(superclass, selector)),
+                   &returned, construction->argValues);
           result = reinterpret_cast<id>(static_cast<uintptr_t>(returned));
         } else if (!hasSelection) {
-          result = reinterpret_cast<id (*)(id, SEL)>(objc_msgSend)(self, @selector(init));
+          struct objc_super sup = {self, superclass};
+          result = reinterpret_cast<id (*)(struct objc_super*, SEL)>(objc_msgSendSuper)(
+              &sup, @selector(init));
         } else {
-          if (!selection->IsObject() || tns::GetValue(isolate, selection) != nullptr) {
+          if (!selection->IsObject() || selection.As<Object>()->InternalFieldCount() > 0) {
             throw NativeScriptException(
                 "[interop.initializer.args] must be an object of initializer tokens, e.g. "
                 "{ frame }.");
@@ -997,7 +1063,8 @@ void ClassBuilder::ConstructESObject(Local<Context> context,
           const MethodMeta* initializer = ArgConverter::FindInitializerByTokens(
               context, klass, selection.As<Object>(), args, true);
           V8VectorArgs vectorArgs(args);
-          result = Interop::CallInitializer(context, initializer, self, klass, vectorArgs);
+          result =
+              Interop::CallInitializer(context, initializer, self, klass, vectorArgs, superclass);
         }
       } @catch (NSException* e) {
         initRaised = true;
@@ -1060,7 +1127,6 @@ void ClassBuilder::ConstructESObject(Local<Context> context,
 
 bool ClassBuilder::TryAdoptNativeInstance(Local<Context> context, id target, Local<Value>& result) {
   Isolate* isolate = v8::Isolate::GetCurrent();
-  auto cache = Caches::Get(isolate);
   // Runs for every object's first wrap; set lookups keep that path flat.
   Class klass = FindESClass(isolate, target);
   if (klass == nil || IsUnderInit(target)) {
@@ -1072,19 +1138,21 @@ bool ClassBuilder::TryAdoptNativeInstance(Local<Context> context, id target, Loc
     }
   }
 
-  auto ctorIt = cache->CtorFuncs.find(class_getName(klass));
-  if (ctorIt == cache->CtorFuncs.end()) {
+  ESClassState* state = Caches::StateFor<ESClassState>(isolate);
+  if (state == nullptr) {
     return false;
   }
-  Local<v8::Function> ctor = ctorIt->second->Get(isolate);
-  if (!IsESDerivedConstructor(isolate, ctor)) {
+  auto ctorIt = state->constructors.find(klass);
+  if (ctorIt == state->constructors.end()) {
     return false;
   }
+  Local<v8::Function> ctor = ctorIt->second.Get(isolate);
 
-  Local<Object> info = NewInitializerInfo(context, nullptr, {});
+  Local<Object> info = NewInitializerInfo(context, state, nullptr, {});
   Local<Object> options = Object::New(isolate);
-  tns::Assert(options->Set(context, InitializerNativeSymbol(isolate), info).FromMaybe(false),
-              isolate);
+  tns::Assert(
+      options->CreateDataProperty(context, InitializerNativeSymbol(isolate), info).FromMaybe(false),
+      isolate);
 
   NativeConstruction construction{target, klass, nullptr, nullptr, nullptr, info, Local<Value>()};
   {
@@ -1109,7 +1177,7 @@ bool ClassBuilder::TryAdoptNativeInstance(Local<Context> context, id target, Loc
                                                     Exception::CreateMessage(isolate, error));
     return false;
   }
-  auto cached = ArgConverter::FindCachedInstance(isolate, cache, target);
+  auto cached = ArgConverter::FindCachedInstance(isolate, Caches::Get(isolate), target);
   if (cached == nullptr) {
     return false;
   }

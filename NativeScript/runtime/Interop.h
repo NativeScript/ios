@@ -88,9 +88,11 @@ class Interop {
   // Throws the NSException `exception` as a NativeScriptException carrying a JS
   // Error with its name, reason and the wrapped exception as `nativeException`.
   [[noreturn]] static void ThrowAsJSError(id exception);
+  // With superclass, the initializer is sent to target as a super send to
+  // that class instead of through objc_msgSend.
   static id CallInitializer(v8::Local<v8::Context> context,
                             const MethodMeta* methodMeta, id target,
-                            Class clazz, V8Args& args);
+                            Class clazz, V8Args& args, Class superclass = nil);
   static v8::Local<v8::Value> CallFunction(ObjCMethodCall& methodCall);
   static v8::Local<v8::Value> CallFunction(CMethodCall& methodCall);
   static v8::Local<v8::Value> GetResultByType(
