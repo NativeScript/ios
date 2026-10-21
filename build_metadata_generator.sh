@@ -13,7 +13,8 @@ function build {
     mkdir build
     cmake -B build -DCMAKE_BUILD_TYPE=Release -DMETADATA_BINARY_ARCH=$1 -DCMAKE_OSX_ARCHITECTURES=$1
     cmake --build build --target clean
-    cmake --build build -j$NUMJOBS
+    # The generator alone: the Swift interop tests do not ship.
+    cmake --build build -j$NUMJOBS --target objc-metadata-generator
     mkdir "dist/$1"
     cp -r "build/bin" "dist/$1"
 }
