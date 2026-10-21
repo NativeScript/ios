@@ -356,8 +356,17 @@ for await (const value of SwiftDemo.countUp(3)) {
 
 Each `next()` advances the Swift iterator in a `Task` and settles on the JS
 thread; calls run one at a time, in order. A sequence that throws rejects
-the pending `next()` with the Swift error. Other `AsyncSequence` types,
-sequences as parameters, and cancelling an iteration are not supported yet.
+the pending `next()` with the Swift error. Leaving a `for await` loop early
+(`break`, `return`, a throw) releases the Swift iterator, which ends a stream
+Swift still produces (`onTermination` sees `.cancelled`).
+
+A class or struct conforming to `AsyncSequence` stays a JS class with its
+other members and is also async-iterable (`for await (const x of countdown)`).
+A Combine `AnyPublisher`, `PassthroughSubject` or `CurrentValueSubject` is an
+async iterator over its `values` (iOS 15+, `null` before): like `values`, it
+asks for one element at a time, so a subject drops what it sends while JS is
+not waiting; buffer in Swift (`.buffer(...)`) when that matters. Sequences as
+parameters are not supported yet.
 
 ## Observation
 
@@ -450,10 +459,9 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 ## Not yet supported
 
-Combine publishers, concrete `AsyncSequence` types,
-generic methods of generic types, other standard library generics,
-protocols with associated types and operators. Each appears in
-the coverage report with its reason.
+Generic methods of generic types, other standard library generics,
+protocols with associated types, and operators. Each appears in the coverage
+report with its reason.
 
 ## Swift language mode
 

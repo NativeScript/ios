@@ -14,6 +14,9 @@ namespace Swift {
 // thunks (ThunkEmitter) and the TypeScript declarations
 // (SwiftDefinitionWriter), so the two cannot disagree. Kinds, flags and
 // signature codes are those of NativeScript/runtime/SwiftInterop.h.
+// The JS name the runtime installs under Symbol.asyncIterator.
+constexpr const char* kAsyncIteratorKey = "@@asyncIterator";
+
 struct SwiftSurface {
   enum TypeKind {
     kClass = 0,
@@ -78,6 +81,9 @@ struct SwiftSurface {
     // `setSubscript(..., value)`, added for a settable subscript: assigns
     // that subscript (its symbol here).
     const Symbol* assignsSubscript = nullptr;
+    // `[Symbol.asyncIterator]()`, added to an AsyncSequence type: iterates
+    // the value itself.
+    bool iteratesSelf = false;
   };
 
   // A tagged enum's cases in registration order, which is the case index

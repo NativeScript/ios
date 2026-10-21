@@ -314,6 +314,47 @@ SwiftSurface describeSurface(const Module& module,
   }
 
   for (const auto& type : surface.types) {
+    const Capability* capability = classification.find(type.symbol->preciseId);
+    if (!capability || !capability->asyncElement ||
+        (type.kind != SwiftSurface::kStruct &&
+         type.kind != SwiftSurface::kClass)) {
+      continue;
+    }
+    const Symbol& sequence = *type.symbol;
+    Symbol symbol;
+    symbol.preciseId = sequence.preciseId;
+    symbol.kind = SymbolKind::InstanceMethod;
+    symbol.name = "makeAsyncIterator()";
+    symbol.baseName = kAsyncIteratorKey;
+    symbol.pathComponents = sequence.pathComponents;
+    symbol.pathComponents.push_back(symbol.name);
+    symbol.parentId = sequence.preciseId;
+    symbol.module = sequence.module;
+    symbol.docComment =
+        "Iterates the sequence: `for await (const x of value)`.";
+    surface.syntheticSymbols.push_back(std::move(symbol));
+
+    Capability iterate;
+    iterate.tier = Tier::SwiftGenerated;
+    iterate.jsName = kAsyncIteratorKey;
+    iterate.result.bridge = Bridge::AsyncSequence;
+    iterate.result.elements.push_back(*capability->asyncElement);
+    surface.syntheticCapabilities.push_back(std::move(iterate));
+
+    SwiftSurface::Member member;
+    member.symbol = &surface.syntheticSymbols.back();
+    member.capability = &surface.syntheticCapabilities.back();
+    member.owner = type.index;
+    member.module = type.module;
+    member.kind = SwiftSurface::kInstanceMethod;
+    member.flags = 0;
+    member.result = member.capability->result;
+    member.signature = ">" + signatureCode(surface, member.result);
+    member.iteratesSelf = true;
+    surface.members.push_back(std::move(member));
+  }
+
+  for (const auto& type : surface.types) {
     const Symbol& view = *type.symbol;
     if (type.kind != SwiftSurface::kStruct || !isSwiftUIView(view)) {
       continue;

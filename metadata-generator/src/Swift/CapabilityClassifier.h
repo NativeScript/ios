@@ -121,6 +121,8 @@ struct BridgedType {
   // Closure: its result (empty for Void), and whether it throws.
   std::vector<BridgedType> results;
   bool throwing = false;
+  // AsyncSequence: a Combine publisher, iterated through its `values`.
+  bool publisher = false;
 };
 
 struct Capability {
@@ -159,6 +161,9 @@ struct Capability {
   // for `objcName`, its Objective-C runtime name.
   bool objcBacked = false;
   std::string objcName;
+  // A bridged class or struct conforming to AsyncSequence: its element,
+  // which its JS class iterates with `for await` (Symbol.asyncIterator).
+  std::optional<BridgedType> asyncElement;
 
   // Bridges for SwiftGenerated callables: parameters in order, then the
   // result (or the property value type).

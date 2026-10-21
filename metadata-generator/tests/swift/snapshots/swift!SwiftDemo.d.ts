@@ -48,6 +48,23 @@ declare module "ns:swift/SwiftDemo" {
     warmLater(delta: number): void;
   }
 
+  export class WordStream {
+    constructor(text: string);
+    makeAsyncIterator(): WordStream.Iterator;
+    /**
+     * Iterates the sequence: `for await (const x of value)`.
+     */
+    [Symbol.asyncIterator](): AsyncIterableIterator<string>;
+  }
+
+  export namespace WordStream {
+    export class Iterator {
+      private constructor();
+      next(signal?: AbortSignal): Promise<string | null>;
+    }
+
+  }
+
   export type Measurement =
     | { case: "area"; width: number; height: number }
     | { case: "none" }
@@ -60,6 +77,13 @@ declare module "ns:swift/SwiftDemo" {
       symbol: string;
     }
 
+  }
+
+  export class Thermometer {
+    constructor();
+    finish(): void;
+    record(value: number): void;
+    readonly readings: AsyncIterableIterator<number>;
   }
 
   export class ParseFailure {
@@ -349,6 +373,31 @@ declare module "ns:swift/SwiftDemo" {
     static cancellations: number;
   }
 
+  export class Countdown {
+    constructor(start: number | bigint);
+    constructor(args: { from: number | bigint });
+    makeAsyncIterator(): Countdown.AsyncIterator;
+    readonly label: string;
+    readonly start: number;
+    /**
+     * Iterates the sequence: `for await (const x of value)`.
+     */
+    [Symbol.asyncIterator](): AsyncIterableIterator<number>;
+  }
+
+  export namespace Countdown {
+    export class AsyncIterator {
+      private constructor();
+      next(signal?: AbortSignal): Promise<number | null>;
+    }
+
+  }
+
+  export class StreamLog {
+    private constructor();
+    static terminations: number;
+  }
+
   export type Score = import("ns:swift/SwiftDemoKit").Pair<string, number>;
   export type Coordinates = { latitude: number; longitude: number };
   export function allFlavors(): (Flavor)[];
@@ -419,6 +468,7 @@ declare module "ns:swift/SwiftDemo" {
   export function excite(greeting: Greeting): void;
   export function lookup(key: string, resolve: (arg0: string) => (number | bigint) | null | undefined): number;
   export function settle(value: number | bigint): import("ns:swift/SwiftDemoKit").Outcome<number>;
+  export function ticker(): AsyncIterableIterator<number>;
   export function unwrap(result: { readonly case: "success"; readonly value: string } | { readonly case: "failure"; readonly value: Error | string }): string;
   export function compact(values: readonly ((number | bigint) | null | undefined)[]): (number)[];
   export function countUp(limit: number | bigint): AsyncIterableIterator<number>;

@@ -388,10 +388,20 @@ class Emitter {
         return "__nsReportProtocol" +
                std::to_string(typeIndexOf(type.symbolId)) + "(" + reporter +
                ", " + value + ")";
-      case Bridge::AsyncSequence:
-        return reporter + ".returnAsyncSequence(__NSAsyncIterator(" + value +
-               ") { r, element in " +
-               returnValue(type.elements.at(0), "r", "element") + " })";
+      case Bridge::AsyncSequence: {
+        std::string report = ") { r, element in " +
+                             returnValue(type.elements.at(0), "r", "element") +
+                             " })";
+        if (!type.publisher) {
+          return reporter + ".returnAsyncSequence(__NSAsyncIterator(" + value +
+                 report;
+        }
+        // A publisher's `values` needs iOS 15; earlier systems get null.
+        return "if #available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *) "
+               "{ " +
+               reporter + ".returnAsyncSequence(__NSAsyncIterator(" + value +
+               ".values" + report + " } else { " + reporter + ".returnNull() }";
+      }
       case Bridge::EnumCase:
         return reporter + ".returnString(__nsEnumName" +
                std::to_string(typeIndexOf(type.symbolId)) + "(" + value + "))";
@@ -593,6 +603,9 @@ class Emitter {
     if (member.assignsSubscript) {
       return emitSubscriptAssignment(member);
     }
+    if (member.iteratesSelf) {
+      return emitIteration(member);
+    }
     if (member.kind == SwiftSurface::kEnumCase) {
       // Cases are values (names, or objects JS builds); nothing to call.
       addRegistration(member, "nil", "nil");
@@ -687,6 +700,24 @@ class Emitter {
 
     addRegistration(member, "__nsThunk" + std::to_string(getterIndex),
                     setterName);
+    return code;
+  }
+
+  // `[Symbol.asyncIterator]()`: an async iterator over the receiver.
+  std::string emitIteration(const SwiftSurface::Member& member) {
+    const Symbol& sequence = *_module.find(member.symbol->parentId);
+    int index = _thunkCount++;
+    std::string code =
+        "// " + sequence.preciseId + " (async iterator)\n" + thunkHeader(index);
+    std::string availability = availabilityCondition(_module, sequence);
+    if (!availability.empty()) {
+      code += "  guard #available(" + availability +
+              ") else { return rt.throwMessage(" +
+              quoted(sequence.name + " is not available") + ") }\n";
+    }
+    std::string receiver = bindReceiver(sequence, code);
+    code += "  " + returnValue(member.result, "rt", receiver) + "\n}\n\n";
+    addRegistration(member, "__nsThunk" + std::to_string(index), "nil");
     return code;
   }
 

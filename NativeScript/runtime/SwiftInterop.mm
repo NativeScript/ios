@@ -3254,8 +3254,9 @@ bool Select(Isolate* isolate, Local<Context> context, const MemberGroup& group,
 LoadedModule* LoadedFor(Isolate* isolate, const ModuleInfo* module);
 Local<External> DataFor(Isolate* isolate, const void* pointer);
 
-// A Swift iterator owned by the step function JS calls; released when that
-// function is collected.
+// A Swift iterator owned by the step function JS calls; released when the
+// iteration finishes (the end, or `return()` after `break`) or that function
+// is collected.
 struct IteratorBox {
   Global<v8::Function> step;
   const ModuleInfo* module;
@@ -3265,13 +3266,25 @@ struct IteratorBox {
   MemberInfo member;
 };
 
+// Releases the Swift iterator, which ends a stream Swift still produces
+// (AsyncStream's onTermination sees `.cancelled`). A step in flight keeps
+// its own reference until it settles.
+void FinishCallback(const FunctionCallbackInfo<Value>& info) {
+  auto* box = static_cast<IteratorBox*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+  if (box->iterator != nullptr) {
+    box->module->release(box->iterator);
+    box->iterator = nullptr;
+  }
+}
+
 void StepCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   auto* box = static_cast<IteratorBox*>(
       info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
   auto* state = Caches::StateFor<IsolateState>(isolate);
   LoadedModule* loaded = LoadedFor(isolate, box->module);
-  if (state == nullptr || loaded == nullptr) {
+  if (state == nullptr || loaded == nullptr || box->iterator == nullptr) {
     return;
   }
   NSSwiftValue slot{};
@@ -3299,14 +3312,28 @@ void StepCallback(const FunctionCallbackInfo<Value>& info) {
 
 // Turns a step function (a Promise of `[element]`, or `[]` at the end) into
 // an async iterator, one step at a time.
-constexpr const char* kIteratorFactory = R"js((function (step) {
+// `finish` releases the Swift iterator at the end, or on `return()` when a
+// `for await` loop exits early.
+constexpr const char* kIteratorFactory = R"js((function (step, finish) {
   let pending = Promise.resolve();
+  let done = false;
+  const end = () => {
+    if (!done) {
+      done = true;
+      finish();
+    }
+    return { value: undefined, done: true };
+  };
   return {
     next() {
-      const result = pending.then(() => step()).then((values) =>
-        values.length ? { value: values[0], done: false } : { value: undefined, done: true });
+      const result = pending.then(() => (done ? [] : step())).then((values) =>
+        values.length ? { value: values[0], done: false } : end());
       pending = result.then(() => undefined, () => undefined);
       return result;
+    },
+    return(value) {
+      end();
+      return Promise.resolve({ value, done: true });
     },
     [Symbol.asyncIterator]() {
       return this;
@@ -3342,18 +3369,26 @@ MaybeLocal<Value> MakeAsyncIterator(Isolate* isolate, Local<Context> context,
     delete box;
     return MaybeLocal<Value>();
   }
+  Local<v8::Function> finish;
+  if (!v8::Function::New(context, FinishCallback, DataFor(isolate, box)).ToLocal(&finish)) {
+    module->release(iterator);
+    delete box;
+    return MaybeLocal<Value>();
+  }
   box->step.Reset(isolate, step);
   box->step.SetWeak(
       box,
       [](const WeakCallbackInfo<IteratorBox>& info) {
         IteratorBox* collected = info.GetParameter();
         collected->step.Reset();
-        collected->module->release(collected->iterator);
+        if (collected->iterator != nullptr) {
+          collected->module->release(collected->iterator);
+        }
         delete collected;
       },
       WeakCallbackType::kParameter);
-  Local<Value> argv[] = {step};
-  return state->iteratorFactory.Get(isolate)->Call(context, v8::Undefined(isolate), 1, argv);
+  Local<Value> argv[] = {step, finish};
+  return state->iteratorFactory.Get(isolate)->Call(context, v8::Undefined(isolate), 2, argv);
 }
 
 LoadedModule* LoadedFor(Isolate* isolate, const ModuleInfo* module) {
@@ -3997,7 +4032,10 @@ class Builder {
   }
 
   void InstallOnTemplate(Local<FunctionTemplate> tmpl, const MemberGroup& group) {
-    Local<v8::String> name = tns::ToV8String(_isolate, group.jsName);
+    // An AsyncSequence type's iterator (see SwiftSurface's kAsyncIteratorKey).
+    Local<v8::Name> name = group.jsName == "@@asyncIterator"
+                               ? Local<v8::Name>(v8::Symbol::GetAsyncIterator(_isolate))
+                               : Local<v8::Name>(tns::ToV8String(_isolate, group.jsName));
     switch (group.kind) {
       case NSSwiftMemberInitializer:
         // Reached through `new`; see ConstructorCallback.

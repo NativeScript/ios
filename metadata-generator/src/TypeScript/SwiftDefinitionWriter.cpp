@@ -56,6 +56,9 @@ bool isIdentifier(const std::string& name) {
 }
 
 std::string propertyKey(const std::string& name) {
+  if (name == kAsyncIteratorKey) {
+    return "[Symbol.asyncIterator]";
+  }
   return isIdentifier(name) ? name : "\"" + name + "\"";
 }
 

@@ -931,6 +931,70 @@ describe("ns:swift", function () {
         });
     });
 
+    describe("AsyncSequence types and publishers", function () {
+        it("iterates an AsyncSequence type with for await", function (done) {
+            var countdown = new SwiftDemo.Countdown(3);
+            expect(countdown.label).toBe("countdown from 3");
+            (async function () {
+                var values = [];
+                for await (var value of countdown) {
+                    values.push(value);
+                }
+                var words = [];
+                for await (var word of new SwiftDemo.WordStream("a b c")) {
+                    words.push(word);
+                }
+                return [values, words];
+            })().then(function (result) {
+                expect(result).toEqual([[3, 2, 1], ["a", "b", "c"]]);
+                done();
+            }, done.fail);
+        });
+
+        it("ends the Swift stream when a for await loop breaks", function (done) {
+            var before = SwiftDemo.StreamLog.terminations;
+            (async function () {
+                var seen = [];
+                for await (var tick of SwiftDemo.ticker()) {
+                    seen.push(tick);
+                    if (tick === 3) {
+                        break;
+                    }
+                }
+                return seen;
+            })().then(function (seen) {
+                expect(seen).toEqual([1, 2, 3]);
+                setTimeout(function () {
+                    expect(SwiftDemo.StreamLog.terminations).toBe(before + 1);
+                    done();
+                }, 200);
+            }, done.fail);
+        });
+
+        it("iterates a Combine publisher's values", function (done) {
+            var thermometer = new SwiftDemo.Thermometer();
+            var readings = thermometer.readings;
+            var received = [];
+            (async function () {
+                for await (var reading of readings) {
+                    received.push(reading);
+                }
+            })().then(function () {
+                expect(received).toEqual([20.5, 21]);
+                done();
+            }, done.fail);
+            // A subject drops what it sends while nothing waits for a value,
+            // so each value goes out once the loop is waiting again.
+            setTimeout(function () {
+                thermometer.record(20.5);
+                setTimeout(function () {
+                    thermometer.record(21);
+                    setTimeout(function () { thermometer.finish(); }, 150);
+                }, 150);
+            }, 200);
+        });
+    });
+
     describe("SwiftUI views", function () {
         it("hosts a view in a UIHostingController", function () {
             var badge = new SwiftDemo.Badge("Inbox", 3);

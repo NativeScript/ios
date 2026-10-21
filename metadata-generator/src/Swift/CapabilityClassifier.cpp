@@ -257,6 +257,7 @@ class Classifier {
     }
     rejectUnbridgedPayloads();
     rejectUnadoptableProtocols();
+    classifyAsyncSequences();
     for (const auto& entry : _module.symbols) {
       if (!isNominalType(entry.second.kind)) {
         _result.bySymbol[entry.first] = classifyOther(entry.second);
@@ -754,6 +755,83 @@ class Classifier {
     return false;
   }
 
+  // The element of each bridged class or struct conforming to AsyncSequence:
+  // its `Element` typealias, or what its iterator's `next()` returns.
+  void classifyAsyncSequences() {
+    for (auto& entry : _result.bySymbol) {
+      const Symbol* symbol = _module.find(entry.first);
+      Capability& capability = entry.second;
+      if (!symbol || capability.tier != Tier::SwiftGenerated ||
+          (symbol->kind != SymbolKind::Struct &&
+           symbol->kind != SymbolKind::Class) ||
+          std::find(symbol->conformances.begin(), symbol->conformances.end(),
+                    KnownTypes::kAsyncSequence) == symbol->conformances.end()) {
+        continue;
+      }
+      const TypeRef* element = memberType(*symbol, "Element");
+      if (!element) {
+        const TypeRef* iterator = memberType(*symbol, "AsyncIterator");
+        const Symbol* iteratorType = nullptr;
+        if (iterator) {
+          for (const auto& fragment : iterator->fragments) {
+            if (!fragment.preciseIdentifier.empty()) {
+              iteratorType = _module.find(fragment.preciseIdentifier);
+            }
+          }
+        }
+        for (const auto& id : iteratorType ? iteratorType->memberIds
+                                           : std::vector<std::string>()) {
+          // Its own next(), not the protocol's default implementation.
+          const Symbol* next = _module.find(id);
+          if (next && next->name == "next()" && next->returnType &&
+              !next->isSynthesized) {
+            element = &*next->returnType;
+          }
+        }
+      }
+      if (!element) {
+        continue;
+      }
+      _substitutions = substitutionsOf(*symbol);
+      std::vector<std::string> reasons;
+      BridgedType bridged =
+          bridge(*element, genericNamesInScope(_module, *symbol), reasons);
+      // An iterator's `next()` returns the element as an optional.
+      if (!memberType(*symbol, "Element")) {
+        bridged.optional = false;
+        if (bridged.node.kind == TypeNode::Kind::Optional &&
+            !bridged.node.children.empty()) {
+          bridged.node = bridged.node.children[0];
+        }
+      }
+      if (reasons.empty() && !bridged.optional &&
+          bridged.bridge != Bridge::Void && bridged.bridge != Bridge::Closure &&
+          bridged.bridge != Bridge::AsyncSequence) {
+        capability.asyncElement = std::move(bridged);
+      }
+    }
+  }
+
+  // The type a member typealias of `type` named `name` (or, for
+  // `AsyncIterator`, the nested type or method declaring it) stands for.
+  const TypeRef* memberType(const Symbol& type, const std::string& name) const {
+    for (const auto& id : type.memberIds) {
+      const Symbol* member = _module.find(id);
+      if (!member) {
+        continue;
+      }
+      if (member->kind == SymbolKind::TypeAlias && member->name == name &&
+          member->aliasedType) {
+        return &*member->aliasedType;
+      }
+      if (name == "AsyncIterator" && member->name == "makeAsyncIterator()" &&
+          member->returnType) {
+        return &*member->returnType;
+      }
+    }
+    return nullptr;
+  }
+
   BridgedType bridgeOwner(const Symbol& owner) const {
     BridgedType bridged;
     if (const Capability* capability = _result.find(owner.preciseId);
@@ -1034,6 +1112,16 @@ class Classifier {
       }
       bridged.elements.push_back(std::move(failure));
       return "";
+    }
+    // Combine publishers as async sequences of their output.
+    if ((usr == KnownTypes::kAnyPublisher ||
+         usr == KnownTypes::kPassthroughSubject ||
+         usr == KnownTypes::kCurrentValueSubject) &&
+        node.components.size() == 1 &&
+        node.components[0].arguments.size() == 2) {
+      bridged.bridge = Bridge::AsyncSequence;
+      bridged.publisher = true;
+      return bridgeElement(node.components[0].arguments[0], bridged, false);
     }
     if (usr == KnownTypes::kSet && node.components.size() == 1 &&
         node.components[0].arguments.size() == 1) {
