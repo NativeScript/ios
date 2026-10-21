@@ -646,6 +646,39 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
   tns::Assert(success, isolate);
 }
 
+// Sets the GC protection of self's JS object directly when this thread is already inside its
+// isolate and holds the lock, as for native code called from JS. That skips the liveness check,
+// the Locker, the isolate scope and the thread check the general path needs. Returns false when
+// this thread is not inside the isolate, so the caller takes that path.
+static bool SetGcProtectionInIsolate(Isolate* isolate, id self, bool protect) {
+  if (Isolate::TryGetCurrent() != isolate || !v8::Locker::IsLocked(isolate)) {
+    return false;
+  }
+  void* raw = isolate->GetData(0);
+  if (raw == nullptr) {
+    return true;
+  }
+  Caches* cache = reinterpret_cast<std::shared_ptr<Caches>*>(raw)->get();
+  if (!cache->IsValid()) {
+    return true;
+  }
+  auto it = cache->Instances.find(self);
+  if (it == cache->Instances.end() || it->second == nullptr) {
+    return true;
+  }
+  HandleScope handle_scope(isolate);
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, it->second->Get(isolate));
+  if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+    if (protect) {
+      objcWrapper->GcProtect();
+    } else {
+      objcWrapper->GcUnprotect();
+    }
+  }
+  return true;
+}
+
 void ClassBuilder::SwizzleRetainRelease(Isolate* isolate, Class extendedClass) {
   IsolateWrapper isolateWrapper(isolate);
 
@@ -661,10 +694,12 @@ void ClassBuilder::SwizzleRetainRelease(Isolate* isolate, Class extendedClass) {
   id (*retain)(id, SEL) =
       (id (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(retain));
   IMP newRetain = imp_implementationWithBlock(^id(id self) {
-    if (!isolateWrapper.IsValid()) {
+    // Only the 1 -> 2 transition changes anything, so other counts skip the isolate checks.
+    if ([self retainCount] != 1 || SetGcProtectionInIsolate(isolate, self, true) ||
+        !isolateWrapper.IsValid()) {
       return retain(self, @selector(retain));
     }
-    if ([self retainCount] == 1) {
+    {
       auto runtime = Runtime::GetRuntime(isolate);
       auto runtimeLoop = runtime->RuntimeLoop();
       void* weakSelf = (__bridge void*)self;
@@ -699,12 +734,14 @@ void ClassBuilder::SwizzleRetainRelease(Isolate* isolate, Class extendedClass) {
   void (*release)(id, SEL) =
       (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(release));
   IMP newRelease = imp_implementationWithBlock(^(id self) {
-    if (!isolateWrapper.IsValid()) {
+    // Only the 2 -> 1 transition changes anything, so other counts skip the isolate checks.
+    if ([self retainCount] != 2 || SetGcProtectionInIsolate(isolate, self, false) ||
+        !isolateWrapper.IsValid()) {
       release(self, @selector(release));
       return;
     }
 
-    if ([self retainCount] == 2) {
+    {
       void* weakSelf = (__bridge void*)self;
       auto gcUnprotect = [isolateWrapper, weakSelf, isolate]() {
         auto innerCache = isolateWrapper.GetCache();
