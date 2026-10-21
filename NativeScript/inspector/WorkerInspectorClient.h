@@ -5,6 +5,7 @@
 #include <dispatch/dispatch.h>
 
 #include <atomic>
+#include <cstdint>
 #include <mutex>
 #include <queue>
 #include <string>
@@ -38,6 +39,11 @@ class WorkerInspectorClient final : public V8InspectorClient,
   const std::string& SessionId() const { return sessionId_; }
   const std::string& TargetId() const { return targetId_; }
   const std::string& Url() const { return url_; }
+
+  // Worker thread. See JsV8InspectorClient::FrontendGeneration.
+  void SetFrontendGeneration(uint64_t generation) {
+    frontendGeneration_ = generation;
+  }
 
   // Any thread. Queues a CDP message (already stripped of routing concerns)
   // and wakes the worker runloop / a nested pause loop.
@@ -106,6 +112,9 @@ class WorkerInspectorClient final : public V8InspectorClient,
   std::atomic<bool> pauseTerminated_{false};
   bool runningPauseLoop_ = false;  // worker thread only
   bool pendingReset_ = false;      // worker thread only
+  // JsV8InspectorClient::FrontendGeneration() as of this session's latest
+  // (re)creation or registration; worker thread only.
+  uint64_t frontendGeneration_ = 0;
 };
 
 }  // namespace v8_inspector

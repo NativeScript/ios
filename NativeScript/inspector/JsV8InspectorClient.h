@@ -38,6 +38,13 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   // scan and copy it costs) for payloads that cannot contain a sourceMapURL.
   void SendRawToFrontend(const std::string& message);
 
+  // Bumped, atomically with the sender swap, whenever a frontend goes away
+  // or is replaced. A worker session records it when created, reset or
+  // registered; output it sends with a stale generation belongs to a
+  // departed frontend and is dropped instead of reaching the next one.
+  uint64_t FrontendGeneration();
+  void SendWorkerOutput(uint64_t generation, const std::string& message);
+
   // Worker targets (Chrome DevTools Target domain, flat-session mode).
   // Register/Unregister are called on the worker's own thread.
   void RegisterWorkerTarget(int workerId, WorkerInspectorClient* client);
@@ -65,10 +72,11 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
  private:
   static constexpr int contextGroupId = 1;
 
-  // Queued behind the departing frontend's messages; replaces the main
-  // session when it reaches the front of the queue.
-  static constexpr const char* kResetSessionMessage =
-      "{\"__nsInternal\":\"resetSession\"}";
+  // Queued on every connect and disconnect, ahead of anything the new
+  // frontend sends. When dispatched it replaces the main session if it served
+  // another connection, then binds the session's output to the current one.
+  static constexpr const char* kSessionSyncMessage =
+      "{\"__nsInternal\":\"syncSession\"}";
 
   std::atomic<bool> isConnected_{false};
   // Set when a reset arrives inside the pause loop (which may run on any
@@ -81,17 +89,24 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   std::unique_ptr<V8InspectorSession> session_;
   tns::Runtime* runtime_;
   v8::Isolate* isolate_;
-  bool terminated_;
+  bool terminated_ = false;
   std::queue<std::string> messages_;
   bool runningNestedLoops_;
   dispatch_queue_t messagesQueue_;
   dispatch_queue_t messageLoopQueue_;
   dispatch_semaphore_t messageArrived_;
+  // The current connection; guarded by senderMutex_.
   std::function<void(const std::string&)> sender_;
-  uint64_t connectionId_ =
-      0;  // id of sender_'s connection, guarded by senderMutex_
-  bool isWaitingForDebugger_;
-  bool hasScheduledDebugBreak_;
+  uint64_t connectionId_ = 0;
+  // The connection the main session serves, which lags the current one until
+  // the sync message is dispatched. Session output goes here, so replies to
+  // a replaced frontend's in-flight commands never reach its successor.
+  // Guarded by senderMutex_.
+  std::function<void(const std::string&)> sessionSender_;
+  uint64_t sessionConnectionId_ = 0;
+  uint64_t frontendGeneration_ = 0;  // guarded by senderMutex_
+  bool isWaitingForDebugger_ = false;
+  bool hasScheduledDebugBreak_ = false;
 
   std::unique_ptr<tns::inspector::TracingAgentImpl> tracing_agent_;
 
@@ -155,7 +170,13 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   // Pause loop only: resumes and defers the session swap to the next drain.
   void DeferSessionResetFromPauseLoop();
   void ResetMainSession();
-  void QueueSessionReset();
+  // Binds the session to the current connection unless it served another
+  // one, in which case it binds nothing and returns false.
+  bool TryBindSession();
+  // Never inside the pause loop: replaces the session if needed, then binds.
+  void SyncSessionWithFrontend();
+  bool SessionOwnsFrontend();
+  void QueueSessionSync();
   void EnqueueMessage(const std::string& message);
   void ScheduleMessageDrain();
   std::string PumpMessage();

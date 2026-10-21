@@ -168,6 +168,11 @@ void WorkerInspectorClient::DoResetSession() {
   }
   session_ =
       inspector_->connect(contextGroupId, this, {}, v8_inspector::V8Inspector::kFullyTrusted);
+
+  JsV8InspectorClient* root = JsV8InspectorClient::GetInstance();
+  if (root != nullptr) {
+    frontendGeneration_ = root->FrontendGeneration();
+  }
 }
 
 void WorkerInspectorClient::MaybeResetSession() {
@@ -267,7 +272,7 @@ void WorkerInspectorClient::SendWrapped(const std::string& message) {
 
   JsV8InspectorClient* root = JsV8InspectorClient::GetInstance();
   if (root != nullptr) {
-    root->SendToFrontend(wrapped);
+    root->SendWorkerOutput(frontendGeneration_, wrapped);
   }
 }
 

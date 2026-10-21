@@ -18,11 +18,12 @@ class InspectorServer {
   // process-unique connection id: onClientConnected hands out its sender,
   // and onClientDisconnected fires once with the same id when the
   // connection closes, after which that sender drops every message.
-  // One client at a time: accepting a client closes the previous one. The
-  // previous client's onClientDisconnected may still be running on its own
-  // queue when the new onClientConnected starts, and a message it had
-  // already read may still reach onMessage afterwards, so callers must
-  // check the connection id.
+  // One client at a time: accepting a client closes the previous one, and
+  // that close reports onClientDisconnected before the new onClientConnected.
+  // A client that closed itself (EOF, read or write error) reports from its
+  // own queue, which can interleave with a new onClientConnected. A message
+  // the previous client had already read may reach onMessage after the
+  // takeover, so callers must check the connection id.
   static in_port_t Init(
       std::function<void(uint64_t connectionId, Sender sender)>
           onClientConnected,

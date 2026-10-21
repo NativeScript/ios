@@ -5,7 +5,6 @@
 
 #include <atomic>
 #include <memory>
-#include <mutex>
 
 namespace v8_inspector {
 
@@ -146,11 +145,9 @@ in_port_t InspectorServer::Init(
     assert(false);
   }
 
-  struct ActiveConnection {
-    std::mutex mutex;
-    std::weak_ptr<Connection> connection;
-  };
-  auto active = std::make_shared<ActiveConnection>();
+  // Only touched by the accept handler, which libdispatch never runs
+  // concurrently with itself.
+  __block std::weak_ptr<Connection> activeConnection;
 
   // Set up the dispatch source that will alert us to new incoming connections
   dispatch_queue_t q = dispatch_queue_create("server_queue", DISPATCH_QUEUE_CONCURRENT);
@@ -193,20 +190,17 @@ in_port_t InspectorServer::Init(
         continue;
       }
 
+      // The accept handler is serial, so back-to-back accepts take over in
+      // order and the newest client stays active.
+      std::shared_ptr<Connection> previous = activeConnection.lock();
+      activeConnection = connection;
+      if (previous != nullptr) {
+        CloseConnection(previous);
+      }
+      onClientConnected(connection->id,
+                        [connection](const std::string& message) { Send(connection, message); });
+
       dispatch_async(connection->queue, ^{
-        {
-          // Held across both callbacks so two clients accepted back to back
-          // cannot hand out their senders in the opposite order.
-          std::lock_guard<std::mutex> lock(active->mutex);
-          std::shared_ptr<Connection> previous = active->connection.lock();
-          active->connection = connection;
-          if (previous != nullptr) {
-            CloseConnection(previous);
-          }
-          onClientConnected(connection->id, [connection](const std::string& message) {
-            Send(connection, message);
-          });
-        }
         ReadNextMessage(connection);
       });
     }
