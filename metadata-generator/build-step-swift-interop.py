@@ -8,13 +8,17 @@
 # SDK modules (WeatherKit), SwiftPM packages and the app's own module. They are
 # generated as one unit. The script writes the object file and the extra
 # linker arguments, one per line, to
-# $CONFIGURATION_BUILD_DIR/NSSwiftInterop-<arch>/link-arguments.txt.
+# $CONFIGURATION_BUILD_DIR/NSSwiftInterop-<arch>/link-arguments.txt. When the
+# extracted symbol graphs, the generator and the settings are unchanged, the
+# previous object is reused.
 #
 # Optional settings:
 #   NS_SWIFT_UNIT                  unit name (default: <product module>Swift)
 #   NS_SWIFT_VERIFY                NO skips compiler verification of the surface
 #   NS_TYPESCRIPT_DECLARATIONS_PATH  also writes swift!<Module>.d.ts there
 
+import hashlib
+import json
 import os
 import shlex
 import shutil
@@ -42,8 +46,10 @@ def main(arch):
     modules = env("NS_SWIFT_MODULES").split()
     work = os.path.join(env("CONFIGURATION_BUILD_DIR"), "NSSwiftInterop-" + arch)
     arguments_file = os.path.join(work, "link-arguments.txt")
-    shutil.rmtree(work, ignore_errors=True)
-    os.makedirs(work)
+    key_file = os.path.join(work, "cache-key.txt")
+    for stale in ("graphs", "verify"):
+        shutil.rmtree(os.path.join(work, stale), ignore_errors=True)
+    os.makedirs(work, exist_ok=True)
     if not modules:
         open(arguments_file, "w").close()
         return
@@ -100,15 +106,33 @@ def main(arch):
     declarations = env("NS_TYPESCRIPT_DECLARATIONS_PATH")
     if declarations:
         generator += ["-output-typescript", os.path.join(declarations, "swift")]
-    run(generator + ["Xclang"], os.path.join(work, "generator.log"))
-
     thunks = os.path.join(work, unit + "+NativeScript.swift")
     obj = os.path.join(work, unit + "+NativeScript.o")
     optimization = "-Onone" if env("CONFIGURATION") == "Debug" else "-O"
-    run(["xcrun", "swiftc", "-parse-as-library", "-c", thunks, "-o", obj,
-         "-module-name", "NSSwiftInterop" + unit, "-target", target, "-sdk", sdk,
-         "-swift-version", "5", optimization] + search_flags,
-        os.path.join(work, "swiftc.log"))
+    compile = ["xcrun", "swiftc", "-parse-as-library", "-c", thunks, "-o", obj,
+               "-module-name", "NSSwiftInterop" + unit, "-target", target, "-sdk", sdk,
+               "-swift-version", "5", optimization] + search_flags
+
+    # Everything the object depends on.
+    digest = hashlib.sha256()
+    for directory in graph_dirs:
+        for name in sorted(os.listdir(directory)):
+            with open(os.path.join(directory, name), "rb") as graph:
+                digest.update(name.encode() + graph.read())
+    tool = os.stat("./objc-metadata-generator")
+    digest.update(json.dumps([generator, compile, tool.st_size, tool.st_mtime,
+                              os.stat(__file__).st_mtime]).encode())
+    key = digest.hexdigest()
+    previous = open(key_file).read() if os.path.exists(key_file) else ""
+    if previous == key and os.path.exists(obj):
+        print("Swift interop: {} is up to date".format(obj))
+    else:
+        if os.path.exists(key_file):
+            os.remove(key_file)
+        run(generator + ["Xclang"], os.path.join(work, "generator.log"))
+        run(compile, os.path.join(work, "swiftc.log"))
+        with open(key_file, "w") as output:
+            output.write(key)
 
     with open(arguments_file, "w") as output:
         output.write(obj + "\n")

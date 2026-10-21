@@ -70,8 +70,10 @@ Objective-C metadata step:
    with `-u` for every register symbol.
 
 The step's logs and outputs are in `$(CONFIGURATION_BUILD_DIR)/NSSwiftInterop-<arch>`.
-Verification and compilation add build time (WeatherKit: about 19 s per
-architecture in a Release build).
+Generation and compilation take a while (WeatherKit: about 19 s per
+architecture in a Release build), so the object is reused while the
+extracted symbol graphs, the generator and the settings stay the same; an
+unchanged build pays only for the extraction.
 
 ## Generation units
 
