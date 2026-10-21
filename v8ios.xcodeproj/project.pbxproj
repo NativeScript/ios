@@ -138,6 +138,7 @@
 		C2937525229FC1600075CB16 /* TNSFunctionPointers.m in Sources */ = {isa = PBXBuildFile; fileRef = C293750C229FC1600075CB16 /* TNSFunctionPointers.m */; };
 		C2937526229FC1600075CB16 /* TNSRecords.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937510229FC1600075CB16 /* TNSRecords.m */; };
 		C2937527229FC1600075CB16 /* TNSPrimitives.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937511229FC1600075CB16 /* TNSPrimitives.m */; };
+		5D0E5EE00000000000000001 /* TNSBenchmark.m in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5EE00000000000000003 /* TNSBenchmark.m */; };
 		C2937528229FC1600075CB16 /* TNSObjCTypes.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937512229FC1600075CB16 /* TNSObjCTypes.m */; };
 		C2937529229FC1600075CB16 /* TNSPrimitivePointers.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937515229FC1600075CB16 /* TNSPrimitivePointers.m */; };
 		C298C027233C9AEA000DDF54 /* TSHelpers.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C298C025233C9AEA000DDF54 /* TSHelpers.cpp */; };
@@ -349,6 +350,7 @@
 		A09586F9A155253666BE4E0E /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B33BDC0F84408229452C85B /* Extensions.swift */; };
 		EF918E4F1A6F3E39721F8C44 /* Shapes.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA98D6B239608C28AFB14F15 /* Shapes.swift */; };
 		1A9C83B48771CCA1BBEA3F77 /* Values.swift in Sources */ = {isa = PBXBuildFile; fileRef = D76F7C886215EB9DB96CA88E /* Values.swift */; };
+		5D0E5EE00000000000000004 /* Benchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5EE00000000000000005 /* Benchmark.swift */; };
 		2B7A41C09E3F4D21A6C0B001 /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7A41C09E3F4D21A6C0B002 /* Views.swift */; };
 		5D0E5ED0000000000000001B /* Badge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5ED0000000000000001A /* Badge.swift */; };
 		5D0E5ED00000000000000019 /* Streams.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5ED00000000000000018 /* Streams.swift */; };
@@ -645,6 +647,8 @@
 		C293750C229FC1600075CB16 /* TNSFunctionPointers.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSFunctionPointers.m; sourceTree = "<group>"; };
 		C293750D229FC1600075CB16 /* TNSObjCTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSObjCTypes.h; sourceTree = "<group>"; };
 		C293750E229FC1600075CB16 /* TNSPrimitives.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSPrimitives.h; sourceTree = "<group>"; };
+		5D0E5EE00000000000000002 /* TNSBenchmark.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSBenchmark.h; sourceTree = "<group>"; };
+		5D0E5EE00000000000000003 /* TNSBenchmark.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSBenchmark.m; sourceTree = "<group>"; };
 		C293750F229FC1600075CB16 /* TNSPrimitivePointers.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSPrimitivePointers.h; sourceTree = "<group>"; };
 		C2937510229FC1600075CB16 /* TNSRecords.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSRecords.m; sourceTree = "<group>"; };
 		C2937511229FC1600075CB16 /* TNSPrimitives.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSPrimitives.m; sourceTree = "<group>"; };
@@ -914,6 +918,7 @@
 		9B33BDC0F84408229452C85B /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Extensions.swift"; sourceTree = "<group>"; };
 		CA98D6B239608C28AFB14F15 /* Shapes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Shapes.swift"; sourceTree = "<group>"; };
 		D76F7C886215EB9DB96CA88E /* Values.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Values.swift"; sourceTree = "<group>"; };
+		5D0E5EE00000000000000005 /* Benchmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Benchmark.swift"; sourceTree = "<group>"; };
 		2B7A41C09E3F4D21A6C0B002 /* Views.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Views.swift"; sourceTree = "<group>"; };
 		5D0E5ED0000000000000001A /* Badge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Badge.swift"; sourceTree = "<group>"; };
 		5D0E5ED00000000000000018 /* Streams.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Streams.swift"; sourceTree = "<group>"; };
@@ -1308,6 +1313,8 @@
 				C2937512229FC1600075CB16 /* TNSObjCTypes.m */,
 				C293750E229FC1600075CB16 /* TNSPrimitives.h */,
 				C2937511229FC1600075CB16 /* TNSPrimitives.m */,
+				5D0E5EE00000000000000002 /* TNSBenchmark.h */,
+				5D0E5EE00000000000000003 /* TNSBenchmark.m */,
 				C293750F229FC1600075CB16 /* TNSPrimitivePointers.h */,
 				C2937515229FC1600075CB16 /* TNSPrimitivePointers.m */,
 				C2937513229FC1600075CB16 /* TNSFunctionPointers.h */,
@@ -1717,6 +1724,7 @@
 				9B33BDC0F84408229452C85B /* Extensions.swift */,
 				CA98D6B239608C28AFB14F15 /* Shapes.swift */,
 				D76F7C886215EB9DB96CA88E /* Values.swift */,
+				5D0E5EE00000000000000005 /* Benchmark.swift */,
 				2B7A41C09E3F4D21A6C0B002 /* Views.swift */,
 				5D0E5ED0000000000000001A /* Badge.swift */,
 				5D0E5ED00000000000000018 /* Streams.swift */,
@@ -2398,6 +2406,7 @@
 				C293751C229FC1600075CB16 /* TNSFunctions.m in Sources */,
 				C2937529229FC1600075CB16 /* TNSPrimitivePointers.m in Sources */,
 				C2937527229FC1600075CB16 /* TNSPrimitives.m in Sources */,
+				5D0E5EE00000000000000001 /* TNSBenchmark.m in Sources */,
 				C2937521229FC1600075CB16 /* TNSApi.m in Sources */,
 				C293751E229FC1600075CB16 /* TNSDeclarationConflicts.m in Sources */,
 				C25376FD2416302D00660D62 /* TNSPseudoDataTypes.m in Sources */,
@@ -2539,6 +2548,7 @@
 				A09586F9A155253666BE4E0E /* Extensions.swift in Sources */,
 				EF918E4F1A6F3E39721F8C44 /* Shapes.swift in Sources */,
 				1A9C83B48771CCA1BBEA3F77 /* Values.swift in Sources */,
+				5D0E5EE00000000000000004 /* Benchmark.swift in Sources */,
 				2B7A41C09E3F4D21A6C0B001 /* Views.swift in Sources */,
 				5D0E5ED0000000000000001B /* Badge.swift in Sources */,
 				5D0E5ED00000000000000019 /* Streams.swift in Sources */,

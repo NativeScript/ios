@@ -109,6 +109,13 @@ declare module "ns:swift/SwiftDemo" {
     export function hashValue(value: Precipitation): number;
   }
 
+  export class BenchmarkPoint {
+    constructor(x: number, y: number);
+    constructor(args: { x: number; y: number });
+    x: number;
+    y: number;
+  }
+
   export class CountdownError {
     private constructor();
     /**
@@ -138,12 +145,31 @@ declare module "ns:swift/SwiftDemo" {
     greeting: Greeting | null;
   }
 
+  export class BenchmarkRecord {
+    private constructor();
+    name: string;
+    rank: number;
+    score: number;
+  }
+
+  export class BenchmarkFailure {
+    private constructor();
+    /**
+     * Retrieve the localized description for this error.
+     */
+    readonly localizedDescription: string;
+  }
+
   export class GreetingRegistry {
     constructor();
     add(greeting: Greeting): void;
     readonly count: number;
     remove(greeting: Greeting): void;
     contains(greeting: Greeting): boolean;
+  }
+
+  export interface BenchmarkDelegate {
+    value(index: number | bigint): number;
   }
 
   export class WeakGreetingHolder {
@@ -399,6 +425,31 @@ declare module "ns:swift/SwiftDemo" {
     subscribe(handler: (arg0: string) => void): void;
   }
 
+  export class Benchmark {
+    constructor();
+    static echoString(value: string): string;
+    static midpointOf(a: BenchmarkPoint, b: BenchmarkPoint): BenchmarkPoint;
+    static topRecords(count: number | bigint, minimum: number): (BenchmarkRecord)[];
+    static callClosure(body: (arg0: number) => number | bigint, count: number | bigint): number;
+    static callDelegate(delegate: BenchmarkDelegate, count: number | bigint): number;
+    static makeDictionary(count: number | bigint): Record<string, number>;
+    static sum(values: readonly (number | bigint)[]): number;
+    static fail(): void;
+    static noop(): void;
+    static length(value: string): number;
+    static negate(value: boolean): boolean;
+    static combine(a: number, b: number, c: number): number;
+    counter: number;
+    static echoInt(value: number | bigint): number;
+    static checksum(data: ArrayBuffer | ArrayBufferView): number;
+    static makeData(length: number | bigint): Uint8Array;
+    static midpoint(a: { readonly x: number; readonly y: number }, b: { readonly x: number; readonly y: number }): { x: number; y: number };
+    static echoLater(value: number | bigint, signal?: AbortSignal): Promise<number>;
+    increment(): number;
+    static makeArray(count: number | bigint): (number)[];
+    static sumValues(values: Readonly<Record<string, number | bigint>>): number;
+  }
+
   export class CancelLog {
     private constructor();
     static cancellations: number;
@@ -448,10 +499,12 @@ declare module "ns:swift/SwiftDemo" {
   export function checkedSide(side: number): number;
   export function countUnique(values: ReadonlySet<number | bigint> | readonly (number | bigint)[]): number;
   export function delayedEcho(text: string, seconds: number, signal?: AbortSignal): Promise<string>;
+  export function describeAny(value: unknown): string;
   export function knownScores(scores: Readonly<Record<string, (number | bigint) | null | undefined>>): Record<string, number | null>;
   export function longestWord(words: readonly (string)[]): number;
   export function parseNumber(text: string): { case: "success"; value: number } | { case: "failure"; value: Error };
   export function sortedNames(names: readonly (string)[], less: (arg0: string, arg1: string) => boolean): (string)[];
+  export function echoAnyLater(value: unknown, signal?: AbortSignal): Promise<unknown>;
   export function firstElement(values: readonly (string)[]): string | null;
   export function firstElement(values: readonly (boolean)[]): boolean | null;
   export function firstElement(values: readonly (number)[]): number | null;
@@ -467,12 +520,17 @@ declare module "ns:swift/SwiftDemo" {
   export function describeValue(value: boolean): string;
   export function describeValue(value: number): string;
   export let globalCounter: number;
+  export function samplePayload(): Record<string, unknown>;
   export function starterWallet(owner: string): import("ns:swift/SwiftDemoKit").Wallet;
   export function waitForCancel(seconds: number, signal?: AbortSignal): Promise<boolean>;
+  export function identifierText(id: string): string;
+  export function makeIdentifier(text: string): string | null;
+  export function repeatCharacter(character: string, count: number | bigint): string;
   export function makeDefaultPoint(): Point;
   export function makeTrackerLater(id: number | bigint, signal?: AbortSignal): Promise<Tracker>;
   export function greetInBackground(greeting: Greeting, signal?: AbortSignal): Promise<string>;
   export function computeInBackground(provider: () => number | bigint, signal?: AbortSignal): Promise<number>;
+  export function reportUnrepresentable(body: (arg0: number) => void): void;
   export function sum(amounts: readonly (import("ns:swift/SwiftDemoKit").Money)[]): import("ns:swift/SwiftDemoKit").Money;
   export function area(measurement: Measurement): number;
   export function bump(value: { value: number | bigint }): void;
@@ -488,6 +546,7 @@ declare module "ns:swift/SwiftDemo" {
   export function boxed(money: import("ns:swift/SwiftDemoKit").Money): import("ns:swift/SwiftDemoKit").Box<import("ns:swift/SwiftDemoKit").Money>;
   export function clear(name: { value: (string) | null | undefined }): void;
   export function evens(limit: number | bigint): (number)[];
+  export function halve(price: number): number;
   export function halve(value: { value: number | bigint }): void;
   export function holes(count: number | bigint): (string | null)[];
   export function inset(rect: { readonly origin: { readonly x: number; readonly y: number }; readonly size: { readonly width: number; readonly height: number } }, insets: { readonly top: number; readonly left: number; readonly bottom: number; readonly right: number }): { origin: { x: number; y: number }; size: { width: number; height: number } };
@@ -509,11 +568,13 @@ declare module "ns:swift/SwiftDemo" {
   export function unwrap(result: { readonly case: "success"; readonly value: string } | { readonly case: "failure"; readonly value: Error | string }): string;
   export function compact(values: readonly ((number | bigint) | null | undefined)[]): (number)[];
   export function countUp(limit: number | bigint): AsyncIterableIterator<number>;
+  export function echoAny(value: unknown): unknown;
   export function echoInt(value: number | bigint): number;
   export function explain(error: ShapeError): string;
   export function firstOf(pair: import("ns:swift/SwiftDemoKit").Pair<string, number>): string;
   export function firstOf(pair: import("ns:swift/SwiftDemoKit").Pair<number, string>): number;
   export function fitting(size: ({ readonly width: number; readonly height: number }) | null | undefined): { width: number; height: number } | null;
+  export function initial(text: string): string | null;
   export function joinAll(parts: readonly (string)[]): string;
   export function largest(values: readonly (string)[]): string | null;
   export function largest(values: readonly (number)[]): number | null;
@@ -554,6 +615,7 @@ declare module "ns:swift/SwiftDemo" {
   export function makeScore(name: string, points: number | bigint): import("ns:swift/SwiftDemoKit").Pair<string, number>;
   export function noteLater(text: string, signal?: AbortSignal): Promise<Note>;
   export function onMeasure(body: (arg0: Measurement) => void): void;
+  export function summarize(body: (arg0: Record<string, (number)[]>, arg1: (Vector2)[], arg2: number | null) => number | bigint): number;
   export function transform(values: readonly (number | bigint)[], body: (arg0: number) => string): (string)[];
 
   global {

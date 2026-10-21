@@ -1087,6 +1087,12 @@ class Classifier {
           bridged.bridge = Bridge::Error;
           return "";
         }
+        if (inner && inner->kind == TypeNode::Kind::Nominal &&
+            inner->components.size() == 1 &&
+            inner->components[0].name == "Any") {
+          bridged.bridge = Bridge::Any;
+          return "";
+        }
         // `any Sequence<E>` and the other collection protocols arrays
         // conform to: an array in, a copy out.
         if (inner && inner->kind == TypeNode::Kind::Nominal &&
@@ -1148,6 +1154,19 @@ class Classifier {
         bridged.elements = std::move(structure->elements);
         return "";
       }
+    }
+    if (usr == KnownTypes::kUUID || usr == KnownTypes::kCharacter) {
+      bridged.bridge = Bridge::String;
+      bridged.scalar = usr == KnownTypes::kUUID
+                           ? BridgedType::Scalar::UUID
+                           : BridgedType::Scalar::Character;
+      return "";
+    }
+    // Foundation's Decimal is the imported NSDecimal on Apple platforms.
+    if (usr == KnownTypes::kDecimal || usr == "c:@SA@NSDecimal") {
+      bridged.bridge = Bridge::Floating;
+      bridged.scalar = BridgedType::Scalar::Decimal;
+      return "";
     }
     if (usr == KnownTypes::kError && node.components.size() == 1) {
       bridged.bridge = Bridge::Error;
@@ -1438,6 +1457,9 @@ class Classifier {
       case Bridge::Result:
       case Bridge::CStruct:
         kind = "record";
+        break;
+      case Bridge::Any:
+        kind = "any";
         break;
       case Bridge::Closure:
         kind = "function";

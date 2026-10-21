@@ -17,6 +17,47 @@ point.x;                             // 2
 Flavor.vanilla;                      // "vanilla"
 ```
 
+## Quick start in an app
+
+1. Write Swift in `App_Resources/iOS/src` (or add a SwiftPM package through
+   `ios.SPMPackages` in `nativescript.config.ts`):
+
+   ```swift
+   public struct Forecast {
+       public let city: String
+       public let highs: [Double]
+   }
+
+   public final class WeatherClient {
+       public init() {}
+       public func forecast(for city: String) async throws -> Forecast {
+           Forecast(city: city, highs: [21, 23.5, 19])
+       }
+   }
+   ```
+
+2. List the module in `App_Resources/iOS/build.xcconfig` (the app's own module
+   is `$(PRODUCT_MODULE_NAME)`; add SDK modules and packages by name), and
+   optionally where TypeScript declarations go:
+
+   ```
+   NS_SWIFT_MODULES = $(PRODUCT_MODULE_NAME)
+   NS_TYPESCRIPT_DECLARATIONS_PATH = $(SRCROOT)/typescript-declarations
+   ```
+
+3. Call it from JavaScript or TypeScript (the app module's name is the app's
+   product module, `nstsrs` for an app called nstsrs):
+
+   ```ts
+   import { WeatherClient } from "ns:swift/nstsrs";
+
+   const forecast = await new WeatherClient().forecast("Lisbon");
+   forecast.highs; // [21, 23.5, 19]
+   ```
+
+`ns build ios` generates, verifies, compiles and links the thunks; there is
+nothing else to configure.
+
 ## How it fits together
 
 1. **Symbol graphs.** Compile the Swift module with `-emit-symbol-graph` (or run
@@ -170,6 +211,9 @@ methods of generic types are not instantiated yet.
 | `Set<T>` | `Set` copy (inputs also accept an array) |
 | `(A, B)` | array copy, `[a, b]` |
 | `(x: A, y: B)` | plain object copy, `{ x: a, y: b }` |
+| `Any`, `[Any]`, `[String: Any]` | the JS value: `null` (`NSNull`), booleans, numbers (integral ones as `Int`), strings, arrays, plain objects; Swift values of the module's types and Objective-C objects as themselves. Back from Swift by the value's type (`Date` as milliseconds, `URL` and `UUID` as strings); TypeScript sees `unknown` |
+| `UUID`, `Character` | string (an invalid UUID or a string of other than one character throws `TypeError`) |
+| `Decimal` | number |
 | `any Error` | `Error` named `SwiftError` (with `swiftType`); inputs accept any value, an `Error`'s message describing it |
 | `CGPoint`, `CGSize`, `CGRect`, `CGVector`, `CGAffineTransform`, `UIEdgeInsets`, `NSDirectionalEdgeInsets`, `UIOffset`, `NSRange`, `CLLocationCoordinate2D`, `MKCoordinateSpan`, `MKCoordinateRegion` | plain object copy of the fields, `{ x, y }` (inputs also accept NativeScript's struct values, `CGPointMake(1, 2)`) |
 | `Result<S, F>` | `{ case: "success", value }` or `{ case: "failure", value }` (no `value` for `Result<Void, F>`) |
@@ -444,22 +488,119 @@ each worker gets its own JS objects.
 
 ## Performance
 
-`TestRunner/app/tests/SwiftInteropBenchmarks.js` times the same operations
-through the Objective-C/C metadata path and through Swift thunks, and writes
-the results to the app's `Documents/swift-bench.txt`. On a Debug runtime in
-the iOS simulator (indicative only; measure Release builds on devices for real
-numbers):
+`TestRunner/app/tests/SwiftInteropBenchmarks.js` calls one API implemented
+twice: in Objective-C (`TestFixtures/Marshalling/TNSBenchmark`, reached
+through NativeScript's metadata, the path apps have used for years) and in
+Swift (`SwiftDemo`'s `Benchmark.swift`, reached through `ns:swift`). The two
+implementations do the same work, and every case consumes its result in JS
+as an app would, so NativeScript's lazily wrapped `NSArray`s pay for the
+elements read and nothing is compared against a no-op. Each figure is the
+median of three timed rounds after a warm-up, per call; the suite writes its
+results to the app's `Documents/swift-bench.txt`.
 
-| Operation | Objective-C/C | Swift thunk |
-|---|---|---|
-| function `(Int) -> Int` | 1733 ns | 1500 ns |
-| class method | 1722 ns | 1500 ns |
-| instance method | 1786 ns | 1722 ns |
-| string round trip | 1717 ns | 1752 ns |
-| construct an object | 3018 ns | 1608 ns |
-| read a property | 1014 ns | 864 ns |
+Release build of TestRunner, iPhone 17 Pro simulator (iOS 26), Apple M3 Max,
+Xcode 27.1 (lower is better):
 
-Comparisons with other runtimes (OneJS) are not part of the suite.
+| Workload | Objective-C | Swift (ns:swift) | Swift / Objective-C |
+|---|---|---|---|
+| call: no arguments | 0.16 µs | 0.09 µs | 0.57x |
+| call: int -> int | 0.18 µs | 0.14 µs | 0.76x |
+| call: 3 doubles -> double | 0.22 µs | 0.20 µs | 0.93x |
+| call: bool -> bool | 0.17 µs | 0.13 µs | 0.79x |
+| string: short round trip | 0.30 µs | 0.20 µs | 0.69x |
+| string: 10 KB in | 1.44 µs | 0.95 µs | 0.66x |
+| string: 10 KB round trip | 1.87 µs | 1.62 µs | 0.86x |
+| object: construct | 0.68 µs | 0.28 µs | 0.41x |
+| object: instance method | 0.10 µs | 0.11 µs | 1.16x |
+| object: property read | 0.09 µs | 0.08 µs | 0.92x |
+| object: property write | 0.11 µs | 0.10 µs | 0.96x |
+| array: 1000 ints in | 66.96 µs | 21.45 µs | 0.32x |
+| array: 1000 ints out, all read | 149.34 µs | 46.85 µs | 0.31x |
+| dictionary: 10 keys in | 4.48 µs | 1.63 µs | 0.36x |
+| dictionary: 10 keys out, all read | 5.76 µs | 2.27 µs | 0.39x |
+| data: 1 MB in | 3319.52 µs | 404.88 µs | 0.12x |
+| data: 1 MB out as bytes | 361.84 µs | 245.68 µs | 0.68x |
+| struct: CGPoint in and out | 0.91 µs | 0.93 µs | 1.02x |
+| callback: native calls JS 100 times | 10.80 µs | 8.90 µs | 0.82x |
+| delegate: native calls JS object 100 times | 10.56 µs | 11.39 µs | 1.08x |
+| error: thrown and caught | 15.60 µs | 13.43 µs | 0.86x |
+| batch: build, filter, sort 1000 records, all read | 886.98 µs | 249.08 µs | 0.28x |
+| async: call and await, sequential | 12.40 µs | 10.13 µs | 0.82x |
+
+- Swift is faster for almost every call shape: scalar calls run in 0.6 to 0.9
+  of the time, object construction in 0.4, and thrown errors in 0.85.
+- Collections are where the difference is largest: arrays and dictionaries
+  cross in about a third of the time, since a thunk converts them in one pass
+  instead of through per-element Objective-C wrappers. The record batch,
+  which builds, filters and sorts 1000 structs natively and reads every field
+  in JS, runs in 0.28 of the time.
+- Binary data crosses fast: a 1 MB `Data` argument takes a tenth of the time
+  (one copy from the typed array, against NativeScript's per-call
+  conversion), and a 1 MB result two thirds.
+- Async calls settle in about 0.8 of the time. Both versions do the same
+  thing: the work runs off the main thread (a nonisolated Swift `async`
+  function runs on the cooperative pool; the Objective-C version on a global
+  queue) and the result reaches JS on the main thread, where the Swift call
+  resolves its Promise directly instead of calling a completion block.
+- Native code calling JS costs about the same as Objective-C: a Swift closure
+  calling a JS function runs in 0.8 of the time of an Objective-C block, and
+  a Swift protocol call on a JS object in 1.1 of a JS subclass's method. An
+  invocation made on the JS thread converts its arguments straight to JS
+  values; one made on another thread is recorded and run on the JS thread.
+- Startup and size: in a Release app whose unit is the app's own module,
+  WeatherKit (424 callables) and a SwiftPM package, the compiled thunks are
+  0.8 MB and the first `ns:swift` import, which registers the unit and builds
+  every module's JS classes, takes 2.7 ms on the simulator. Later imports of
+  the unit's modules return the built namespaces.
+- A Debug build (unoptimized thunks) is slower on both paths; there Swift's
+  scalar calls are about 1.2x Objective-C's while the collection, batch and
+  async cases keep most of their lead.
+
+## Recipes
+
+- **A SwiftUI view in a NativeScript layout.** `hostingController()` on any
+  bridged `View` struct returns a `UIHostingController`; add its `view` to a
+  NativeScript container (for example a `ContentView`'s `nativeView`, or a
+  custom `View` subclass whose `createNativeView()` returns it):
+
+  ```ts
+  const controller = new Badge("Inbox", 3).hostingController();
+  const native = controller.view; // a UIView, sized by SwiftUI
+  ```
+
+- **A delegate implemented in JavaScript.** Declare a class-bound protocol in
+  Swift and pass a plain JS object; keep it referenced from JS when Swift
+  holds it `weak`:
+
+  ```swift
+  public protocol UploadDelegate: AnyObject { func progress(_ fraction: Double) }
+  public final class Uploader { public weak var delegate: (any UploadDelegate)? ... }
+  ```
+  ```ts
+  this.delegate = { progress: (f: number) => (this.percent = f * 100) };
+  uploader.delegate = this.delegate;
+  ```
+
+- **A cancellable request.** An `async` Swift function takes an `AbortSignal`
+  after its arguments; aborting cancels the Swift task:
+
+  ```ts
+  const controller = new AbortController();
+  const items = client.search("swift", controller.signal);
+  controller.abort(); // items rejects; Swift's Task.sleep / URLSession throw CancellationError
+  ```
+
+- **Streams.** Return `AsyncStream<T>`, a type conforming to `AsyncSequence`,
+  or a Combine `AnyPublisher<T, E>`, and iterate it with `for await`;
+  `break` ends the Swift stream.
+
+- **JSON-like payloads.** `[String: Any]` takes and returns plain JS objects;
+  give Swift a typed struct where the shape is known, and TypeScript types it
+  precisely.
+
+- **Swift-only API on a UIKit subclass.** A `UIView` or `UIViewController`
+  subclass keeps its NativeScript class (`MyView.new()`), and its Swift-only
+  methods are added to it once `ns:swift/<Module>` is loaded.
 
 ## Coverage and verification
 

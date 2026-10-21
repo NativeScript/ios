@@ -240,6 +240,9 @@ std::string signatureCode(const SwiftSurface& surface,
     case Bridge::Error:
       code = "!";
       break;
+    case Bridge::Any:
+      code = "a";
+      break;
     case Bridge::Result:
       code = "R(" + signatureCode(surface, type.elements.at(0)) + "," +
              signatureCode(surface, type.elements.at(1)) + ")";
@@ -348,6 +351,19 @@ SwiftSurface describeSurface(const Module& module,
                           signatureCode(surface, capability->parameters[i]);
     }
     member.signature += ">" + signatureCode(surface, member.result);
+    // Graphs can declare one member twice (a protocol's default and a
+    // constrained extension's); JS reaches it once.
+    bool duplicate = std::any_of(
+        surface.members.begin(), surface.members.end(),
+        [&](const SwiftSurface::Member& other) {
+          return other.owner == member.owner && other.kind == member.kind &&
+                 other.signature == member.signature &&
+                 other.symbol->name == symbol.name &&
+                 other.capability->jsName == capability->jsName;
+        });
+    if (duplicate) {
+      continue;
+    }
     if (subscript && capability->isSettable && !capability->isAsync) {
       Symbol setter = symbol;
       setter.name = "setSubscript(";

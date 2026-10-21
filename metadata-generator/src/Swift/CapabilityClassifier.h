@@ -72,6 +72,10 @@ enum class Bridge {
   // a plain JS object copy of its fields, `{ x, y }`; `elements` holds the
   // fields, `labels` their names, and `objcClass` the struct's name.
   CStruct,
+  // `Any`: whatever JS value fits (null as NSNull, numbers as Int or Double,
+  // strings, arrays, plain objects as [String: Any], Swift and Objective-C
+  // objects), and back by the value's Swift type.
+  Any,
   // Result<Success, Failure>: a plain JS object copy,
   // `{ case: "success", value }` or `{ case: "failure", value }`;
   // `elements` holds Success (Void for none) and Failure.
@@ -123,6 +127,9 @@ struct BridgedType {
   bool throwing = false;
   // AsyncSequence: a Combine publisher, iterated through its `values`.
   bool publisher = false;
+  // A Foundation value that crosses as a JS string (UUID, Character) or
+  // number (Decimal); `bridge` is String or Floating.
+  enum class Scalar { None, UUID, Character, Decimal } scalar = Scalar::None;
 };
 
 struct Capability {
