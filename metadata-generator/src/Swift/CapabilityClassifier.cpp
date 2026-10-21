@@ -50,6 +50,112 @@ bool isCallableKind(SymbolKind kind) {
   }
 }
 
+namespace {
+
+struct CStructInfo {
+  const char* name;
+  const char* framework;
+  // Field names and types: CGFloat, Double, Int, or another struct here.
+  std::vector<std::pair<const char*, const char*>> fields;
+};
+
+const std::vector<CStructInfo>& cStructs() {
+  static const std::vector<CStructInfo> list = {
+      {"CGPoint", "CoreGraphics", {{"x", "CGFloat"}, {"y", "CGFloat"}}},
+      {"CGSize", "CoreGraphics", {{"width", "CGFloat"}, {"height", "CGFloat"}}},
+      {"CGVector", "CoreGraphics", {{"dx", "CGFloat"}, {"dy", "CGFloat"}}},
+      {"CGRect", "CoreGraphics", {{"origin", "CGPoint"}, {"size", "CGSize"}}},
+      {"CGAffineTransform",
+       "CoreGraphics",
+       {{"a", "CGFloat"},
+        {"b", "CGFloat"},
+        {"c", "CGFloat"},
+        {"d", "CGFloat"},
+        {"tx", "CGFloat"},
+        {"ty", "CGFloat"}}},
+      {"UIEdgeInsets",
+       "UIKit",
+       {{"top", "CGFloat"},
+        {"left", "CGFloat"},
+        {"bottom", "CGFloat"},
+        {"right", "CGFloat"}}},
+      {"NSDirectionalEdgeInsets",
+       "UIKit",
+       {{"top", "CGFloat"},
+        {"leading", "CGFloat"},
+        {"bottom", "CGFloat"},
+        {"trailing", "CGFloat"}}},
+      {"UIOffset",
+       "UIKit",
+       {{"horizontal", "CGFloat"}, {"vertical", "CGFloat"}}},
+      {"NSRange", "Foundation", {{"location", "Int"}, {"length", "Int"}}},
+      {"CLLocationCoordinate2D",
+       "CoreLocation",
+       {{"latitude", "Double"}, {"longitude", "Double"}}},
+      {"MKCoordinateSpan",
+       "MapKit",
+       {{"latitudeDelta", "Double"}, {"longitudeDelta", "Double"}}},
+      {"MKCoordinateRegion",
+       "MapKit",
+       {{"center", "CLLocationCoordinate2D"}, {"span", "MKCoordinateSpan"}}},
+  };
+  return list;
+}
+
+const CStructInfo* findCStruct(const std::string& name) {
+  for (const auto& info : cStructs()) {
+    if (name == info.name) {
+      return &info;
+    }
+  }
+  return nullptr;
+}
+
+TypeNode nominal(const std::string& name, const std::string& usr) {
+  TypeNode node;
+  node.kind = TypeNode::Kind::Nominal;
+  TypeNode::Component component;
+  component.name = name;
+  component.usr = usr;
+  node.components.push_back(std::move(component));
+  return node;
+}
+
+}  // namespace
+
+std::optional<BridgedType> cStructBridge(const std::string& name) {
+  const CStructInfo* info = findCStruct(name);
+  if (!info) {
+    return std::nullopt;
+  }
+  BridgedType bridged;
+  bridged.bridge = Bridge::CStruct;
+  bridged.objcClass = info->name;
+  bridged.node = nominal(info->name, "");
+  for (const auto& field : info->fields) {
+    std::string type = field.second;
+    BridgedType element;
+    if (type == "CGFloat" || type == "Double") {
+      element.bridge = Bridge::Floating;
+      element.node = nominal(
+          type, type == "CGFloat" ? KnownTypes::kCGFloat : KnownTypes::kDouble);
+    } else if (type == "Int") {
+      element.bridge = Bridge::Integer;
+      element.node = nominal(type, KnownTypes::kInt);
+    } else {
+      element = *cStructBridge(type);
+    }
+    bridged.labels.push_back(field.first);
+    bridged.elements.push_back(std::move(element));
+  }
+  return bridged;
+}
+
+const char* frameworkOfCStruct(const std::string& name) {
+  const CStructInfo* info = findCStruct(name);
+  return info ? info->framework : nullptr;
+}
+
 bool hasAssociatedValues(const Module& module, const Symbol& symbol) {
   if (symbol.kind != SymbolKind::Enum) {
     return false;
@@ -206,6 +312,13 @@ class Classifier {
   Capability classifyType(const Symbol& symbol) const {
     Capability capability;
     if (commonRejection(symbol, capability)) {
+      if (capability.tier == Tier::ObjCDirect &&
+          symbol.kind == SymbolKind::Class && symbol.parentId.empty() &&
+          symbol.genericParameters.empty() &&
+          llvm::StringRef(symbol.usr).startswith("c:@M@")) {
+        capability.objcBacked = true;
+        capability.objcName = objcClassName(symbol.usr, &symbol);
+      }
       return capability;
     }
     if (symbol.kind == SymbolKind::Protocol) {
@@ -467,7 +580,8 @@ class Classifier {
         }
       }
       const Capability* ownerCapability = _result.find(owner->preciseId);
-      if (!ownerCapability || ownerCapability->tier != Tier::SwiftGenerated) {
+      if (!ownerCapability || (ownerCapability->tier != Tier::SwiftGenerated &&
+                               !ownerCapability->objcBacked)) {
         Tier tier =
             ownerCapability && ownerCapability->tier == Tier::SwiftSpecialized
                 ? Tier::SwiftSpecialized
@@ -515,7 +629,8 @@ class Classifier {
     }
     capability.isMainActor =
         !nonisolated && (hasAttribute(symbol, "@MainActor") ||
-                         (owner && hasAttribute(*owner, "@MainActor")));
+                         (owner && (hasAttribute(*owner, "@MainActor") ||
+                                    inheritsMainActor(*owner))));
     // Another actor's state cannot be assigned from outside it.
     capability.isSettable = symbol.isSettable && !capability.isAsync;
 
@@ -608,8 +723,50 @@ class Classifier {
     return capability;
   }
 
+  // Whether `type` subclasses a UIKit class isolated to the main actor
+  // (UIResponder and its views and controllers), which symbol graphs do not
+  // record on the subclass.
+  bool inheritsMainActor(const Symbol& type) const {
+    std::string superclass = type.superclassId;
+    for (int depth = 0; !superclass.empty() && depth < 32; depth++) {
+      if (const Symbol* parent = _module.find(superclass)) {
+        if (hasAttribute(*parent, "@MainActor")) {
+          return true;
+        }
+        superclass = parent->superclassId;
+        continue;
+      }
+      llvm::StringRef name(superclass);
+      if (!name.consume_front("c:objc(cs)") || !name.startswith("UI")) {
+        return false;
+      }
+      for (const char* suffix :
+           {"Responder", "View", "ViewController", "Controller", "Control",
+            "Window", "Application", "Button", "Label", "Field", "Bar", "Cell",
+            "Switch", "Slider", "Stepper"}) {
+        if (name.endswith(suffix)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    return false;
+  }
+
   BridgedType bridgeOwner(const Symbol& owner) const {
     BridgedType bridged;
+    if (const Capability* capability = _result.find(owner.preciseId);
+        capability && capability->objcBacked) {
+      // NativeScript's wrapper of the object, as for any Objective-C class.
+      bridged.bridge = Bridge::ObjCObject;
+      bridged.objcClass = capability->objcName;
+      TypeNode::Component component;
+      component.name = owner.name;
+      component.usr = owner.preciseId;
+      bridged.node.kind = TypeNode::Kind::Nominal;
+      bridged.node.components.push_back(std::move(component));
+      return bridged;
+    }
     bridged.symbolId = owner.preciseId;
     bridged.bridge = owner.kind == SymbolKind::Struct      ? Bridge::StructBox
                      : owner.kind != SymbolKind::Enum      ? Bridge::ClassHandle
@@ -652,15 +809,23 @@ class Classifier {
   }
 
   // Bridges a collection's element (value) type into `container.elements`.
-  std::string bridgeElement(const TypeNode& node,
-                            BridgedType& container) const {
+  // Arrays and dictionaries hold optional elements as nulls; an async
+  // sequence's nil ends it.
+  std::string bridgeElement(const TypeNode& node, BridgedType& container,
+                            bool allowOptional = true) const {
     BridgedType element;
     element.node = node;
+    const TypeNode* inner = &node;
     if (node.kind == TypeNode::Kind::Optional ||
         node.kind == TypeNode::Kind::ImplicitlyUnwrappedOptional) {
-      return "optional-element";
+      inner = &node.children[0];
+      if (!allowOptional || inner->kind == TypeNode::Kind::Optional ||
+          inner->kind == TypeNode::Kind::ImplicitlyUnwrappedOptional) {
+        return "optional-element";
+      }
+      element.optional = true;
     }
-    std::string reason = bridgeNonOptional(node, element);
+    std::string reason = bridgeNonOptional(*inner, element);
     if (reason.empty() && element.bridge == Bridge::Void) {
       reason = "unbridged-type:Void";
     }
@@ -690,14 +855,33 @@ class Classifier {
         }
         return "generic";
       case TypeNode::Kind::Function: {
-        // JS functions stand in for closures that return nothing: a Swift
-        // caller cannot wait for a value from another thread's JS.
-        if (node.isAsync || node.isThrowing ||
-            (!node.result.empty() &&
-             node.result[0].kind != TypeNode::Kind::Void)) {
+        // JS functions stand in for closures. A caller on another thread
+        // waits for the JS thread to run one that returns a value.
+        if (node.isAsync) {
           return "closure";
         }
         bridged.bridge = Bridge::Closure;
+        bridged.throwing = node.isThrowing;
+        if (!node.result.empty() &&
+            node.result[0].kind != TypeNode::Kind::Void) {
+          BridgedType result;
+          result.node = node.result[0];
+          const TypeNode* inner = &node.result[0];
+          if (inner->kind == TypeNode::Kind::Optional ||
+              inner->kind == TypeNode::Kind::ImplicitlyUnwrappedOptional) {
+            result.optional = true;
+            inner = &inner->children[0];
+          }
+          std::string reason = bridgeNonOptional(*inner, result);
+          if (reason.empty() && (result.bridge == Bridge::Closure ||
+                                 result.bridge == Bridge::AsyncSequence)) {
+            reason = "closure";
+          }
+          if (!reason.empty()) {
+            return reason;
+          }
+          bridged.results.push_back(std::move(result));
+        }
         for (const auto& parameter : node.children) {
           BridgedType element;
           element.node = parameter;
@@ -722,8 +906,26 @@ class Classifier {
         }
         return "";
       }
-      case TypeNode::Kind::Tuple:
-        return "tuple";
+      case TypeNode::Kind::Tuple: {
+        bridged.bridge = Bridge::Tuple;
+        size_t labeled = std::count_if(
+            node.labels.begin(), node.labels.end(),
+            [](const std::string& label) { return !label.empty(); });
+        if (node.children.size() < 2 ||
+            (labeled != 0 && labeled != node.children.size())) {
+          return "tuple";
+        }
+        if (labeled != 0) {
+          bridged.labels = node.labels;
+        }
+        for (const auto& child : node.children) {
+          std::string reason = bridgeElement(child, bridged);
+          if (!reason.empty()) {
+            return reason;
+          }
+        }
+        return "";
+      }
       case TypeNode::Kind::Array:
         bridged.bridge = Bridge::Array;
         return bridgeElement(node.children[0], bridged);
@@ -739,6 +941,11 @@ class Classifier {
       case TypeNode::Kind::Existential: {
         const TypeNode* inner =
             node.children.empty() ? nullptr : &node.children[0];
+        if (inner && inner->kind == TypeNode::Kind::Nominal &&
+            inner->usr() == KnownTypes::kError) {
+          bridged.bridge = Bridge::Error;
+          return "";
+        }
         const Symbol* protocol = inner && inner->kind == TypeNode::Kind::Nominal
                                      ? _module.find(inner->usr())
                                      : nullptr;
@@ -762,7 +969,8 @@ class Classifier {
             inner->usr() == KnownTypes::kAsyncSequence &&
             !inner->components.back().arguments.empty()) {
           bridged.bridge = Bridge::AsyncSequence;
-          return bridgeElement(inner->components.back().arguments[0], bridged);
+          return bridgeElement(inner->components.back().arguments[0], bridged,
+                               false);
         }
         return "opaque-type";
       }
@@ -782,11 +990,60 @@ class Classifier {
         isPrimitive(usr, bridged.bridge)) {
       return "";
     }
+    if (llvm::StringRef(usr).startswith("c:") && node.components.size() == 1 &&
+        node.components[0].arguments.empty()) {
+      if (auto structure = cStructBridge(node.components[0].name)) {
+        bridged.bridge = Bridge::CStruct;
+        bridged.objcClass = structure->objcClass;
+        bridged.labels = std::move(structure->labels);
+        bridged.elements = std::move(structure->elements);
+        return "";
+      }
+    }
+    if (usr == KnownTypes::kError && node.components.size() == 1) {
+      bridged.bridge = Bridge::Error;
+      return "";
+    }
+    if (usr == KnownTypes::kResult && node.components.size() == 1 &&
+        node.components[0].arguments.size() == 2) {
+      bridged.bridge = Bridge::Result;
+      const TypeNode& success = node.components[0].arguments[0];
+      if (success.kind == TypeNode::Kind::Void) {
+        BridgedType none;
+        none.bridge = Bridge::Void;
+        none.node = success;
+        bridged.elements.push_back(std::move(none));
+      } else if (std::string reason = bridgeElement(success, bridged);
+                 !reason.empty()) {
+        return reason;
+      }
+      BridgedType failure;
+      failure.node = node.components[0].arguments[1];
+      std::string reason = bridgeNonOptional(failure.node, failure);
+      if (!reason.empty()) {
+        return reason;
+      }
+      bool errorLike = failure.bridge == Bridge::Error ||
+                       failure.bridge == Bridge::EnumCase ||
+                       failure.bridge == Bridge::TaggedEnum ||
+                       failure.bridge == Bridge::ClassHandle ||
+                       failure.bridge == Bridge::StructBox;
+      if (!errorLike) {
+        return "unbridged-type:Swift.Result";
+      }
+      bridged.elements.push_back(std::move(failure));
+      return "";
+    }
+    if (usr == KnownTypes::kSet && node.components.size() == 1 &&
+        node.components[0].arguments.size() == 1) {
+      bridged.bridge = Bridge::Set;
+      return bridgeElement(node.components[0].arguments[0], bridged, false);
+    }
     if ((usr == KnownTypes::kAsyncStream ||
          usr == KnownTypes::kAsyncThrowingStream) &&
         !node.components.back().arguments.empty()) {
       bridged.bridge = Bridge::AsyncSequence;
-      return bridgeElement(node.components.back().arguments[0], bridged);
+      return bridgeElement(node.components.back().arguments[0], bridged, false);
     }
     if (usr == KnownTypes::kDate) {
       bridged.bridge = Bridge::Date;
@@ -1005,11 +1262,22 @@ class Classifier {
       case Bridge::Data:
         kind = "bytes";
         break;
+      case Bridge::Tuple:
+        if (!type.labels.empty()) {
+          kind = "record";
+          break;
+        }
+        [[fallthrough]];
       case Bridge::Array:
-        kind = "array";
+      case Bridge::Set:
+        // The runtime tells arrays apart by their first element.
+        kind = "array:" + (type.elements.empty() ? std::string()
+                                                 : jsKind(type.elements[0]));
         break;
       case Bridge::Dictionary:
       case Bridge::TaggedEnum:
+      case Bridge::Result:
+      case Bridge::CStruct:
         kind = "record";
         break;
       case Bridge::Closure:

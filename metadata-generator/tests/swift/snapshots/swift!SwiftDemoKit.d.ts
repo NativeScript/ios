@@ -5,6 +5,7 @@ declare module "ns:swift/SwiftDemoKit" {
   export class Box<Value> {
     constructor(value: Value);
     value: Value;
+    static readonly sample: Box<number>;
     replaced(value: Value): Box<Value>;
   }
 

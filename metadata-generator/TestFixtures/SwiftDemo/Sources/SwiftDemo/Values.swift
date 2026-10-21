@@ -182,3 +182,74 @@ public final class Bench {
     public static func echo(_ value: Int) -> Int { value }
     public func echo(_ value: Int) -> Int { value }
 }
+
+// Closures returning values (JS functions whose result Swift waits for).
+public func transform(_ values: [Int], _ body: (Int) -> String) -> [String] { values.map(body) }
+public func sortedNames(_ names: [String], by less: (String, String) -> Bool) -> [String] {
+    names.sorted(by: less)
+}
+public func firstMatch(_ values: [Int], where predicate: (Int) throws -> Bool) throws -> Int? {
+    try values.first(where: predicate)
+}
+public func lookup(_ key: String, _ resolve: (String) -> Int?) -> Int { resolve(key) ?? -1 }
+public func computeInBackground(_ provider: @escaping @Sendable () -> Int) async -> Int {
+    await Task.detached { provider() * 2 }.value
+}
+
+// Generic functions: one overload per stand-in for each type parameter.
+public func largest<T: Comparable>(_ values: [T]) -> T? { values.max() }
+public func repeated<T>(_ value: T, times: Int) -> [T] { Array(repeating: value, count: times) }
+public func popCount<I: FixedWidthInteger>(_ value: I) -> Int { value.nonzeroBitCount }
+public func zero<N: Numeric>() -> N { 0 }
+public func greetTwice<G: Greeting>(_ greeting: G, _ other: String) -> String {
+    greeting.greet(other) + " " + greeting.greet(other)
+}
+// Not instantiated: a metatype, an associated type, and too many
+// combinations.
+public func decodeJSON<T: Decodable>(_ type: T.Type, from text: String) -> T? {
+    try? JSONDecoder().decode(type, from: Data(text.utf8))
+}
+public func firstElement<C: Collection>(_ values: C) -> C.Element? { values.first }
+public func joined<A, B>(_ first: A, _ second: B) -> String { "\(first)/\(second)" }
+
+// Optional collection elements (JS nulls).
+public func compact(_ values: [Int?]) -> [Int] { values.compactMap { $0 } }
+public func holes(_ count: Int) -> [String?] { (0..<count).map { $0 % 2 == 0 ? "x" : nil } }
+public func knownScores(_ scores: [String: Int?]) -> [String: Int?] { scores.filter { $0.value != nil } }
+
+// Tuples (JS arrays, or objects when labeled) and sets (JS Sets).
+public func divide(_ a: Int, by b: Int) -> (quotient: Int, remainder: Int) { (a / b, a % b) }
+public func swapPair(_ pair: (Int, String)) -> (String, Int) { (pair.1, pair.0) }
+public func plot(_ point: (x: Double, y: Double)?) -> String? { point.map { "\($0.x),\($0.y)" } }
+public func spans() -> [(String, Int?)] { [("a", 1), ("b", nil)] }
+public func uniqueTags(_ tags: [String]) -> Set<String> { Set(tags) }
+public func countUnique(_ values: Set<Int>) -> Int { values.count }
+public func tallyLater(_ words: [String]) async -> (unique: Set<String>, count: Int) {
+    (Set(words), words.count)
+}
+
+// Errors as values, and Result (tagged objects naming their case).
+public struct ParseFailure: Error, CustomStringConvertible {
+    public let text: String
+    public var description: String { "not a number: \(text)" }
+}
+public func parseNumber(_ text: String) -> Result<Int, any Error> {
+    if let value = Int(text) { return .success(value) }
+    return .failure(ParseFailure(text: text))
+}
+public func checkSides(_ sides: Int) -> Result<Void, ShapeError> {
+    sides >= 3 ? .success(()) : .failure(.tooManySides(count: sides, limit: 3))
+}
+public func unwrap(_ result: Result<String, any Error>) throws -> String { try result.get() }
+public func parseLater(_ text: String) async -> Result<Int, any Error> { parseNumber(text) }
+public func fetchItem(_ id: Int, _ completion: @escaping @Sendable (Result<String, any Error>) -> Void) {
+    DispatchQueue.global().async {
+        completion(id > 0 ? .success("item \(id)") : .failure(ParseFailure(text: "\(id)")))
+    }
+}
+public func describeError(_ error: (any Error)?) -> String { error.map { "\($0)" } ?? "none" }
+
+// `some P` parameters: implicit generic parameters, instantiated the same way.
+public func shoutAll(_ value: some StringProtocol) -> String { value.uppercased() }
+public func describeValue(_ value: some CustomStringConvertible) -> String { value.description }
+public func greetOnce(_ greeting: some Greeting, _ other: String) -> String { greeting.greet(other) }

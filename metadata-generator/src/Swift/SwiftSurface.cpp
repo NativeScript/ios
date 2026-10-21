@@ -152,10 +152,33 @@ std::string signatureCode(const SwiftSurface& surface,
     case Bridge::Dictionary:
       code = "{" + signatureCode(surface, type.elements.at(0)) + "}";
       break;
+    case Bridge::Set:
+      code = "S[" + signatureCode(surface, type.elements.at(0)) + "]";
+      break;
+    case Bridge::Error:
+      code = "!";
+      break;
+    case Bridge::Result:
+      code = "R(" + signatureCode(surface, type.elements.at(0)) + "," +
+             signatureCode(surface, type.elements.at(1)) + ")";
+      break;
+    case Bridge::Tuple:
+    case Bridge::CStruct:
+      code = "*(";
+      for (size_t i = 0; i < type.elements.size(); i++) {
+        code += (i > 0 ? "," : "") +
+                (type.labels.empty() ? "" : type.labels[i] + ":") +
+                signatureCode(surface, type.elements[i]);
+      }
+      code += ")";
+      break;
     case Bridge::Closure: {
       code = "(";
       for (size_t i = 0; i < type.elements.size(); i++) {
         code += (i > 0 ? "," : "") + signatureCode(surface, type.elements[i]);
+      }
+      if (!type.results.empty()) {
+        code += ">" + signatureCode(surface, type.results[0]);
       }
       code += ")";
       break;
@@ -174,13 +197,14 @@ SwiftSurface describeSurface(const Module& module,
   for (const auto& entry : module.symbols) {
     const Symbol& symbol = entry.second;
     const Capability* capability = classification.find(entry.first);
-    if (!capability || capability->tier != Tier::SwiftGenerated ||
-        !isNominalType(symbol.kind)) {
+    if (!capability || !isNominalType(symbol.kind) ||
+        (capability->tier != Tier::SwiftGenerated && !capability->objcBacked)) {
       continue;
     }
     SwiftSurface::TypeKind kind =
-        symbol.kind == SymbolKind::Protocol ? SwiftSurface::kProtocol
-        : symbol.kind == SymbolKind::Struct ? SwiftSurface::kStruct
+        capability->objcBacked                ? SwiftSurface::kObjCClass
+        : symbol.kind == SymbolKind::Protocol ? SwiftSurface::kProtocol
+        : symbol.kind == SymbolKind::Struct   ? SwiftSurface::kStruct
         : symbol.kind == SymbolKind::Enum
             ? (hasAssociatedValues(module, symbol) ? SwiftSurface::kTaggedEnum
                                                    : SwiftSurface::kEnum)

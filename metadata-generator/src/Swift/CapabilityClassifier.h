@@ -58,8 +58,26 @@ enum class Bridge {
   Array,
   // [String: T]: a plain JS object copy; `elements` holds T.
   Dictionary,
-  // A closure parameter returning Void: a JS function. `elements` holds the
-  // closure's parameters.
+  // Set<T>: a JS Set copy (an array is accepted as input); `elements` holds
+  // T.
+  Set,
+  // A tuple of two or more values: a JS array copy, or a plain object copy
+  // when every element is labeled; `elements` holds the element types and
+  // `labels` their labels.
+  Tuple,
+  // `any Error` as a value: a JS Error named "SwiftError"; any JS value
+  // as input, whose message the Swift error describes.
+  Error,
+  // A C struct Swift imports whose fields are known (cStructBridge):
+  // a plain JS object copy of its fields, `{ x, y }`; `elements` holds the
+  // fields, `labels` their names, and `objcClass` the struct's name.
+  CStruct,
+  // Result<Success, Failure>: a plain JS object copy,
+  // `{ case: "success", value }` or `{ case: "failure", value }`;
+  // `elements` holds Success (Void for none) and Failure.
+  Result,
+  // A closure parameter (not async): a JS function. `elements` holds the
+  // closure's parameters, `results` its result.
   Closure,
   // An Objective-C class instance: NativeScript's ordinary Objective-C
   // wrapper, with the same identity Objective-C calls give it.
@@ -89,15 +107,20 @@ struct BridgedType {
   // string>`).
   std::vector<BridgedType> typeArguments;
   TypeNode node;
-  // Array and Dictionary: the element (value) type. Closure: its
-  // parameters.
+  // Array, Dictionary and Set: the element (value) type. Tuple: the element
+  // types. Closure: its parameters.
   std::vector<BridgedType> elements;
+  // Tuple: the element labels, or empty when none is labeled.
+  std::vector<std::string> labels;
   // Closure parameters declared @escaping (valid only in parameter
   // position, so kept out of `node`).
   bool escaping = false;
   // An inout parameter: JS passes a reference object, `{ value }`, whose
   // value is the argument and receives the final value.
   bool isInout = false;
+  // Closure: its result (empty for Void), and whether it throws.
+  std::vector<BridgedType> results;
+  bool throwing = false;
 };
 
 struct Capability {
@@ -131,6 +154,11 @@ struct Capability {
   bool isSettable = false;
   // A requirement of an adoptable protocol, which JS implementations provide.
   bool isRequirement = false;
+  // An Objective-C-visible class declared in Swift (ObjCDirect): its
+  // Swift-only members are generated and installed on NativeScript's class
+  // for `objcName`, its Objective-C runtime name.
+  bool objcBacked = false;
+  std::string objcName;
 
   // Bridges for SwiftGenerated callables: parameters in order, then the
   // result (or the property value type).
@@ -156,6 +184,13 @@ Classification classify(
 
 // Whether `kind` is something JavaScript can call or read.
 bool isCallableKind(SymbolKind kind);
+
+// `name` (a C struct Swift imports, such as CGPoint or
+// CLLocationCoordinate2D) as a CStruct bridge, when its fields are known.
+std::optional<BridgedType> cStructBridge(const std::string& name);
+
+// The framework that declares the C struct `name`, or null.
+const char* frameworkOfCStruct(const std::string& name);
 
 // Whether enum `symbol` has a case with associated values.
 bool hasAssociatedValues(const Module& module, const Symbol& symbol);

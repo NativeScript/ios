@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module", "observe", "track"]);
-            expect(swift.abiVersion).toBe(11);
+            expect(swift.abiVersion).toBe(13);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(11);
+            expect(info.abiVersion).toBe(13);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -50,9 +50,9 @@ describe("ns:swift", function () {
         });
 
         it("exposes only the generated surface", function () {
-            // Unsupported declarations (async, generic, closures, ...) are absent.
+            // Unsupported declarations (a type-only protocol's generics, metatypes, ...) are absent.
             expect(SwiftDemo.Loader.prototype.transform).toBeUndefined();
-            expect(SwiftDemo.Loader.prototype.withCompletion).toBeUndefined();
+            expect(SwiftDemo.decodeJSON).toBeUndefined();
         });
     });
 
@@ -272,6 +272,42 @@ describe("ns:swift", function () {
     });
 
     describe("collections and Foundation values", function () {
+        it("copies tuples as arrays, or objects when labeled", function () {
+            expect(SwiftDemo.divide(7, 2)).toEqual({ quotient: 3, remainder: 1 });
+            expect(SwiftDemo.swapPair([1, "one"])).toEqual(["one", 1]);
+            expect(SwiftDemo.plot({ x: 1, y: 2.5 })).toBe("1.0,2.5");
+            expect(SwiftDemo.plot(null)).toBeNull();
+            expect(SwiftDemo.spans()).toEqual([["a", 1], ["b", null]]);
+            expect(function () { SwiftDemo.swapPair([1]); })
+                .toThrowError(TypeError, /swapPair\(_: \(Int, String\)\)/);
+            expect(function () { SwiftDemo.swapPair(["one", 1]); }).toThrowError(TypeError);
+        });
+
+        it("copies sets as JS Sets, accepting arrays", function () {
+            var tags = SwiftDemo.uniqueTags(["a", "b", "a"]);
+            expect(tags instanceof Set).toBe(true);
+            expect(Array.from(tags).sort()).toEqual(["a", "b"]);
+            expect(SwiftDemo.countUnique(new Set([1, 2, 3]))).toBe(3);
+            expect(SwiftDemo.countUnique([1, 1, 2])).toBe(2);
+            expect(function () { SwiftDemo.countUnique("abc"); }).toThrowError(TypeError);
+        });
+
+        it("resolves tuples and sets from async calls", function (done) {
+            SwiftDemo.tallyLater(["a", "b", "a"]).then(function (tally) {
+                expect(tally.count).toBe(3);
+                expect(tally.unique instanceof Set).toBe(true);
+                expect(tally.unique.size).toBe(2);
+                done();
+            }, done.fail);
+        });
+
+        it("passes optional elements as nulls", function () {
+            expect(SwiftDemo.compact([1, null, 3, undefined])).toEqual([1, 3]);
+            expect(SwiftDemo.holes(3)).toEqual(["x", null, "x"]);
+            expect(SwiftDemo.knownScores({ a: 1, b: null })).toEqual({ a: 1 });
+            expect(function () { SwiftDemo.compact([1, "two"]); }).toThrowError(TypeError);
+        });
+
         it("copies arrays both ways", function () {
             expect(SwiftDemo.names(3)).toEqual(["n0", "n1", "n2"]);
             expect(SwiftDemo.total([1, 2, 3.5])).toBe(6.5);
@@ -770,6 +806,59 @@ describe("ns:swift", function () {
         });
     });
 
+    describe("Objective-C-visible Swift classes", function () {
+        it("installs Swift-only members on NativeScript's class", function () {
+            var note = Note.init("hello world");
+            expect(note instanceof Note).toBe(true);
+            expect(note.text).toBe("hello world");
+            expect(note.summary(5)).toBe("hello");
+            expect(note.tagged("a").tagged("b")).toBe(note);
+            expect(Array.from(note.tags).sort()).toEqual(["a", "b"]);
+            note.tags = new Set(["c"]);
+            expect(Array.from(note.tags)).toEqual(["c"]);
+            expect(Note.blank().text).toBe("");
+            expect(SwiftDemo.text(note)).toBe("hello world");
+        });
+
+        it("leaves NativeScript's own members alone", function () {
+            var note = Note.init("x");
+            expect(note.revision).toBe(1);
+            note.revision = 2;
+            expect(note.revision).toBe(2);
+            expect(Object.keys(Note.prototype)).not.toContain("summary");
+        });
+
+        it("refuses receivers of other classes", function () {
+            expect(function () { Note.prototype.summary.call(NSObject.new(), 1); })
+                .toThrowError(TypeError, /Illegal invocation/);
+        });
+
+        it("calls a UIView subclass's Swift-only members", function () {
+            var view = CounterView.new();
+            expect(view instanceof UIView).toBe(true);
+            expect(view.configure(1, null)).toBe(2);
+            expect(view.configure(5, 3)).toBe(8);
+            expect(view.count).toBe(8);
+        });
+    });
+
+    describe("C structs", function () {
+        it("copies known C structs as plain objects", function () {
+            expect(SwiftDemo.midpoint({ x: 0, y: 0 }, { x: 4, y: 2 })).toEqual({ x: 2, y: 1 });
+            var rect = SwiftDemo.inset({ origin: { x: 0, y: 0 }, size: { width: 10, height: 10 } },
+                                       { top: 1, left: 2, bottom: 3, right: 4 });
+            expect(rect).toEqual({ origin: { x: 2, y: 1 }, size: { width: 4, height: 6 } });
+            expect(SwiftDemo.fitting({ width: 1, height: 2 })).toEqual({ width: 2, height: 4 });
+            expect(SwiftDemo.fitting(null)).toBeNull();
+            expect(SwiftDemo.latitudeSpan({ latitude: 10, longitude: 0 }, { latitude: 4, longitude: 1 })).toBe(6);
+            expect(function () { SwiftDemo.midpoint({ x: 1 }, { x: 0, y: 0 }); }).toThrowError(TypeError);
+        });
+
+        it("accepts NativeScript's struct values", function () {
+            expect(SwiftDemo.midpoint(CGPointMake(0, 0), CGPointMake(2, 2))).toEqual({ x: 1, y: 1 });
+        });
+    });
+
     describe("Objective-C objects", function () {
         it("passes NativeScript's Objective-C wrappers", function () {
             var view = UIView.new();
@@ -859,6 +948,110 @@ describe("ns:swift", function () {
         });
     });
 
+    describe("Result and errors as values", function () {
+        it("returns a Result as an object naming its case", function () {
+            expect(SwiftDemo.parseNumber("42")).toEqual({ case: "success", value: 42 });
+            var failed = SwiftDemo.parseNumber("x");
+            expect(failed.case).toBe("failure");
+            expect(failed.value instanceof Error).toBe(true);
+            expect(failed.value.name).toBe("SwiftError");
+            expect(failed.value.message).toBe("not a number: x");
+            expect(failed.value.swiftType).toBe("SwiftDemo.ParseFailure");
+            expect(SwiftDemo.checkSides(4)).toEqual({ case: "success" });
+            expect(SwiftDemo.checkSides(2)).toEqual({
+                case: "failure",
+                value: { case: "tooManySides", count: 2, limit: 3 }
+            });
+        });
+
+        it("passes a Result and errors from JS", function () {
+            expect(SwiftDemo.unwrap({ case: "success", value: "ok" })).toBe("ok");
+            expect(function () { SwiftDemo.unwrap({ case: "failure", value: new Error("nope") }); })
+                .toThrowError(/nope/);
+            expect(function () { SwiftDemo.unwrap({ case: "other" }); }).toThrowError(TypeError);
+            expect(SwiftDemo.describeError(new Error("boom"))).toBe("boom");
+            expect(SwiftDemo.describeError("plain")).toBe("plain");
+            expect(SwiftDemo.describeError(null)).toBe("none");
+        });
+
+        it("delivers a Result to completion handlers and promises", function (done) {
+            SwiftDemo.fetchItem(3, function (result) {
+                expect(result).toEqual({ case: "success", value: "item 3" });
+                SwiftDemo.fetchItem(-1, function (failure) {
+                    expect(failure.case).toBe("failure");
+                    expect(failure.value.message).toBe("not a number: -1");
+                    SwiftDemo.parseLater("7").then(function (parsed) {
+                        expect(parsed).toEqual({ case: "success", value: 7 });
+                        done();
+                    }, done.fail);
+                });
+            });
+        });
+    });
+
+    describe("generic functions", function () {
+        it("picks the instantiation the arguments call for", function () {
+            expect(SwiftDemo.largest([3, 9, 2])).toBe(9);
+            expect(SwiftDemo.largest(["b", "c", "a"])).toBe("c");
+            expect(SwiftDemo.repeated("x", 2)).toEqual(["x", "x"]);
+            expect(SwiftDemo.repeated(true, 1)).toEqual([true]);
+            expect(SwiftDemo.repeated(1.5, 2)).toEqual([1.5, 1.5]);
+            expect(new SwiftDemo.Loader().first(["a", "b"])).toBe("a");
+            expect(new SwiftDemo.Loader().first([4])).toBe(4);
+        });
+
+        it("instantiates with integers, protocols and superclasses", function () {
+            expect(SwiftDemo.popCount(7)).toBe(3);
+            expect(SwiftDemo.zero()).toBe(0);
+            var greeting = {
+                name: "js",
+                punctuation: "!",
+                greet: function (other) { return "hi " + other; },
+                reset: function () {}
+            };
+            expect(SwiftDemo.greetTwice(greeting, "ada")).toBe("hi ada hi ada");
+            expect(SwiftDemo.greetTwice(SwiftDemo.makeGreeting("swift"), "ada"))
+                .toBe("Good day, ada, from swift Good day, ada, from swift");
+            var view = UILabel.new();
+            view.tag = 5;
+            expect(SwiftDemo.viewTag(view)).toBe(5);
+        });
+
+        it("throws when the arguments do not decide the instantiation", function () {
+            expect(function () { SwiftDemo.largest([]); })
+                .toThrowError(TypeError, /Ambiguous call to largest/);
+            expect(function () { SwiftDemo.largest([true]); })
+                .toThrowError(TypeError, /No overload of largest/);
+        });
+
+        it("instantiates with the arguments of the unit's generic types", function () {
+            var Kit = swift.module("SwiftDemoKit");
+            expect(SwiftDemo.unbox(SwiftDemo.countBox(3))).toBe(3);
+            expect(SwiftDemo.unbox(SwiftDemo.boxed(new Kit.Money(2, "EUR"))).amount).toBe(2);
+            expect(SwiftDemo.unbox(Kit.Box.sample)).toBe(7);
+            expect(SwiftDemo.firstOf(SwiftDemo.makeScore("ada", 3))).toBe("ada");
+            expect(SwiftDemo.firstOf(new Kit.Pair(2, "two"))).toBe(2);
+        });
+
+        it("instantiates `some P` parameters", function () {
+            expect(SwiftDemo.shoutAll("abc")).toBe("ABC");
+            expect(SwiftDemo.describeValue(true)).toBe("true");
+            expect(SwiftDemo.describeValue(2.5)).toBe("2.5");
+            expect(SwiftDemo.describeValue("x")).toBe("x");
+            expect(SwiftDemo.greetOnce(SwiftDemo.makeGreeting("swift"), "ada"))
+                .toBe("Good day, ada, from swift");
+            var label = UILabel.new();
+            label.tag = 4;
+            expect(SwiftDemo.tagOf(label)).toBe(4);
+        });
+
+        it("leaves functions without known stand-ins out", function () {
+            expect(SwiftDemo.decodeJSON).toBeUndefined();
+            expect(SwiftDemo.firstElement).toBeUndefined();
+            expect(SwiftDemo.joined).toBeUndefined();
+        });
+    });
+
     describe("closures", function () {
         it("calls JS functions passed for closures while the call runs", function () {
             var ticks = [];
@@ -887,6 +1080,43 @@ describe("ns:swift", function () {
         it("refuses values that are not functions", function () {
             expect(function () { SwiftDemo.countdown(1, 5); })
                 .toThrowError(TypeError, /countdown.*\(Int, Bool\) -> Void/);
+        });
+
+        it("returns JS functions' results to Swift", function () {
+            expect(SwiftDemo.transform([1, 2, 3], function (n) { return "#" + n; }))
+                .toEqual(["#1", "#2", "#3"]);
+            expect(SwiftDemo.sortedNames(["b", "c", "a"], function (x, y) { return x > y; }))
+                .toEqual(["c", "b", "a"]);
+            expect(SwiftDemo.lookup("seven", function (key) { return key.length; })).toBe(5);
+            expect(SwiftDemo.lookup("none", function () { return null; })).toBe(-1);
+        });
+
+        it("throws when a function's result does not convert", function () {
+            expect(function () { SwiftDemo.transform([1], function () { return 5; }); })
+                .toThrowError(TypeError, /transform/);
+        });
+
+        it("throws a JS exception from a throwing closure into Swift and back", function () {
+            expect(SwiftDemo.firstMatch([1, 4, 9], function (n) { return n > 3; })).toBe(4);
+            expect(SwiftDemo.firstMatch([1], function () { return false; })).toBeNull();
+            var calls = 0;
+            expect(function () {
+                SwiftDemo.firstMatch([1, 2, 3], function () {
+                    calls++;
+                    throw new Error("no match");
+                });
+            }).toThrowError("no match");
+            expect(calls).toBe(1);
+        });
+
+        it("waits for functions called from other threads", function (done) {
+            SwiftDemo.computeInBackground(function () {
+                expect(NSThread.isMainThread).toBe(true);
+                return 21;
+            }).then(function (value) {
+                expect(value).toBe(42);
+                done();
+            }, done.fail);
         });
 
         it("runs closures called from other threads on the JS thread", function (done) {

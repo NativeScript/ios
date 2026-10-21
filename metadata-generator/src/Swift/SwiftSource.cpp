@@ -192,13 +192,19 @@ const char* frameworkOfObjCClass(llvm::StringRef name) {
   return best;
 }
 
-void collectObjCClasses(const BridgedType& type, std::set<std::string>& out) {
+void collectObjCClasses(const BridgedType& type, std::set<std::string>& out,
+                        std::set<std::string>& structs) {
   if (type.bridge == Bridge::ObjCObject &&
       type.objcClass.find('.') == std::string::npos) {
     out.insert(type.objcClass);
   }
-  for (const auto& element : type.elements) {
-    collectObjCClasses(element, out);
+  if (type.bridge == Bridge::CStruct) {
+    structs.insert(type.objcClass);
+  }
+  for (const auto* list : {&type.elements, &type.results}) {
+    for (const auto& element : *list) {
+      collectObjCClasses(element, out, structs);
+    }
   }
 }
 
@@ -208,6 +214,7 @@ std::string swiftImports(const Module& module,
                          const Classification& classification) {
   std::set<std::string> overlays;
   std::set<std::string> classes;
+  std::set<std::string> structs;
   for (const auto& entry : module.symbols) {
     const Capability* capability = classification.find(entry.first);
     if (!capability || capability->tier != Tier::SwiftGenerated) {
@@ -217,9 +224,9 @@ std::string swiftImports(const Module& module,
       overlays.insert(entry.second.declaringModule);
     }
     for (const auto& parameter : capability->parameters) {
-      collectObjCClasses(parameter, classes);
+      collectObjCClasses(parameter, classes, structs);
     }
-    collectObjCClasses(capability->result, classes);
+    collectObjCClasses(capability->result, classes, structs);
   }
   std::set<std::string> frameworks;
   for (const auto& entry : module.symbols) {
@@ -230,6 +237,12 @@ std::string swiftImports(const Module& module,
       // hostingController() (SwiftSurface).
       frameworks.insert("SwiftUI");
       frameworks.insert("UIKit");
+    }
+  }
+  for (const auto& name : structs) {
+    const char* framework = frameworkOfCStruct(name);
+    if (framework && llvm::StringRef(framework) != "Foundation") {
+      frameworks.insert(framework);
     }
   }
   for (const auto& name : classes) {

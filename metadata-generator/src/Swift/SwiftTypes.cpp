@@ -844,6 +844,429 @@ bool sameTypeRequirementsHold(const Symbol& member, const Symbol& base,
   return true;
 }
 
+// How a generic function's type parameter appears in its types.
+struct ParameterUse {
+  // In an argument outside closures, so the arguments JS passes tell its
+  // instantiations apart.
+  bool inArgument = false;
+  // As a metatype (`T.Type`) or through an associated type (`T.Element`),
+  // which no stand-in substitutes.
+  bool unsupported = false;
+  // As an argument of a generic type in an argument (`Box<T>`): the type's
+  // USR and the argument's position.
+  std::vector<std::pair<std::string, size_t>> families;
+};
+
+void collectUse(const TypeNode& node, const std::string& name, bool argument,
+                bool inClosure, bool inMetatype, ParameterUse& use) {
+  if (node.kind == TypeNode::Kind::GenericParameter &&
+      !node.components.empty() && node.components[0].name == name) {
+    if (node.components.size() > 1 || inMetatype) {
+      use.unsupported = true;
+    } else if (argument && !inClosure) {
+      use.inArgument = true;
+    }
+    return;
+  }
+  bool closure = inClosure || node.kind == TypeNode::Kind::Function;
+  bool metatype = inMetatype || node.kind == TypeNode::Kind::Metatype;
+  if (node.kind == TypeNode::Kind::Nominal && argument && !closure &&
+      !metatype) {
+    const auto& arguments = node.components.back().arguments;
+    for (size_t i = 0; i < arguments.size(); i++) {
+      if (arguments[i].kind == TypeNode::Kind::GenericParameter &&
+          arguments[i].components.size() == 1 &&
+          arguments[i].components[0].name == name) {
+        use.families.emplace_back(node.usr(), i);
+      }
+    }
+  }
+  for (const auto* list : {&node.children, &node.result, &node.thrownType}) {
+    for (const auto& child : *list) {
+      collectUse(child, name, argument, closure, metatype, use);
+    }
+  }
+  for (const auto& component : node.components) {
+    for (const auto& argumentType : component.arguments) {
+      collectUse(argumentType, name, argument, closure, metatype, use);
+    }
+  }
+}
+
+TypeNode nominalNode(const std::string& qualifiedName, const std::string& usr) {
+  TypeNode node;
+  node.kind = TypeNode::Kind::Nominal;
+  llvm::SmallVector<llvm::StringRef, 4> names;
+  llvm::StringRef(qualifiedName).split(names, '.');
+  for (llvm::StringRef name : names) {
+    TypeNode::Component component;
+    component.name = name.str();
+    node.components.push_back(std::move(component));
+  }
+  node.components.back().usr = usr;
+  return node;
+}
+
+// Standard library types that stand in for a type parameter constrained only
+// by standard library protocols, with the protocols each conforms to. At most
+// one number type stands in, since a JS number converts to every one.
+struct Primitive {
+  const char* name;
+  const char* usr;
+  std::set<std::string> protocols;
+};
+
+const std::vector<Primitive>& primitives() {
+  static const std::vector<Primitive> list = [] {
+    std::set<std::string> common = {"Equatable",
+                                    "Hashable",
+                                    "Encodable",
+                                    "Decodable",
+                                    "Codable",
+                                    "Sendable",
+                                    "CustomStringConvertible",
+                                    "CustomDebugStringConvertible",
+                                    "LosslessStringConvertible"};
+    std::set<std::string> number = {
+        "Comparable",         "Numeric",    "SignedNumeric",
+        "AdditiveArithmetic", "Strideable", "ExpressibleByIntegerLiteral",
+        "BitwiseCopyable"};
+    auto with = [&](std::set<std::string> base,
+                    std::initializer_list<const char*> more) {
+      base.insert(common.begin(), common.end());
+      base.insert(more.begin(), more.end());
+      return base;
+    };
+    return std::vector<Primitive>{
+        {"Double", KnownTypes::kDouble,
+         with(number, {"FloatingPoint", "BinaryFloatingPoint",
+                       "ExpressibleByFloatLiteral"})},
+        {"Int", KnownTypes::kInt,
+         with(number, {"BinaryInteger", "FixedWidthInteger", "SignedInteger"})},
+        {"String", KnownTypes::kString,
+         with({}, {"Comparable", "StringProtocol", "ExpressibleByStringLiteral",
+                   "TextOutputStream", "TextOutputStreamable"})},
+        {"Bool", KnownTypes::kBool,
+         with({}, {"ExpressibleByBooleanLiteral", "BitwiseCopyable"})},
+    };
+  }();
+  return list;
+}
+
+// Standard library USRs follow "s:" with a substitution ("s:SQ") or the
+// module's own "s"; other modules' start with their name's length.
+bool isStandardLibraryUSR(llvm::StringRef usr) {
+  return usr.size() > 2 && usr.startswith("s:") && !llvm::isDigit(usr[2]);
+}
+
+// The concrete types `parameter` is instantiated with, given the function's
+// constraints; empty when none is known to satisfy them. A unit protocol
+// stands in as its existential, which Swift opens at the call.
+std::vector<TypeNode> standIns(
+    const Module& module, const std::string& parameter,
+    const std::vector<GenericConstraint>& constraints) {
+  std::vector<std::string> standard;
+  std::vector<const Symbol*> protocols;
+  const GenericConstraint* superclass = nullptr;
+  for (const auto& constraint : constraints) {
+    llvm::StringRef lhs(constraint.lhs);
+    if (lhs.startswith(parameter + ".")) {
+      return {};
+    }
+    if (lhs != parameter) {
+      continue;
+    }
+    if (constraint.kind == "superclass") {
+      superclass = &constraint;
+    } else if (constraint.kind != "conformance") {
+      return {};
+    } else if (const Symbol* protocol = module.find(constraint.rhsPrecise);
+               protocol && protocol->kind == SymbolKind::Protocol) {
+      protocols.push_back(protocol);
+    } else if (isStandardLibraryUSR(constraint.rhsPrecise)) {
+      llvm::StringRef name(constraint.rhs);
+      standard.push_back(name.substr(name.rfind('.') + 1).str());
+    } else {
+      return {};
+    }
+  }
+  if (superclass) {
+    if (!protocols.empty() || !standard.empty()) {
+      return {};
+    }
+    return {nominalNode(superclass->rhs, superclass->rhsPrecise)};
+  }
+  if (!protocols.empty()) {
+    if (protocols.size() > 1) {
+      return {};
+    }
+    TypeNode existential;
+    existential.kind = TypeNode::Kind::Existential;
+    existential.children.push_back(
+        nominalNode(protocols[0]->name, protocols[0]->preciseId));
+    return {existential};
+  }
+  std::vector<TypeNode> result;
+  bool number = false;
+  for (const Primitive& primitive : primitives()) {
+    bool isNumber = primitive.usr == KnownTypes::kDouble ||
+                    primitive.usr == KnownTypes::kInt;
+    if (isNumber && number) {
+      continue;
+    }
+    bool satisfies = std::all_of(standard.begin(), standard.end(),
+                                 [&](const std::string& name) {
+                                   return primitive.protocols.count(name);
+                                 });
+    if (satisfies) {
+      number |= isNumber;
+      result.push_back(nominalNode(primitive.name, primitive.usr));
+    }
+  }
+  return result;
+}
+
+// The arguments at `position` of the unit's instantiations of the generic
+// type `usr`, which stand in for a type parameter the function passes to it.
+std::vector<TypeNode> familyArguments(const Module& module,
+                                      const std::string& usr, size_t position) {
+  std::vector<TypeNode> result;
+  std::set<std::string> seen;
+  for (const auto& entry : module.symbols) {
+    const Symbol& type = entry.second;
+    if (isNominalType(type.kind) && type.genericBase == usr &&
+        position < type.typeArguments.size() &&
+        seen.insert(typeKey(type.typeArguments[position])).second) {
+      result.push_back(type.typeArguments[position]);
+    }
+  }
+  return result;
+}
+
+// The constraint `some P` (a parameter's implicit generic parameter) puts
+// on its stand-ins: conformance to a protocol, or a superclass.
+std::optional<GenericConstraint> opaqueConstraint(const Module& module,
+                                                  const TypeNode& node) {
+  if (node.children.size() != 1 ||
+      node.children[0].kind != TypeNode::Kind::Nominal ||
+      !node.children[0].components.back().arguments.empty()) {
+    return std::nullopt;
+  }
+  const TypeNode& bound = node.children[0];
+  llvm::StringRef usr(bound.usr());
+  GenericConstraint constraint;
+  constraint.lhs = "some " + spelling(bound);
+  constraint.rhs = spelling(bound);
+  constraint.rhsPrecise = usr.str();
+  // `some` bounds a protocol or a class; standard library protocols' USRs
+  // are substitutions ("s:Sy") rather than names ending in P.
+  const Symbol* symbol = module.find(constraint.rhsPrecise);
+  if ((symbol && symbol->kind == SymbolKind::Class) ||
+      usr.startswith("c:objc(cs)")) {
+    constraint.kind = "superclass";
+  } else if (usr.startswith("s:")) {
+    constraint.kind = "conformance";
+  } else {
+    return std::nullopt;
+  }
+  return constraint;
+}
+
+// A declaration's spelling of a stand-in: a nominal, or a protocol's
+// existential.
+TypeRef typeRefOf(const TypeNode& node) {
+  TypeRef ref;
+  ref.spelling = spelling(node);
+  const TypeNode* nominal = &node;
+  if (node.kind == TypeNode::Kind::Existential) {
+    ref.fragments.push_back(Fragment{"keyword", "any", ""});
+    ref.fragments.push_back(Fragment{"text", " ", ""});
+    nominal = &node.children[0];
+  }
+  for (size_t i = 0; i < nominal->components.size(); i++) {
+    if (i > 0) {
+      ref.fragments.push_back(Fragment{"text", ".", ""});
+    }
+    const auto& component = nominal->components[i];
+    ref.fragments.push_back(Fragment{
+        "typeIdentifier", component.name,
+        i + 1 == nominal->components.size() ? component.usr : std::string()});
+  }
+  return ref;
+}
+
+bool isGenericFunctionKind(SymbolKind kind) {
+  return kind == SymbolKind::Function || kind == SymbolKind::InstanceMethod ||
+         kind == SymbolKind::TypeMethod || kind == SymbolKind::Initializer;
+}
+
+// Adds a synthetic copy of every generic function, method and initializer
+// for each combination of its type parameters' stand-ins (see standIns and
+// familyArguments). Members of generic types and protocols are left generic.
+void instantiateGenericFunctions(Module& module) {
+  // Each combination becomes one overload of the function's JS name. The
+  // unit's own instantiations bound the combinations of family arguments.
+  constexpr size_t kMaxInstantiations = 6;
+  constexpr size_t kMaxFamilyInstantiations = 16;
+  std::vector<std::string> ids;
+  for (const auto& entry : module.symbols) {
+    bool opaque = std::any_of(
+        entry.second.parameters.begin(), entry.second.parameters.end(),
+        [](const Parameter& p) {
+          return llvm::StringRef(p.type.spelling).startswith("some ");
+        });
+    if (isGenericFunctionKind(entry.second.kind) &&
+        (!entry.second.genericParameters.empty() || opaque)) {
+      ids.push_back(entry.first);
+    }
+  }
+
+  for (const std::string& id : ids) {
+    const Symbol source = *module.find(id);
+    bool genericContext = false;
+    for (const Symbol* parent =
+             source.parentId.empty() ? nullptr : module.find(source.parentId);
+         parent;
+         parent = parent->parentId.empty() ? nullptr
+                                           : module.find(parent->parentId)) {
+      genericContext |= !parent->genericParameters.empty() ||
+                        !parent->genericBase.empty() ||
+                        parent->kind == SymbolKind::Protocol;
+    }
+    // A depth above 0 is nested in a generic context, which may be a type
+    // of another module (`extension Array`).
+    for (const auto& parameter : source.genericParameters) {
+      genericContext |= parameter.depth != 0;
+    }
+    if (genericContext) {
+      continue;
+    }
+
+    std::set<std::string> generics = genericNamesInScope(module, source);
+    std::vector<TypeNode> types;
+    std::vector<bool> isArgument;
+    bool parsed = true;
+    auto add = [&](const TypeRef& type, bool argument) {
+      bool complete = true;
+      types.push_back(parseType(type, generics, &complete));
+      isArgument.push_back(argument);
+      parsed &= complete;
+    };
+    for (const auto& parameter : source.parameters) {
+      add(parameter.type, true);
+    }
+    if (source.returnType) {
+      add(*source.returnType, false);
+    }
+    if (!parsed) {
+      continue;
+    }
+
+    std::vector<std::vector<TypeNode>> options;
+    // Per option: the generic parameter it substitutes, and for a `some P`
+    // parameter (an implicit generic parameter) the parameter it retypes.
+    std::vector<std::pair<std::string, int>> targets;
+    size_t combinations = 1;
+    bool fromFamilies = false;
+    for (size_t i = 0; i < source.parameters.size(); i++) {
+      const TypeNode& node = types[i];
+      if (node.kind != TypeNode::Kind::Opaque) {
+        continue;
+      }
+      std::vector<TypeNode> candidates;
+      if (const auto constraint = opaqueConstraint(module, node);
+          constraint && source.parameters[i].modifier.empty()) {
+        candidates = standIns(module, constraint->lhs, {*constraint});
+      }
+      if (candidates.empty()) {
+        combinations = 0;
+        break;
+      }
+      combinations *= candidates.size();
+      options.push_back(std::move(candidates));
+      targets.emplace_back(source.parameters[i].type.spelling,
+                           static_cast<int>(i));
+    }
+    for (const auto& parameter : source.genericParameters) {
+      if (combinations == 0) {
+        break;
+      }
+      if (llvm::StringRef(parameter.name).startswith("some ")) {
+        // An implicit generic parameter, handled above.
+        continue;
+      }
+      ParameterUse use;
+      for (size_t i = 0; i < types.size(); i++) {
+        collectUse(types[i], parameter.name, isArgument[i], false, false, use);
+      }
+      std::vector<TypeNode> candidates;
+      if (!use.families.empty()) {
+        candidates = familyArguments(module, use.families[0].first,
+                                     use.families[0].second);
+        fromFamilies |= !candidates.empty();
+      }
+      if (candidates.empty() &&
+          !llvm::StringRef(parameter.name).contains(' ')) {
+        candidates =
+            standIns(module, parameter.name, source.genericConstraints);
+      }
+      if (use.unsupported || candidates.empty() ||
+          (candidates.size() > 1 && !use.inArgument)) {
+        combinations = 0;
+        break;
+      }
+      combinations *= candidates.size();
+      options.push_back(std::move(candidates));
+      targets.emplace_back(parameter.name, -1);
+    }
+    if (combinations == 0 ||
+        combinations >
+            (fromFamilies ? kMaxFamilyInstantiations : kMaxInstantiations)) {
+      continue;
+    }
+
+    std::vector<std::string> copies;
+    for (size_t n = 0; n < combinations; n++) {
+      Symbol copy = source;
+      copy.genericParameters.clear();
+      copy.genericConstraints.clear();
+      copy.genericBase = source.preciseId;
+      std::string key;
+      size_t rest = n;
+      for (size_t i = 0; i < options.size(); i++) {
+        const TypeNode& argument = options[i][rest % options[i].size()];
+        rest /= options[i].size();
+        // A `some P` parameter's entry only marks the copy an
+        // instantiation: its type is rewritten instead.
+        copy.substitutions.emplace_back(targets[i].first, argument);
+        if (targets[i].second >= 0) {
+          copy.parameters[targets[i].second].type = typeRefOf(argument);
+        }
+        key += (i > 0 ? "," : "") + typeKey(argument);
+      }
+      copy.preciseId = source.preciseId + "@<" + key + ">";
+      copies.push_back(copy.preciseId);
+      module.symbols.emplace(copy.preciseId, std::move(copy));
+    }
+
+    auto insertAfter = [&](std::vector<std::string>& list) {
+      auto at = std::find(list.begin(), list.end(), id);
+      if (at != list.end()) {
+        list.insert(at + 1, copies.begin(), copies.end());
+      }
+    };
+    if (source.parentId.empty()) {
+      insertAfter(module.topLevelIds);
+    } else if (auto parent = module.symbols.find(source.parentId);
+               parent != module.symbols.end()) {
+      insertAfter(parent->second.memberIds);
+    } else if (auto external = module.externalTypes.find(source.parentId);
+               external != module.externalTypes.end()) {
+      insertAfter(external->second.memberIds);
+    }
+  }
+}
+
 }  // namespace
 
 std::string instantiationKey(const TypeNode& node) { return typeKey(node); }
@@ -971,6 +1394,7 @@ void instantiateGenerics(Module& module) {
       }
     }
   }
+  instantiateGenericFunctions(module);
 }
 
 }  // namespace Swift

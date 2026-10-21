@@ -40,7 +40,7 @@
 // calls it by reporting the arguments as an array: callbackBegin, each
 // argument through the complete* entries, then completeArrayEnd.
 
-#define NS_SWIFT_ABI_VERSION 11
+#define NS_SWIFT_ABI_VERSION 13
 
 #ifdef __cplusplus
 extern "C" {
@@ -120,6 +120,12 @@ enum {
   // refines. Its members are its requirements (NSSwiftMemberRequirement)
   // and extension members, called on boxed values of the protocol.
   NSSwiftTypeProtocol = 5,
+  // An Objective-C-visible class declared in Swift; `jsName` is its
+  // Objective-C class name. Its Swift-only members install on NativeScript's
+  // class for it (instance members on its prototype, `init` and static
+  // members on its constructor), called with NativeScript's wrapper of the
+  // object as the receiver (NSSwiftTagObjC). The type has no JS class here.
+  NSSwiftTypeObjCClass = 6,
 };
 
 enum {
@@ -166,8 +172,20 @@ enum {
 //   B           Data: bytes (NSSwiftTagString) <-> Uint8Array copy
 //   [<code>]    array (NSSwiftTagArray) <-> JS array copy
 //   {<code>}    [String: <code>] (NSSwiftTagMap) <-> plain JS object copy
-//   (<code>,...)
-//               closure returning Void, of the listed parameters
+//   !           Error: its message (NSSwiftTagString) <- any JS value (an
+//               Error's message); returnErrorValue -> JS Error named
+//               "SwiftError"
+//   R(<success>,<failure>)
+//               Result, as a tagged enum of two cases (NSSwiftTagCase):
+//               { case: "success", value } and { case: "failure", value };
+//               success may be v (no value)
+//   S[<code>]   Set (NSSwiftTagArray, reported as an array) <-> JS Set copy
+//               (arrays accepted as input)
+//   *(<code>,...) or *(<label>:<code>,...)
+//               tuple (NSSwiftTagArray of its elements, reported as an array)
+//               <-> JS array copy, or plain JS object copy when labeled
+//   (<code>,...) or (<code>,...><result>)
+//               closure of the listed parameters, returning Void or <result>
 //               (NSSwiftTagFunction) <- JS function; parameters only
 //   p<n>        value of protocol type index n: a Swift object (tag Object)
 //               or a JS object implementing it (NSSwiftTagJSObject)
@@ -312,6 +330,20 @@ struct NSSwiftAPI {
                                        NSSwiftThunk next);
   /* 50 */ void (*completeAsyncSequence)(void* token, void* iterator,
                                          NSSwiftThunk next);
+
+  // Ends a callbackBegin invocation of a closure that returns a value (or
+  // throws): runs the function on the isolate's thread, waiting for it from
+  // any other thread, and returns its result like objectCallEnd.
+  /* 51 */ const NSSwiftValue* (*callbackCallEnd)(void* token);
+
+  // Report an error as a value (code `!`), such as a Result's failure,
+  // instead of throwing it.
+  /* 52 */ void (*returnErrorValue)(NSSwiftCall* call, const uint8_t* message,
+                                    intptr_t messageLength, const uint8_t* type,
+                                    intptr_t typeLength);
+  /* 53 */ void (*completeErrorValue)(void* token, const uint8_t* message,
+                                      intptr_t messageLength,
+                                      const uint8_t* type, intptr_t typeLength);
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);

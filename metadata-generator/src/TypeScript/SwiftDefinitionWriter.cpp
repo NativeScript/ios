@@ -120,12 +120,34 @@ std::string codeDisplayName(const SwiftSurface& surface,
     case Bridge::Dictionary:
       name = "[String: " + codeDisplayName(surface, type.elements.at(0)) + "]";
       break;
+    case Bridge::Set:
+      name = "Set<" + codeDisplayName(surface, type.elements.at(0)) + ">";
+      break;
+    case Bridge::Error:
+      name = "Error";
+      break;
+    case Bridge::Result:
+      name = "Result<" + codeDisplayName(surface, type.elements.at(0)) + ", " +
+             codeDisplayName(surface, type.elements.at(1)) + ">";
+      break;
+    case Bridge::Tuple:
+    case Bridge::CStruct: {
+      std::vector<std::string> elements;
+      for (size_t i = 0; i < type.elements.size(); i++) {
+        elements.push_back((type.labels.empty() ? "" : type.labels[i] + ": ") +
+                           codeDisplayName(surface, type.elements[i]));
+      }
+      name = "(" + llvm::join(elements, ", ") + ")";
+      break;
+    }
     case Bridge::Closure: {
       std::vector<std::string> parameters;
       for (const auto& element : type.elements) {
         parameters.push_back(codeDisplayName(surface, element));
       }
-      name = "(" + llvm::join(parameters, ", ") + ") -> Void";
+      name = "(" + llvm::join(parameters, ", ") + ") -> " +
+             (type.results.empty() ? "Void"
+                                   : codeDisplayName(surface, type.results[0]));
       break;
     }
     case Bridge::AsyncSequence:
@@ -171,6 +193,11 @@ class Writer {
       if (!type.symbol->genericBase.empty()) {
         _families.emplace(type.symbol->genericBase, type.index);
       }
+      if (type.kind == SwiftSurface::kObjCClass) {
+        _objcGlobals.emplace(
+            _classification.find(type.symbol->preciseId)->objcName,
+            globalName(type));
+      }
     }
   }
 
@@ -189,6 +216,7 @@ class Writer {
     }
     writeTypeAliases();
     writeModuleMembers();
+    writeObjCClasses();
 
     _out << "}\n\n"
          << "declare module \"ns:swift\" {\n"
@@ -330,12 +358,28 @@ class Writer {
       return bridge == Bridge::String || bridge == Bridge::EnumCase ||
              bridge == Bridge::URL;
     };
+    if (a.bridge == Bridge::Error || b.bridge == Bridge::Error) {
+      // Any object or string converts to an error.
+      return true;
+    }
     auto record = [](Bridge bridge) {
-      return bridge == Bridge::Dictionary || bridge == Bridge::TaggedEnum;
+      return bridge == Bridge::Dictionary || bridge == Bridge::TaggedEnum ||
+             bridge == Bridge::Tuple || bridge == Bridge::Result ||
+             bridge == Bridge::CStruct;
     };
+    auto arrayLike = [](const BridgedType& type) {
+      return type.bridge == Bridge::Array || type.bridge == Bridge::Set ||
+             (type.bridge == Bridge::Tuple && type.labels.empty());
+    };
+    if (arrayLike(a) && arrayLike(b)) {
+      // The runtime tells arrays apart by their first element; an empty
+      // array still matches both.
+      return a.elements.empty() || b.elements.empty() ||
+             overlaps(a.elements[0], b.elements[0]);
+    }
     if (a.bridge == b.bridge &&
         (a.bridge == Bridge::Date || a.bridge == Bridge::Data ||
-         a.bridge == Bridge::Array || a.bridge == Bridge::Closure)) {
+         a.bridge == Bridge::Closure)) {
       return true;
     }
     if (record(a.bridge) && record(b.bridge)) {
@@ -432,7 +476,11 @@ class Writer {
 
   // NativeScript's Objective-C typings declare classes globally by their
   // runtime name; Swift classes without @objc(Name) have none there.
-  static std::string objcTypeName(const BridgedType& type) {
+  std::string objcTypeName(const BridgedType& type) const {
+    auto global = _objcGlobals.find(type.objcClass);
+    if (global != _objcGlobals.end()) {
+      return global->second;
+    }
     return isIdentifier(type.objcClass) ? type.objcClass : "NSObject";
   }
 
@@ -484,6 +532,21 @@ class Writer {
       case Bridge::Dictionary:
         ts = "Readonly<Record<string, " + inputType(type.elements.at(0)) + ">>";
         break;
+      case Bridge::Set: {
+        std::string element = inputType(type.elements.at(0));
+        ts = "ReadonlySet<" + element + "> | readonly (" + element + ")[]";
+        break;
+      }
+      case Bridge::Tuple:
+      case Bridge::CStruct:
+        ts = tupleType(type, true);
+        break;
+      case Bridge::Error:
+        ts = "Error | string";
+        break;
+      case Bridge::Result:
+        ts = resultType(type, true);
+        break;
       case Bridge::Closure: {
         // The function receives what Swift passes: output types.
         std::vector<std::string> parameters;
@@ -491,7 +554,9 @@ class Writer {
           parameters.push_back("arg" + std::to_string(i) + ": " +
                                outputType(type.elements[i]));
         }
-        ts = "(" + llvm::join(parameters, ", ") + ") => void";
+        // What JS returns is converted like an argument: input types.
+        ts = "(" + llvm::join(parameters, ", ") + ") => " +
+             (type.results.empty() ? "void" : inputType(type.results[0]));
         break;
       }
       default:
@@ -499,6 +564,36 @@ class Writer {
         break;
     }
     return type.optional ? "(" + ts + ") | null | undefined" : ts;
+  }
+
+  // `{ case: "success"; value: S } | { case: "failure"; value: F }`.
+  std::string resultType(const BridgedType& type, bool input) const {
+    std::string readonly = input ? "readonly " : "";
+    auto value = [&](const BridgedType& element) {
+      return "; " + readonly +
+             "value: " + (input ? inputType(element) : outputType(element));
+    };
+    const BridgedType& success = type.elements.at(0);
+    return "{ " + readonly + "case: \"success\"" +
+           (success.bridge == Bridge::Void ? "" : value(success)) + " } | { " +
+           readonly + "case: \"failure\"" + value(type.elements.at(1)) + " }";
+  }
+
+  // `[A, B]`, or `{ latitude: A; longitude: B }` when labeled.
+  std::string tupleType(const BridgedType& type, bool input) const {
+    std::vector<std::string> elements;
+    for (size_t i = 0; i < type.elements.size(); i++) {
+      std::string element =
+          input ? inputType(type.elements[i]) : outputType(type.elements[i]);
+      elements.push_back(type.labels.empty()
+                             ? element
+                             : (input ? "readonly " : "") + type.labels[i] +
+                                   ": " + element);
+    }
+    if (type.labels.empty()) {
+      return (input ? "readonly [" : "[") + llvm::join(elements, ", ") + "]";
+    }
+    return "{ " + llvm::join(elements, "; ") + " }";
   }
 
   std::string outputType(const BridgedType& type) const {
@@ -543,6 +638,19 @@ class Writer {
         break;
       case Bridge::Dictionary:
         ts = "Record<string, " + outputType(type.elements.at(0)) + ">";
+        break;
+      case Bridge::Set:
+        ts = "Set<" + outputType(type.elements.at(0)) + ">";
+        break;
+      case Bridge::Tuple:
+      case Bridge::CStruct:
+        ts = tupleType(type, false);
+        break;
+      case Bridge::Error:
+        ts = "Error";
+        break;
+      case Bridge::Result:
+        ts = resultType(type, false);
         break;
       case Bridge::Closure:
         ts = "never";
@@ -673,7 +781,8 @@ class Writer {
   void buildTree() {
     for (const auto& type : _surface.types) {
       int family = familyOf(type.index);
-      if (type.module != _name || (family >= 0 && family != type.index)) {
+      if (type.module != _name || (family >= 0 && family != type.index) ||
+          type.kind == SwiftSurface::kObjCClass) {
         continue;
       }
       const auto& components = type.symbol->pathComponents;
@@ -944,8 +1053,98 @@ class Writer {
     }
   }
 
+  // NativeScript's global name for an Objective-C-visible Swift class: its
+  // name in the generated -Swift.h header.
+  std::string globalName(const SwiftSurface::Type& type) const {
+    const std::string& objcName =
+        _classification.find(type.symbol->preciseId)->objcName;
+    return isIdentifier(objcName) ? objcName : type.symbol->name;
+  }
+
+  // Swift-only members of Objective-C-visible classes, merged into
+  // NativeScript's global declaration of each class: instance members into
+  // its interface, initializers (`init`) and static members into a
+  // namespace.
+  void writeObjCClasses() {
+    bool opened = false;
+    for (const auto& type : _surface.types) {
+      if (type.kind != SwiftSurface::kObjCClass || type.module != _name) {
+        continue;
+      }
+      std::vector<const Group*> instance;
+      std::vector<const Group*> statics;
+      for (const Group& group : _groups) {
+        if (group.owner != type.index) {
+          continue;
+        }
+        bool isInstance = group.kind == SwiftSurface::kInstanceMethod ||
+                          group.kind == SwiftSurface::kInstanceProperty;
+        (isInstance ? instance : statics).push_back(&group);
+      }
+      if (instance.empty() && statics.empty()) {
+        continue;
+      }
+      if (!opened) {
+        _out << "\n  global {\n";
+        opened = true;
+      }
+      std::string name = globalName(type);
+      if (!instance.empty()) {
+        _out << "    interface " << name << " {\n";
+        for (const Group* group : instance) {
+          const Member& first = *group->overloads[0];
+          if (group->kind == SwiftSurface::kInstanceMethod) {
+            writeMethodGroup(*group, "      ", "");
+            continue;
+          }
+          writeDoc(*first.symbol, "      ");
+          _out << "      "
+               << ((first.flags & SwiftSurface::kSettable) ? "" : "readonly ")
+               << propertyKey(group->jsName) << ": " << resultOf(first)
+               << ";\n";
+        }
+        _out << "    }\n";
+      }
+      if (!statics.empty()) {
+        _out << "    namespace " << name << " {\n";
+        for (const Group* group : statics) {
+          std::string key = group->kind == SwiftSurface::kInitializer
+                                ? "init"
+                                : group->jsName;
+          if (!isIdentifier(key) || (key != "init" && isReserved(key))) {
+            continue;
+          }
+          const Member& first = *group->overloads[0];
+          if (group->kind == SwiftSurface::kStaticProperty) {
+            writeDoc(*first.symbol, "      ");
+            _out << "      "
+                 << ((first.flags & SwiftSurface::kSettable) ? "let "
+                                                             : "const ")
+                 << key << ": " << resultOf(first) << ";\n";
+            continue;
+          }
+          for (const Member* member : group->overloads) {
+            if (ambiguousWithin(*group, *member)) {
+              continue;
+            }
+            writeDoc(*member->symbol, "      ");
+            _out << "      function " << key << "(" << parameterList(*member)
+                 << "): " << resultOf(*member) << ";\n";
+          }
+        }
+        _out << "    }\n";
+      }
+    }
+    if (opened) {
+      _out << "  }\n";
+    }
+  }
+
   const Module& _module;
   const Classification& _classification;
+  // Objective-C runtime name -> global name of the unit's
+  // Objective-C-visible classes.
+  std::map<std::string, std::string> _objcGlobals;
   // The unit module these declarations are for.
   std::string _name;
   // Generic type id -> the instantiation that declares the family.

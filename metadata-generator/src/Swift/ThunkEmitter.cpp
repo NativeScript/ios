@@ -138,11 +138,82 @@ class Emitter {
         ValueExpression inner = valueExpression(element, "s", "j");
         std::string reader =
             type.bridge == Bridge::Array ? "__nsReadArray" : "__nsReadMap";
+        std::string elementType = valueTypeName(element);
+        std::string body = inner.code;
+        if (element.optional) {
+          // nil still means the element did not convert; .some(nil) is null.
+          elementType += "?";
+          body = "if s.isNull(j) { return .some(nil) }; " +
+                 std::string(inner.failable
+                                 ? "guard let v = " + inner.code +
+                                       " else { return nil }; return .some(v)"
+                                 : "return .some(" + inner.code + ")");
+        }
         // An explicit closure argument: trailing closures cannot appear in
         // guard conditions.
         return {reader + "(" + slots + ", " + index +
-                    ", { (s: __NSSlots, j: Int) -> " + valueTypeName(element) +
-                    "? in " + inner.code + " })",
+                    ", { (s: __NSSlots, j: Int) -> " + elementType + "? in " +
+                    body + " })",
+                true};
+      }
+      case Bridge::Set: {
+        BridgedType array = type;
+        array.bridge = Bridge::Array;
+        return {valueExpression(array, slots, index).code + ".map({ Set($0) })",
+                true};
+      }
+      case Bridge::Error:
+        return {"__NSJSValueError(message: " + read("string") + ")", false};
+      case Bridge::Result: {
+        std::string own = "t" + std::to_string(_tupleCount++);
+        const BridgedType& success = type.elements.at(0);
+        std::string successCase =
+            success.bridge == Bridge::Void
+                ? "    return .success(())\n"
+                : readCaseElement(success, 1, own + "v", own) +
+                      "    return .success(" + own + "v)\n";
+        return {"({ () -> " + swiftTypeText(unwrappedNode(type), _module) +
+                    "? in\n    let (" + own + ", _) = " + slots + ".elements(" +
+                    index + ")\n    switch " + own +
+                    ".int64(0) {\n    case 0:\n" + successCase +
+                    "    case 1:\n" +
+                    readCaseElement(type.elements.at(1), 1, own + "e", own) +
+                    "    return .failure(" + own +
+                    "e)\n    default: return nil\n    }\n  })()",
+                true};
+      }
+      case Bridge::CStruct: {
+        // Its fields as a labeled tuple, then the memberwise initializer.
+        BridgedType fields = type;
+        fields.bridge = Bridge::Tuple;
+        fields.optional = false;
+        fields.node = TypeNode();
+        fields.node.kind = TypeNode::Kind::Tuple;
+        fields.node.labels = type.labels;
+        std::vector<std::string> arguments;
+        for (size_t k = 0; k < type.elements.size(); k++) {
+          fields.node.children.push_back(type.elements[k].node);
+          arguments.push_back(type.labels[k] + ": $0." + std::to_string(k));
+        }
+        return {valueExpression(fields, slots, index).code + ".map({ " +
+                    type.objcClass + "(" + llvm::join(arguments, ", ") + ") })",
+                true};
+      }
+      case Bridge::Tuple: {
+        // Its own slots name: element readers may nest another tuple's.
+        std::string own = "t" + std::to_string(_tupleCount++);
+        std::string lines;
+        std::vector<std::string> names;
+        for (size_t k = 0; k < type.elements.size(); k++) {
+          names.push_back(own + "e" + std::to_string(k));
+          lines += readCaseElement(type.elements[k], k, names.back(), own);
+        }
+        return {"({ () -> " + swiftTypeText(unwrappedNode(type), _module) +
+                    "? in\n    let (" + own + ", " + own + "n) = " + slots +
+                    ".elements(" + index + ")\n    guard " + own +
+                    "n == " + std::to_string(type.elements.size()) +
+                    " else { return nil }\n" + lines + "    return (" +
+                    llvm::join(names, ", ") + ")\n  })()",
                 true};
       }
       case Bridge::Closure: {
@@ -163,13 +234,37 @@ class Emitter {
                                 : report);
         }
         std::string closureType = swiftTypeText(unwrappedNode(type), _module);
-        std::string body =
-            reports.empty() ? "_ in" : "r in " + llvm::join(reports, "; ");
-        return {"{ () -> " + closureType +
-                    " in let callback = __NSCallback(api: rt.api, handle: " +
-                    read("callback") + "); return { (" +
-                    llvm::join(parameters, ", ") + ") in callback.invoke { " +
-                    body + " } } }()",
+        std::string head =
+            "{ () -> " + closureType +
+            " in let callback = __NSCallback(api: rt.api, handle: " +
+            read("callback") + "); return { (" + llvm::join(parameters, ", ") +
+            ")";
+        if (type.results.empty() && !type.throwing) {
+          std::string body =
+              reports.empty() ? "_ in" : "r in " + llvm::join(reports, "; ");
+          return {head + " in callback.invoke { " + body + " } } }()", false};
+        }
+        // Waits for the JS function's result.
+        BridgedType result;
+        result.bridge = Bridge::Void;
+        if (!type.results.empty()) {
+          result = type.results[0];
+        }
+        std::string resultType = result.bridge == Bridge::Void
+                                     ? "Void"
+                                     : swiftTypeText(result.node, _module);
+        std::string zero = zeroValue(result);
+        std::string failure =
+            type.throwing ? "throw __NSJSError(requirement: \"a closure\")"
+            : zero.empty()
+                ? "fatalError(\"a JavaScript closure implementation failed\")"
+                : "return " + zero;
+        return {head + (type.throwing ? " throws" : "") + " -> " + resultType +
+                    " in let result: " + resultType +
+                    "? = callback.call({ r in " + llvm::join(reports, "; ") +
+                    " }, " + resultReader(result) +
+                    "); guard let result else { " + failure +
+                    " }; return result } }()",
                 false};
       }
       case Bridge::Void:
@@ -210,6 +305,10 @@ class Emitter {
            " }\n" + "    " + name + " = value\n" + "  }\n";
   }
 
+  std::string describeElement(const BridgedType& element) const {
+    return describe(element) + (element.optional ? " or null" : "");
+  }
+
   // How errors describe what a value must be.
   std::string describe(const BridgedType& type) const {
     switch (type.bridge) {
@@ -218,10 +317,16 @@ class Emitter {
         return "a case of " + typeName(type.symbolId);
       case Bridge::URL:
         return "a valid URL";
+      case Bridge::Result:
+        return "a Result ({ case: \"success\" | \"failure\", value })";
+      case Bridge::CStruct:
+        return "a " + type.objcClass + " ({ " + llvm::join(type.labels, ", ") +
+               " })";
       case Bridge::Array:
-        return "an array of " + describe(type.elements.at(0));
+        return "an array of " + describeElement(type.elements.at(0));
       case Bridge::Dictionary:
-        return "an object whose values are " + describe(type.elements.at(0));
+        return "an object whose values are " +
+               describeElement(type.elements.at(0));
       case Bridge::ClassHandle:
       case Bridge::StructBox:
         return typeName(type.symbolId);
@@ -240,6 +345,16 @@ class Emitter {
       return typeName(type.symbolId);
     }
     return swiftTypeText(unwrappedNode(type), _module);
+  }
+
+  // Statements returning a collection's `element`, null when it is nil.
+  std::string returnElement(const BridgedType& element,
+                            const std::string& reporter,
+                            const std::string& name = "element") const {
+    std::string write = returnValue(element, reporter, name);
+    return element.optional ? "if let " + name + " { " + write + " } else { " +
+                                  reporter + ".returnNull() }"
+                            : write;
   }
 
   // Statements returning `value` (a non-optional expression of `type`).
@@ -291,12 +406,54 @@ class Emitter {
       case Bridge::Data:
         return reporter + ".returnBytes(" + value + ")";
       case Bridge::Array:
+      case Bridge::Set:
         return reporter + ".returnArray(" + value + ") { element in " +
-               returnValue(type.elements.at(0), reporter, "element") + " }";
+               returnElement(type.elements.at(0), reporter) + " }";
+      case Bridge::Error:
+        return reporter + ".returnErrorValue(" + value + ")";
+      case Bridge::Result: {
+        std::string own = "t" + std::to_string(_tupleCount++);
+        const BridgedType& success = type.elements.at(0);
+        std::string successCase =
+            success.bridge == Bridge::Void
+                ? "case .success: " + reporter + ".returnCase(0) {}"
+                : "case .success(let " + own + "v): " + reporter +
+                      ".returnCase(0) { " +
+                      returnElement(success, reporter, own + "v") + " }";
+        return "switch " + value + " { " + successCase +
+               "; case .failure(let " + own + "e): " + reporter +
+               ".returnCase(1) { " +
+               returnValue(type.elements.at(1), reporter, own + "e") + " } }";
+      }
+      case Bridge::CStruct: {
+        std::vector<std::string> reports;
+        for (size_t k = 0; k < type.elements.size(); k++) {
+          reports.push_back(returnValue(type.elements[k], reporter,
+                                        value + "." + type.labels[k]));
+        }
+        return reporter + ".returnTuple(" +
+               std::to_string(type.elements.size()) + ") { " +
+               llvm::join(reports, "; ") + " }";
+      }
+      case Bridge::Tuple: {
+        std::vector<std::string> reports;
+        for (size_t k = 0; k < type.elements.size(); k++) {
+          const BridgedType& element = type.elements[k];
+          std::string field = value + "." + std::to_string(k);
+          reports.push_back(
+              element.optional ? "if let element = " + field + " { " +
+                                     returnValue(element, reporter, "element") +
+                                     " } else { " + reporter + ".returnNull() }"
+                               : returnValue(element, reporter, field));
+        }
+        return reporter + ".returnTuple(" +
+               std::to_string(type.elements.size()) + ") { " +
+               llvm::join(reports, "; ") + " }";
+      }
       case Bridge::Dictionary:
         return reporter + ".returnMap(" + value + ") { key, element in " +
                reporter + ".returnString(key); " +
-               returnValue(type.elements.at(0), reporter, "element") + " }";
+               returnElement(type.elements.at(0), reporter) + " }";
       case Bridge::Closure:
       case Bridge::TypeParameter:
       case Bridge::None:
@@ -596,6 +753,13 @@ private struct __NSJSError: Error, CustomStringConvertible {
   var description: String { "the JavaScript implementation of \(requirement) failed" }
 }
 
+// An error JavaScript passes as a value; it describes itself by the JS
+// error's message.
+private struct __NSJSValueError: Error, CustomStringConvertible {
+  let message: String
+  var description: String { message }
+}
+
 // The result entries calls and completions share, so value reporting code
 // serves both.
 private protocol __NSReporter {
@@ -611,6 +775,8 @@ private protocol __NSReporter {
   func returnMap<Value>(_ values: [String: Value], _ each: (String, Value) -> Void)
   func returnObject(_ object: AnyObject, _ typeIndex: UInt32)
   func returnCase(_ index: Int, _ values: () -> Void)
+  func returnTuple(_ count: Int, _ values: () -> Void)
+  func returnErrorValue(_ error: any Error)
   func returnObjC(_ object: AnyObject)
   func returnJSObject(_ object: __NSJSObject)
   func returnAsyncSequence(_ iterator: __NSAsyncIterator)
@@ -748,6 +914,12 @@ private struct __NSCall: __NSReporter {
     values()
     slot(36, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(call)
   }
+  // An array of `count` values of their own types, which `values` reports.
+  func returnTuple(_ count: Int, _ values: () -> Void) {
+    slot(23, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(call, count)
+    values()
+    slot(24, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(call)
+  }
   // `value` reports the final value of inout argument `index`.
   func writeBack(_ index: Int, _ value: () -> Void) {
     slot(38, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(call, index)
@@ -771,10 +943,13 @@ private struct __NSCall: __NSReporter {
       call, Unmanaged.passRetained(iterator).toOpaque(), __nsIteratorNext)
   }
   func throwError(_ error: any Error) {
-    report(String(describing: error), String(reflecting: type(of: error)))
+    report(8, String(describing: error), String(reflecting: type(of: error)))
   }
   func throwMessage(_ message: String) {
-    report(message, "")
+    report(8, message, "")
+  }
+  func returnErrorValue(_ error: any Error) {
+    report(52, String(describing: error), String(reflecting: type(of: error)))
   }
   func throwTypeError(_ message: String) {
     var message = message
@@ -783,12 +958,12 @@ private struct __NSCall: __NSReporter {
         call, $0.baseAddress, $0.count)
     }
   }
-  private func report(_ message: String, _ type: String) {
+  private func report(_ entry: Int, _ message: String, _ type: String) {
     var message = message
     var type = type
     message.withUTF8 { messageBytes in
       type.withUTF8 { typeBytes in
-        slot(8, (@convention(c) (UnsafeMutableRawPointer, UnsafePointer<UInt8>?, Int,
+        slot(entry, (@convention(c) (UnsafeMutableRawPointer, UnsafePointer<UInt8>?, Int,
                                  UnsafePointer<UInt8>?, Int) -> Void).self)(
           call, messageBytes.baseAddress, messageBytes.count, typeBytes.baseAddress, typeBytes.count)
       }
@@ -859,6 +1034,11 @@ private struct __NSCompletion: @unchecked Sendable, __NSReporter {
     values()
     slot(37, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(token)
   }
+  func returnTuple(_ count: Int, _ values: () -> Void) {
+    slot(27, (@convention(c) (UnsafeMutableRawPointer, Int) -> Void).self)(token, count)
+    values()
+    slot(28, (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(token)
+  }
   func returnObject(_ object: AnyObject, _ typeIndex: UInt32) {
     slot(21, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer, UInt32) -> Void).self)(
       token, Unmanaged.passRetained(object).toOpaque(), typeIndex)
@@ -876,11 +1056,17 @@ private struct __NSCompletion: @unchecked Sendable, __NSReporter {
       token, Unmanaged.passRetained(iterator).toOpaque(), __nsIteratorNext)
   }
   func throwError(_ error: any Error) {
+    report(22, error)
+  }
+  func returnErrorValue(_ error: any Error) {
+    report(53, error)
+  }
+  private func report(_ entry: Int, _ error: any Error) {
     var message = String(describing: error)
     var type = String(reflecting: Swift.type(of: error))
     message.withUTF8 { messageBytes in
       type.withUTF8 { typeBytes in
-        slot(22, (@convention(c) (UnsafeMutableRawPointer, UnsafePointer<UInt8>?, Int,
+        slot(entry, (@convention(c) (UnsafeMutableRawPointer, UnsafePointer<UInt8>?, Int,
                                   UnsafePointer<UInt8>?, Int) -> Void).self)(
           token, messageBytes.baseAddress, messageBytes.count, typeBytes.baseAddress, typeBytes.count)
       }
@@ -902,6 +1088,22 @@ private final class __NSCallback: @unchecked Sendable {
 
   deinit {
     api.load(fromByteOffset: 33 * 8, as: (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(handle)
+  }
+
+  // Calls the function and waits for its result; nil when it threw or
+  // returned a value `read` cannot convert.
+  func call<T>(_ arguments: (__NSCompletion) -> Void, _ read: (__NSSlots) -> T?) -> T? {
+    let begin = api.load(fromByteOffset: 31 * 8,
+                         as: (@convention(c) (UnsafeMutableRawPointer) -> UnsafeMutableRawPointer).self)
+    let completion = __NSCompletion(api: api, token: begin(handle))
+    arguments(completion)
+    let end = api.load(fromByteOffset: 51 * 8,
+                       as: (@convention(c) (UnsafeMutableRawPointer) -> UnsafeRawPointer?).self)
+    guard let result = end(completion.token) else { return nil }
+    defer {
+      api.load(fromByteOffset: 45 * 8, as: (@convention(c) (UnsafeRawPointer) -> Void).self)(result)
+    }
+    return read(__NSSlots(base: result, api: api))
   }
 
   // `arguments` reports each argument through the ordinary return entries.
@@ -1181,9 +1383,10 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
   // Lines binding `name` to associated value slot `slot` of `s`, returning
   // nil when it does not convert.
   std::string readCaseElement(const BridgedType& type, size_t slot,
-                              const std::string& name) const {
+                              const std::string& name,
+                              const std::string& slots = "s") const {
     std::string index = std::to_string(slot);
-    ValueExpression value = valueExpression(type, "s", index);
+    ValueExpression value = valueExpression(type, slots, index);
     std::string typeText = valueTypeName(type);
     if (!type.optional) {
       return value.failable ? "    guard let " + name + " = " + value.code +
@@ -1191,11 +1394,11 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
                             : "    let " + name + " = " + value.code + "\n";
     }
     if (!value.failable) {
-      return "    let " + name + ": " + typeText + "? = s.isNull(" + index +
-             ") ? nil : " + value.code + "\n";
+      return "    let " + name + ": " + typeText + "? = " + slots + ".isNull(" +
+             index + ") ? nil : " + value.code + "\n";
     }
-    return "    var " + name + ": " + typeText + "? = nil\n    if !s.isNull(" +
-           index + ") {\n      guard let value = " + value.code +
+    return "    var " + name + ": " + typeText + "? = nil\n    if !" + slots +
+           ".isNull(" + index + ") {\n      guard let value = " + value.code +
            " else { return nil }\n      " + name + " = value\n    }\n";
   }
 
@@ -1314,6 +1517,25 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
     return result;
   }
 
+  // A closure converting the one result slot a JS call returns to `result`,
+  // nil when it does not convert.
+  std::string resultReader(const BridgedType& result) const {
+    if (result.bridge == Bridge::Void) {
+      return "{ (_: __NSSlots) -> Void? in () }";
+    }
+    std::string resultType = swiftTypeText(result.node, _module);
+    ValueExpression value = valueExpression(result, "s", "0");
+    if (!result.optional) {
+      return "{ (s: __NSSlots) -> " + resultType + "? in " + value.code + " }";
+    }
+    std::string inner = swiftTypeText(unwrappedNode(result), _module);
+    return "{ (s: __NSSlots) -> " + inner +
+           "?? in if s.isNull(0) { return .some(nil) }; " +
+           (value.failable ? "return (" + value.code + ").map { .some($0) }"
+                           : "return .some(" + value.code + ")") +
+           " }";
+  }
+
   // What a requirement returns when its JS implementation fails, or "" when
   // its type has no such value.
   static std::string zeroValue(const BridgedType& type) {
@@ -1354,22 +1576,7 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
                                  : swiftTypeText(result.node, _module);
     std::string owner = llvm::join(symbol.pathComponents, ".");
 
-    auto readClosure = [&]() -> std::string {
-      if (result.bridge == Bridge::Void) {
-        return "{ (_: __NSSlots) -> Void? in () }";
-      }
-      ValueExpression value = valueExpression(result, "s", "0");
-      if (!result.optional) {
-        return "{ (s: __NSSlots) -> " + resultType + "? in " + value.code +
-               " }";
-      }
-      std::string inner = swiftTypeText(unwrappedNode(result), _module);
-      return "{ (s: __NSSlots) -> " + inner +
-             "?? in if s.isNull(0) { return .some(nil) }; " +
-             (value.failable ? "return (" + value.code + ").map { .some($0) }"
-                             : "return .some(" + value.code + ")") +
-             " }";
-    };
+    auto readClosure = [&]() { return resultReader(result); };
     auto body = [&](int index, const std::string& reports,
                     const std::string& indent) {
       std::string zero = zeroValue(result);
@@ -1510,9 +1717,13 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
     for (const auto& type : _surface.types) {
       const Symbol& symbol = *type.symbol;
       int kind = type.kind;
+      const Capability* capability = _classification.find(symbol.preciseId);
+      std::string jsName = type.kind == SwiftSurface::kObjCClass
+                               ? capability->objcName
+                               : llvm::join(symbol.pathComponents, ".");
       out += "  registerType(registrar, " + std::to_string(type.index) + ", " +
              std::to_string(kind) + ", " + quoted(type.module) + ", " +
-             quoted(llvm::join(symbol.pathComponents, ".")) + ", " +
+             quoted(jsName) + ", " +
              quoted(qualifiedTypeName(_module, symbol)) + ", " +
              std::to_string(type.superIndex) + ")\n";
     }
@@ -1562,6 +1773,8 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
   SwiftSurface _surface;
   std::vector<std::string> _registrations;
   int _thunkCount = 0;
+  // Names the slots each tuple reader binds.
+  mutable int _tupleCount = 0;
 };
 
 }  // namespace

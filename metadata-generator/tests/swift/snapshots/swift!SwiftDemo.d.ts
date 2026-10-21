@@ -62,6 +62,16 @@ declare module "ns:swift/SwiftDemo" {
 
   }
 
+  export class ParseFailure {
+    private constructor();
+    readonly description: string;
+    readonly text: string;
+    /**
+     * Retrieve the localized description for this error.
+     */
+    readonly localizedDescription: string;
+  }
+
   export interface RankedScorer extends Scorer {
     readonly rank: number | null;
   }
@@ -171,10 +181,17 @@ declare module "ns:swift/SwiftDemo" {
      * @deprecated Use fetch(url:) instead
      */
     legacyFetch(): void;
+    withCompletion(completion: (arg0: { case: "success"; value: string } | { case: "failure"; value: ShapeError }) => void): void;
     each(body: (arg0: number) => void): void;
     load(path: string): Uint8Array;
     wait(seconds: number): Promise<void>;
     fetch(url: string | URL): Promise<string>;
+    first(items: readonly (string)[]): string | null;
+    first(items: readonly (boolean)[]): boolean | null;
+    first(items: readonly (number)[]): number | null;
+    "first(of: [String])"(items: readonly (string)[]): string | null;
+    "first(of: [Bool])"(items: readonly (boolean)[]): boolean | null;
+    "first(of: [Double])"(items: readonly (number)[]): number | null;
     lookup(table: Readonly<Record<string, number | bigint>>, key: string): number | null;
     update(point: { value: Point }): void;
     /**
@@ -296,50 +313,84 @@ declare module "ns:swift/SwiftDemo" {
   }
 
   export type Score = import("ns:swift/SwiftDemoKit").Pair<string, number>;
+  export type Coordinates = { latitude: number; longitude: number };
   export function allFlavors(): (Flavor)[];
+  export function checkSides(sides: number | bigint): { case: "success" } | { case: "failure"; value: ShapeError };
   export function echoString(value: string): string;
   export function echoUInt64(value: number | bigint): number;
+  export function firstMatch(values: readonly (number | bigint)[], predicate: (arg0: number) => boolean): number | null;
   export function greetLater(name: (string) | null | undefined, completion: (arg0: string | null) => void): void;
+  export function greetTwice(greeting: Greeting, other: string): string;
   export function largestInt(): number;
   export function makeScorer(): Scorer;
   export function namesLater(count: number | bigint): Promise<(string)[]>;
+  export function parseLater(text: string): Promise<{ case: "success"; value: number } | { case: "failure"; value: Error }>;
+  export function tallyLater(words: readonly (string)[]): Promise<{ unique: Set<string>; count: number }>;
+  export function uniqueTags(tags: readonly (string)[]): Set<string>;
   export function wordCounts(words: readonly (string)[]): Record<string, number>;
   export function checkedSide(side: number): number;
+  export function countUnique(values: ReadonlySet<number | bigint> | readonly (number | bigint)[]): number;
   export function delayedEcho(text: string, seconds: number): Promise<string>;
+  export function knownScores(scores: Readonly<Record<string, (number | bigint) | null | undefined>>): Record<string, number | null>;
+  export function parseNumber(text: string): { case: "success"; value: number } | { case: "failure"; value: Error };
+  export function sortedNames(names: readonly (string)[], less: (arg0: string, arg1: string) => boolean): (string)[];
   export function firstSubview(view: UIView): UIView | null;
+  export function latitudeSpan(a: { readonly latitude: number; readonly longitude: number }, b: { readonly latitude: number; readonly longitude: number }): number;
   export function makeGreeting(name: string): Greeting;
   export function measureLater(width: number): Promise<Measurement>;
   export function measurements(): (Measurement)[];
   export function swapTrackers(a: { value: Tracker }, b: { value: Tracker }): void;
   export const defaultFlavor: Flavor;
+  export function describeError(error: (Error | string) | null | undefined): string;
+  export function describeValue(value: string): string;
+  export function describeValue(value: boolean): string;
+  export function describeValue(value: number): string;
   export let globalCounter: number;
   export function starterWallet(owner: string): import("ns:swift/SwiftDemoKit").Wallet;
   export function makeDefaultPoint(): Point;
   export function makeTrackerLater(id: number | bigint): Promise<Tracker>;
   export function greetInBackground(greeting: Greeting): Promise<string>;
+  export function computeInBackground(provider: () => number | bigint): Promise<number>;
   export function sum(amounts: readonly (import("ns:swift/SwiftDemoKit").Money)[]): import("ns:swift/SwiftDemoKit").Money;
   export function area(measurement: Measurement): number;
   export function bump(value: { value: number | bigint }): void;
   export function echo(payload: Payload): Payload;
   export function flip(coin: import("ns:swift/SwiftDemoKit").Coin): import("ns:swift/SwiftDemoKit").Coin;
   export function host(url: string | URL): string | null;
+  export function plot(point: ({ readonly x: number; readonly y: number }) | null | undefined): string | null;
   export function ramp(count: number | bigint): Uint8Array;
   export function same(greeting: Greeting): Greeting;
   export function tags(views: readonly (UIView)[]): (number)[];
-  export function text(note: NSObject): string;
+  export function text(note: Note): string;
+  export function zero(): number;
   export function boxed(money: import("ns:swift/SwiftDemoKit").Money): import("ns:swift/SwiftDemoKit").Box<import("ns:swift/SwiftDemoKit").Money>;
   export function clear(name: { value: (string) | null | undefined }): void;
   export function halve(value: { value: number | bigint }): void;
+  export function holes(count: number | bigint): (string | null)[];
+  export function inset(rect: { readonly origin: { readonly x: number; readonly y: number }; readonly size: { readonly width: number; readonly height: number } }, insets: { readonly top: number; readonly left: number; readonly bottom: number; readonly right: number }): { origin: { x: number; y: number }; size: { width: number; height: number } };
   export function names(count: number | bigint): (string)[];
   export function pages(count: number | bigint): AsyncIterableIterator<(string)[]>;
   export function shout(name: (string) | null | undefined): string | null;
+  export function spans(): ([string, number | null])[];
+  export function tagOf(view: UIView): number;
   export function total(values: readonly (number)[]): number;
+  export function unbox(box: import("ns:swift/SwiftDemoKit").Box<import("ns:swift/SwiftDemoKit").Money>): import("ns:swift/SwiftDemoKit").Money;
+  export function unbox(box: import("ns:swift/SwiftDemoKit").Box<number>): number;
   export function append(word: string, words: { value: readonly (string)[] }): void;
+  export function divide(a: number | bigint, b: number | bigint): { quotient: number; remainder: number };
   export function excite(greeting: Greeting): void;
+  export function lookup(key: string, resolve: (arg0: string) => (number | bigint) | null | undefined): number;
   export function settle(value: number | bigint): import("ns:swift/SwiftDemoKit").Outcome<number>;
+  export function unwrap(result: { readonly case: "success"; readonly value: string } | { readonly case: "failure"; readonly value: Error | string }): string;
+  export function compact(values: readonly ((number | bigint) | null | undefined)[]): (number)[];
   export function countUp(limit: number | bigint): AsyncIterableIterator<number>;
   export function echoInt(value: number | bigint): number;
   export function explain(error: ShapeError): string;
+  export function firstOf(pair: import("ns:swift/SwiftDemoKit").Pair<string, number>): string;
+  export function firstOf(pair: import("ns:swift/SwiftDemoKit").Pair<number, string>): number;
+  export function fitting(size: ({ readonly width: number; readonly height: number }) | null | undefined): { width: number; height: number } | null;
+  export function largest(values: readonly (string)[]): string | null;
+  export function largest(values: readonly (number)[]): number | null;
   export function lengths(table: Readonly<Record<string, string>>): Record<string, number>;
   /**
    * @remarks Requires iOS 18.0; throws on earlier versions.
@@ -349,24 +400,52 @@ declare module "ns:swift/SwiftDemo" {
   export function nextDay(date: Date): Date;
   export function resolve(path: string, base: string | URL): URL;
   export function topRank(scorer: RankedScorer): string;
+  export function viewTag(view: UIView): number;
   export function centroid(points: readonly (Point)[]): Point;
   export function checksum(data: ArrayBuffer | ArrayBufferView): number;
   export function countBox(value: number | bigint): import("ns:swift/SwiftDemoKit").Box<number>;
   export function describe(pair: import("ns:swift/SwiftDemoKit").Pair<number, string>): string;
   export function describe(view: UIView): string;
   export function echoInt8(value: number | bigint): number;
-  export function makeNote(text: string): NSObject;
+  export function makeNote(text: string): Note;
+  export function midpoint(a: { readonly x: number; readonly y: number }, b: { readonly x: number; readonly y: number }): { x: number; y: number };
   export function mirrored(grid: readonly (readonly (number | bigint)[])[]): ((number)[])[];
+  export function popCount(value: number | bigint): number;
+  export function repeated(value: string, times: number | bigint): (string)[];
+  export function repeated(value: boolean, times: number | bigint): (boolean)[];
+  export function repeated(value: number, times: number | bigint): (number)[];
   export function scoreAll(scorer: Scorer, values: readonly (number | bigint)[]): (number)[];
+  export function shoutAll(value: string): string;
   export function simplify(formula: Formula): Formula;
+  export function swapPair(pair: readonly [number | bigint, string]): [string, number];
   export function trackers(ids: readonly (number | bigint)[]): (Tracker)[];
   export function countDown(start: number | bigint, failure: (number | bigint) | null | undefined): AsyncIterableIterator<number>;
   export function countdown(start: number | bigint, tick: (arg0: number, arg1: boolean) => void): void;
+  export function fetchItem(id: number | bigint, completion: (arg0: { case: "success"; value: string } | { case: "failure"; value: Error }) => void): void;
+  export function greetOnce(greeting: Greeting, other: string): string;
   export function introduce(greeting: Greeting, other: string): string;
   export function makeLabel(text: string): UILabel;
   export function makeScore(name: string, points: number | bigint): import("ns:swift/SwiftDemoKit").Pair<string, number>;
-  export function noteLater(text: string): Promise<NSObject>;
+  export function noteLater(text: string): Promise<Note>;
   export function onMeasure(body: (arg0: Measurement) => void): void;
+  export function transform(values: readonly (number | bigint)[], body: (arg0: number) => string): (string)[];
+
+  global {
+    interface CounterView {
+      readonly count: number;
+      configure(start: number | bigint, step: (number | bigint) | null | undefined): number;
+    }
+    interface Note {
+      tags: Set<string>;
+      readonly text: string;
+      tagged(tag: string): Note;
+      summary(maxLength: number | bigint): string;
+    }
+    namespace Note {
+      function init(text: string): Note;
+      function blank(): Note;
+    }
+  }
 }
 
 declare module "ns:swift" {

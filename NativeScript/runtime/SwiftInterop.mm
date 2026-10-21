@@ -39,6 +39,8 @@ constexpr double kMaxSafeInteger = 9007199254740991.0;
 
 // --- Signatures --------------------------------------------------------------
 
+struct CaseInfo;
+
 struct ValueCode {
   enum class Kind {
     Void,
@@ -54,6 +56,10 @@ struct ValueCode {
     Data,
     Array,
     Map,
+    Set,
+    Tuple,
+    Error,
+    Result,
     Function,
     Tagged,
     ObjC,
@@ -71,7 +77,36 @@ struct ValueCode {
   Class objcClass = nil;
   // Array and Map: the element (value) code. Function: its parameter codes.
   std::vector<ValueCode> element;
+  // Function: its result code; empty for Void.
+  std::vector<ValueCode> returns;
+  // Tuple: its element codes are `element`; its labels, or empty when none
+  // is labeled (a JS array rather than an object).
+  std::vector<std::string> labels;
+  // Result: its two cases, `success` and `failure`, as a tagged enum's.
+  std::shared_ptr<const std::vector<CaseInfo>> cases;
 };
+
+// One case of a tagged enum: its JS keys and value codes, by position.
+struct CaseInfo {
+  std::string name;
+  std::vector<std::string> keys;
+  std::vector<ValueCode> codes;
+};
+
+// The '>' before the result in "params>result": the last one outside
+// brackets, since closure parameters carry their own.
+size_t ResultArrow(const std::string& text) {
+  int depth = 0;
+  size_t arrow = std::string::npos;
+  for (size_t i = 0; i < text.size(); i++) {
+    char c = text[i];
+    depth += (c == '[' || c == '{' || c == '(') - (c == ']' || c == '}' || c == ')');
+    if (c == '>' && depth == 0) {
+      arrow = i;
+    }
+  }
+  return arrow;
+}
 
 // Splits "a,[b],(c,d)" at its top-level commas.
 bool SplitCodes(const std::string& text, std::vector<std::string>& parts) {
@@ -114,18 +149,92 @@ bool ParseCode(std::string text, ValueCode& code) {
     return ParseCode(text.substr(1), element) && element.kind != ValueCode::Kind::Void &&
            element.kind != ValueCode::Kind::Function && !element.optional;
   }
+  if (text == "!") {
+    code.kind = ValueCode::Kind::Error;
+    return true;
+  }
+  if (text.size() > 3 && text.compare(0, 2, "R(") == 0 && text.back() == ')') {
+    code.kind = ValueCode::Kind::Result;
+    std::vector<std::string> parts;
+    ValueCode success;
+    ValueCode failure;
+    if (!SplitCodes(text.substr(2, text.size() - 3), parts) || parts.size() != 2 ||
+        !ParseCode(parts[0], success) || !ParseCode(parts[1], failure) ||
+        success.kind == ValueCode::Kind::Function || failure.kind == ValueCode::Kind::Void ||
+        failure.optional) {
+      return false;
+    }
+    auto cases = std::make_shared<std::vector<CaseInfo>>(2);
+    (*cases)[0].name = "success";
+    if (success.kind != ValueCode::Kind::Void) {
+      (*cases)[0].keys = {"value"};
+      (*cases)[0].codes = {success};
+    }
+    (*cases)[1].name = "failure";
+    (*cases)[1].keys = {"value"};
+    (*cases)[1].codes = {failure};
+    code.cases = cases;
+    return true;
+  }
+  if (text.size() > 3 && text.compare(0, 2, "S[") == 0 && text.back() == ']') {
+    code.kind = ValueCode::Kind::Set;
+    code.element.emplace_back();
+    ValueCode& element = code.element.back();
+    return ParseCode(text.substr(2, text.size() - 3), element) &&
+           element.kind != ValueCode::Kind::Void && element.kind != ValueCode::Kind::Function &&
+           !element.optional;
+  }
+  if (text.size() > 3 && text.compare(0, 2, "*(") == 0 && text.back() == ')') {
+    code.kind = ValueCode::Kind::Tuple;
+    std::vector<std::string> parts;
+    if (!SplitCodes(text.substr(2, text.size() - 3), parts) || parts.size() < 2) {
+      return false;
+    }
+    for (std::string part : parts) {
+      // "label:code"; codes themselves start with no identifier and colon.
+      size_t colon = part.find(':');
+      bool labeled = colon != std::string::npos && colon > 0 &&
+                     std::all_of(part.begin(), part.begin() + colon,
+                                 [](char c) { return std::isalnum(c) || c == '_'; });
+      // Every element is labeled, or none is.
+      if (!code.element.empty() && labeled == code.labels.empty()) {
+        return false;
+      }
+      if (labeled) {
+        code.labels.push_back(part.substr(0, colon));
+        part = part.substr(colon + 1);
+      }
+      code.element.emplace_back();
+      if (!ParseCode(part, code.element.back()) ||
+          code.element.back().kind == ValueCode::Kind::Void ||
+          code.element.back().kind == ValueCode::Kind::Function) {
+        return false;
+      }
+    }
+    return true;
+  }
   if ((text.front() == '[' && text.back() == ']') || (text.front() == '{' && text.back() == '}')) {
     code.kind = text.front() == '[' ? ValueCode::Kind::Array : ValueCode::Kind::Map;
     code.element.emplace_back();
     ValueCode& element = code.element.back();
     return ParseCode(text.substr(1, text.size() - 2), element) &&
-           element.kind != ValueCode::Kind::Void && element.kind != ValueCode::Kind::Function &&
-           !element.optional;
+           element.kind != ValueCode::Kind::Void && element.kind != ValueCode::Kind::Function;
   }
   if (text.front() == '(' && text.back() == ')') {
     code.kind = ValueCode::Kind::Function;
+    std::string inner = text.substr(1, text.size() - 2);
+    size_t arrow = ResultArrow(inner);
+    if (arrow != std::string::npos) {
+      code.returns.emplace_back();
+      if (!ParseCode(inner.substr(arrow + 1), code.returns.back()) ||
+          code.returns.back().kind == ValueCode::Kind::Function ||
+          code.returns.back().kind == ValueCode::Kind::Void) {
+        return false;
+      }
+      inner = inner.substr(0, arrow);
+    }
     std::vector<std::string> parts;
-    if (!SplitCodes(text.substr(1, text.size() - 2), parts)) {
+    if (!SplitCodes(inner, parts)) {
       return false;
     }
     for (const std::string& part : parts) {
@@ -215,7 +324,7 @@ struct Signature {
 };
 
 bool ParseSignature(const std::string& text, Signature& signature) {
-  size_t arrow = text.find('>');
+  size_t arrow = ResultArrow(text);
   if (arrow == std::string::npos) {
     return false;
   }
@@ -293,13 +402,6 @@ struct MemberGroup {
   std::vector<const MemberInfo*> overloads;
 };
 
-// One case of a tagged enum: its JS keys and value codes, by position.
-struct CaseInfo {
-  std::string name;
-  std::vector<std::string> keys;
-  std::vector<ValueCode> codes;
-};
-
 struct TypeInfo {
   uint32_t index = 0;
   uint32_t kind = 0;
@@ -317,9 +419,14 @@ struct TypeInfo {
   int family = -1;
   // NSSwiftTypeProtocol: the requirement table adapters call by index.
   std::vector<const MemberInfo*> requirements;
+  // NSSwiftTypeObjCClass: the class `jsName` names, or nil when not loaded.
+  Class objcClass = nil;
 };
 
 bool IsEnumKind(uint32_t kind) { return kind == NSSwiftTypeEnum || kind == NSSwiftTypeTaggedEnum; }
+
+// Types without a JS class of their own.
+bool HasNoTemplate(uint32_t kind) { return IsEnumKind(kind) || kind == NSSwiftTypeObjCClass; }
 
 // A registered unit: one or more Swift modules sharing one type table.
 struct ModuleInfo {
@@ -387,6 +494,27 @@ std::string TypeDisplayName(const ModuleInfo& module, const ValueCode& code) {
     case ValueCode::Kind::Map:
       name = "[String: " + TypeDisplayName(module, code.element.at(0)) + "]";
       break;
+    case ValueCode::Kind::Set:
+      name = "Set<" + TypeDisplayName(module, code.element.at(0)) + ">";
+      break;
+    case ValueCode::Kind::Error:
+      name = "Error";
+      break;
+    case ValueCode::Kind::Result: {
+      const auto& success = (*code.cases)[0].codes;
+      name = "Result<" +
+             (success.empty() ? std::string("Void") : TypeDisplayName(module, success[0])) + ", " +
+             TypeDisplayName(module, (*code.cases)[1].codes[0]) + ">";
+      break;
+    }
+    case ValueCode::Kind::Tuple:
+      name = "(";
+      for (size_t i = 0; i < code.element.size(); i++) {
+        name += (i > 0 ? ", " : "") + (code.labels.empty() ? "" : code.labels[i] + ": ") +
+                TypeDisplayName(module, code.element[i]);
+      }
+      name += ")";
+      break;
     case ValueCode::Kind::Object:
     case ValueCode::Kind::Enum:
     case ValueCode::Kind::Tagged:
@@ -400,7 +528,8 @@ std::string TypeDisplayName(const ModuleInfo& module, const ValueCode& code) {
       for (size_t i = 0; i < code.element.size(); i++) {
         name += (i > 0 ? ", " : "") + TypeDisplayName(module, code.element[i]);
       }
-      name += ") -> Void";
+      name += ") -> " + (code.returns.empty() ? std::string("Void")
+                                              : TypeDisplayName(module, code.returns[0]));
       if (code.optional) {
         name = "(" + name + ")";
       }
@@ -466,6 +595,9 @@ void ApiRegisterType(NSSwiftRegistrar* registrar, uint32_t index, uint32_t kind,
   type.jsName = jsName ? jsName : "";
   type.swiftName = swiftName ? swiftName : "";
   type.superIndex = superIndex;
+  if (kind == NSSwiftTypeObjCClass) {
+    type.objcClass = objc_getClass(type.jsName.c_str());
+  }
   module->types.push_back(std::move(type));
 }
 
@@ -560,6 +692,11 @@ void ApiObjectResultRelease(const NSSwiftValue* result);
 void ApiReturnJSObject(NSSwiftCall* call, void* object);
 void ApiCompleteJSObject(void* token, void* object);
 void ApiRegisterTracker(NSSwiftRegistrar* registrar, NSSwiftTracker tracker);
+const NSSwiftValue* ApiCallbackCallEnd(void* token);
+void ApiReturnErrorValue(NSSwiftCall* call, const uint8_t* message, intptr_t messageLength,
+                         const uint8_t* type, intptr_t typeLength);
+void ApiCompleteErrorValue(void* token, const uint8_t* message, intptr_t messageLength,
+                           const uint8_t* type, intptr_t typeLength);
 void ApiReturnAsyncSequence(NSSwiftCall* call, void* iterator, NSSwiftThunk next);
 void ApiCompleteAsyncSequence(void* token, void* iterator, NSSwiftThunk next);
 struct IsolateState;
@@ -589,6 +726,7 @@ const NSSwiftAPI kAPI = {
     ApiRegisterUnitModule,   ApiObjectCallBegin,      ApiObjectCallEnd,
     ApiObjectResultRelease,  ApiReturnJSObject,       ApiCompleteJSObject,
     ApiRegisterTracker,      ApiReturnAsyncSequence,  ApiCompleteAsyncSequence,
+    ApiCallbackCallEnd,      ApiReturnErrorValue,     ApiCompleteErrorValue,
 };
 
 // "Polygon.Style" -> "Style".
@@ -916,6 +1054,10 @@ struct ResultFrame {
   const ValueCode* element = nullptr;
   // Set for a case: its values' keys and codes.
   const CaseInfo* tagged = nullptr;
+  // Set for a tuple: its element codes and labels (an object when labeled).
+  const ValueCode* tuple = nullptr;
+  // `target` is a JS Set, filled by Add.
+  bool isSet = false;
   // An inout argument's reference object, whose `value` receives the one
   // value reported (of code `element`).
   bool writeBack = false;
@@ -959,6 +1101,9 @@ const ValueCode* CurrentCode(CallContext* context) {
   if (frame.tagged != nullptr) {
     return frame.next < frame.tagged->codes.size() ? &frame.tagged->codes[frame.next] : nullptr;
   }
+  if (frame.tuple != nullptr) {
+    return frame.next < frame.tuple->element.size() ? &frame.tuple->element[frame.next] : nullptr;
+  }
   return frame.isMap && frame.expectKey ? &KeyCode() : frame.element;
 }
 
@@ -984,6 +1129,14 @@ void Complete(CallContext* context, Local<Value> value) {
                  ->Set(context->context,
                        tns::ToV8String(context->isolate, frame.tagged->keys[frame.next++]), value)
                  .FromMaybe(false);
+  } else if (frame.tuple != nullptr && !frame.tuple->labels.empty()) {
+    stored = frame.next < frame.tuple->labels.size() &&
+             frame.target
+                 ->Set(context->context,
+                       tns::ToV8String(context->isolate, frame.tuple->labels[frame.next++]), value)
+                 .FromMaybe(false);
+  } else if (frame.isSet) {
+    stored = !frame.target.As<v8::Set>()->Add(context->context, value).IsEmpty();
   } else if (!frame.isMap) {
     stored = frame.target->Set(context->context, frame.next++, value).FromMaybe(false);
   } else if (frame.expectKey) {
@@ -1170,9 +1323,14 @@ void ApiReturnNull(NSSwiftCall* call) {
 void BeginContainer(CallContext* context, bool isMap, intptr_t count) {
   const ValueCode* code = CurrentCode(context);
   ValueCode::Kind expected = isMap ? ValueCode::Kind::Map : ValueCode::Kind::Array;
-  // An iterator step reports its element as an array.
-  bool step = !isMap && code != nullptr && code->kind == ValueCode::Kind::AsyncSequence;
-  if (code == nullptr || (code->kind != expected && !step) || code->element.empty()) {
+  // An iterator step reports its element as an array, and so do sets and
+  // tuples.
+  bool arrayLike =
+      !isMap && code != nullptr &&
+      (code->kind == ValueCode::Kind::AsyncSequence || code->kind == ValueCode::Kind::Set ||
+       (code->kind == ValueCode::Kind::Tuple &&
+        static_cast<size_t>(count) == code->element.size()));
+  if (code == nullptr || (code->kind != expected && !arrayLike) || code->element.empty()) {
     Fail(context);
     context->isolate->ThrowException(Exception::Error(tns::ToV8String(
         context->isolate, context->member->swiftName + " reported an unexpected collection")));
@@ -1180,8 +1338,15 @@ void BeginContainer(CallContext* context, bool isMap, intptr_t count) {
   }
   ResultFrame frame;
   frame.isMap = isMap;
-  frame.target = isMap ? Local<Object>(Object::New(context->isolate))
-                       : Local<Object>(v8::Array::New(context->isolate, static_cast<int>(count)));
+  frame.isSet = code->kind == ValueCode::Kind::Set;
+  if (code->kind == ValueCode::Kind::Tuple) {
+    frame.tuple = code;
+  }
+  frame.target = isMap || (frame.tuple != nullptr && !code->labels.empty())
+                     ? Local<Object>(Object::New(context->isolate))
+                 : frame.isSet
+                     ? Local<Object>(v8::Set::New(context->isolate))
+                     : Local<Object>(v8::Array::New(context->isolate, static_cast<int>(count)));
   frame.element = &code->element[0];
   context->frames.push_back(frame);
 }
@@ -1217,13 +1382,25 @@ MaybeLocal<Object> NewCaseObject(Isolate* isolate, Local<Context> context, const
   return object;
 }
 
-// The case `caseIndex` of the tagged enum `code` names, or null.
-const CaseInfo* CaseOf(const ModuleInfo& module, const ValueCode* code, intptr_t caseIndex) {
-  if (code == nullptr || code->kind != ValueCode::Kind::Tagged || code->typeIndex < 0 ||
-      code->typeIndex >= static_cast<int>(module.types.size())) {
+// The cases of a tagged enum or Result code, or null.
+const std::vector<CaseInfo>* CasesOf(const ModuleInfo& module, const ValueCode& code) {
+  if (code.kind == ValueCode::Kind::Result) {
+    return code.cases.get();
+  }
+  if (code.kind != ValueCode::Kind::Tagged || code.typeIndex < 0 ||
+      code.typeIndex >= static_cast<int>(module.types.size())) {
     return nullptr;
   }
-  const auto& cases = module.types[code->typeIndex].cases;
+  return &module.types[code.typeIndex].cases;
+}
+
+// The case `caseIndex` of the tagged enum (or Result) `code` names, or null.
+const CaseInfo* CaseOf(const ModuleInfo& module, const ValueCode* code, intptr_t caseIndex) {
+  const std::vector<CaseInfo>* found = code ? CasesOf(module, *code) : nullptr;
+  if (found == nullptr) {
+    return nullptr;
+  }
+  const auto& cases = *found;
   return caseIndex >= 0 && caseIndex < static_cast<intptr_t>(cases.size()) ? &cases[caseIndex]
                                                                            : nullptr;
 }
@@ -1361,6 +1538,14 @@ void ApiThrowError(NSSwiftCall* call, const uint8_t* message, intptr_t messageLe
       SwiftErrorValue(context->isolate, context->context, text, typeName));
 }
 
+void ApiReturnErrorValue(NSSwiftCall* call, const uint8_t* message, intptr_t messageLength,
+                         const uint8_t* type, intptr_t typeLength) {
+  CallContext* context = ContextOf(call);
+  std::string text(reinterpret_cast<const char*>(message), message ? messageLength : 0);
+  std::string typeName(reinterpret_cast<const char*>(type), type ? typeLength : 0);
+  Complete(context, SwiftErrorValue(context->isolate, context->context, text, typeName));
+}
+
 void ApiThrowTypeError(NSSwiftCall* call, const uint8_t* message, intptr_t length) {
   CallContext* context = ContextOf(call);
   context->completed = true;
@@ -1393,6 +1578,8 @@ struct AsyncOutcome {
     Null,
     Object,
     Error,
+    // An error as a value (a Result's failure), rather than a rejection.
+    ErrorValue,
     Array,
     Map,
     Case,
@@ -1532,6 +1719,40 @@ bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
       if (code.element.empty()) {
         return failed("returned an unexpected array");
       }
+      if (code.kind == ValueCode::Kind::Tuple) {
+        if (node.children.size() != code.element.size()) {
+          return failed("returned an unexpected tuple");
+        }
+        bool labeled = !code.labels.empty();
+        Local<Object> tuple =
+            labeled ? Object::New(isolate)
+                    : v8::Array::New(isolate, static_cast<int>(code.element.size())).As<Object>();
+        for (uint32_t i = 0; i < code.element.size(); i++) {
+          Local<Value> element;
+          Local<Value> key = labeled ? tns::ToV8String(isolate, code.labels[i]).As<Value>()
+                                     : v8::Integer::New(isolate, i).As<Value>();
+          if (!OutcomeToJS(isolate, context, state, name, *node.children[i], code.element[i],
+                           element, rejection) ||
+              !tuple->Set(context, key, element).FromMaybe(false)) {
+            return false;
+          }
+        }
+        out = tuple;
+        return true;
+      }
+      if (code.kind == ValueCode::Kind::Set) {
+        Local<v8::Set> set = v8::Set::New(isolate);
+        for (const auto& child : node.children) {
+          Local<Value> element;
+          if (!OutcomeToJS(isolate, context, state, name, *child, code.element[0], element,
+                           rejection) ||
+              set->Add(context, element).IsEmpty()) {
+            return false;
+          }
+        }
+        out = set;
+        return true;
+      }
       Local<v8::Array> array = v8::Array::New(isolate, static_cast<int>(node.children.size()));
       for (uint32_t i = 0; i < node.children.size(); i++) {
         Local<Value> element;
@@ -1585,6 +1806,9 @@ bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
     case AsyncOutcome::Kind::Error:
       rejection = SwiftErrorValue(isolate, context, node.text, node.errorType);
       return false;
+    case AsyncOutcome::Kind::ErrorValue:
+      out = SwiftErrorValue(isolate, context, node.text, node.errorType);
+      return true;
   }
   return failed("returned an unknown value");
 }
@@ -1879,6 +2103,14 @@ void ApiCompleteError(void* token, const uint8_t* message, intptr_t messageLengt
   Emit(token, outcome);
 }
 
+void ApiCompleteErrorValue(void* token, const uint8_t* message, intptr_t messageLength,
+                           const uint8_t* type, intptr_t typeLength) {
+  auto outcome = Outcome(AsyncOutcome::Kind::ErrorValue);
+  outcome->text.assign(reinterpret_cast<const char*>(message), message ? messageLength : 0);
+  outcome->errorType.assign(reinterpret_cast<const char*>(type), type ? typeLength : 0);
+  Emit(token, outcome);
+}
+
 void ApiCompleteArrayBegin(void* token, intptr_t /*count*/) {
   Emit(token, Outcome(AsyncOutcome::Kind::Array));
 }
@@ -1979,9 +2211,18 @@ bool Accepts(Isolate* isolate, const ModuleInfo& module, const ValueCode& code,
       return value->IsArrayBuffer() || value->IsArrayBufferView();
     case ValueCode::Kind::Array:
       return value->IsArray();
+    case ValueCode::Kind::Set:
+      return value->IsSet() || value->IsArray();
+    case ValueCode::Kind::Tuple:
+      return code.labels.empty()
+                 ? value->IsArray() && value.As<v8::Array>()->Length() == code.element.size()
+                 : IsRecord(isolate, value);
     case ValueCode::Kind::Map:
     case ValueCode::Kind::Tagged:
+    case ValueCode::Kind::Result:
       return IsRecord(isolate, value);
+    case ValueCode::Kind::Error:
+      return value->IsObject() || value->IsString();
     case ValueCode::Kind::Object: {
       SwiftObjectWrapper* wrapper = SwiftWrapperOf(isolate, value);
       return wrapper && wrapper->Module() == &module &&
@@ -2221,9 +2462,45 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
       }
       return ThrowArgument(isolate, member, index, "must be an ArrayBuffer or a typed array");
 
+    case ValueCode::Kind::Tuple: {
+      size_t count = code.element.size();
+      bool labeled = !code.labels.empty();
+      if (!Accepts(isolate, module, code, value)) {
+        return ThrowArgument(isolate, member, index,
+                             labeled ? "must be an object, " + TypeDisplayName(module, code)
+                                     : "must be an array of " + std::to_string(count) +
+                                           " values, " + TypeDisplayName(module, code));
+      }
+      arena.slots.emplace_back(count);
+      std::vector<NSSwiftValue>& elements = arena.slots.back();
+      for (size_t i = 0; i < count; i++) {
+        Local<Value> element;
+        bool read =
+            labeled
+                ? value.As<Object>()
+                      ->Get(context, tns::ToV8String(isolate, code.labels[i]))
+                      .ToLocal(&element)
+                : value.As<v8::Array>()->Get(context, static_cast<uint32_t>(i)).ToLocal(&element);
+        if (!read || !Convert(isolate, context, module, member, index, code.element[i], element,
+                              elements[i], arena)) {
+          return false;
+        }
+      }
+      slot.tag = NSSwiftTagArray;
+      slot.payload.object = elements.data();
+      slot.length = count;
+      return true;
+    }
+
+    case ValueCode::Kind::Set:
     case ValueCode::Kind::Array: {
+      if (code.kind == ValueCode::Kind::Set && value->IsSet()) {
+        value = value.As<v8::Set>()->AsArray();
+      }
       if (!value->IsArray()) {
-        return ThrowArgument(isolate, member, index, "must be an array");
+        return ThrowArgument(
+            isolate, member, index,
+            code.kind == ValueCode::Kind::Set ? "must be a Set or an array" : "must be an array");
       }
       Local<v8::Array> array = value.As<v8::Array>();
       uint32_t length = array->Length();
@@ -2288,9 +2565,32 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
       return true;
     }
 
+    case ValueCode::Kind::Error: {
+      // Swift receives an error whose description is the message.
+      Local<Value> message = value;
+      if (value->IsObject() && !value->IsString()) {
+        Local<Value> property;
+        if (value.As<Object>()
+                ->Get(context, tns::ToV8String(isolate, "message"))
+                .ToLocal(&property) &&
+            !property->IsUndefined()) {
+          message = property;
+        }
+      }
+      Local<v8::String> text;
+      if (!message->ToString(context).ToLocal(&text)) {
+        return false;
+      }
+      return WriteString(isolate, text, slot, arena);
+    }
+
+    case ValueCode::Kind::Result:
     case ValueCode::Kind::Tagged: {
-      const TypeInfo& type = module.types[code.typeIndex];
-      std::string expected = "must be a case of " + type.jsName + " ({ case: \"...\" })";
+      const std::vector<CaseInfo>& cases = *CasesOf(module, code);
+      std::string expected =
+          code.kind == ValueCode::Kind::Result
+              ? "must be a Result ({ case: \"success\" | \"failure\", value })"
+              : "must be a case of " + module.types[code.typeIndex].jsName + " ({ case: \"...\" })";
       if (!IsRecord(isolate, value)) {
         return ThrowArgument(isolate, member, index, expected);
       }
@@ -2300,13 +2600,13 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
       }
       std::string caseName = name->IsString() ? tns::ToString(isolate, name) : "";
       size_t caseIndex = 0;
-      while (caseIndex < type.cases.size() && type.cases[caseIndex].name != caseName) {
+      while (caseIndex < cases.size() && cases[caseIndex].name != caseName) {
         caseIndex++;
       }
-      if (caseIndex == type.cases.size()) {
+      if (caseIndex == cases.size()) {
         return ThrowArgument(isolate, member, index, expected);
       }
-      const CaseInfo& info = type.cases[caseIndex];
+      const CaseInfo& info = cases[caseIndex];
       arena.slots.emplace_back(1 + info.codes.size());
       std::vector<NSSwiftValue>& values = arena.slots.back();
       values[0].tag = NSSwiftTagInt64;
@@ -2503,58 +2803,133 @@ ObjectResult* RunObjectCall(SwiftCallback* handle, AsyncOutcome& arguments, intp
   return nullptr;
 }
 
+// Runs `run` on `handle`'s isolate thread, waiting for it from any other
+// thread; null when it fails or cannot run.
+ObjectResult* RunAndWait(SwiftCallback* handle, std::function<ObjectResult*()> run) {
+  if (Isolate::TryGetCurrent() == handle->isolate) {
+    v8::Locker locker(handle->isolate);
+    return handle->wrapper.IsValid() ? run() : nullptr;
+  }
+  // The guard ends the wait when the loop drops the task without running it.
+  struct Wait {
+    std::mutex mutex;
+    std::condition_variable condition;
+    bool done = false;
+    ObjectResult* result = nullptr;
+    void Finish(ObjectResult* value) {
+      std::lock_guard<std::mutex> lock(mutex);
+      if (!done) {
+        done = true;
+        result = value;
+      } else {
+        delete value;
+      }
+      condition.notify_all();
+    }
+  };
+  struct Guard {
+    std::shared_ptr<Wait> wait;
+    ~Guard() { wait->Finish(nullptr); }
+  };
+  auto wait = std::make_shared<Wait>();
+  std::shared_ptr<Guard> guard(new Guard{wait});
+  NativeScriptPlatform* platform = NativeScriptPlatform::Instance();
+  std::shared_ptr<EventLoop> loop =
+      platform ? platform->LookupEventLoop(handle->isolate) : std::shared_ptr<EventLoop>();
+  IsolateWrapper isolateWrapper = handle->wrapper;
+  bool posted = loop && loop->PostInternal([guard, run, isolateWrapper]() {
+    guard->wait->Finish(isolateWrapper.IsValid() ? run() : nullptr);
+  });
+  guard.reset();
+  if (!posted) {
+    return nullptr;
+  }
+  std::unique_lock<std::mutex> lock(wait->mutex);
+  wait->condition.wait(lock, [&] { return wait->done; });
+  return wait->result;
+}
+
 const NSSwiftValue* ApiObjectCallEnd(void* rawToken) {
   std::unique_ptr<AsyncToken> token(static_cast<AsyncToken*>(rawToken));
   SwiftCallback* handle = token->callback;
   std::shared_ptr<AsyncOutcome> arguments = token->root;
   intptr_t encoded = token->requirement;
-  ObjectResult* result = nullptr;
+  ObjectResult* result = RunAndWait(handle, [handle, arguments, encoded]() {
+    return RunObjectCall(handle, *arguments, encoded);
+  });
+  ReleaseCallback(handle);
+  return result ? &result->value : nullptr;
+}
 
-  if (Isolate::TryGetCurrent() == handle->isolate) {
-    v8::Locker locker(handle->isolate);
-    if (handle->wrapper.IsValid()) {
-      result = RunObjectCall(handle, *arguments, encoded);
+// Calls the JS function `handle` holds with `arguments` and converts what it
+// returns; null when it threw or returned a value that does not convert.
+ObjectResult* RunFunctionCall(SwiftCallback* handle, AsyncOutcome& arguments) {
+  Isolate* isolate = handle->isolate;
+  Isolate::Scope isolateScope(isolate);
+  HandleScope handleScope(isolate);
+  auto* state = Caches::StateFor<IsolateState>(isolate);
+  if (state == nullptr) {
+    return nullptr;
+  }
+  Local<Context> context = Caches::Get(isolate)->GetContext();
+  Context::Scope contextScope(context);
+  CallContext* call = state->calls.empty() ? nullptr : state->calls.back();
+  if (call != nullptr && !call->callbackException.IsEmpty()) {
+    return nullptr;
+  }
+
+  TryCatch tryCatch(isolate);
+  Local<Value> exception;
+  const ValueCode& code = handle->code;
+  std::vector<Local<Value>> argv;
+  for (size_t i = 0; i < code.element.size() && i < arguments.children.size(); i++) {
+    Local<Value> value;
+    if (!OutcomeToJS(isolate, context, state, handle->name, *arguments.children[i], code.element[i],
+                     value, exception)) {
+      break;
     }
-  } else {
-    // Run on the isolate's thread and wait. The guard ends the wait when the
-    // loop drops the task without running it.
-    struct Wait {
-      std::mutex mutex;
-      std::condition_variable condition;
-      bool done = false;
-      ObjectResult* result = nullptr;
-      void Finish(ObjectResult* value) {
-        std::lock_guard<std::mutex> lock(mutex);
-        if (!done) {
-          done = true;
-          result = value;
-        } else {
-          delete value;
-        }
-        condition.notify_all();
-      }
-    };
-    struct Guard {
-      std::shared_ptr<Wait> wait;
-      ~Guard() { wait->Finish(nullptr); }
-    };
-    auto wait = std::make_shared<Wait>();
-    std::shared_ptr<Guard> guard(new Guard{wait});
-    NativeScriptPlatform* platform = NativeScriptPlatform::Instance();
-    std::shared_ptr<EventLoop> loop =
-        platform ? platform->LookupEventLoop(handle->isolate) : std::shared_ptr<EventLoop>();
-    IsolateWrapper isolateWrapper = handle->wrapper;
-    bool posted = loop && loop->PostInternal([guard, handle, arguments, encoded, isolateWrapper]() {
-      guard->wait->Finish(isolateWrapper.IsValid() ? RunObjectCall(handle, *arguments, encoded)
-                                                   : nullptr);
-    });
-    guard.reset();
-    if (posted) {
-      std::unique_lock<std::mutex> lock(wait->mutex);
-      wait->condition.wait(lock, [&] { return wait->done; });
-      result = wait->result;
+    argv.push_back(value);
+  }
+  auto result = std::make_unique<ObjectResult>();
+  bool done = false;
+  if (exception.IsEmpty()) {
+    Local<Value> returned;
+    done = handle->target.Get(isolate)
+               .As<v8::Function>()
+               ->Call(context, v8::Undefined(isolate), static_cast<int>(argv.size()), argv.data())
+               .ToLocal(&returned);
+    if (done && code.returns.empty()) {
+      result->value.tag = NSSwiftTagNull;
+    } else if (done) {
+      MemberInfo member;
+      member.swiftName = handle->name + " (closure)";
+      done = Convert(isolate, context, *handle->module, member, kReturnedValue, code.returns[0],
+                     returned, result->value, result->arena);
     }
   }
+  if (done) {
+    return result.release();
+  }
+  if (exception.IsEmpty()) {
+    if (!tryCatch.HasCaught() || !tryCatch.CanContinue()) {
+      return nullptr;
+    }
+    exception = tryCatch.Exception();
+  }
+  if (call != nullptr) {
+    call->callbackException.Reset(isolate, exception);
+  } else {
+    NativeScriptException::ReportToJsHandlersAndLog(isolate, exception, tryCatch.Message());
+  }
+  return nullptr;
+}
+
+const NSSwiftValue* ApiCallbackCallEnd(void* rawToken) {
+  std::unique_ptr<AsyncToken> token(static_cast<AsyncToken*>(rawToken));
+  SwiftCallback* handle = token->callback;
+  std::shared_ptr<AsyncOutcome> arguments = token->root;
+  ObjectResult* result =
+      RunAndWait(handle, [handle, arguments]() { return RunFunctionCall(handle, *arguments); });
   ReleaseCallback(handle);
   return result ? &result->value : nullptr;
 }
@@ -2626,6 +3001,29 @@ bool Select(Isolate* isolate, Local<Context> context, const MemberGroup& group,
           return true;
         }
       }
+    }
+  }
+
+  if (matches.size() > 1) {
+    // Overloads taking arrays of different element types (a generic
+    // function's instantiations): the first elements decide.
+    std::vector<const MemberInfo*> preferred;
+    for (const MemberInfo* member : matches) {
+      bool accepts = true;
+      for (size_t i = 0; accepts && i < arguments.size(); i++) {
+        const ValueCode& code = member->signature.parameters[i];
+        Local<Value> first;
+        accepts = code.kind != ValueCode::Kind::Array || code.inout || !arguments[i]->IsArray() ||
+                  arguments[i].As<v8::Array>()->Length() == 0 ||
+                  (arguments[i].As<v8::Array>()->Get(context, 0).ToLocal(&first) &&
+                   Accepts(isolate, module, code.element[0], first));
+      }
+      if (accepts) {
+        preferred.push_back(member);
+      }
+    }
+    if (preferred.size() < 2) {
+      matches = std::move(preferred);
     }
   }
 
@@ -2789,6 +3187,15 @@ MaybeLocal<Value> Invoke(Isolate* isolate, const MemberGroup& group, const Membe
       if (!Convert(isolate, context, module, member, 0, code, receiver, slot, arena)) {
         return MaybeLocal<Value>();
       }
+    } else if (owner.kind == NSSwiftTypeObjCClass) {
+      id object = ObjCObjectOf(isolate, receiver);
+      if (object == nil || owner.objcClass == nil || ![object isKindOfClass:owner.objcClass]) {
+        isolate->ThrowException(Exception::TypeError(tns::ToV8String(
+            isolate, "Illegal invocation: " + member.swiftName + " needs a " + owner.swiftName)));
+        return MaybeLocal<Value>();
+      }
+      slot.tag = NSSwiftTagObjC;
+      slot.payload.object = object;
     } else {
       SwiftObjectWrapper* wrapper = SwiftWrapperOf(isolate, receiver);
       if (!wrapper || wrapper->Module() != &module ||
@@ -3093,7 +3500,7 @@ class Builder {
     _loaded.templates.resize(_module.types.size());
     std::vector<Local<FunctionTemplate>> templates(_module.types.size());
     for (const TypeInfo& type : _module.types) {
-      if (IsEnumKind(type.kind) || type.family != static_cast<int>(type.index)) {
+      if (HasNoTemplate(type.kind) || type.family != static_cast<int>(type.index)) {
         continue;
       }
       Local<FunctionTemplate> tmpl =
@@ -3103,7 +3510,7 @@ class Builder {
       templates[type.index] = tmpl;
     }
     for (const TypeInfo& type : _module.types) {
-      if (!IsEnumKind(type.kind)) {
+      if (!HasNoTemplate(type.kind)) {
         templates[type.index] = templates[type.family];
       }
     }
@@ -3126,6 +3533,7 @@ class Builder {
     // function exists.
     std::vector<const MemberGroup*> moduleGroups;
     std::vector<const MemberGroup*> enumGroups;
+    std::vector<const MemberGroup*> objcGroups;
     for (const auto& group : _module.groups) {
       if (group->owner < 0) {
         moduleGroups.push_back(group.get());
@@ -3136,6 +3544,10 @@ class Builder {
         enumGroups.push_back(group.get());
         continue;
       }
+      if (owner.kind == NSSwiftTypeObjCClass) {
+        objcGroups.push_back(group.get());
+        continue;
+      }
       InstallOnTemplate(templates[group->owner], *group);
     }
 
@@ -3143,6 +3555,9 @@ class Builder {
     for (const TypeInfo& type : _module.types) {
       if (IsEnumKind(type.kind)) {
         values[type.index] = enums[type.index];
+        continue;
+      }
+      if (type.kind == NSSwiftTypeObjCClass) {
         continue;
       }
       if (type.family != static_cast<int>(type.index)) {
@@ -3165,11 +3580,15 @@ class Builder {
     // Keyed by module and path: modules have their own namespaces.
     std::map<std::string, Local<Object>> containers;
     for (const TypeInfo& type : _module.types) {
-      containers[type.swiftModule + ":" + type.jsName] = values[type.index];
+      if (type.kind != NSSwiftTypeObjCClass) {
+        containers[type.swiftModule + ":" + type.jsName] = values[type.index];
+      }
     }
     std::vector<const TypeInfo*> byDepth;
     for (const TypeInfo& type : _module.types) {
-      byDepth.push_back(&type);
+      if (type.kind != NSSwiftTypeObjCClass) {
+        byDepth.push_back(&type);
+      }
     }
     std::stable_sort(byDepth.begin(), byDepth.end(), [](const TypeInfo* a, const TypeInfo* b) {
       return std::count(a->jsName.begin(), a->jsName.end(), '.') <
@@ -3212,6 +3631,21 @@ class Builder {
     }
     for (const MemberGroup* group : moduleGroups) {
       if (!InstallOnObject(exports[group->swiftModule], *group)) {
+        return false;
+      }
+    }
+    std::map<int, std::pair<Local<Object>, Local<Object>>> objcClasses;
+    for (const MemberGroup* group : objcGroups) {
+      auto found = objcClasses.find(group->owner);
+      if (found == objcClasses.end()) {
+        Local<Object> constructor;
+        Local<Object> prototype;
+        if (!NativeScriptClass(_module.types[group->owner], constructor, prototype)) {
+          continue;
+        }
+        found = objcClasses.emplace(group->owner, std::make_pair(constructor, prototype)).first;
+      }
+      if (!InstallOnObjCClass(found->second.first, found->second.second, *group)) {
         return false;
       }
     }
@@ -3284,6 +3718,89 @@ class Builder {
     Local<v8::Function> function;
     return tmpl->GetFunction(_context).ToLocal(&function) &&
            target->Set(_context, tns::ToV8String(_isolate, key), function).FromMaybe(false);
+  }
+
+  // NativeScript's constructor and prototype for `type`'s Objective-C class;
+  // false when its metadata does not describe that exact class, as the
+  // nearest described superclass would be the wrong one to extend.
+  bool NativeScriptClass(const TypeInfo& type, Local<Object>& constructor,
+                         Local<Object>& prototype) {
+    const Meta* meta = type.objcClass ? ArgConverter::FindMeta(type.objcClass) : nullptr;
+    // Metadata names a Swift class by its mangled runtime name and also
+    // records the demangled one, which class_getName returns.
+    const char* className = type.objcClass ? class_getName(type.objcClass) : "";
+    if (meta == nullptr || meta->type() != MetaType::Interface ||
+        (strcmp(meta->name(), className) != 0 && strcmp(meta->demangledName(), className) != 0)) {
+      return false;
+    }
+    Local<Value> value;
+    Local<Value> proto;
+    if (!_context->Global()
+             ->Get(_context, tns::ToV8String(_isolate, meta->jsName()))
+             .ToLocal(&value) ||
+        !value->IsFunction()) {
+      return false;
+    }
+    constructor = value.As<Object>();
+    if (!constructor->Get(_context, tns::ToV8String(_isolate, "prototype")).ToLocal(&proto) ||
+        !proto->IsObject()) {
+      return false;
+    }
+    prototype = proto.As<Object>();
+    return true;
+  }
+
+  // Swift-only members of an Objective-C-visible class, beside the members
+  // NativeScript gives it, which they never replace.
+  bool InstallOnObjCClass(Local<Object> constructor, Local<Object> prototype,
+                          const MemberGroup& group) {
+    bool instance =
+        group.kind == NSSwiftMemberInstanceMethod || group.kind == NSSwiftMemberInstanceProperty;
+    Local<Object> target = instance ? prototype : constructor;
+    std::string key = group.kind == NSSwiftMemberInitializer ? "init" : group.jsName;
+    auto define = [&](const std::string& name, Local<FunctionTemplate> tmpl) {
+      Local<v8::String> property = tns::ToV8String(_isolate, name);
+      Local<v8::Function> function;
+      if (target->Has(_context, property).FromMaybe(true)) {
+        return true;
+      }
+      return tmpl->GetFunction(_context).ToLocal(&function) &&
+             target->DefineOwnProperty(_context, property, function, DontEnum).FromMaybe(false);
+    };
+    switch (group.kind) {
+      case NSSwiftMemberInstanceProperty:
+      case NSSwiftMemberStaticProperty: {
+        Local<v8::String> property = tns::ToV8String(_isolate, key);
+        if (target->Has(_context, property).FromMaybe(true)) {
+          return true;
+        }
+        Local<v8::Function> getter;
+        Local<v8::Function> setter;
+        if (!MethodTemplate(group, GetterCallback)->GetFunction(_context).ToLocal(&getter) ||
+            (HasSetter(group) &&
+             !MethodTemplate(group, SetterCallback)->GetFunction(_context).ToLocal(&setter))) {
+          return false;
+        }
+        target->SetAccessorProperty(property, getter, setter, DontEnum);
+        return true;
+      }
+      case NSSwiftMemberInitializer:
+      case NSSwiftMemberInstanceMethod:
+      case NSSwiftMemberStaticMethod: {
+        if (!define(key, MethodTemplate(group))) {
+          return false;
+        }
+        for (const auto& overload : OverloadKeys(group)) {
+          if (!define(overload.first,
+                      MethodTemplate(*ExactGroupFor(group, *overload.second), ExactCallback))) {
+            return false;
+          }
+        }
+        return true;
+      }
+      default:
+        return true;
+    }
   }
 
   // Enum and module-level members, on a plain object.

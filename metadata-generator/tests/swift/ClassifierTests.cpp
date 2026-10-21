@@ -101,7 +101,7 @@ TEST(ClassifyRejections) {
   EXPECT_TIER("Loader.fetch(url:)", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.transform(_:)", Tier::SwiftSpecialized, "generic");
   EXPECT_TIER("Loader.first(of:)", Tier::SwiftSpecialized, "generic");
-  EXPECT_TIER("Loader.withCompletion(_:)", Tier::Unsupported, "unbridged-type:Swift.Result");
+  EXPECT_TIER("Loader.withCompletion(_:)", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.each(_:)", Tier::SwiftGenerated);
   EXPECT_TIER("countdown(from:_:)", Tier::SwiftGenerated);
   EXPECT_TIER("greetLater(_:completion:)", Tier::SwiftGenerated);

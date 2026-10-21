@@ -52,6 +52,8 @@ public final class Box<Value> {
     public var value: Value
     public init(_ value: Value) { self.value = value }
     public func replaced(with value: Value) -> Box<Value> { Box(value) }
+    // On every instantiation, like WeatherKit's `WeatherQuery.daily`.
+    public static var sample: Box<Int> { Box<Int>(7) }
 }
 
 public enum Outcome<Value> {

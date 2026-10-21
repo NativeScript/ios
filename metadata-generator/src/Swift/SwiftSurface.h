@@ -22,6 +22,10 @@ struct SwiftSurface {
     kEnum = 3,
     kTaggedEnum = 4,
     kProtocol = 5,
+    // An Objective-C-visible class declared in Swift, registered under its
+    // Objective-C name: its Swift-only members install on NativeScript's
+    // class, which has no TypeScript or JS class of its own here.
+    kObjCClass = 6,
   };
   enum MemberKind {
     kInitializer = 0,
@@ -101,7 +105,7 @@ SwiftSurface describeSurface(const Module& module,
                              const Classification& classification);
 
 // Signature code of one value ("i64", "o3?", "t2", "[s]", "{f64}",
-// "(i64,s)", "&i64"...).
+// "(i64,s)", "(s>b)", "&i64"...).
 std::string signatureCode(const SwiftSurface& surface, const BridgedType& type);
 
 // Signed/unsigned integer width of an Integer bridge: {code, Swift type,

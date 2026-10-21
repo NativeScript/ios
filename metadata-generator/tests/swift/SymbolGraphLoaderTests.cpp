@@ -73,7 +73,10 @@ TEST(LoadsFixtureWithoutDiagnostics) {
 TEST(TopLevelDeclarationsInSourceOrder) {
   std::vector<std::string> names;
   for (const auto& id : demo().topLevelIds) {
-    names.push_back(demo().find(id)->name);
+    const Symbol* symbol = demo().find(id);
+    if (symbol->substitutions.empty()) {
+      names.push_back(symbol->name);
+    }
   }
   std::vector<std::string> expected = {"Badge",
                                        "Greeter",
@@ -104,6 +107,8 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "boxed(_:)",
                                        "countBox(_:)",
                                        "settle(_:)",
+                                       "unbox(_:)",
+                                       "firstOf(_:)",
                                        "Shape",
                                        "Polygon",
                                        "Square",
@@ -168,14 +173,54 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "echoInt(_:)",
                                        "echoString(_:)",
                                        "Bench",
+                                       "transform(_:_:)",
+                                       "sortedNames(_:by:)",
+                                       "firstMatch(_:where:)",
+                                       "lookup(_:_:)",
+                                       "computeInBackground(_:)",
+                                       "largest(_:)",
+                                       "repeated(_:times:)",
+                                       "popCount(_:)",
+                                       "zero()",
+                                       "greetTwice(_:_:)",
+                                       "decodeJSON(_:from:)",
+                                       "firstElement(_:)",
+                                       "joined(_:_:)",
+                                       "compact(_:)",
+                                       "holes(_:)",
+                                       "knownScores(_:)",
+                                       "divide(_:by:)",
+                                       "swapPair(_:)",
+                                       "plot(_:)",
+                                       "spans()",
+                                       "uniqueTags(_:)",
+                                       "countUnique(_:)",
+                                       "tallyLater(_:)",
+                                       "ParseFailure",
+                                       "parseNumber(_:)",
+                                       "checkSides(_:)",
+                                       "unwrap(_:)",
+                                       "parseLater(_:)",
+                                       "fetchItem(_:_:)",
+                                       "describeError(_:)",
+                                       "shoutAll(_:)",
+                                       "describeValue(_:)",
+                                       "greetOnce(_:_:)",
                                        "describe(_:)",
                                        "makeLabel(_:)",
                                        "tags(_:)",
                                        "firstSubview(of:)",
                                        "Note",
+                                       "CounterView",
                                        "makeNote(_:)",
                                        "text(of:)",
                                        "noteLater(_:)",
+                                       "viewTag(_:)",
+                                       "midpoint(_:_:)",
+                                       "inset(_:by:)",
+                                       "fitting(_:)",
+                                       "latitudeSpan(_:_:)",
+                                       "tagOf(_:)",
                                        "Money",
                                        "Wallet",
                                        "Coin",
@@ -532,6 +577,52 @@ TEST(TypeAliases) {
   REQUIRE(alias && alias->aliasedType);
   CHECK_EQ(alias->aliasedType->spelling,
            std::string("(latitude: Double, longitude: Double)"));
+}
+
+TEST(GenericFunctionInstantiations) {
+  auto standIns = [](const std::string& path) {
+    const Symbol* generic = symbolAt(demo(), path);
+    std::vector<std::string> result;
+    if (!generic) {
+      return std::vector<std::string>{"missing"};
+    }
+    for (const auto& entry : demo().symbols) {
+      if (entry.second.genericBase != generic->preciseId) {
+        continue;
+      }
+      std::vector<std::string> parts;
+      for (const auto& substitution : entry.second.substitutions) {
+        parts.push_back(substitution.first + "=" + spelling(substitution.second));
+      }
+      result.push_back(llvm::join(parts, ","));
+    }
+    std::sort(result.begin(), result.end());
+    return result;
+  };
+  using List = std::vector<std::string>;
+  CHECK(standIns("largest(_:)") == List({"T=Double", "T=String"}));
+  CHECK(standIns("repeated(_:times:)") == List({"T=Bool", "T=Double", "T=String"}));
+  CHECK(standIns("popCount(_:)") == List({"I=Int"}));
+  // One stand-in: the result alone decides it.
+  CHECK(standIns("zero()") == List({"N=Double"}));
+  CHECK(standIns("greetTwice(_:_:)") == List({"G=any Greeting"}));
+  CHECK(standIns("viewTag(_:)") == List({"V=UIView"}));
+  CHECK(standIns("Loader.first(of:)") == List({"Element=Bool", "Element=Double", "Element=String"}));
+  // The arguments of the unit's Box and Pair instantiations.
+  CHECK(standIns("unbox(_:)").size() == 2);
+  CHECK(standIns("firstOf(_:)").size() == 4);
+  // `some P` parameters.
+  CHECK(standIns("shoutAll(_:)") == List({"some StringProtocol=String"}));
+  CHECK(standIns("describeValue(_:)") ==
+        List({"some CustomStringConvertible=Bool",
+              "some CustomStringConvertible=Double",
+              "some CustomStringConvertible=String"}));
+  CHECK(standIns("greetOnce(_:_:)") == List({"some Greeting=any Greeting"}));
+  CHECK(standIns("tagOf(_:)") == List({"some UIView=UIView"}));
+  CHECK(standIns("decodeJSON(_:from:)").empty());
+  CHECK(standIns("firstElement(_:)").empty());
+  // 3 x 3 combinations.
+  CHECK(standIns("joined(_:_:)").empty());
 }
 
 TEST(IRSnapshot) { checkSnapshot("SwiftDemo.ir.json", dumpModuleJSON(demo())); }

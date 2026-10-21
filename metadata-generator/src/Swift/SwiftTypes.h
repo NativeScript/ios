@@ -45,6 +45,13 @@ std::string instantiationKey(const TypeNode& node);
 // members whose generic parameters stand for its arguments. Instantiations
 // spelled only inside other instantiations' members are followed to a
 // bounded depth.
+//
+// Also adds a synthetic copy of each generic function, method and
+// initializer outside generic types for every combination of concrete
+// stand-ins for its type parameters: `Double`, `String` and `Bool` (`Int`
+// for integer protocols) as its standard library constraints allow, a unit
+// protocol's existential, or its superclass constraint. Combinations JS
+// arguments could not tell apart are not added.
 void instantiateGenerics(Module& module);
 
 // Well-known USRs of standard library and Foundation types.
@@ -77,6 +84,7 @@ constexpr const char* kURL = "s:10Foundation3URLV";
 constexpr const char* kData = "s:10Foundation4DataV";
 constexpr const char* kDate = "s:10Foundation4DateV";
 constexpr const char* kError = "s:s5ErrorP";
+constexpr const char* kResult = "s:s6ResultO";
 }  // namespace KnownTypes
 
 }  // namespace Swift

@@ -107,8 +107,40 @@ TypeScript as the generic class (`Measurement<UnitType>`): `new
 Measurement(...)` picks the instantiation from its arguments, an instance
 calls the members of its own instantiation, and `instanceof Measurement`
 holds for all of them. A member that does not exist for an instantiation
-(a constrained extension's) is left out of that instantiation. Generic
-functions and methods are not bridged yet.
+(a constrained extension's) is left out of that instantiation.
+
+## Generic functions
+
+A generic function, method or initializer is instantiated once for each
+concrete stand-in of its type parameters, and every instantiation is an
+overload of its JS name:
+
+| Use or constraint of `T` | Stand-ins |
+|---|---|
+| an argument of a unit generic type (`Box<T>`, `WeatherQuery<T>`) | the arguments of the unit's instantiations of that type |
+| none | `Double`, `String`, `Bool` |
+| standard library protocols (`Comparable`, `Numeric`, `StringProtocol`, ...) | those of `Double` (or `Int` for integer protocols), `String` and `Bool` that conform |
+| one protocol of the unit (`G: Greeting`) | `any Greeting`, which Swift opens at the call: Swift values and JS objects implementing it |
+| a superclass (`V: UIView`) | the superclass, which also takes its subclasses' instances |
+
+`largest<T: Comparable>(_ values: [T]) -> T?` takes `largest([3, 9])` and
+`largest(["b", "a"])`, and TypeScript declares both overloads. WeatherKit's
+`weather(for:including:)` gets one overload per `WeatherQuery`
+instantiation: `service.weather(location, WeatherQuery.daily)` returns a
+`Forecast<DayWeather>`. A call picks
+the instantiation its arguments convert to; an array decides by its first
+element, so `largest([])` throws a `TypeError` naming the overloads' keys.
+At most one number type stands in, since a JS number converts to every one.
+
+A generic function is left out when a type parameter appears as a metatype
+(`T.Type`) or through an associated type (`C.Element`), when it is
+constrained by another module's protocol, when its arguments could not tell
+several instantiations apart (a type parameter only in the result or in a
+closure), or when it would need more than six instantiations (sixteen from a
+generic type's instantiations). A `some P` parameter is an implicit type
+parameter, instantiated the same way: `describe(_ value: some
+CustomStringConvertible)` takes a number, a string or a boolean. Generic
+methods of generic types are not instantiated yet.
 
 ## Value model
 
@@ -128,11 +160,17 @@ functions and methods are not bridged yet.
 | `Data` | `Uint8Array` copy (inputs accept any `ArrayBuffer` or view) |
 | `[T]` | array copy |
 | `[String: T]` | plain object copy |
+| `Set<T>` | `Set` copy (inputs also accept an array) |
+| `(A, B)` | array copy, `[a, b]` |
+| `(x: A, y: B)` | plain object copy, `{ x: a, y: b }` |
+| `any Error` | `Error` named `SwiftError` (with `swiftType`); inputs accept any value, an `Error`'s message describing it |
+| `CGPoint`, `CGSize`, `CGRect`, `CGVector`, `CGAffineTransform`, `UIEdgeInsets`, `NSDirectionalEdgeInsets`, `UIOffset`, `NSRange`, `CLLocationCoordinate2D`, `MKCoordinateSpan`, `MKCoordinateRegion` | plain object copy of the fields, `{ x, y }` (inputs also accept NativeScript's struct values, `CGPointMake(1, 2)`) |
+| `Result<S, F>` | `{ case: "success", value }` or `{ case: "failure", value }` (no `value` for `Result<Void, F>`) |
 | `(A, B) -> Void` (parameters only) | `function (a, b)` |
 | Objective-C class (`UIView`, an `NSObject` subclass) | NativeScript's ordinary Objective-C wrapper, with the identity Objective-C calls give it |
 
 Collections are copied in both directions; their elements follow the same
-table (optional elements are not supported yet), and dictionary keys must be
+table (an optional element is `null` when it is `nil`), and dictionary keys must be
 `String`.
 
 An enum with associated values keys each value by its label; a case's only,
@@ -146,8 +184,8 @@ Thunks import the framework an Objective-C class most likely comes from
 (`UIView` -> UIKit), guessed from its prefix since symbol graphs do not
 record it; compiler verification drops declarations whose types still do not
 resolve. TypeScript names these classes by their global `@nativescript/types`
-name, and Swift classes without `@objc(Name)` as `NSObject`. Swift-only
-members of Objective-C-visible Swift classes are not exposed yet.
+name, and Swift classes without `@objc(Name)` as `NSObject`, except the
+unit's own Objective-C-visible classes (below).
 
 Structs have value semantics: reading a struct-typed property, passing a struct
 argument, or returning one copies it, so a JS object never aliases another
@@ -158,7 +196,8 @@ holds.
 
 - Methods and functions take positional arguments. Overloads with the same
   JavaScript name are resolved by argument count and by which overloads accept
-  the arguments' JS types.
+  the arguments' JS types; overloads taking arrays of different element types
+  are told apart by the arrays' first elements.
 - When more than one overload accepts the arguments (`scale(by: Double)` and
   `scale(by: Int)` both accept a number), the call throws a `TypeError` naming
   the overloads' keys; call one directly by key: `polygon["scale(by: Int)"](2)`.
@@ -184,8 +223,8 @@ holds.
 
 ## Closures
 
-A closure parameter that returns `Void` takes a JS function; its arguments
-follow the value table. The Swift closure keeps the function alive for as long
+A closure parameter takes a JS function; its arguments and its result follow
+the value table. The Swift closure keeps the function alive for as long
 as Swift holds the closure, and drops it when Swift releases the closure.
 
 - Called on the JS thread, the closure runs the function before returning.
@@ -196,9 +235,49 @@ as Swift holds the closure, and drops it when Swift releases the closure.
 - Called from any other thread (a completion handler run by a background
   queue), the invocation is queued to the isolate's thread and Swift does not
   wait for it. A throw there is reported as an uncaught error.
-- Closures that return a value, throw, or are `async`, `@autoclosure`
-  parameters, closures with `inout` parameters, and closures returned from
-  Swift are not bridged yet.
+- A closure that returns a value (`transform([1, 2], (n) => "#" + n)`) always
+  waits for the function, on any thread: from another thread, the call is
+  queued to the isolate's thread and the Swift thread blocks until it ran.
+  When the function throws or returns a value that does not convert, the
+  exception (a `TypeError` for the conversion) is thrown from the Swift call
+  in progress, or reported as an uncaught error otherwise. A `throws` closure
+  then throws into Swift; any other closure returns `nil`, `false`, `0`, an
+  empty string or collection, and stops the process when its result type has
+  none of these.
+- `async` closures, `@autoclosure` parameters, closures with `inout`
+  parameters, closures returning closures or sequences, and closures returned
+  from Swift are not bridged yet.
+
+## Objective-C-visible Swift classes
+
+A Swift class that subclasses `NSObject` (a `UIView` or `UIViewController`
+subclass, say) is an Objective-C class to NativeScript: JS creates and holds
+it through NativeScript's own class, and its `@objc` members work as before.
+Its Swift-only members, the ones Objective-C cannot see, install on that same
+class when the module loads:
+
+```swift
+public final class CounterView: UIView {
+    public private(set) var count = 0
+    public func configure(start: Int, step: Int?) -> Int { ... }
+}
+```
+
+```js
+require("ns:swift/MyApp");
+const view = CounterView.new();      // NativeScript's class
+view.configure(1, null);             // Swift-only, through a thunk
+Note.init("hello");                  // a Swift-only initializer
+```
+
+- Instance members go on the class's prototype; static members and
+  Swift-only initializers (as `init`) on its constructor. They never replace
+  a member NativeScript already gives the class.
+- The class needs NativeScript metadata, which an app gets from its
+  `-Swift.h` header; members of a class without metadata are not installed.
+- Members of `UIResponder` subclasses (views, controllers) are isolated to the
+  main thread, as UIKit declares them.
+- TypeScript merges the members into the global declaration of the class.
 
 ## Protocols
 
@@ -353,12 +432,10 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 ## Not yet supported
 
-Closures that return values, async cancellation, Combine publishers,
-concrete `AsyncSequence` types, generic functions,
-`Result` and other standard library generics, protocols with associated
-types, tuples, sets, optional collection
-elements, subscripts and operators. Each appears in the coverage report with
-its reason.
+Async cancellation, Combine publishers, concrete `AsyncSequence` types,
+generic methods of generic types, other standard library generics,
+protocols with associated types, subscripts and operators. Each appears in
+the coverage report with its reason.
 
 ## Swift language mode
 

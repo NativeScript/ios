@@ -38,7 +38,10 @@ inline std::vector<const Symbol*> symbolsAt(const Module& module,
                                             const std::string& path) {
   std::vector<const Symbol*> result;
   for (const auto& entry : module.symbols) {
-    if (llvm::join(entry.second.pathComponents, ".") == path) {
+    // A generic function's instantiations share its path.
+    bool instantiation = !isNominalType(entry.second.kind) &&
+                         !entry.second.substitutions.empty();
+    if (llvm::join(entry.second.pathComponents, ".") == path && !instantiation) {
       result.push_back(&entry.second);
     }
   }
