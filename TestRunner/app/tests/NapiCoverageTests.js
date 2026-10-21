@@ -46,6 +46,16 @@ describe("Node-API value surface", function () {
             expect(created.empty).toBe("");
         });
 
+        it("hands an external latin1 string to C as UTF-8", function () {
+            var external = napi.createExternalLatin1();
+            expect(external.copied).toBe(false);
+            expect(external.text).toBe("café");
+
+            TNSClearOutput();
+            functionWithCharPtr(external.text);
+            expect(TNSGetOutput()).toBe("café");
+        });
+
         it("honours an explicit length when creating", function () {
             expect(napi.createStrings().utf8Sized).toBe("abc");
         });
