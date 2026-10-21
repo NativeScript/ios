@@ -39,6 +39,8 @@ lookup("k", () => null).toFixed();
 (largest([1, 2]) ?? 0).toFixed();
 repeated("x", 2).concat(["y"]);
 holes(2).map((value) => value ?? "-");
+declare const signal: AbortSignal;
+delayedEcho("x", 1, signal).then((value) => value.toUpperCase());
 divide(7, 2).quotient.toFixed();
 swapPair([1, "a"])[0].toUpperCase();
 uniqueTags(["a"]).has("a");

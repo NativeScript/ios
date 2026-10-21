@@ -253,3 +253,17 @@ public func describeError(_ error: (any Error)?) -> String { error.map { "\($0)"
 public func shoutAll(_ value: some StringProtocol) -> String { value.uppercased() }
 public func describeValue(_ value: some CustomStringConvertible) -> String { value.description }
 public func greetOnce(_ greeting: some Greeting, _ other: String) -> String { greeting.greet(other) }
+
+// Cancellation: an AbortSignal after the arguments cancels the Swift task.
+public final class CancelLog {
+    public static var cancellations = 0
+}
+public func waitForCancel(_ seconds: Double) async -> Bool {
+    do {
+        try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+        return false
+    } catch {
+        CancelLog.cancellations += 1
+        return true
+    }
+}

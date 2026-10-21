@@ -687,6 +687,10 @@ class Writer {
           parameter ? parameterName(*parameter, i) : "arg" + std::to_string(i);
       parts.push_back(name + ": " + inputType(parameters[i]));
     }
+    if (member.flags & SwiftSurface::kAsync) {
+      // Aborting rejects the Promise and cancels the Swift task.
+      parts.push_back("signal?: AbortSignal");
+    }
     return llvm::join(parts, ", ");
   }
 

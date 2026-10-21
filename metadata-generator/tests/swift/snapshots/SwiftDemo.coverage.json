@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 1231,
+      "total": 1234,
       "objc-direct": 3,
-      "swift-generated": 331,
+      "swift-generated": 334,
       "swift-specialized": 371,
       "type-only": 5,
       "unsupported": 521,
       "not-applicable": 0
     },
     "callable": {
-      "total": 1179,
+      "total": 1181,
       "objc-direct": 1,
-      "swift-generated": 288,
+      "swift-generated": 290,
       "swift-specialized": 368,
       "type-only": 2,
       "unsupported": 520,
       "not-applicable": 0
     },
-    "effectiveCallable": 289,
+    "effectiveCallable": 291,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -35,9 +35,9 @@
       "not-applicable": 0
     },
     "class": {
-      "total": 20,
+      "total": 21,
       "objc-direct": 2,
-      "swift-generated": 17,
+      "swift-generated": 18,
       "swift-specialized": 1,
       "type-only": 0,
       "unsupported": 0,
@@ -62,9 +62,9 @@
       "not-applicable": 0
     },
     "function": {
-      "total": 107,
+      "total": 108,
       "objc-direct": 0,
-      "swift-generated": 104,
+      "swift-generated": 105,
       "swift-specialized": 3,
       "type-only": 0,
       "unsupported": 0,
@@ -152,9 +152,9 @@
       "not-applicable": 0
     },
     "typeProperty": {
-      "total": 8,
+      "total": 9,
       "objc-direct": 0,
-      "swift-generated": 6,
+      "swift-generated": 7,
       "swift-specialized": 1,
       "type-only": 1,
       "unsupported": 0,
@@ -9330,6 +9330,14 @@
       "location": "file://Sources/SwiftDemo/Purse.swift:5"
     },
     {
+      "id": "s:9SwiftDemo13waitForCancelySbSdYaF",
+      "path": "waitForCancel(_:)",
+      "kind": "function",
+      "tier": "swift-generated",
+      "jsName": "waitForCancel",
+      "location": "file://Sources/SwiftDemo/Values.swift:261"
+    },
+    {
       "id": "s:9SwiftDemo14CountdownErrorV",
       "path": "CountdownError",
       "kind": "struct",
@@ -11230,6 +11238,21 @@
       "tier": "swift-generated",
       "jsName": "trackers",
       "location": "file://Sources/SwiftDemo/Values.swift:63"
+    },
+    {
+      "id": "s:9SwiftDemo9CancelLogC",
+      "path": "CancelLog",
+      "kind": "class",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Values.swift:258"
+    },
+    {
+      "id": "s:9SwiftDemo9CancelLogC13cancellationsSivpZ",
+      "path": "CancelLog.cancellations",
+      "kind": "typeProperty",
+      "tier": "swift-generated",
+      "jsName": "cancellations",
+      "location": "file://Sources/SwiftDemo/Values.swift:259"
     },
     {
       "id": "s:9SwiftDemo9countDown4from9failingAtScsySis5Error_pGSi_SiSgtF",

@@ -45,3 +45,13 @@ declare module "ns:swift" {
    */
   export function observe(read: () => void, onChange: () => void): () => void;
 }
+
+/**
+ * Async Swift members take an optional trailing AbortSignal: aborting rejects
+ * the call's Promise with the signal's reason and cancels the Swift task.
+ * Declared here for programs without the DOM library; it merges with it.
+ */
+interface AbortSignal {
+  readonly aborted: boolean;
+  readonly reason: any;
+}

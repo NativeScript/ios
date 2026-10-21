@@ -198,8 +198,8 @@ declare module "ns:swift/SwiftDemo" {
     withCompletion(completion: (arg0: { case: "success"; value: string } | { case: "failure"; value: ShapeError }) => void): void;
     each(body: (arg0: number) => void): void;
     load(path: string): Uint8Array;
-    wait(seconds: number): Promise<void>;
-    fetch(url: string | URL): Promise<string>;
+    wait(seconds: number, signal?: AbortSignal): Promise<void>;
+    fetch(url: string | URL, signal?: AbortSignal): Promise<string>;
     first(items: readonly (string)[]): string | null;
     first(items: readonly (boolean)[]): boolean | null;
     first(items: readonly (number)[]): number | null;
@@ -236,7 +236,7 @@ declare module "ns:swift/SwiftDemo" {
     readonly step: Promise<number>;
     label(): string;
     readonly value: Promise<number>;
-    increment(): Promise<number>;
+    increment(signal?: AbortSignal): Promise<number>;
   }
 
   export type Formula =
@@ -253,7 +253,7 @@ declare module "ns:swift/SwiftDemo" {
 
   export class Palette {
     constructor();
-    strokeLater(): Promise<number>;
+    strokeLater(signal?: AbortSignal): Promise<number>;
     stroke(): number;
     readonly strokes: number;
   }
@@ -326,6 +326,11 @@ declare module "ns:swift/SwiftDemo" {
     subscribe(handler: (arg0: string) => void): void;
   }
 
+  export class CancelLog {
+    private constructor();
+    static cancellations: number;
+  }
+
   export type Score = import("ns:swift/SwiftDemoKit").Pair<string, number>;
   export type Coordinates = { latitude: number; longitude: number };
   export function allFlavors(): (Flavor)[];
@@ -337,21 +342,21 @@ declare module "ns:swift/SwiftDemo" {
   export function greetTwice(greeting: Greeting, other: string): string;
   export function largestInt(): number;
   export function makeScorer(): Scorer;
-  export function namesLater(count: number | bigint): Promise<(string)[]>;
-  export function parseLater(text: string): Promise<{ case: "success"; value: number } | { case: "failure"; value: Error }>;
-  export function tallyLater(words: readonly (string)[]): Promise<{ unique: Set<string>; count: number }>;
+  export function namesLater(count: number | bigint, signal?: AbortSignal): Promise<(string)[]>;
+  export function parseLater(text: string, signal?: AbortSignal): Promise<{ case: "success"; value: number } | { case: "failure"; value: Error }>;
+  export function tallyLater(words: readonly (string)[], signal?: AbortSignal): Promise<{ unique: Set<string>; count: number }>;
   export function uniqueTags(tags: readonly (string)[]): Set<string>;
   export function wordCounts(words: readonly (string)[]): Record<string, number>;
   export function checkedSide(side: number): number;
   export function countUnique(values: ReadonlySet<number | bigint> | readonly (number | bigint)[]): number;
-  export function delayedEcho(text: string, seconds: number): Promise<string>;
+  export function delayedEcho(text: string, seconds: number, signal?: AbortSignal): Promise<string>;
   export function knownScores(scores: Readonly<Record<string, (number | bigint) | null | undefined>>): Record<string, number | null>;
   export function parseNumber(text: string): { case: "success"; value: number } | { case: "failure"; value: Error };
   export function sortedNames(names: readonly (string)[], less: (arg0: string, arg1: string) => boolean): (string)[];
   export function firstSubview(view: UIView): UIView | null;
   export function latitudeSpan(a: { readonly latitude: number; readonly longitude: number }, b: { readonly latitude: number; readonly longitude: number }): number;
   export function makeGreeting(name: string): Greeting;
-  export function measureLater(width: number): Promise<Measurement>;
+  export function measureLater(width: number, signal?: AbortSignal): Promise<Measurement>;
   export function measurements(): (Measurement)[];
   export function swapTrackers(a: { value: Tracker }, b: { value: Tracker }): void;
   export const defaultFlavor: Flavor;
@@ -361,10 +366,11 @@ declare module "ns:swift/SwiftDemo" {
   export function describeValue(value: number): string;
   export let globalCounter: number;
   export function starterWallet(owner: string): import("ns:swift/SwiftDemoKit").Wallet;
+  export function waitForCancel(seconds: number, signal?: AbortSignal): Promise<boolean>;
   export function makeDefaultPoint(): Point;
-  export function makeTrackerLater(id: number | bigint): Promise<Tracker>;
-  export function greetInBackground(greeting: Greeting): Promise<string>;
-  export function computeInBackground(provider: () => number | bigint): Promise<number>;
+  export function makeTrackerLater(id: number | bigint, signal?: AbortSignal): Promise<Tracker>;
+  export function greetInBackground(greeting: Greeting, signal?: AbortSignal): Promise<string>;
+  export function computeInBackground(provider: () => number | bigint, signal?: AbortSignal): Promise<number>;
   export function sum(amounts: readonly (import("ns:swift/SwiftDemoKit").Money)[]): import("ns:swift/SwiftDemoKit").Money;
   export function area(measurement: Measurement): number;
   export function bump(value: { value: number | bigint }): void;
@@ -440,7 +446,7 @@ declare module "ns:swift/SwiftDemo" {
   export function introduce(greeting: Greeting, other: string): string;
   export function makeLabel(text: string): UILabel;
   export function makeScore(name: string, points: number | bigint): import("ns:swift/SwiftDemoKit").Pair<string, number>;
-  export function noteLater(text: string): Promise<Note>;
+  export function noteLater(text: string, signal?: AbortSignal): Promise<Note>;
   export function onMeasure(body: (arg0: Measurement) => void): void;
   export function transform(values: readonly (number | bigint)[], body: (arg0: number) => string): (string)[];
 

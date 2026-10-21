@@ -383,6 +383,12 @@ Both need a loaded Swift module (its thunks carry the tracking code).
   synchronously, runs in a Swift `Task`, and settles the Promise on the
   calling isolate's thread (main or Worker); a `throw` rejects it with the
   Swift error. If the isolate is gone by then, the outcome is dropped.
+- An `async` call takes an `AbortSignal` after its arguments:
+  `await fetchItems(query, controller.signal)`. Aborting rejects the Promise
+  at once with the signal's reason and cancels the Swift task, which stops
+  where it checks for cancellation (`Task.sleep`, `try Task.checkCancellation()`,
+  URLSession); whatever it reports afterwards is dropped. A signal already
+  aborted rejects without calling Swift.
 - Members of an `actor` are awaited from outside it, exactly as in Swift:
   `await counter.increment()`, `await counter.value`. Actor properties are
   never assignable from JavaScript. `nonisolated` members stay synchronous.
@@ -441,7 +447,7 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 ## Not yet supported
 
-Async cancellation, Combine publishers, concrete `AsyncSequence` types,
+Combine publishers, concrete `AsyncSequence` types,
 generic methods of generic types, other standard library generics,
 protocols with associated types, subscripts and operators. Each appears in
 the coverage report with its reason.

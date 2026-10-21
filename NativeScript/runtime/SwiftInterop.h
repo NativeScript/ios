@@ -40,7 +40,7 @@
 // calls it by reporting the arguments as an array: callbackBegin, each
 // argument through the complete* entries, then completeArrayEnd.
 
-#define NS_SWIFT_ABI_VERSION 14
+#define NS_SWIFT_ABI_VERSION 15
 
 #ifdef __cplusplus
 extern "C" {
@@ -353,6 +353,14 @@ struct NSSwiftAPI {
   // otherwise.
   /* 54 */ void* (*adapterOf)(void* handle);
   /* 55 */ void (*adoptAdapter)(void* handle, void* adapter);
+
+  // Called by an async thunk after starting its task, during the call that
+  // began `token`: `cancel(context)` runs if JS aborts the call (an
+  // AbortSignal passed after its arguments), and `release(context)` once
+  // the call settles either way.
+  /* 56 */ void (*setCancel)(void* token, void* context,
+                             void (*cancel)(void* context),
+                             void (*release)(void* context));
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);

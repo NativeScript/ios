@@ -208,6 +208,8 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "shoutAll(_:)",
                                        "describeValue(_:)",
                                        "greetOnce(_:_:)",
+                                       "CancelLog",
+                                       "waitForCancel(_:)",
                                        "describe(_:)",
                                        "makeLabel(_:)",
                                        "tags(_:)",

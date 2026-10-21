@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module", "observe", "track"]);
-            expect(swift.abiVersion).toBe(14);
+            expect(swift.abiVersion).toBe(15);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(14);
+            expect(info.abiVersion).toBe(15);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -459,6 +459,48 @@ describe("ns:swift", function () {
                 fail("worker error: " + event.message);
                 done();
             };
+        });
+    });
+
+    describe("cancellation", function () {
+        it("rejects an aborted call with the signal's reason and cancels the task", function (done) {
+            var controller = new AbortController();
+            var before = SwiftDemo.CancelLog.cancellations;
+            SwiftDemo.waitForCancel(10, controller.signal).then(function () {
+                done.fail("the call resolved");
+            }, function (reason) {
+                expect(reason).toBe(controller.signal.reason);
+                setTimeout(function () {
+                    expect(SwiftDemo.CancelLog.cancellations).toBe(before + 1);
+                    done();
+                }, 300);
+            });
+            controller.abort();
+        });
+
+        it("rejects at once when the signal is already aborted", function (done) {
+            var controller = new AbortController();
+            controller.abort(new Error("stop"));
+            SwiftDemo.delayedEcho("x", 0.01, controller.signal).then(function () {
+                done.fail("the call resolved");
+            }, function (reason) {
+                expect(reason.message).toBe("stop");
+                done();
+            });
+        });
+
+        it("resolves calls whose signal is not aborted", function (done) {
+            var controller = new AbortController();
+            SwiftDemo.delayedEcho("kept", 0.01, controller.signal).then(function (value) {
+                expect(value).toBe("kept");
+                controller.abort();
+                done();
+            }, done.fail);
+        });
+
+        it("passes no signal to members that are not async", function () {
+            expect(function () { SwiftDemo.shout("a", new AbortController().signal); })
+                .toThrowError(TypeError);
         });
     });
 

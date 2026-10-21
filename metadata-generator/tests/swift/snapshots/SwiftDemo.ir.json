@@ -164,6 +164,8 @@
     "s:9SwiftDemo13describeValueySSxs23CustomStringConvertibleRzlF@<s:Sb>",
     "s:9SwiftDemo9greetOnceySSx_SStAA8GreetingRzlF",
     "s:9SwiftDemo9greetOnceySSx_SStAA8GreetingRzlF@<any Greeting>",
+    "s:9SwiftDemo9CancelLogC",
+    "s:9SwiftDemo13waitForCancelySbSdYaF",
     "s:9SwiftDemo8describeySSSo6UIViewCF",
     "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
     "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
@@ -68231,6 +68233,34 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo13waitForCancelySbSdYaF",
+      "kind": "function",
+      "path": "waitForCancel(_:)",
+      "name": "waitForCancel(_:)",
+      "access": "public",
+      "declaration": "func waitForCancel(_ seconds: Double) async -> Bool",
+      "parameters": [
+        {
+          "internalName": "seconds",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "async": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:260:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo14CountdownErrorV",
       "kind": "struct",
       "path": "CountdownError",
@@ -74999,6 +75029,44 @@
       },
       "location": "file://Sources/SwiftDemo/Values.swift:62:12",
       "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo9CancelLogC",
+      "kind": "class",
+      "path": "CancelLog",
+      "name": "CancelLog",
+      "access": "public",
+      "declaration": "final class CancelLog",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:257:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo9CancelLogC13cancellationsSivpZ"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo9CancelLogC13cancellationsSivpZ",
+      "kind": "typeProperty",
+      "path": "CancelLog.cancellations",
+      "name": "cancellations",
+      "access": "public",
+      "declaration": "static var cancellations: Int",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:258:22",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo9CancelLogC"
     },
     {
       "id": "s:9SwiftDemo9countDown4from9failingAtScsySis5Error_pGSi_SiSgtF",

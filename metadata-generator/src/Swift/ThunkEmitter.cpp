@@ -565,7 +565,7 @@ class Emitter {
       code += "  let captured = __NSUnchecked((" + list + "))\n";
       unpack = "    let (" + list + ") = captured.value\n";
     }
-    code += "  Task {\n" + unpack;
+    code += "  let task = Task {\n" + unpack;
     if (throwing) {
       code += "    do {\n      let " + binding + annotation(resultType) +
               " = " + expression + "\n" +
@@ -575,7 +575,7 @@ class Emitter {
       code += "    let " + binding + annotation(resultType) + " = " +
               expression + "\n" + returnResult(result, "    ", "completion");
     }
-    return code + "  }\n";
+    return code + "  }\n  completion.onCancel { task.cancel() }\n";
   }
 
   std::string emitMember(const SwiftSurface::Member& member) {
@@ -984,6 +984,18 @@ private struct __NSCompletion: @unchecked Sendable, __NSReporter {
   let api: UnsafeRawPointer
   let token: UnsafeMutableRawPointer
 
+  // `cancel` runs when JS aborts the call (its AbortSignal); the runtime
+  // drops it once the call settles.
+  func onCancel(_ cancel: @escaping @Sendable () -> Void) {
+    let box = Unmanaged.passRetained(__NSCancellation(cancel)).toOpaque()
+    slot(56, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer,
+                              @convention(c) (UnsafeMutableRawPointer) -> Void,
+                              @convention(c) (UnsafeMutableRawPointer) -> Void) -> Void).self)(
+      token, box,
+      { Unmanaged<__NSCancellation>.fromOpaque($0).takeUnretainedValue().cancel() },
+      { Unmanaged<__NSCancellation>.fromOpaque($0).release() })
+  }
+
   private func slot<Function>(_ index: Int, _: Function.Type) -> Function {
     api.load(fromByteOffset: index * 8, as: Function.self)
   }
@@ -1114,6 +1126,11 @@ private final class __NSCallback: @unchecked Sendable {
     arguments(completion)
     api.load(fromByteOffset: 28 * 8, as: (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(completion.token)
   }
+}
+
+private final class __NSCancellation {
+  let cancel: @Sendable () -> Void
+  init(_ cancel: @escaping @Sendable () -> Void) { self.cancel = cancel }
 }
 
 // The adapter of JS object argument `i`: the one already made for that JS

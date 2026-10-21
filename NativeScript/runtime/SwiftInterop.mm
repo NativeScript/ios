@@ -699,6 +699,7 @@ void ApiCompleteErrorValue(void* token, const uint8_t* message, intptr_t message
                            const uint8_t* type, intptr_t typeLength);
 void* ApiAdapterOf(void* handle);
 void ApiAdoptAdapter(void* handle, void* adapter);
+void ApiSetCancel(void* token, void* context, void (*cancel)(void*), void (*release)(void*));
 void ApiReturnAsyncSequence(NSSwiftCall* call, void* iterator, NSSwiftThunk next);
 void ApiCompleteAsyncSequence(void* token, void* iterator, NSSwiftThunk next);
 struct IsolateState;
@@ -767,6 +768,7 @@ const NSSwiftAPI kAPI = {
     ApiCompleteErrorValue,
     ApiAdapterOf,
     ApiAdoptAdapter,
+    ApiSetCancel,
 };
 
 // "Polygon.Style" -> "Style".
@@ -1024,6 +1026,16 @@ struct PendingAsync {
   Global<Promise::Resolver> resolver;
   ValueCode code;
   std::string name;
+  // Cancels the Swift task (setCancel); released with the entry.
+  void* cancelContext = nullptr;
+  void (*cancel)(void*) = nullptr;
+  void (*release)(void*) = nullptr;
+
+  ~PendingAsync() {
+    if (release != nullptr) {
+      release(cancelContext);
+    }
+  }
 };
 
 struct SwiftCallback;
@@ -1139,6 +1151,8 @@ struct CallContext : NSSwiftCall {
   Local<Value> result;
   bool completed = false;
   bool threw = false;
+  // The pending entry of an async call (beginAsync), or 0.
+  uint64_t asyncId = 0;
   // The first exception a JS callback threw while the thunk ran; it is
   // thrown from the call once the thunk returns.
   Global<Value> callbackException;
@@ -2177,6 +2191,7 @@ void* ApiBeginAsync(NSSwiftCall* call) {
     pending->code = *context->resultCode;
     pending->name = context->member->swiftName;
     context->state->pending.emplace(id, std::move(pending));
+    context->asyncId = id;
     Complete(context, resolver->GetPromise());
   } else {
     // The token is still completed later; it then finds no pending entry.
@@ -2207,6 +2222,24 @@ void ApiCallbackRetain(void* callback) {
 void ApiCallbackRelease(void* callback) { ReleaseCallback(static_cast<SwiftCallback*>(callback)); }
 
 void* ApiAdapterOf(void* handle) { return static_cast<SwiftCallback*>(handle)->adapter; }
+
+// On the isolate's thread, during the call that began `token`.
+void ApiSetCancel(void* token, void* context, void (*cancel)(void*), void (*release)(void*)) {
+  auto* async = static_cast<AsyncToken*>(token);
+  auto* state = Caches::StateFor<IsolateState>(async->isolate);
+  if (state == nullptr) {
+    release(context);
+    return;
+  }
+  auto it = state->pending.find(async->id);
+  if (it == state->pending.end()) {
+    release(context);
+    return;
+  }
+  it->second->cancelContext = context;
+  it->second->cancel = cancel;
+  it->second->release = release;
+}
 
 void ApiAdoptAdapter(void* handle, void* adapter) {
   auto* callback = static_cast<SwiftCallback*>(handle);
@@ -3336,7 +3369,7 @@ LoadedModule* LoadedFor(Isolate* isolate, const ModuleInfo* module) {
 // `receiver` (empty for non-instance members) and `arguments`.
 MaybeLocal<Value> Invoke(Isolate* isolate, const MemberGroup& group, const MemberInfo& member,
                          Local<Value> receiver, const std::vector<Local<Value>>& arguments,
-                         bool setter, Local<Object> constructTarget) {
+                         bool setter, Local<Object> constructTarget, uint64_t* asyncId = nullptr) {
   Local<Context> context = isolate->GetCurrentContext();
   const ModuleInfo& module = *group.module;
   auto* state = Caches::StateFor<IsolateState>(isolate);
@@ -3417,6 +3450,9 @@ MaybeLocal<Value> Invoke(Isolate* isolate, const MemberGroup& group, const Membe
   state->calls.push_back(&call);
   thunk(&call, slots.empty() ? nullptr : slots.data(), static_cast<intptr_t>(slots.size()));
   state->calls.pop_back();
+  if (asyncId != nullptr) {
+    *asyncId = call.asyncId;
+  }
 
   // A JS exception thrown while the thunk ran caused whatever error the
   // thunk reported, so it is the one JS sees.
@@ -3477,6 +3513,96 @@ const MemberGroup& ForReceiver(Isolate* isolate, const MemberGroup& group, Local
   return storage.overloads.empty() ? group : storage;
 }
 
+// Takes a trailing AbortSignal off a call of an async member; empty when
+// there is none.
+Local<Object> TakeSignal(Isolate* isolate, Local<Context> context, const MemberGroup& group,
+                         std::vector<Local<Value>>& arguments) {
+  bool async = std::any_of(group.overloads.begin(), group.overloads.end(),
+                           [](const MemberInfo* m) { return m->flags & NSSwiftMemberAsync; });
+  Local<Value> type;
+  if (!async || arguments.empty() || !arguments.back()->IsObject() ||
+      !context->Global()->Get(context, tns::ToV8String(isolate, "AbortSignal")).ToLocal(&type) ||
+      !type->IsFunction() ||
+      !arguments.back()->InstanceOf(context, type.As<Object>()).FromMaybe(false)) {
+    return Local<Object>();
+  }
+  Local<Object> signal = arguments.back().As<Object>();
+  arguments.pop_back();
+  return signal;
+}
+
+// Rejects pending call `id` with `reason` and cancels its Swift task; a
+// result it reports later finds no entry.
+void AbortPending(Isolate* isolate, Local<Context> context, uint64_t id, Local<Value> reason) {
+  auto* state = Caches::StateFor<IsolateState>(isolate);
+  if (state == nullptr) {
+    return;
+  }
+  auto it = state->pending.find(id);
+  if (it == state->pending.end()) {
+    return;
+  }
+  std::unique_ptr<PendingAsync> pending = std::move(it->second);
+  state->pending.erase(it);
+  if (pending->cancel != nullptr) {
+    pending->cancel(pending->cancelContext);
+  }
+  pending->resolver.Get(isolate)->Reject(context, reason).Check();
+}
+
+// The signal's abort listener; its data is [call id, signal].
+void AbortListener(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<v8::Array> data = info.Data().As<v8::Array>();
+  Local<Value> id;
+  Local<Value> signal;
+  Local<Value> reason;
+  if (data->Get(context, 0).ToLocal(&id) && data->Get(context, 1).ToLocal(&signal) &&
+      signal.As<Object>()->Get(context, tns::ToV8String(isolate, "reason")).ToLocal(&reason)) {
+    AbortPending(isolate, context, static_cast<uint64_t>(id.As<v8::Number>()->Value()), reason);
+  }
+}
+
+// Ties async call `id` to `signal`: aborting rejects its Promise with the
+// signal's reason and cancels the Swift task.
+void WatchSignal(Isolate* isolate, Local<Context> context, uint64_t id, Local<Object> signal) {
+  if (id == 0) {
+    return;
+  }
+  Local<v8::Array> data = v8::Array::New(isolate, 2);
+  data->Set(context, 0, v8::Number::New(isolate, static_cast<double>(id))).Check();
+  data->Set(context, 1, signal).Check();
+  Local<v8::Function> listener;
+  Local<Value> add;
+  if (!v8::Function::New(context, AbortListener, data).ToLocal(&listener) ||
+      !signal->Get(context, tns::ToV8String(isolate, "addEventListener")).ToLocal(&add) ||
+      !add->IsFunction()) {
+    return;
+  }
+  Local<Object> options = Object::New(isolate);
+  options->Set(context, tns::ToV8String(isolate, "once"), v8::True(isolate)).Check();
+  Local<Value> argv[] = {tns::ToV8String(isolate, "abort"), listener, options};
+  (void)add.As<v8::Function>()->Call(context, signal, 3, argv);
+}
+
+// A Promise already rejected with an aborted signal's reason, or empty when
+// `signal` is not aborted.
+MaybeLocal<Value> AlreadyAborted(Isolate* isolate, Local<Context> context, Local<Object> signal) {
+  Local<Value> aborted;
+  Local<Value> reason;
+  Local<Promise::Resolver> resolver;
+  if (signal.IsEmpty() ||
+      !signal->Get(context, tns::ToV8String(isolate, "aborted")).ToLocal(&aborted) ||
+      !aborted->BooleanValue(isolate) ||
+      !signal->Get(context, tns::ToV8String(isolate, "reason")).ToLocal(&reason) ||
+      !Promise::Resolver::New(context).ToLocal(&resolver)) {
+    return MaybeLocal<Value>();
+  }
+  resolver->Reject(context, reason).Check();
+  return resolver->GetPromise();
+}
+
 void MethodCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   const MemberGroup& all = *GroupOf(info);
@@ -3498,17 +3624,27 @@ void MethodCallback(const FunctionCallbackInfo<Value>& info) {
   const MemberGroup& group = ForReceiver(isolate, all, receiver, storage);
 
   std::vector<Local<Value>> arguments = ArgumentsOf(info, first);
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> signal = TakeSignal(isolate, context, group, arguments);
   Selection selection;
   if (group.kind == NSSwiftMemberInstanceProperty) {
     // Enum instance properties are exposed as functions of the case name.
     selection.member = group.overloads[0];
-  } else if (!Select(isolate, isolate->GetCurrentContext(), group, arguments, selection)) {
+  } else if (!Select(isolate, context, group, arguments, selection)) {
     return;
   }
   Local<Value> result;
+  if (AlreadyAborted(isolate, context, signal).ToLocal(&result)) {
+    info.GetReturnValue().Set(result);
+    return;
+  }
+  uint64_t asyncId = 0;
   if (Invoke(isolate, group, *selection.member, receiver, selection.arguments, false,
-             Local<Object>())
+             Local<Object>(), &asyncId)
           .ToLocal(&result)) {
+    if (!signal.IsEmpty()) {
+      WatchSignal(isolate, context, asyncId, signal);
+    }
     info.GetReturnValue().Set(result);
   }
 }
@@ -3528,6 +3664,8 @@ void ExactCallback(const FunctionCallbackInfo<Value>& info) {
     receiver = info.This();
   }
   std::vector<Local<Value>> arguments = ArgumentsOf(info, first);
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> signal = TakeSignal(isolate, context, group, arguments);
   if (arguments.size() != member.signature.parameters.size()) {
     isolate->ThrowException(Exception::TypeError(tns::ToV8String(
         isolate, member.swiftName + " expects " +
@@ -3535,8 +3673,16 @@ void ExactCallback(const FunctionCallbackInfo<Value>& info) {
     return;
   }
   Local<Value> result;
-  if (Invoke(isolate, group, member, receiver, arguments, false, Local<Object>())
+  if (AlreadyAborted(isolate, context, signal).ToLocal(&result)) {
+    info.GetReturnValue().Set(result);
+    return;
+  }
+  uint64_t asyncId = 0;
+  if (Invoke(isolate, group, member, receiver, arguments, false, Local<Object>(), &asyncId)
           .ToLocal(&result)) {
+    if (!signal.IsEmpty()) {
+      WatchSignal(isolate, context, asyncId, signal);
+    }
     info.GetReturnValue().Set(result);
   }
 }
