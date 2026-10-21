@@ -171,3 +171,14 @@ public func halve(_ value: inout Int) throws {
 }
 public func clear(_ name: inout String?) { name = nil }
 public func swapTrackers(_ a: inout Tracker, _ b: inout Tracker) { swap(&a, &b) }
+
+// Counterparts of TNSPrimitives calls, for SwiftInteropBenchmarks.js.
+public func echoInt(_ value: Int) -> Int { value }
+public func echoString(_ value: String) -> String { value }
+
+public final class Bench {
+    public var value = 0
+    public init() {}
+    public static func echo(_ value: Int) -> Int { value }
+    public func echo(_ value: Int) -> Int { value }
+}

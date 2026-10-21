@@ -46,6 +46,35 @@ the fixture sources together with the generated `Interop/` file, whose
 contents the generator tests keep identical to the generator's output. The
 fixture's `Package.swift` builds the same files as two SwiftPM modules.
 
+## In an app
+
+An app names the Swift modules JavaScript uses in
+`App_Resources/iOS/build.xcconfig`:
+
+```
+NS_SWIFT_MODULES = WeatherKit MyPackage $(PRODUCT_MODULE_NAME)
+```
+
+SDK modules, SwiftPM packages (`ios.SPMPackages`) and the app's own Swift
+module (from `App_Resources/iOS/src`) all work. At link time, `internal/nsld.sh`
+runs `build-step-swift-interop.py` for each architecture, next to the
+Objective-C metadata step:
+
+1. `swift-symbolgraph-extract` reads every listed module from the build
+   products and the SDK.
+2. The generator writes them as one unit (`NS_SWIFT_UNIT`, by default
+   `<product module>Swift`), verified by the Swift compiler unless
+   `NS_SWIFT_VERIFY = NO`. With `NS_TYPESCRIPT_DECLARATIONS_PATH` set, the
+   declarations go to its `swift` folder.
+3. `swiftc` compiles the thunks to an object, which is linked into the app
+   with `-u` for every register symbol.
+
+The step's logs and outputs are in `$(CONFIGURATION_BUILD_DIR)/NSSwiftInterop-<arch>`.
+Generation and compilation take a while (WeatherKit: about 19 s per
+architecture in a Release build), so the object is reused while the
+extracted symbol graphs, the generator and the settings stay the same; an
+unchanged build pays only for the extraction.
+
 ## Generation units
 
 Modules generated together form a unit: `--swift-unit <Name>` with one
@@ -290,6 +319,25 @@ A Swift object returned to JavaScript is retained once by its JS wrapper and
 released when the wrapper is garbage collected; returning the same object again
 yields the same wrapper. Wrappers belong to the isolate that created them, so
 each worker gets its own JS objects.
+
+## Performance
+
+`TestRunner/app/tests/SwiftInteropBenchmarks.js` times the same operations
+through the Objective-C/C metadata path and through Swift thunks, and writes
+the results to the app's `Documents/swift-bench.txt`. On a Debug runtime in
+the iOS simulator (indicative only; measure Release builds on devices for real
+numbers):
+
+| Operation | Objective-C/C | Swift thunk |
+|---|---|---|
+| function `(Int) -> Int` | 1733 ns | 1500 ns |
+| class method | 1722 ns | 1500 ns |
+| instance method | 1786 ns | 1722 ns |
+| string round trip | 1717 ns | 1752 ns |
+| construct an object | 3018 ns | 1608 ns |
+| read a property | 1014 ns | 864 ns |
+
+Comparisons with other runtimes (OneJS) are not part of the suite.
 
 ## Coverage and verification
 

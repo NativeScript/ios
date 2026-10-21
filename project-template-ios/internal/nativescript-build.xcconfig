@@ -23,6 +23,10 @@ LDPLUSPLUS = $SRCROOT/internal/nsld.sh
 // * It will be generated on each build, so you can find it after running "ns build ios" in "YOUR_APP/platforms/ios".
 // NS_DEBUG_METADATA_PATH = $(SRCROOT)/debug-metadata
 
+// * ns:swift: the Swift modules JavaScript calls through generated thunks (SDK modules,
+// * SwiftPM packages, $(PRODUCT_MODULE_NAME)), space-separated. Set it in App_Resources/iOS/build.xcconfig.
+// NS_SWIFT_MODULES = WeatherKit
+
 // Xcode 12 
 EXCLUDED_ARCHS_x86_64 = arm64 arm64e
 EXCLUDED_ARCHS[sdk=iphonesimulator*] = i386 armv6 armv7 armv7s armv8 $(EXCLUDED_ARCHS_$(NATIVE_ARCH_64_BIT))
