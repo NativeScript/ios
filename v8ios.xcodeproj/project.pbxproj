@@ -350,6 +350,12 @@
 		EF918E4F1A6F3E39721F8C44 /* Shapes.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA98D6B239608C28AFB14F15 /* Shapes.swift */; };
 		1A9C83B48771CCA1BBEA3F77 /* Values.swift in Sources */ = {isa = PBXBuildFile; fileRef = D76F7C886215EB9DB96CA88E /* Values.swift */; };
 		2B7A41C09E3F4D21A6C0B001 /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7A41C09E3F4D21A6C0B002 /* Views.swift */; };
+		5D0E5ED0000000000000001B /* Badge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5ED0000000000000001A /* Badge.swift */; };
+		5D0E5ED00000000000000019 /* Streams.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5ED00000000000000018 /* Streams.swift */; };
+		5D0E5ED00000000000000017 /* Observing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5ED00000000000000016 /* Observing.swift */; };
+		5D0E5ED00000000000000015 /* Protocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5ED00000000000000014 /* Protocols.swift */; };
+		5D0E5ED00000000000000004 /* Purse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5ED00000000000000003 /* Purse.swift */; };
+		5D0E5ED00000000000000002 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0E5ED00000000000000001 /* Money.swift */; };
 		F84875BB70573F18E4D9BA12 /* SwiftDemo+NativeScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9283D493244254925F2F5D4D /* SwiftDemo+NativeScript.swift */; };
 		D3DEE264C143B4BB31683835 /* SwiftRuntimeLinkage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FFACD5929635A9739D992FE /* SwiftRuntimeLinkage.swift */; };
 /* End PBXBuildFile section */
@@ -410,6 +416,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 25D322C92AC1521571A8C2F4;
 			remoteInfo = SwiftDemo;
+		};
+		5D0E5ED0000000000000000C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C27E277822202663009C10A3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5D0E5ED00000000000000006;
+			remoteInfo = SwiftDemoKit;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -902,8 +915,15 @@
 		CA98D6B239608C28AFB14F15 /* Shapes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Shapes.swift"; sourceTree = "<group>"; };
 		D76F7C886215EB9DB96CA88E /* Values.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Values.swift"; sourceTree = "<group>"; };
 		2B7A41C09E3F4D21A6C0B002 /* Views.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Views.swift"; sourceTree = "<group>"; };
+		5D0E5ED0000000000000001A /* Badge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Badge.swift"; sourceTree = "<group>"; };
+		5D0E5ED00000000000000018 /* Streams.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Streams.swift"; sourceTree = "<group>"; };
+		5D0E5ED00000000000000016 /* Observing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Observing.swift"; sourceTree = "<group>"; };
+		5D0E5ED00000000000000014 /* Protocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Protocols.swift"; sourceTree = "<group>"; };
+		5D0E5ED00000000000000003 /* Purse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Purse.swift"; sourceTree = "<group>"; };
+		5D0E5ED00000000000000001 /* Money.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemoKit/Money.swift"; sourceTree = "<group>"; };
 		9283D493244254925F2F5D4D /* SwiftDemo+NativeScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Interop/SwiftDemo+NativeScript.swift"; sourceTree = "<group>"; };
 		8431D102ADFEC30630A1D9EB /* libSwiftDemo.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libSwiftDemo.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		5D0E5ED00000000000000005 /* libSwiftDemoKit.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libSwiftDemoKit.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		2FFACD5929635A9739D992FE /* SwiftRuntimeLinkage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftRuntimeLinkage.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -969,6 +989,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		67C5137D65E8C782880B46DC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5D0E5ED0000000000000000B /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -1162,6 +1189,7 @@
 			children = (
 				C2DDEB16229EA89000345BFE /* TestRunner.app */,
 				8431D102ADFEC30630A1D9EB /* libSwiftDemo.a */,
+				5D0E5ED00000000000000005 /* libSwiftDemoKit.a */,
 				C2DDEB32229EAB3B00345BFE /* NativeScript.framework */,
 				C29374E2229FC0F60075CB16 /* libTestFixtures.a */,
 				C2F4CBB322C60BFD0036B56F /* metadata-generator */,
@@ -1690,6 +1718,12 @@
 				CA98D6B239608C28AFB14F15 /* Shapes.swift */,
 				D76F7C886215EB9DB96CA88E /* Values.swift */,
 				2B7A41C09E3F4D21A6C0B002 /* Views.swift */,
+				5D0E5ED0000000000000001A /* Badge.swift */,
+				5D0E5ED00000000000000018 /* Streams.swift */,
+				5D0E5ED00000000000000016 /* Observing.swift */,
+				5D0E5ED00000000000000014 /* Protocols.swift */,
+				5D0E5ED00000000000000003 /* Purse.swift */,
+				5D0E5ED00000000000000001 /* Money.swift */,
 				9283D493244254925F2F5D4D /* SwiftDemo+NativeScript.swift */,
 			);
 			name = SwiftDemo;
@@ -1980,10 +2014,27 @@
 			buildRules = (
 			);
 			dependencies = (
+				5D0E5ED0000000000000000D /* PBXTargetDependency */,
 			);
 			name = SwiftDemo;
 			productName = SwiftDemo;
 			productReference = 8431D102ADFEC30630A1D9EB /* libSwiftDemo.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+		5D0E5ED00000000000000006 /* SwiftDemoKit */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5D0E5ED00000000000000007 /* Build configuration list for PBXNativeTarget "SwiftDemoKit" */;
+			buildPhases = (
+				5D0E5ED0000000000000000A /* Sources */,
+				5D0E5ED0000000000000000B /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SwiftDemoKit;
+			productName = SwiftDemoKit;
+			productReference = 5D0E5ED00000000000000005 /* libSwiftDemoKit.a */;
 			productType = "com.apple.product-type.library.static";
 		};
 /* End PBXNativeTarget section */
@@ -2041,6 +2092,7 @@
 				C2DDEB31229EAB3B00345BFE /* NativeScript */,
 				C29374E1229FC0F60075CB16 /* TestFixtures */,
 				25D322C92AC1521571A8C2F4 /* SwiftDemo */,
+				5D0E5ED00000000000000006 /* SwiftDemoKit */,
 				C2F4CBB222C60BFD0036B56F /* metadata-generator */,
 				C23992C6236C2D6E00D2F720 /* TestRunnerTests */,
 				C2253781241A41C500192740 /* TKLiveSync */,
@@ -2488,7 +2540,20 @@
 				EF918E4F1A6F3E39721F8C44 /* Shapes.swift in Sources */,
 				1A9C83B48771CCA1BBEA3F77 /* Values.swift in Sources */,
 				2B7A41C09E3F4D21A6C0B001 /* Views.swift in Sources */,
+				5D0E5ED0000000000000001B /* Badge.swift in Sources */,
+				5D0E5ED00000000000000019 /* Streams.swift in Sources */,
+				5D0E5ED00000000000000017 /* Observing.swift in Sources */,
+				5D0E5ED00000000000000015 /* Protocols.swift in Sources */,
+				5D0E5ED00000000000000004 /* Purse.swift in Sources */,
 				F84875BB70573F18E4D9BA12 /* SwiftDemo+NativeScript.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5D0E5ED0000000000000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5D0E5ED00000000000000002 /* Money.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2551,6 +2616,11 @@
 			);
 			target = 25D322C92AC1521571A8C2F4 /* SwiftDemo */;
 			targetProxy = EAC6F6059220EE00658E50B4 /* PBXContainerItemProxy */;
+		};
+		5D0E5ED0000000000000000D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5D0E5ED00000000000000006 /* SwiftDemoKit */;
+			targetProxy = 5D0E5ED0000000000000000C /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -2969,6 +3039,7 @@
 					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libTestFixtures.a",
 					"-Wl,-u,_ns_swift_register_SwiftDemo",
 					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libSwiftDemo.a",
+					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libSwiftDemoKit.a",
 					"-sectcreate",
 					__DATA,
 					__TNSMetadata,
@@ -3028,6 +3099,7 @@
 					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libTestFixtures.a",
 					"-Wl,-u,_ns_swift_register_SwiftDemo",
 					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libSwiftDemo.a",
+					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libSwiftDemoKit.a",
 					"-sectcreate",
 					__DATA,
 					__TNSMetadata,
@@ -3364,6 +3436,32 @@
 			};
 			name = Release;
 		};
+		5D0E5ED00000000000000008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				SYMROOT = build;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5D0E5ED00000000000000009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				SYMROOT = build;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -3453,6 +3551,15 @@
 			buildConfigurations = (
 				367136433311CFF0FDB0C91E /* Debug */,
 				445B0766107C823B92906250 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5D0E5ED00000000000000007 /* Build configuration list for PBXNativeTarget "SwiftDemoKit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5D0E5ED00000000000000008 /* Debug */,
+				5D0E5ED00000000000000009 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

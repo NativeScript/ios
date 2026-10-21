@@ -2,6 +2,8 @@
 
 #include <llvm/ADT/StringExtras.h>
 
+#include <algorithm>
+
 #include "FragmentTokens.h"
 
 namespace Swift {
@@ -656,8 +658,319 @@ std::set<std::string> genericNamesInScope(const Module& module,
     for (const auto& parameter : current->genericParameters) {
       names.insert(parameter.name);
     }
+    for (const auto& substitution : current->substitutions) {
+      names.insert(substitution.first);
+    }
   }
   return names;
+}
+
+TypeNode substitute(
+    const TypeNode& node,
+    const std::vector<std::pair<std::string, TypeNode>>& substitutions) {
+  if (node.kind == TypeNode::Kind::GenericParameter &&
+      node.components.size() == 1) {
+    for (const auto& substitution : substitutions) {
+      if (substitution.first == node.components[0].name) {
+        TypeNode result = substitution.second;
+        result.attributes.insert(result.attributes.end(),
+                                 node.attributes.begin(),
+                                 node.attributes.end());
+        if (result.modifier.empty()) {
+          result.modifier = node.modifier;
+        }
+        return result;
+      }
+    }
+    return node;
+  }
+  TypeNode result = node;
+  for (auto& child : result.children) {
+    child = substitute(child, substitutions);
+  }
+  for (auto& child : result.result) {
+    child = substitute(child, substitutions);
+  }
+  for (auto& child : result.thrownType) {
+    child = substitute(child, substitutions);
+  }
+  for (auto& component : result.components) {
+    for (auto& argument : component.arguments) {
+      argument = substitute(argument, substitutions);
+    }
+  }
+  return result;
+}
+
+namespace {
+
+std::string typeKey(const TypeNode& node) {
+  switch (node.kind) {
+    case TypeNode::Kind::Nominal: {
+      std::string key = node.usr().empty() ? spelling(node) : node.usr();
+      const auto& arguments = node.components.back().arguments;
+      if (!arguments.empty()) {
+        key += "<";
+        for (size_t i = 0; i < arguments.size(); i++) {
+          key += (i > 0 ? "," : "") + typeKey(arguments[i]);
+        }
+        key += ">";
+      }
+      return key;
+    }
+    case TypeNode::Kind::Optional:
+    case TypeNode::Kind::ImplicitlyUnwrappedOptional:
+      return typeKey(node.children.at(0)) + "?";
+    case TypeNode::Kind::Array:
+      return "[" + typeKey(node.children.at(0)) + "]";
+    case TypeNode::Kind::Dictionary:
+      return "[" + typeKey(node.children.at(0)) + ":" +
+             typeKey(node.children.at(1)) + "]";
+    default:
+      return spelling(node);
+  }
+}
+
+bool isConcrete(const TypeNode& node) {
+  if (node.kind == TypeNode::Kind::GenericParameter ||
+      node.kind == TypeNode::Kind::Opaque ||
+      node.kind == TypeNode::Kind::Unknown) {
+    return false;
+  }
+  for (const auto* list : {&node.children, &node.result, &node.thrownType}) {
+    for (const auto& child : *list) {
+      if (!isConcrete(child)) {
+        return false;
+      }
+    }
+  }
+  for (const auto& component : node.components) {
+    for (const auto& argument : component.arguments) {
+      if (!isConcrete(argument)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+// Concrete generic nominals in `node`, outermost first.
+void collectInstantiations(const TypeNode& node,
+                           std::vector<const TypeNode*>& out) {
+  if (node.kind == TypeNode::Kind::Nominal && !node.components.empty() &&
+      !node.components.back().arguments.empty() && isConcrete(node)) {
+    out.push_back(&node);
+  }
+  for (const auto* list : {&node.children, &node.result, &node.thrownType}) {
+    for (const auto& child : *list) {
+      collectInstantiations(child, out);
+    }
+  }
+  for (const auto& component : node.components) {
+    for (const auto& argument : component.arguments) {
+      collectInstantiations(argument, out);
+    }
+  }
+}
+
+std::vector<const TypeRef*> typesOf(const Symbol& symbol) {
+  std::vector<const TypeRef*> types;
+  for (const auto& parameter : symbol.parameters) {
+    types.push_back(&parameter.type);
+  }
+  for (const auto* type :
+       {&symbol.returnType, &symbol.valueType, &symbol.aliasedType}) {
+    if (*type) {
+      types.push_back(&**type);
+    }
+  }
+  return types;
+}
+
+std::string withoutSpaces(llvm::StringRef text) {
+  std::string out;
+  for (char c : text) {
+    if (c != ' ') {
+      out += c;
+    }
+  }
+  return out;
+}
+
+// Whether `member`'s same-type requirements (`where UnitType == UnitMass`,
+// `where Self == Style<Double>`) hold for `base` instantiated with
+// `arguments`. Requirements this cannot decide count as holding; compiler
+// verification has the last word.
+bool sameTypeRequirementsHold(const Symbol& member, const Symbol& base,
+                              const std::vector<TypeNode>& arguments) {
+  std::vector<const GenericConstraint*> constraints;
+  for (const auto& constraint : member.genericConstraints) {
+    constraints.push_back(&constraint);
+  }
+  if (member.extension) {
+    for (const auto& constraint : member.extension->constraints) {
+      constraints.push_back(&constraint);
+    }
+  }
+  std::vector<std::string> spelled;
+  for (const auto& argument : arguments) {
+    spelled.push_back(withoutSpaces(spelling(argument)));
+  }
+  for (const GenericConstraint* constraint : constraints) {
+    if (constraint->kind != "sameType") {
+      continue;
+    }
+    std::string rhs = withoutSpaces(constraint->rhs);
+    for (size_t i = 0; i < base.genericParameters.size() && i < spelled.size();
+         i++) {
+      if (constraint->lhs == base.genericParameters[i].name &&
+          rhs != spelled[i] &&
+          llvm::StringRef(spelled[i]).rsplit('.').second != rhs) {
+        return false;
+      }
+    }
+    // `Self == Outer.Base<Args>`, qualified or not.
+    std::string prefix = base.name + "<";
+    size_t at = rhs.find(prefix);
+    if (constraint->lhs == "Self" && at != std::string::npos &&
+        (at == 0 || rhs[at - 1] == '.') && llvm::StringRef(rhs).endswith(">") &&
+        rhs.find('<') == at + base.name.size()) {
+      std::string own = prefix + llvm::join(spelled, ",") + ">";
+      if (rhs.substr(at) != own) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+}  // namespace
+
+std::string instantiationKey(const TypeNode& node) { return typeKey(node); }
+
+void instantiateGenerics(Module& module) {
+  // Instantiations a synthetic member spells are followed this deep, which
+  // stops `Box<T>.wrapped() -> Box<Box<T>>` from unfolding forever.
+  constexpr int kMaxDepth = 2;
+  struct Pending {
+    std::string id;
+    int depth;
+  };
+  std::vector<Pending> queue;
+  for (const auto& entry : module.symbols) {
+    queue.push_back(Pending{entry.first, 0});
+  }
+
+  for (size_t next = 0; next < queue.size(); next++) {
+    Pending pending = queue[next];
+    const Symbol* source = module.find(pending.id);
+    if (!source) {
+      continue;
+    }
+    std::set<std::string> generics = genericNamesInScope(module, *source);
+    std::vector<std::pair<std::string, TypeNode>> substitutions;
+    for (const Symbol* current = source; current;
+         current = current->parentId.empty() ? nullptr
+                                             : module.find(current->parentId)) {
+      substitutions.insert(substitutions.end(), current->substitutions.begin(),
+                           current->substitutions.end());
+    }
+
+    std::vector<TypeNode> found;
+    for (const TypeRef* type : typesOf(*source)) {
+      bool complete = true;
+      TypeNode node =
+          substitute(parseType(*type, generics, &complete), substitutions);
+      if (!complete) {
+        continue;
+      }
+      std::vector<const TypeNode*> nodes;
+      collectInstantiations(node, nodes);
+      for (const TypeNode* instance : nodes) {
+        found.push_back(*instance);
+      }
+    }
+
+    for (const TypeNode& instance : found) {
+      std::string key = instantiationKey(instance);
+      const Symbol* base = module.find(instance.usr());
+      const auto& arguments = instance.components.back().arguments;
+      if (module.find(key) || !base || !isNominalType(base->kind) ||
+          base->kind == SymbolKind::Protocol || !base->genericBase.empty() ||
+          base->genericParameters.size() != arguments.size() ||
+          pending.depth >= kMaxDepth) {
+        continue;
+      }
+      // Only the type's own parameters: one nested in a generic type is not
+      // instantiated.
+      bool nestedInGeneric = false;
+      for (const Symbol* parent =
+               base->parentId.empty() ? nullptr : module.find(base->parentId);
+           parent;
+           parent = parent->parentId.empty() ? nullptr
+                                             : module.find(parent->parentId)) {
+        nestedInGeneric |= !parent->genericParameters.empty();
+      }
+      if (nestedInGeneric) {
+        continue;
+      }
+
+      Symbol type = *base;
+      type.preciseId = key;
+      type.genericBase = base->preciseId;
+      type.genericParameters.clear();
+      type.genericConstraints.clear();
+      type.typeArguments = arguments;
+      type.memberIds.clear();
+      for (size_t i = 0; i < arguments.size(); i++) {
+        type.substitutions.emplace_back(base->genericParameters[i].name,
+                                        arguments[i]);
+      }
+      std::vector<std::string> members;
+      for (const auto& memberId : base->memberIds) {
+        const Symbol* member = module.find(memberId);
+        if (!member || isNominalType(member->kind) ||
+            !sameTypeRequirementsHold(*member, *base, arguments)) {
+          continue;
+        }
+        Symbol copy = *member;
+        // Graphs repeat the enclosing type's parameters on its members.
+        auto substituted = [&](const std::string& name) {
+          for (const auto& parameter : base->genericParameters) {
+            if (parameter.name == name) {
+              return true;
+            }
+          }
+          return false;
+        };
+        copy.genericParameters.erase(
+            std::remove_if(
+                copy.genericParameters.begin(), copy.genericParameters.end(),
+                [&](const GenericParameter& p) { return substituted(p.name); }),
+            copy.genericParameters.end());
+        copy.genericConstraints.erase(
+            std::remove_if(copy.genericConstraints.begin(),
+                           copy.genericConstraints.end(),
+                           [&](const GenericConstraint& c) {
+                             return substituted(
+                                 llvm::StringRef(c.lhs).split('.').first.str());
+                           }),
+            copy.genericConstraints.end());
+        copy.preciseId = member->preciseId + "@" + key;
+        copy.parentId = key;
+        copy.genericBase = member->preciseId;
+        copy.memberIds.clear();
+        members.push_back(copy.preciseId);
+        module.symbols.emplace(copy.preciseId, std::move(copy));
+      }
+      type.memberIds = members;
+      module.symbols.emplace(key, std::move(type));
+      queue.push_back(Pending{key, pending.depth});
+      for (const auto& member : members) {
+        queue.push_back(Pending{member, pending.depth + 1});
+      }
+    }
+  }
 }
 
 }  // namespace Swift

@@ -64,6 +64,17 @@ enum class Bridge {
   // An Objective-C class instance: NativeScript's ordinary Objective-C
   // wrapper, with the same identity Objective-C calls give it.
   ObjCObject,
+  // A generic parameter, in a generic type's declarations for TypeScript
+  // only (Classification::templates); never generated.
+  TypeParameter,
+  // An adoptable module protocol as a value (`any P`): a JS object
+  // implementing it (through a generated adapter), or a Swift value that
+  // conforms to it.
+  Protocol,
+  // A result that is an asynchronous sequence (AsyncStream,
+  // AsyncThrowingStream, `some AsyncSequence<E, F>`): a JS async iterator;
+  // `elements` holds the element type.
+  AsyncSequence,
 };
 
 struct BridgedType {
@@ -71,8 +82,12 @@ struct BridgedType {
   bool optional = false;
   // Nominal bridges: the module symbol the type refers to.
   std::string symbolId;
-  // ObjCObject: the class's Objective-C runtime name.
+  // ObjCObject: the class's Objective-C runtime name. TypeParameter: the
+  // parameter's name.
   std::string objcClass;
+  // A generic type's arguments, for its TypeScript name (`Pair<number,
+  // string>`).
+  std::vector<BridgedType> typeArguments;
   TypeNode node;
   // Array and Dictionary: the element (value) type. Closure: its
   // parameters.
@@ -91,7 +106,8 @@ struct Capability {
   // ("unbridged-type:Foundation.URL"). Codes:
   //   objc-visible, not-public, unavailable, obsoleted, unknown-kind,
   //   deinitializer, macro, extension-block, protocol, protocol-requirement,
-  //   type-alias, associated-type, generic, noncopyable,
+  //   type-alias, associated-type, generic, noncopyable, protocol-static,
+  //   async-sequence-parameter,
   //   nonescapable, async-initializer, operator, subscript,
   //   enum-associated-values,
   //   external-type-extension, owner-not-bridged, missing-owner,
@@ -113,6 +129,8 @@ struct Capability {
   bool isMainActor = false;
   // A property or variable JS can assign.
   bool isSettable = false;
+  // A requirement of an adoptable protocol, which JS implementations provide.
+  bool isRequirement = false;
 
   // Bridges for SwiftGenerated callables: parameters in order, then the
   // result (or the property value type).
@@ -122,6 +140,10 @@ struct Capability {
 
 struct Classification {
   std::map<std::string, Capability> bySymbol;
+  // Members of generic types with generated instantiations, with generic
+  // parameters bridged as TypeParameter: one declaration for TypeScript
+  // covering every instantiation.
+  std::map<std::string, Capability> templates;
 
   const Capability* find(const std::string& id) const;
 };

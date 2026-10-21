@@ -13,6 +13,18 @@ SDK_PATH="$(xcrun --sdk iphonesimulator --show-sdk-path)"
 
 xcrun swiftc \
   -emit-module \
+  -emit-module-path "$WORK_DIR/SwiftDemoKit.swiftmodule" \
+  -emit-symbol-graph \
+  -emit-symbol-graph-dir "$WORK_DIR" \
+  -symbol-graph-minimum-access-level public \
+  -module-name SwiftDemoKit \
+  -target arm64-apple-ios15.0-simulator \
+  -sdk "$SDK_PATH" \
+  "$FIXTURE_DIR"/Sources/SwiftDemoKit/*.swift
+
+xcrun swiftc \
+  -emit-module \
+  -I "$WORK_DIR" \
   -emit-module-path "$WORK_DIR/SwiftDemo.swiftmodule" \
   -emit-symbol-graph \
   -emit-symbol-graph-dir "$WORK_DIR" \

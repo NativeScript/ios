@@ -22,6 +22,32 @@ declare module "ns:swift/SwiftDemo" {
     export function localizedDescription(value: ShapeError): string;
   }
 
+  /**
+   * @remarks Requires iOS 17.0; throws on earlier versions.
+   */
+  export class Thermostat {
+    /**
+     * @remarks Requires iOS 17.0; throws on earlier versions.
+     */
+    constructor();
+    /**
+     * @remarks Requires iOS 17.0; throws on earlier versions.
+     */
+    warm(delta: number): void;
+    /**
+     * @remarks Requires iOS 17.0; throws on earlier versions.
+     */
+    label: string;
+    /**
+     * @remarks Requires iOS 17.0; throws on earlier versions.
+     */
+    celsius: number;
+    /**
+     * @remarks Requires iOS 17.0; throws on earlier versions.
+     */
+    warmLater(delta: number): void;
+  }
+
   export type Measurement =
     | { case: "area"; width: number; height: number }
     | { case: "none" }
@@ -36,6 +62,10 @@ declare module "ns:swift/SwiftDemo" {
 
   }
 
+  export interface RankedScorer extends Scorer {
+    readonly rank: number | null;
+  }
+
   export type Precipitation = "none" | "rain" | "snow";
   export namespace Precipitation {
     export const none: "none";
@@ -43,6 +73,35 @@ declare module "ns:swift/SwiftDemo" {
     export const snow: "snow";
     export function init(rawValue: string): Precipitation | null;
     export function hashValue(value: Precipitation): number;
+  }
+
+  export class CountdownError {
+    private constructor();
+    /**
+     * Retrieve the localized description for this error.
+     */
+    readonly localizedDescription: string;
+  }
+
+  export class DoublingScorer {
+    constructor();
+    score(value: number | bigint): number;
+  }
+
+  export class FormalGreeting {
+    constructor(name: string);
+    constructor(args: { name: string });
+    punctuation: string;
+    readonly name: string;
+    greet(other: string): string;
+    reset(): void;
+    shout(other: string): string;
+  }
+
+  export class GreetingHolder {
+    constructor();
+    greet(other: string): string | null;
+    greeting: Greeting | null;
   }
 
   export namespace Job {
@@ -60,6 +119,17 @@ declare module "ns:swift/SwiftDemo" {
     inner: Point;
     outer: Point;
     expand(delta: number): void;
+  }
+
+  export class Badge {
+    constructor(title: string, count: number | bigint);
+    constructor(args: { title: string; count: number | bigint });
+    count: number;
+    title: string;
+    /**
+     * A UIHostingController showing this view (main thread only).
+     */
+    hostingController(): UIViewController;
   }
 
   export class Point {
@@ -106,6 +176,10 @@ declare module "ns:swift/SwiftDemo" {
     oldFetch(): void;
   }
 
+  export interface Scorer {
+    score(value: number | bigint): number;
+  }
+
   export class Square extends Polygon {
     constructor(side: number);
     constructor(args: { side: number });
@@ -133,6 +207,10 @@ declare module "ns:swift/SwiftDemo" {
     | { case: "number"; value: number };
   export namespace Formula {
     export function value(value: Formula): number;
+  }
+
+  export interface Greeter {
+    greet(name: string): string;
   }
 
   export class Palette {
@@ -194,6 +272,13 @@ declare module "ns:swift/SwiftDemo" {
     static readonly liveCount: number;
   }
 
+  export interface Greeting {
+    punctuation: string;
+    readonly name: string;
+    greet(other: string): string;
+    reset(): void;
+  }
+
   export class Notifier {
     constructor();
     publishLater(message: string): void;
@@ -203,50 +288,74 @@ declare module "ns:swift/SwiftDemo" {
     subscribe(handler: (arg0: string) => void): void;
   }
 
+  export type Score = import("ns:swift/SwiftDemoKit").Pair<string, number>;
   export function allFlavors(): (Flavor)[];
   export function echoUInt64(value: number | bigint): number;
   export function greetLater(name: (string) | null | undefined, completion: (arg0: string | null) => void): void;
   export function largestInt(): number;
+  export function makeScorer(): Scorer;
   export function namesLater(count: number | bigint): Promise<(string)[]>;
   export function wordCounts(words: readonly (string)[]): Record<string, number>;
   export function checkedSide(side: number): number;
   export function delayedEcho(text: string, seconds: number): Promise<string>;
   export function firstSubview(view: UIView): UIView | null;
+  export function makeGreeting(name: string): Greeting;
   export function measureLater(width: number): Promise<Measurement>;
   export function measurements(): (Measurement)[];
   export function swapTrackers(a: { value: Tracker }, b: { value: Tracker }): void;
   export const defaultFlavor: Flavor;
   export let globalCounter: number;
+  export function starterWallet(owner: string): import("ns:swift/SwiftDemoKit").Wallet;
   export function makeDefaultPoint(): Point;
   export function makeTrackerLater(id: number | bigint): Promise<Tracker>;
+  export function greetInBackground(greeting: Greeting): Promise<string>;
+  export function sum(amounts: readonly (import("ns:swift/SwiftDemoKit").Money)[]): import("ns:swift/SwiftDemoKit").Money;
   export function area(measurement: Measurement): number;
   export function bump(value: { value: number | bigint }): void;
   export function echo(payload: Payload): Payload;
+  export function flip(coin: import("ns:swift/SwiftDemoKit").Coin): import("ns:swift/SwiftDemoKit").Coin;
   export function host(url: string | URL): string | null;
   export function ramp(count: number | bigint): Uint8Array;
+  export function same(greeting: Greeting): Greeting;
   export function tags(views: readonly (UIView)[]): (number)[];
   export function text(note: NSObject): string;
+  export function boxed(money: import("ns:swift/SwiftDemoKit").Money): import("ns:swift/SwiftDemoKit").Box<import("ns:swift/SwiftDemoKit").Money>;
   export function clear(name: { value: (string) | null | undefined }): void;
   export function halve(value: { value: number | bigint }): void;
   export function names(count: number | bigint): (string)[];
+  export function pages(count: number | bigint): AsyncIterableIterator<(string)[]>;
   export function shout(name: (string) | null | undefined): string | null;
   export function total(values: readonly (number)[]): number;
   export function append(word: string, words: { value: readonly (string)[] }): void;
+  export function excite(greeting: Greeting): void;
+  export function settle(value: number | bigint): import("ns:swift/SwiftDemoKit").Outcome<number>;
+  export function countUp(limit: number | bigint): AsyncIterableIterator<number>;
   export function explain(error: ShapeError): string;
   export function lengths(table: Readonly<Record<string, string>>): Record<string, number>;
+  /**
+   * @remarks Requires iOS 18.0; throws on earlier versions.
+   */
+  export function letters(word: string): AsyncIterableIterator<string>;
   export function measure(width: number, height: (number) | null | undefined): Measurement;
   export function nextDay(date: Date): Date;
   export function resolve(path: string, base: string | URL): URL;
+  export function topRank(scorer: RankedScorer): string;
   export function centroid(points: readonly (Point)[]): Point;
   export function checksum(data: ArrayBuffer | ArrayBufferView): number;
+  export function countBox(value: number | bigint): import("ns:swift/SwiftDemoKit").Box<number>;
+  export function describe(pair: import("ns:swift/SwiftDemoKit").Pair<number, string>): string;
   export function describe(view: UIView): string;
   export function echoInt8(value: number | bigint): number;
   export function makeNote(text: string): NSObject;
   export function mirrored(grid: readonly (readonly (number | bigint)[])[]): ((number)[])[];
+  export function scoreAll(scorer: Scorer, values: readonly (number | bigint)[]): (number)[];
   export function simplify(formula: Formula): Formula;
   export function trackers(ids: readonly (number | bigint)[]): (Tracker)[];
+  export function countDown(start: number | bigint, failure: (number | bigint) | null | undefined): AsyncIterableIterator<number>;
   export function countdown(start: number | bigint, tick: (arg0: number, arg1: boolean) => void): void;
+  export function introduce(greeting: Greeting, other: string): string;
   export function makeLabel(text: string): UILabel;
+  export function makeScore(name: string, points: number | bigint): import("ns:swift/SwiftDemoKit").Pair<string, number>;
   export function noteLater(text: string): Promise<NSObject>;
   export function onMeasure(body: (arg0: Measurement) => void): void;
 }

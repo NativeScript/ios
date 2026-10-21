@@ -60,11 +60,12 @@ std::string symbolJSON(const std::string& id, const std::string& kind,
 }  // namespace
 
 TEST(LoadsFixtureWithoutDiagnostics) {
-  CHECK_EQ(fixture().modules.size(), size_t(1));
+  CHECK_EQ(fixture().modules.size(), size_t(2));
   CHECK_EQ(diagnosticCodes(fixture().diagnostics), std::string());
   const Module& module = demo();
   CHECK_EQ(module.name, std::string("SwiftDemo"));
-  CHECK_EQ(module.graphFiles.size(), size_t(2));
+  CHECK_EQ(llvm::join(module.unitModules, ","), std::string("SwiftDemo,SwiftDemoKit"));
+  CHECK_EQ(module.graphFiles.size(), size_t(4));
   CHECK_EQ(module.platform.operatingSystem, std::string("ios"));
   CHECK_EQ(module.platform.environment, std::string("simulator"));
 }
@@ -74,10 +75,35 @@ TEST(TopLevelDeclarationsInSourceOrder) {
   for (const auto& id : demo().topLevelIds) {
     names.push_back(demo().find(id)->name);
   }
-  std::vector<std::string> expected = {"Greeter",
+  std::vector<std::string> expected = {"Badge",
+                                       "Greeter",
                                        "Demo",
                                        "Point",
                                        "Flavor",
+                                       "Thermostat",
+                                       "Greeting",
+                                       "Scorer",
+                                       "RankedScorer",
+                                       "FormalGreeting",
+                                       "DoublingScorer",
+                                       "introduce(_:to:)",
+                                       "makeGreeting(_:)",
+                                       "same(_:)",
+                                       "excite(_:)",
+                                       "scoreAll(_:_:)",
+                                       "makeScorer()",
+                                       "topRank(_:)",
+                                       "greetInBackground(_:)",
+                                       "GreetingHolder",
+                                       "starterWallet(for:)",
+                                       "sum(of:)",
+                                       "flip(_:)",
+                                       "Score",
+                                       "makeScore(_:_:)",
+                                       "describe(_:)",
+                                       "boxed(_:)",
+                                       "countBox(_:)",
+                                       "settle(_:)",
                                        "Shape",
                                        "Polygon",
                                        "Square",
@@ -92,6 +118,11 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "defaultFlavor",
                                        "globalCounter",
                                        "Coordinates",
+                                       "countUp(to:)",
+                                       "CountdownError",
+                                       "countDown(from:failingAt:)",
+                                       "letters(of:)",
+                                       "pages(_:)",
                                        "checkedSide(_:)",
                                        "echoInt8(_:)",
                                        "echoUInt64(_:)",
@@ -141,7 +172,14 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "Note",
                                        "makeNote(_:)",
                                        "text(of:)",
-                                       "noteLater(_:)"};
+                                       "noteLater(_:)",
+                                       "Money",
+                                       "Wallet",
+                                       "Coin",
+                                       "formatted(_:)",
+                                       "Pair",
+                                       "Box",
+                                       "Outcome"};
   CHECK_EQ(llvm::join(names, ","), llvm::join(expected, ","));
 }
 
@@ -497,15 +535,17 @@ TEST(IRSnapshot) { checkSnapshot("SwiftDemo.ir.json", dumpModuleJSON(demo())); }
 
 TEST(TypeScriptSnapshot) {
   Classification classification = classify(demo());
-  TypeScript::SwiftDefinitionWriter writer(demo(), classification);
-  checkSnapshot("swift!SwiftDemo.d.ts", writer.write());
+  for (const auto& name : demo().swiftModules()) {
+    TypeScript::SwiftDefinitionWriter writer(demo(), classification, name);
+    checkSnapshot("swift!" + name + ".d.ts", writer.write());
+  }
 }
 
 TEST(LoadOrderDoesNotChangeTheIR) {
   std::vector<Diagnostic> diagnostics;
   auto files =
       SymbolGraphLoader::findGraphFiles(SWIFT_FIXTURE_GRAPHS_DIR, diagnostics);
-  REQUIRE(files.size() == 2);
+  REQUIRE(files.size() == 4);
 
   SymbolGraphLoader reversed;
   for (auto it = files.rbegin(); it != files.rend(); ++it) {
@@ -513,7 +553,9 @@ TEST(LoadOrderDoesNotChangeTheIR) {
   }
   ModuleSet set = reversed.finish();
   REQUIRE(set.modules.count("SwiftDemo"));
-  CHECK(dumpModuleJSON(set.modules.at("SwiftDemo")) == dumpModuleJSON(demo()));
+  Module unit = mergeUnit(set, "SwiftDemo");
+  instantiateGenerics(unit);
+  CHECK(dumpModuleJSON(unit) == dumpModuleJSON(demo()));
 }
 
 TEST(InvalidJSONIsAnError) {

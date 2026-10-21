@@ -42,10 +42,12 @@ TEST(ThunksTypeCheck) {
 }
 
 TEST(ThunkRegistration) {
-  CHECK_EQ(thunks().registerSymbol, std::string("ns_swift_register_SwiftDemo"));
+  CHECK(thunks().registerSymbols ==
+        (std::vector<std::string>{"ns_swift_register_SwiftDemo",
+                                  "ns_swift_register_SwiftDemoKit"}));
   CHECK_EQ(thunks().fingerprint.size(), size_t(16));
   CHECK(thunks().thunkCount > 0);
-  CHECK(registers("registerModule(registrar, 7, \"SwiftDemo\", \"" +
+  CHECK(registers("registerModule(registrar, 11, \"SwiftDemo\", \"" +
                   thunks().fingerprint + "\", __nsRelease)"));
   // Cases of a tagged enum register their associated values' codes.
   CHECK(registers("\"tooManySides\", \"tooManySides(count:limit:)\", \"i64,i64>t"));
@@ -54,6 +56,11 @@ TEST(ThunkRegistration) {
   CHECK(registers("\"firstSubview\", \"firstSubview(of:)\", \"@UIView>@UIView?\""));
   CHECK(registers("\"makeNote\", \"makeNote(_:)\", \"s>@SwiftDemo.Note\""));
   CHECK(thunks().source.find("#if canImport(UIKit)\nimport UIKit\n#endif") != std::string::npos);
+  // SwiftUI views are hosted on the main actor (flag 16).
+  CHECK(registers("\"hostingController\", \"hostingController()\", \">@UIViewController\""));
+  // Protocol values; requirements carry the requirement flag (32).
+  CHECK(registers("\"introduce\", \"introduce(_:to:)\", \"p"));
+  CHECK(thunks().source.find("private final class __NSAdapter") != std::string::npos);
   // Inout parameters are marked; the thunk writes their final value back.
   CHECK(registers("\"append\", \"append(_:to:)\", \"s,&[s]>v\""));
   CHECK(registers("\"swapTrackers\", \"swapTrackers(_:_:)\", \"&o"));
@@ -66,8 +73,8 @@ TEST(ThunkRegistration) {
   // Failable initializer of a class returns an optional object.
   CHECK(registers("\"constructor\", \"init(name:)\", \"s>o"));
   // Ambiguous overloads carry the flag (4) and stay distinct by signature.
-  CHECK(registers(", 1, 4, \"scale\", \"scale(by:)\", \"f64>v\""));
-  CHECK(registers(", 1, 4, \"scale\", \"scale(by:)\", \"i64>v\""));
+  CHECK(registers(", 1, 4, \"SwiftDemo\", \"scale\", \"scale(by:)\", \"f64>v\""));
+  CHECK(registers(", 1, 4, \"SwiftDemo\", \"scale\", \"scale(by:)\", \"i64>v\""));
   // Enum cases register without a thunk.
   CHECK(registers("\"vanilla\", \"vanilla\", \">e"));
   // A case named `none` maps to the enum's case, not Optional.none.
@@ -114,8 +121,10 @@ TEST(TypeScriptUsageCompiles) {
     return path.str().str();
   };
   Classification classification = classify(demo());
-  write("swift-SwiftDemo.d.ts",
-        TypeScript::SwiftDefinitionWriter(demo(), classification).write());
+  for (const auto& name : demo().swiftModules()) {
+    write("swift-" + name + ".d.ts",
+          TypeScript::SwiftDefinitionWriter(demo(), classification, name).write());
+  }
   auto usage =
       llvm::MemoryBuffer::getFile(SWIFT_TEST_DIR "/typescript/usage.ts");
   REQUIRE(usage);
@@ -124,7 +133,8 @@ TEST(TypeScriptUsageCompiles) {
                         "/index.d.ts\" />\n"
                         "/// <reference path=\"" SWIFT_TEST_DIR
                         "/typescript/objc-globals.d.ts\" />\n"
-                        "/// <reference path=\"./swift-SwiftDemo.d.ts\" />\n" +
+                        "/// <reference path=\"./swift-SwiftDemo.d.ts\" />\n"
+                        "/// <reference path=\"./swift-SwiftDemoKit.d.ts\" />\n" +
                             (*usage)->getBuffer().str());
 
   llvm::SmallString<128> log(directory);

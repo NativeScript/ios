@@ -5,8 +5,10 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <condition_variable>
 #include <cstring>
 #include <deque>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -55,6 +57,8 @@ struct ValueCode {
     Function,
     Tagged,
     ObjC,
+    Protocol,
+    AsyncSequence,
   };
   Kind kind = Kind::Void;
   int bits = 64;
@@ -102,6 +106,13 @@ bool ParseCode(std::string text, ValueCode& code) {
   }
   if (text.empty()) {
     return false;
+  }
+  if (text.front() == '~') {
+    code.kind = ValueCode::Kind::AsyncSequence;
+    code.element.emplace_back();
+    ValueCode& element = code.element.back();
+    return ParseCode(text.substr(1), element) && element.kind != ValueCode::Kind::Void &&
+           element.kind != ValueCode::Kind::Function && !element.optional;
   }
   if ((text.front() == '[' && text.back() == ']') || (text.front() == '{' && text.back() == '}')) {
     code.kind = text.front() == '[' ? ValueCode::Kind::Array : ValueCode::Kind::Map;
@@ -174,6 +185,9 @@ bool ParseCode(std::string text, ValueCode& code) {
       return number(text.substr(1), code.typeIndex);
     case 't':
       code.kind = ValueCode::Kind::Tagged;
+      return number(text.substr(1), code.typeIndex);
+    case 'p':
+      code.kind = ValueCode::Kind::Protocol;
       return number(text.substr(1), code.typeIndex);
     case '@':
       code.kind = ValueCode::Kind::ObjC;
@@ -253,6 +267,7 @@ struct ModuleInfo;
 
 struct MemberInfo {
   int owner = -1;
+  std::string swiftModule;
   uint32_t kind = 0;
   uint32_t flags = 0;
   std::string jsName;
@@ -268,6 +283,8 @@ struct MemberInfo {
 struct MemberGroup {
   const ModuleInfo* module = nullptr;
   int owner = -1;
+  // Module-level groups: the Swift module whose namespace holds them.
+  std::string swiftModule;
   uint32_t kind = 0;
   std::string jsName;
   std::vector<const MemberInfo*> overloads;
@@ -283,6 +300,7 @@ struct CaseInfo {
 struct TypeInfo {
   uint32_t index = 0;
   uint32_t kind = 0;
+  std::string swiftModule;
   std::string jsName;
   std::string swiftName;
   int superIndex = -1;
@@ -291,12 +309,22 @@ struct TypeInfo {
   const MemberGroup* initializers = nullptr;
   // NSSwiftTypeTaggedEnum: the cases, by case index.
   std::vector<CaseInfo> cases;
+  // Instantiations of one generic type share a module and JS name; they
+  // form a family with one JS class, named by its first type's index.
+  int family = -1;
+  // NSSwiftTypeProtocol: the requirement table adapters call by index.
+  std::vector<const MemberInfo*> requirements;
 };
 
 bool IsEnumKind(uint32_t kind) { return kind == NSSwiftTypeEnum || kind == NSSwiftTypeTaggedEnum; }
 
+// A registered unit: one or more Swift modules sharing one type table.
 struct ModuleInfo {
+  // The unit's name.
   std::string name;
+  // Its Swift modules, each an `ns:swift/<name>` namespace.
+  std::vector<std::string> modules;
+  NSSwiftTracker tracker = nullptr;
   std::string fingerprint;
   uint32_t abiVersion = 0;
   NSSwiftRelease release = nullptr;
@@ -359,6 +387,7 @@ std::string TypeDisplayName(const ModuleInfo& module, const ValueCode& code) {
     case ValueCode::Kind::Object:
     case ValueCode::Kind::Enum:
     case ValueCode::Kind::Tagged:
+    case ValueCode::Kind::Protocol:
       name = code.typeIndex >= 0 && code.typeIndex < static_cast<int>(module.types.size())
                  ? module.types[code.typeIndex].jsName
                  : "?";
@@ -375,6 +404,9 @@ std::string TypeDisplayName(const ModuleInfo& module, const ValueCode& code) {
       break;
     case ValueCode::Kind::ObjC:
       name = code.className;
+      break;
+    case ValueCode::Kind::AsyncSequence:
+      name = "AsyncSequence<" + TypeDisplayName(module, code.element.at(0)) + ">";
       break;
   }
   return (code.inout ? "inout " : "") + (code.optional ? name + "?" : name);
@@ -399,15 +431,26 @@ void ApiRegisterModule(NSSwiftRegistrar* registrar, uint32_t abiVersion, const c
                        const char* fingerprint, NSSwiftRelease release) {
   ModuleInfo* module = static_cast<Registrar*>(registrar)->module;
   module->abiVersion = abiVersion;
-  if (name != nullptr && module->name != name) {
-    module->error = "registers as '" + std::string(name) + "'";
-  }
+  module->name = name ? name : "";
   module->fingerprint = fingerprint ? fingerprint : "";
   module->release = release;
 }
 
-void ApiRegisterType(NSSwiftRegistrar* registrar, uint32_t index, uint32_t kind, const char* jsName,
-                     const char* swiftName, int32_t superIndex) {
+void ApiRegisterTracker(NSSwiftRegistrar* registrar, NSSwiftTracker tracker) {
+  static_cast<Registrar*>(registrar)->module->tracker = tracker;
+}
+
+void ApiRegisterUnitModule(NSSwiftRegistrar* registrar, const char* name) {
+  ModuleInfo* module = static_cast<Registrar*>(registrar)->module;
+  if (name != nullptr &&
+      std::find(module->modules.begin(), module->modules.end(), name) == module->modules.end()) {
+    module->modules.push_back(name);
+  }
+}
+
+void ApiRegisterType(NSSwiftRegistrar* registrar, uint32_t index, uint32_t kind,
+                     const char* swiftModule, const char* jsName, const char* swiftName,
+                     int32_t superIndex) {
   ModuleInfo* module = static_cast<Registrar*>(registrar)->module;
   if (index != module->types.size()) {
     module->error = "type indices are not dense";
@@ -416,6 +459,7 @@ void ApiRegisterType(NSSwiftRegistrar* registrar, uint32_t index, uint32_t kind,
   TypeInfo type;
   type.index = index;
   type.kind = kind;
+  type.swiftModule = swiftModule ? swiftModule : "";
   type.jsName = jsName ? jsName : "";
   type.swiftName = swiftName ? swiftName : "";
   type.superIndex = superIndex;
@@ -423,11 +467,12 @@ void ApiRegisterType(NSSwiftRegistrar* registrar, uint32_t index, uint32_t kind,
 }
 
 void ApiRegisterMember(NSSwiftRegistrar* registrar, int32_t owner, uint32_t kind, uint32_t flags,
-                       const char* jsName, const char* swiftName, const char* signature,
-                       NSSwiftThunk thunk, NSSwiftThunk setter) {
+                       const char* swiftModule, const char* jsName, const char* swiftName,
+                       const char* signature, NSSwiftThunk thunk, NSSwiftThunk setter) {
   ModuleInfo* module = static_cast<Registrar*>(registrar)->module;
   MemberInfo member;
   member.owner = owner;
+  member.swiftModule = swiftModule ? swiftModule : "";
   member.kind = kind;
   member.flags = flags;
   member.jsName = jsName ? jsName : "";
@@ -505,6 +550,23 @@ void ApiWriteBackBegin(NSSwiftCall* call, intptr_t index);
 void ApiWriteBackEnd(NSSwiftCall* call);
 void ApiReturnObjC(NSSwiftCall* call, void* object);
 void ApiCompleteObjC(void* token, void* object);
+void ApiRegisterUnitModule(NSSwiftRegistrar* registrar, const char* name);
+void* ApiObjectCallBegin(void* object, intptr_t index);
+const NSSwiftValue* ApiObjectCallEnd(void* token);
+void ApiObjectResultRelease(const NSSwiftValue* result);
+void ApiReturnJSObject(NSSwiftCall* call, void* object);
+void ApiCompleteJSObject(void* token, void* object);
+void ApiRegisterTracker(NSSwiftRegistrar* registrar, NSSwiftTracker tracker);
+void ApiReturnAsyncSequence(NSSwiftCall* call, void* iterator, NSSwiftThunk next);
+void ApiCompleteAsyncSequence(void* token, void* iterator, NSSwiftThunk next);
+struct IsolateState;
+// A JS async iterator over a Swift iterator (+1, taken over).
+MaybeLocal<Value> MakeAsyncIterator(Isolate* isolate, Local<Context> context,
+                                    const ModuleInfo* module, void* iterator, NSSwiftThunk next,
+                                    const ValueCode& code, const std::string& name);
+struct SwiftCallback;
+Local<Value> JSObjectOf(SwiftCallback* handle, Isolate* isolate);
+void ReleaseCallback(SwiftCallback* callback);
 
 const NSSwiftAPI kAPI = {
     ApiReturnVoid,           ApiReturnBool,           ApiReturnInt64,
@@ -521,6 +583,9 @@ const NSSwiftAPI kAPI = {
     ApiCallbackRelease,      ApiReturnCaseBegin,      ApiCompleteCaseBegin,
     ApiReturnArrayEnd,       ApiCompleteContainerEnd, ApiWriteBackBegin,
     ApiWriteBackEnd,         ApiReturnObjC,           ApiCompleteObjC,
+    ApiRegisterUnitModule,   ApiObjectCallBegin,      ApiObjectCallEnd,
+    ApiObjectResultRelease,  ApiReturnJSObject,       ApiCompleteJSObject,
+    ApiRegisterTracker,      ApiReturnAsyncSequence,  ApiCompleteAsyncSequence,
 };
 
 // "Polygon.Style" -> "Style".
@@ -543,18 +608,53 @@ bool IsValidModuleName(const std::string& name) {
   return true;
 }
 
+void BuildRequirements(ModuleInfo& module) {
+  std::vector<bool> built(module.types.size(), false);
+  std::function<void(TypeInfo&)> build = [&](TypeInfo& type) {
+    if (built[type.index]) {
+      return;
+    }
+    built[type.index] = true;
+    if (type.superIndex >= 0 && module.types[type.superIndex].kind == NSSwiftTypeProtocol) {
+      build(module.types[type.superIndex]);
+      type.requirements = module.types[type.superIndex].requirements;
+    }
+    for (const MemberInfo& member : module.members) {
+      if (member.owner == static_cast<int>(type.index) &&
+          (member.flags & NSSwiftMemberRequirement)) {
+        type.requirements.push_back(&member);
+      }
+    }
+  };
+  for (TypeInfo& type : module.types) {
+    if (type.kind == NSSwiftTypeProtocol) {
+      build(type);
+    }
+  }
+}
+
+void BuildFamilies(ModuleInfo& module) {
+  std::map<std::string, int> first;
+  for (TypeInfo& type : module.types) {
+    auto inserted = first.emplace(type.swiftModule + ":" + type.jsName, type.index);
+    type.family = inserted.first->second;
+  }
+}
+
 void BuildGroups(ModuleInfo& module) {
   robin_hood::unordered_map<std::string, MemberGroup*> byKey;
   for (const MemberInfo& member : module.members) {
-    std::string key =
-        std::to_string(member.owner) + ":" + std::to_string(member.kind) + ":" + member.jsName;
+    int owner = member.owner < 0 ? -1 : module.types[member.owner].family;
+    std::string key = std::to_string(owner) + ":" + std::to_string(member.kind) + ":" +
+                      member.jsName + (member.owner < 0 ? ":" + member.swiftModule : "");
     auto it = byKey.find(key);
     MemberGroup* group;
     if (it == byKey.end()) {
       module.groups.push_back(std::make_unique<MemberGroup>());
       group = module.groups.back().get();
       group->module = &module;
-      group->owner = member.owner;
+      group->owner = owner;
+      group->swiftModule = member.owner < 0 ? member.swiftModule : "";
       group->kind = member.kind;
       group->jsName = member.jsName;
       byKey.emplace(key, group);
@@ -564,6 +664,7 @@ void BuildGroups(ModuleInfo& module) {
     group->overloads.push_back(&member);
     if (member.kind == NSSwiftMemberInitializer && member.owner >= 0) {
       module.types[member.owner].initializers = group;
+      module.types[owner].initializers = group;
     }
   }
 
@@ -607,6 +708,19 @@ std::string Validate(const ModuleInfo& module) {
   if (module.release == nullptr) {
     return "registered no release function";
   }
+  auto inUnit = [&](const std::string& name) {
+    return std::find(module.modules.begin(), module.modules.end(), name) != module.modules.end();
+  };
+  for (const TypeInfo& type : module.types) {
+    if (!inUnit(type.swiftModule)) {
+      return "type " + type.swiftName + " names an unregistered module";
+    }
+  }
+  for (const MemberInfo& member : module.members) {
+    if (member.owner < 0 && !inUnit(member.swiftModule)) {
+      return member.swiftName + " names an unregistered module";
+    }
+  }
   auto validType = [&](int index) {
     return index >= 0 && index < static_cast<int>(module.types.size());
   };
@@ -636,6 +750,11 @@ std::string Validate(const ModuleInfo& module) {
            module.types[code->typeIndex].kind != NSSwiftTypeTaggedEnum)) {
         return member.swiftName + " references an unknown enum";
       }
+      if (code->kind == ValueCode::Kind::Protocol &&
+          (!validType(code->typeIndex) ||
+           module.types[code->typeIndex].kind != NSSwiftTypeProtocol)) {
+        return member.swiftName + " references an unknown protocol";
+      }
       for (const auto& element : code->element) {
         codes.push_back(&element);
       }
@@ -662,7 +781,6 @@ std::shared_ptr<const ModuleInfo> LoadModuleInfo(const std::string& name, std::s
   }
 
   auto module = std::make_shared<ModuleInfo>();
-  module->name = name;
   std::string symbol = "ns_swift_register_" + name;
   auto registerFunction =
       reinterpret_cast<NSSwiftRegisterFunction>(dlsym(RTLD_DEFAULT, symbol.c_str()));
@@ -675,10 +793,25 @@ std::shared_ptr<const ModuleInfo> LoadModuleInfo(const std::string& name, std::s
     registrar.module = module.get();
     registerFunction(&registrar);
     std::string problem = Validate(*module);
+    if (problem.empty() &&
+        std::find(module->modules.begin(), module->modules.end(), name) == module->modules.end()) {
+      problem = "registers a unit without it";
+    }
+    for (const auto& other : module->modules) {
+      auto registered = gModules.find(other);
+      if (problem.empty() && other != name && registered != gModules.end()) {
+        problem = "shares module '" + other + "' with another unit";
+      }
+    }
     if (!problem.empty()) {
       module->error = "Swift module '" + name + "' " + problem;
     } else {
+      BuildFamilies(*module);
+      BuildRequirements(*module);
       BuildGroups(*module);
+      for (const auto& other : module->modules) {
+        gModules.emplace(other, module);
+      }
     }
   }
   gModules.emplace(name, module);
@@ -693,30 +826,36 @@ std::shared_ptr<const ModuleInfo> LoadModuleInfo(const std::string& name, std::s
 
 class SwiftObjectWrapper;
 
+// A unit as one isolate sees it.
 struct LoadedModule {
   std::shared_ptr<const ModuleInfo> info;
-  Global<Object> exports;
+  // Each Swift module's namespace.
+  robin_hood::unordered_map<std::string, Global<Object>> exports;
   // Constructor templates by type index; empty for enums.
   std::vector<Global<FunctionTemplate>> templates;
 };
 
 // An async call's Promise, settled on the isolate's thread.
+// Its own copy of what the result is: the call's member may be gone by the
+// time it settles (an iterator step's).
 struct PendingAsync {
   Global<Promise::Resolver> resolver;
-  const MemberInfo* member;
+  ValueCode code;
+  std::string name;
 };
 
 struct IsolateState {
-  robin_hood::unordered_map<std::string, std::unique_ptr<LoadedModule>> modules;
   // Resolvers stay here, on the isolate's thread: a v8::Global must not be
   // destroyed by the thread that completes the call.
   robin_hood::unordered_map<uint64_t, std::unique_ptr<PendingAsync>> pending;
   uint64_t nextAsyncId = 1;
-  robin_hood::unordered_map<const ModuleInfo*, LoadedModule*> byInfo;
+  robin_hood::unordered_map<const ModuleInfo*, std::unique_ptr<LoadedModule>> byInfo;
   // Swift object -> its JS wrapper, so a Swift object has one JS identity.
   robin_hood::unordered_map<void*, SwiftObjectWrapper*> identity;
   // Thunk calls in progress on the isolate's thread, innermost last.
   std::vector<CallContext*> calls;
+  // Builds async iterators from step functions (MakeAsyncIterator).
+  Global<v8::Function> iteratorFactory;
 };
 
 // Owns one retain of a Swift object for as long as its JS wrapper lives.
@@ -899,6 +1038,27 @@ bool IsObjCInstance(id object, const ValueCode& code) {
   return object != nil && (code.objcClass == nil || [object isKindOfClass:code.objcClass]);
 }
 
+void ApiReturnAsyncSequence(NSSwiftCall* call, void* iterator, NSSwiftThunk next) {
+  CallContext* context = ContextOf(call);
+  const ValueCode* code = CurrentCode(context);
+  Local<Value> value;
+  if (code == nullptr || code->kind != ValueCode::Kind::AsyncSequence ||
+      !MakeAsyncIterator(context->isolate, context->context, context->module, iterator, next, *code,
+                         context->member->swiftName)
+           .ToLocal(&value)) {
+    if (code == nullptr || code->kind != ValueCode::Kind::AsyncSequence) {
+      context->module->release(iterator);
+    }
+    return Fail(context);
+  }
+  Complete(context, value);
+}
+
+void ApiReturnJSObject(NSSwiftCall* call, void* object) {
+  CallContext* context = ContextOf(call);
+  Complete(context, JSObjectOf(static_cast<SwiftCallback*>(object), context->isolate));
+}
+
 void ApiReturnObjC(NSSwiftCall* call, void* object) {
   CallContext* context = ContextOf(call);
   Local<Value> value;
@@ -1006,7 +1166,9 @@ void ApiReturnNull(NSSwiftCall* call) {
 void BeginContainer(CallContext* context, bool isMap, intptr_t count) {
   const ValueCode* code = CurrentCode(context);
   ValueCode::Kind expected = isMap ? ValueCode::Kind::Map : ValueCode::Kind::Array;
-  if (code == nullptr || code->kind != expected || code->element.empty()) {
+  // An iterator step reports its element as an array.
+  bool step = !isMap && code != nullptr && code->kind == ValueCode::Kind::AsyncSequence;
+  if (code == nullptr || (code->kind != expected && !step) || code->element.empty()) {
     Fail(context);
     context->isolate->ThrowException(Exception::Error(tns::ToV8String(
         context->isolate, context->member->swiftName + " reported an unexpected collection")));
@@ -1213,6 +1375,9 @@ void ApiThrowTypeError(NSSwiftCall* call, const uint8_t* message, intptr_t lengt
 // What a Swift task produced, in a form that can cross threads. Arrays and
 // maps hold their elements (a map's alternate key and value) as children, a
 // tagged enum case its values (with its case index in `int64`).
+struct SwiftCallback;
+void ReleaseCallback(SwiftCallback* callback);
+
 struct AsyncOutcome {
   enum class Kind {
     Void,
@@ -1228,6 +1393,10 @@ struct AsyncOutcome {
     Map,
     Case,
     ObjC,
+    // `object` is a JS object handle the outcome holds a reference to.
+    JSObject,
+    // `object` is a Swift iterator, stepped by `next`.
+    Sequence,
   };
   Kind kind = Kind::Void;
   bool boolean = false;
@@ -1239,11 +1408,14 @@ struct AsyncOutcome {
   void* object = nullptr;
   uint32_t typeIndex = 0;
   const ModuleInfo* module = nullptr;
+  NSSwiftThunk next = nullptr;
   std::vector<std::shared_ptr<AsyncOutcome>> children;
 
   // An undelivered object (the isolate went away) still owns its retain.
   ~AsyncOutcome() {
-    if (object != nullptr) {
+    if (object != nullptr && kind == Kind::JSObject) {
+      ReleaseCallback(static_cast<SwiftCallback*>(object));
+    } else if (object != nullptr) {
       module->release(object);
     }
   }
@@ -1259,6 +1431,8 @@ struct AsyncToken {
   std::vector<AsyncOutcome*> open;
   // Set for a callback invocation; the token holds a reference.
   struct SwiftCallback* callback = nullptr;
+  // An object call (objectCallBegin): the encoded requirement.
+  intptr_t requirement = -1;
 };
 
 // Converts `node` (of `code`) to JS; on failure sets `rejection` and returns
@@ -1321,14 +1495,28 @@ bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
       void* object = node.object;
       // WrapSwiftObject takes over the retain.
       node.object = nullptr;
-      Local<Object> wrapper = WrapSwiftObject(
-          isolate, context, node.module, loaded == state->byInfo.end() ? nullptr : loaded->second,
-          state, object, node.typeIndex, nullptr);
+      Local<Object> wrapper =
+          WrapSwiftObject(isolate, context, node.module,
+                          loaded == state->byInfo.end() ? nullptr : loaded->second.get(), state,
+                          object, node.typeIndex, nullptr);
       if (wrapper.IsEmpty()) {
         return failed("returned an object JavaScript cannot wrap");
       }
       out = wrapper;
       return true;
+    }
+    case AsyncOutcome::Kind::JSObject:
+      out = JSObjectOf(static_cast<SwiftCallback*>(node.object), isolate);
+      return true;
+    case AsyncOutcome::Kind::Sequence: {
+      if (code.kind != ValueCode::Kind::AsyncSequence) {
+        return failed("returned an unexpected sequence");
+      }
+      void* iterator = node.object;
+      node.object = nullptr;
+      return MakeAsyncIterator(isolate, context, node.module, iterator, node.next, code, name)
+                 .ToLocal(&out) ||
+             failed("returned a sequence JavaScript cannot iterate");
     }
     case AsyncOutcome::Kind::ObjC: {
       id object = static_cast<id>(node.object);
@@ -1413,8 +1601,8 @@ void SettleOnIsolate(Isolate* isolate, uint64_t id, AsyncOutcome& outcome) {
   Local<Promise::Resolver> resolver = pending->resolver.Get(isolate);
   Local<Value> value;
   Local<Value> rejection;
-  if (OutcomeToJS(isolate, context, state, pending->member->swiftName, outcome,
-                  pending->member->signature.result, value, rejection)) {
+  if (OutcomeToJS(isolate, context, state, pending->name, outcome, pending->code, value,
+                  rejection)) {
     resolver->Resolve(context, value).Check();
   } else {
     resolver->Reject(context, rejection).Check();
@@ -1423,27 +1611,32 @@ void SettleOnIsolate(Isolate* isolate, uint64_t id, AsyncOutcome& outcome) {
 
 // --- Callbacks ---------------------------------------------------------------------
 
-// A JS function passed for a closure parameter. The call's arena holds one
-// reference, each Swift closure capturing it another, and each invocation in
-// flight one more. `function` is only touched on the isolate's thread.
+// A JS function passed for a closure parameter, or a JS object passed for a
+// protocol value (`code` says which). The call's arena holds one reference,
+// each Swift closure or adapter holding it another, and each invocation in
+// flight one more. `target` is only touched on the isolate's thread.
 struct SwiftCallback {
   SwiftCallback(Isolate* isolate, const ModuleInfo* module, const ValueCode& code,
-                const std::string& name, Local<v8::Function> function)
+                const std::string& name, Local<Object> target)
       : isolate(isolate),
         wrapper(isolate),
         module(module),
         code(code),
         name(name),
-        function(isolate, function) {}
+        target(isolate, target) {}
 
   Isolate* isolate;
   IsolateWrapper wrapper;
   const ModuleInfo* module;
   ValueCode code;
   std::string name;
-  Global<v8::Function> function;
+  Global<Object> target;
   std::atomic<int> references{1};
 };
+
+Local<Value> JSObjectOf(SwiftCallback* handle, Isolate* isolate) {
+  return handle->target.Get(isolate);
+}
 
 // Runs `body` on the isolate's thread with the isolate locked and valid:
 // now when called there, otherwise queued. Returns false when it will not run.
@@ -1514,7 +1707,8 @@ void RunCallback(SwiftCallback* callback, AsyncOutcome& arguments) {
   }
   if (exception.IsEmpty()) {
     Local<Value> ignored;
-    if (callback->function.Get(isolate)
+    if (callback->target.Get(isolate)
+            .As<v8::Function>()
             ->Call(context, v8::Undefined(isolate), static_cast<int>(argv.size()), argv.data())
             .ToLocal(&ignored) ||
         !tryCatch.HasCaught() || !tryCatch.CanContinue()) {
@@ -1600,7 +1794,8 @@ void* ApiBeginAsync(NSSwiftCall* call) {
   if (Promise::Resolver::New(context->context).ToLocal(&resolver)) {
     auto pending = std::make_unique<PendingAsync>();
     pending->resolver.Reset(isolate, resolver);
-    pending->member = context->member;
+    pending->code = *context->resultCode;
+    pending->name = context->member->swiftName;
     context->state->pending.emplace(id, std::move(pending));
     Complete(context, resolver->GetPromise());
   } else {
@@ -1688,6 +1883,26 @@ void ApiCompleteMapBegin(void* token, intptr_t /*count*/) {
   Emit(token, Outcome(AsyncOutcome::Kind::Map));
 }
 
+void ApiCompleteAsyncSequence(void* token, void* iterator, NSSwiftThunk next) {
+  auto outcome = Outcome(AsyncOutcome::Kind::Sequence);
+  outcome->object = iterator;
+  outcome->next = next;
+  Emit(token, outcome);
+}
+
+void ApiCompleteJSObject(void* token, void* object) {
+  auto outcome = Outcome(AsyncOutcome::Kind::JSObject);
+  ApiCallbackRetain(object);
+  outcome->object = object;
+  Emit(token, outcome);
+}
+
+void* ApiObjectCallBegin(void* object, intptr_t index) {
+  auto* token = static_cast<AsyncToken*>(ApiCallbackBegin(object));
+  token->requirement = index;
+  return token;
+}
+
 void ApiCompleteObjC(void* token, void* object) {
   auto outcome = Outcome(AsyncOutcome::Kind::ObjC);
   outcome->object = object;
@@ -1772,16 +1987,29 @@ bool Accepts(Isolate* isolate, const ModuleInfo& module, const ValueCode& code,
       return value->IsFunction();
     case ValueCode::Kind::ObjC:
       return IsObjCInstance(ObjCObjectOf(isolate, value), code);
+    case ValueCode::Kind::Protocol: {
+      // A Swift value is checked by the thunk.
+      SwiftObjectWrapper* wrapper = SwiftWrapperOf(isolate, value);
+      return wrapper
+                 ? wrapper->Module() == &module
+                 : value->IsObject() && !value->IsArray() && ObjCObjectOf(isolate, value) == nil;
+    }
+    case ValueCode::Kind::AsyncSequence:
     case ValueCode::Kind::Void:
       return false;
   }
   return false;
 }
 
+// The index Convert is given for a JS implementation's return value.
+constexpr size_t kReturnedValue = static_cast<size_t>(-1);
+
 bool ThrowArgument(Isolate* isolate, const MemberInfo& member, size_t index,
                    const std::string& problem, bool range = false) {
-  std::string message =
-      member.swiftName + ": argument " + std::to_string(index + 1) + " " + problem;
+  std::string message = member.swiftName + ": " +
+                        (index == kReturnedValue ? std::string("the value returned")
+                                                 : "argument " + std::to_string(index + 1)) +
+                        " " + problem;
   Local<v8::String> text = tns::ToV8String(isolate, message);
   isolate->ThrowException(range ? Exception::RangeError(text) : Exception::TypeError(text));
   return false;
@@ -2095,6 +2323,45 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
       return true;
     }
 
+    case ValueCode::Kind::Protocol: {
+      const TypeInfo& protocol = module.types[code.typeIndex];
+      if (SwiftObjectWrapper* wrapper = SwiftWrapperOf(isolate, value)) {
+        if (wrapper->Module() != &module) {
+          return ThrowArgument(isolate, member, index, "must be a " + protocol.jsName);
+        }
+        slot.tag = NSSwiftTagObject;
+        slot.payload.object = wrapper->Object();
+        return true;
+      }
+      if (!value->IsObject() || value->IsArray() || ObjCObjectOf(isolate, value) != nil) {
+        return ThrowArgument(isolate, member, index,
+                             "must be a " + protocol.jsName + " or an object implementing it");
+      }
+      // A JS implementation must provide every requirement.
+      Local<Object> object = value.As<Object>();
+      std::string missing;
+      for (const MemberInfo* requirement : protocol.requirements) {
+        Local<v8::String> key = tns::ToV8String(isolate, requirement->jsName);
+        Local<Value> found;
+        bool present = requirement->kind == NSSwiftMemberInstanceProperty
+                           ? object->Has(context, key).FromMaybe(false)
+                           : object->Get(context, key).ToLocal(&found) && found->IsFunction();
+        if (!present) {
+          missing += (missing.empty() ? "" : ", ") + requirement->jsName;
+        }
+      }
+      if (!missing.empty()) {
+        return ThrowArgument(
+            isolate, member, index,
+            "does not implement " + protocol.jsName + " (missing " + missing + ")");
+      }
+      auto* handle = new SwiftCallback(isolate, &module, code, member.swiftName, object);
+      arena.callbacks.push_back(handle);
+      slot.tag = NSSwiftTagJSObject;
+      slot.payload.object = handle;
+      return true;
+    }
+
     case ValueCode::Kind::ObjC: {
       id object = ObjCObjectOf(isolate, value);
       if (!IsObjCInstance(object, code)) {
@@ -2110,17 +2377,186 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
         return ThrowArgument(isolate, member, index, "must be a function");
       }
       auto* callback =
-          new SwiftCallback(isolate, &module, code, member.swiftName, value.As<v8::Function>());
+          new SwiftCallback(isolate, &module, code, member.swiftName, value.As<Object>());
       arena.callbacks.push_back(callback);
       slot.tag = NSSwiftTagFunction;
       slot.payload.object = callback;
       return true;
     }
 
+    case ValueCode::Kind::AsyncSequence:
     case ValueCode::Kind::Void:
       break;
   }
   return ThrowArgument(isolate, member, index, "has an unsupported type");
+}
+
+// --- Calls into JS implementations of protocols -------------------------------------
+
+// A JS implementation's return value as one slot, with the storage it
+// points into.
+struct ObjectResult {
+  NSSwiftValue value{};
+  SlotArena arena;
+};
+
+// Runs requirement `encoded` of `handle` with `arguments`, on the isolate's
+// thread; null when it threw or its value does not convert.
+ObjectResult* RunObjectCall(SwiftCallback* handle, AsyncOutcome& arguments, intptr_t encoded) {
+  Isolate* isolate = handle->isolate;
+  Isolate::Scope isolateScope(isolate);
+  HandleScope handleScope(isolate);
+  auto* state = Caches::StateFor<IsolateState>(isolate);
+  if (state == nullptr) {
+    return nullptr;
+  }
+  Local<Context> context = Caches::Get(isolate)->GetContext();
+  Context::Scope contextScope(context);
+
+  const ModuleInfo& module = *handle->module;
+  const TypeInfo& protocol = module.types[handle->code.typeIndex];
+  size_t position = static_cast<size_t>(encoded / 2);
+  bool setter = encoded % 2 == 1;
+  if (encoded < 0 || position >= protocol.requirements.size()) {
+    return nullptr;
+  }
+  const MemberInfo& member = *protocol.requirements[position];
+  bool property = member.kind == NSSwiftMemberInstanceProperty;
+
+  // The innermost call in progress on this thread made this one.
+  CallContext* call = state->calls.empty() ? nullptr : state->calls.back();
+  if (call != nullptr && !call->callbackException.IsEmpty()) {
+    return nullptr;
+  }
+
+  TryCatch tryCatch(isolate);
+  Local<Value> exception;
+  std::vector<ValueCode> codes;
+  if (!property) {
+    codes = member.signature.parameters;
+  } else if (setter) {
+    codes.push_back(member.signature.result);
+  }
+  std::vector<Local<Value>> argv;
+  for (size_t i = 0; i < codes.size() && i < arguments.children.size(); i++) {
+    Local<Value> value;
+    if (!OutcomeToJS(isolate, context, state, member.swiftName, *arguments.children[i], codes[i],
+                     value, exception)) {
+      break;
+    }
+    argv.push_back(value);
+  }
+
+  auto result = std::make_unique<ObjectResult>();
+  Local<Object> target = handle->target.Get(isolate);
+  Local<v8::String> key = tns::ToV8String(isolate, member.jsName);
+  bool done = false;
+  if (exception.IsEmpty()) {
+    Local<Value> returned;
+    if (property && setter) {
+      done =
+          target->Set(context, key, argv.empty() ? Local<Value>(v8::Undefined(isolate)) : argv[0])
+              .FromMaybe(false);
+      result->value.tag = NSSwiftTagNull;
+    } else if (property) {
+      done = target->Get(context, key).ToLocal(&returned);
+    } else {
+      Local<Value> function;
+      if (target->Get(context, key).ToLocal(&function)) {
+        if (function->IsFunction()) {
+          done = function.As<v8::Function>()
+                     ->Call(context, target, static_cast<int>(argv.size()), argv.data())
+                     .ToLocal(&returned);
+        } else {
+          exception = Exception::TypeError(tns::ToV8String(
+              isolate, protocol.jsName + "." + member.jsName + " is not a function"));
+        }
+      }
+    }
+    if (done && !(property && setter)) {
+      if (member.signature.result.kind == ValueCode::Kind::Void) {
+        result->value.tag = NSSwiftTagNull;
+      } else {
+        done = Convert(isolate, context, module, member, kReturnedValue, member.signature.result,
+                       returned, result->value, result->arena);
+      }
+    }
+  }
+  if (done) {
+    return result.release();
+  }
+  if (exception.IsEmpty()) {
+    if (!tryCatch.HasCaught() || !tryCatch.CanContinue()) {
+      return nullptr;
+    }
+    exception = tryCatch.Exception();
+  }
+  if (call != nullptr) {
+    call->callbackException.Reset(isolate, exception);
+  } else {
+    NativeScriptException::ReportToJsHandlersAndLog(isolate, exception, tryCatch.Message());
+  }
+  return nullptr;
+}
+
+const NSSwiftValue* ApiObjectCallEnd(void* rawToken) {
+  std::unique_ptr<AsyncToken> token(static_cast<AsyncToken*>(rawToken));
+  SwiftCallback* handle = token->callback;
+  std::shared_ptr<AsyncOutcome> arguments = token->root;
+  intptr_t encoded = token->requirement;
+  ObjectResult* result = nullptr;
+
+  if (Isolate::TryGetCurrent() == handle->isolate) {
+    v8::Locker locker(handle->isolate);
+    if (handle->wrapper.IsValid()) {
+      result = RunObjectCall(handle, *arguments, encoded);
+    }
+  } else {
+    // Run on the isolate's thread and wait. The guard ends the wait when the
+    // loop drops the task without running it.
+    struct Wait {
+      std::mutex mutex;
+      std::condition_variable condition;
+      bool done = false;
+      ObjectResult* result = nullptr;
+      void Finish(ObjectResult* value) {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (!done) {
+          done = true;
+          result = value;
+        } else {
+          delete value;
+        }
+        condition.notify_all();
+      }
+    };
+    struct Guard {
+      std::shared_ptr<Wait> wait;
+      ~Guard() { wait->Finish(nullptr); }
+    };
+    auto wait = std::make_shared<Wait>();
+    std::shared_ptr<Guard> guard(new Guard{wait});
+    NativeScriptPlatform* platform = NativeScriptPlatform::Instance();
+    std::shared_ptr<EventLoop> loop =
+        platform ? platform->LookupEventLoop(handle->isolate) : std::shared_ptr<EventLoop>();
+    IsolateWrapper isolateWrapper = handle->wrapper;
+    bool posted = loop && loop->PostInternal([guard, handle, arguments, encoded, isolateWrapper]() {
+      guard->wait->Finish(isolateWrapper.IsValid() ? RunObjectCall(handle, *arguments, encoded)
+                                                   : nullptr);
+    });
+    guard.reset();
+    if (posted) {
+      std::unique_lock<std::mutex> lock(wait->mutex);
+      wait->condition.wait(lock, [&] { return wait->done; });
+      result = wait->result;
+    }
+  }
+  ReleaseCallback(handle);
+  return result ? &result->value : nullptr;
+}
+
+void ApiObjectResultRelease(const NSSwiftValue* value) {
+  delete reinterpret_cast<ObjectResult*>(const_cast<NSSwiftValue*>(value));
 }
 
 // --- Dispatch ----------------------------------------------------------------------
@@ -2208,13 +2644,118 @@ bool Select(Isolate* isolate, Local<Context> context, const MemberGroup& group,
   return false;
 }
 
+LoadedModule* LoadedFor(Isolate* isolate, const ModuleInfo* module);
+Local<External> DataFor(Isolate* isolate, const void* pointer);
+
+// A Swift iterator owned by the step function JS calls; released when that
+// function is collected.
+struct IteratorBox {
+  Global<v8::Function> step;
+  const ModuleInfo* module;
+  void* iterator;
+  NSSwiftThunk next;
+  // Names the steps in errors; its result is the sequence's code.
+  MemberInfo member;
+};
+
+void StepCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  auto* box = static_cast<IteratorBox*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+  auto* state = Caches::StateFor<IsolateState>(isolate);
+  LoadedModule* loaded = LoadedFor(isolate, box->module);
+  if (state == nullptr || loaded == nullptr) {
+    return;
+  }
+  NSSwiftValue slot{};
+  slot.tag = NSSwiftTagObject;
+  slot.payload.object = box->iterator;
+
+  CallContext call;
+  call.api = &kAPI;
+  call.isolate = isolate;
+  call.context = isolate->GetCurrentContext();
+  call.module = box->module;
+  call.loaded = loaded;
+  call.state = state;
+  call.member = &box->member;
+  call.resultCode = &box->member.signature.result;
+  state->calls.push_back(&call);
+  box->next(&call, &slot, 1);
+  state->calls.pop_back();
+  if (!call.callbackException.IsEmpty()) {
+    isolate->ThrowException(call.callbackException.Get(isolate));
+  } else if (!call.threw && call.completed) {
+    info.GetReturnValue().Set(call.result);
+  }
+}
+
+// Turns a step function (a Promise of `[element]`, or `[]` at the end) into
+// an async iterator, one step at a time.
+constexpr const char* kIteratorFactory = R"js((function (step) {
+  let pending = Promise.resolve();
+  return {
+    next() {
+      const result = pending.then(() => step()).then((values) =>
+        values.length ? { value: values[0], done: false } : { value: undefined, done: true });
+      pending = result.then(() => undefined, () => undefined);
+      return result;
+    },
+    [Symbol.asyncIterator]() {
+      return this;
+    },
+  };
+}))js";
+
+MaybeLocal<Value> MakeAsyncIterator(Isolate* isolate, Local<Context> context,
+                                    const ModuleInfo* module, void* iterator, NSSwiftThunk next,
+                                    const ValueCode& code, const std::string& name) {
+  auto* state = Caches::StateFor<IsolateState>(isolate);
+  if (state == nullptr) {
+    module->release(iterator);
+    return MaybeLocal<Value>();
+  }
+  if (state->iteratorFactory.IsEmpty()) {
+    Local<Script> script;
+    Local<Value> factory;
+    if (!Script::Compile(context, tns::ToV8String(isolate, kIteratorFactory)).ToLocal(&script) ||
+        !script->Run(context).ToLocal(&factory) || !factory->IsFunction()) {
+      module->release(iterator);
+      return MaybeLocal<Value>();
+    }
+    state->iteratorFactory.Reset(isolate, factory.As<v8::Function>());
+  }
+
+  auto* box = new IteratorBox{{}, module, iterator, next, MemberInfo()};
+  box->member.swiftName = name + " (iterator)";
+  box->member.signature.result = code;
+  Local<v8::Function> step;
+  if (!v8::Function::New(context, StepCallback, DataFor(isolate, box)).ToLocal(&step)) {
+    module->release(iterator);
+    delete box;
+    return MaybeLocal<Value>();
+  }
+  box->step.Reset(isolate, step);
+  box->step.SetWeak(
+      box,
+      [](const WeakCallbackInfo<IteratorBox>& info) {
+        IteratorBox* collected = info.GetParameter();
+        collected->step.Reset();
+        collected->module->release(collected->iterator);
+        delete collected;
+      },
+      WeakCallbackType::kParameter);
+  Local<Value> argv[] = {step};
+  return state->iteratorFactory.Get(isolate)->Call(context, v8::Undefined(isolate), 1, argv);
+}
+
 LoadedModule* LoadedFor(Isolate* isolate, const ModuleInfo* module) {
   auto* state = Caches::StateFor<IsolateState>(isolate);
   if (state == nullptr) {
     return nullptr;
   }
   auto it = state->byInfo.find(module);
-  return it == state->byInfo.end() ? nullptr : it->second;
+  return it == state->byInfo.end() ? nullptr : it->second.get();
 }
 
 // Calls `member`'s getter/call thunk (or its setter when `setter`) with
@@ -2294,11 +2835,13 @@ MaybeLocal<Value> Invoke(Isolate* isolate, const MemberGroup& group, const Membe
   thunk(&call, slots.empty() ? nullptr : slots.data(), static_cast<intptr_t>(slots.size()));
   state->calls.pop_back();
 
-  if (call.threw) {
-    return MaybeLocal<Value>();
-  }
+  // A JS exception thrown while the thunk ran caused whatever error the
+  // thunk reported, so it is the one JS sees.
   if (!call.callbackException.IsEmpty()) {
     isolate->ThrowException(call.callbackException.Get(isolate));
+    return MaybeLocal<Value>();
+  }
+  if (call.threw) {
     return MaybeLocal<Value>();
   }
   if (!call.completed) {
@@ -2329,23 +2872,41 @@ bool ReceiverIsEnumArgument(const MemberGroup& group) {
 
 // Methods, functions, and enum instance members (whose receiver, a case
 // name, is the first argument).
+// A family's group holds every instantiation's overloads; an instance call
+// can only reach those of the receiver's own type.
+MemberGroup ForReceiver(Isolate* isolate, const MemberGroup& group, Local<Value> receiver) {
+  SwiftObjectWrapper* wrapper = receiver.IsEmpty() ? nullptr : SwiftWrapperOf(isolate, receiver);
+  if (wrapper == nullptr || wrapper->Module() != group.module) {
+    return group;
+  }
+  MemberGroup filtered = group;
+  filtered.overloads.clear();
+  for (const MemberInfo* member : group.overloads) {
+    if (group.module->IsA(wrapper->TypeIndex(), member->owner)) {
+      filtered.overloads.push_back(member);
+    }
+  }
+  return filtered.overloads.empty() ? group : filtered;
+}
+
 void MethodCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
-  const MemberGroup& group = *GroupOf(info);
+  const MemberGroup& all = *GroupOf(info);
   Local<Value> receiver;
   int first = 0;
-  if (ReceiverIsEnumArgument(group)) {
+  if (ReceiverIsEnumArgument(all)) {
     if (info.Length() < 1) {
-      isolate->ThrowException(Exception::TypeError(tns::ToV8String(
-          isolate, group.jsName + " needs a " + group.module->types[group.owner].jsName +
-                       " case name as its first argument")));
+      isolate->ThrowException(Exception::TypeError(
+          tns::ToV8String(isolate, all.jsName + " needs a " + all.module->types[all.owner].jsName +
+                                       " case name as its first argument")));
       return;
     }
     receiver = info[0];
     first = 1;
-  } else if (IsInstanceKind(group.kind)) {
+  } else if (IsInstanceKind(all.kind)) {
     receiver = info.This();
   }
+  MemberGroup group = ForReceiver(isolate, all, receiver);
 
   std::vector<Local<Value>> arguments = ArgumentsOf(info, first);
   Selection selection;
@@ -2393,8 +2954,9 @@ void ExactCallback(const FunctionCallbackInfo<Value>& info) {
 
 void GetterCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
-  const MemberGroup& group = *GroupOf(info);
-  Local<Value> receiver = IsInstanceKind(group.kind) ? Local<Value>(info.This()) : Local<Value>();
+  const MemberGroup& all = *GroupOf(info);
+  Local<Value> receiver = IsInstanceKind(all.kind) ? Local<Value>(info.This()) : Local<Value>();
+  MemberGroup group = ForReceiver(isolate, all, receiver);
   Local<Value> result;
   if (Invoke(isolate, group, *group.overloads[0], receiver, {}, false, Local<Object>())
           .ToLocal(&result)) {
@@ -2404,8 +2966,9 @@ void GetterCallback(const FunctionCallbackInfo<Value>& info) {
 
 void SetterCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
-  const MemberGroup& group = *GroupOf(info);
-  Local<Value> receiver = IsInstanceKind(group.kind) ? Local<Value>(info.This()) : Local<Value>();
+  const MemberGroup& all = *GroupOf(info);
+  Local<Value> receiver = IsInstanceKind(all.kind) ? Local<Value>(info.This()) : Local<Value>();
+  MemberGroup group = ForReceiver(isolate, all, receiver);
   std::vector<Local<Value>> arguments = {info.Length() > 0 ? info[0]
                                                            : Local<Value>(v8::Undefined(isolate))};
   Invoke(isolate, group, *group.overloads[0], receiver, arguments, true, Local<Object>());
@@ -2508,13 +3071,17 @@ class Builder {
   Builder(Isolate* isolate, Local<Context> context, LoadedModule& loaded)
       : _isolate(isolate), _context(context), _loaded(loaded), _module(*loaded.info) {}
 
-  MaybeLocal<Object> Build() {
-    Local<Object> exports = Object::New(_isolate);
+  // Fills the unit's templates and every module's namespace.
+  bool Build() {
+    std::map<std::string, Local<Object>> exports;
+    for (const auto& name : _module.modules) {
+      exports[name] = Object::New(_isolate);
+    }
 
     _loaded.templates.resize(_module.types.size());
     std::vector<Local<FunctionTemplate>> templates(_module.types.size());
     for (const TypeInfo& type : _module.types) {
-      if (IsEnumKind(type.kind)) {
+      if (IsEnumKind(type.kind) || type.family != static_cast<int>(type.index)) {
         continue;
       }
       Local<FunctionTemplate> tmpl =
@@ -2524,8 +3091,13 @@ class Builder {
       templates[type.index] = tmpl;
     }
     for (const TypeInfo& type : _module.types) {
-      if (type.superIndex >= 0 && !templates[type.index].IsEmpty() &&
-          !templates[type.superIndex].IsEmpty()) {
+      if (!IsEnumKind(type.kind)) {
+        templates[type.index] = templates[type.family];
+      }
+    }
+    for (const TypeInfo& type : _module.types) {
+      if (type.family == static_cast<int>(type.index) && type.superIndex >= 0 &&
+          !templates[type.index].IsEmpty() && !templates[type.superIndex].IsEmpty()) {
         templates[type.index]->Inherit(templates[type.superIndex]);
       }
     }
@@ -2533,7 +3105,8 @@ class Builder {
     std::vector<Local<Object>> enums(_module.types.size());
     for (const TypeInfo& type : _module.types) {
       if (IsEnumKind(type.kind)) {
-        enums[type.index] = Object::New(_isolate);
+        enums[type.index] = type.family == static_cast<int>(type.index) ? Object::New(_isolate)
+                                                                        : enums[type.family];
       }
     }
 
@@ -2560,19 +3133,27 @@ class Builder {
         values[type.index] = enums[type.index];
         continue;
       }
+      if (type.family != static_cast<int>(type.index)) {
+        _loaded.templates[type.index].Reset(_isolate, templates[type.index]);
+        continue;
+      }
       Local<v8::Function> function;
       if (!templates[type.index]->GetFunction(_context).ToLocal(&function)) {
-        return MaybeLocal<Object>();
+        return false;
       }
       _loaded.templates[type.index].Reset(_isolate, templates[type.index]);
       values[type.index] = function;
     }
+    for (const TypeInfo& type : _module.types) {
+      values[type.index] = values[type.family];
+    }
 
     // Nested types hang off their parent by JS path ("Polygon.Style"); a
     // parent that is not bridged gets a plain namespace object.
+    // Keyed by module and path: modules have their own namespaces.
     std::map<std::string, Local<Object>> containers;
     for (const TypeInfo& type : _module.types) {
-      containers[type.jsName] = values[type.index];
+      containers[type.swiftModule + ":" + type.jsName] = values[type.index];
     }
     std::vector<const TypeInfo*> byDepth;
     for (const TypeInfo& type : _module.types) {
@@ -2584,19 +3165,19 @@ class Builder {
     });
     std::vector<Local<Object>> namespaces;
     for (const TypeInfo* type : byDepth) {
-      Local<Object> container = exports;
-      std::string path;
+      Local<Object> container = exports[type->swiftModule];
+      std::string path = type->swiftModule + ":";
       size_t start = 0;
       for (size_t dot = type->jsName.find('.'); dot != std::string::npos;
            dot = type->jsName.find('.', start)) {
         std::string component = type->jsName.substr(start, dot - start);
-        path += (path.empty() ? "" : ".") + component;
+        path += (path.back() == ':' ? "" : ".") + component;
         auto existing = containers.find(path);
         if (existing == containers.end()) {
           Local<Object> space = Object::New(_isolate);
           if (!container->Set(_context, tns::ToV8String(_isolate, component), space)
                    .FromMaybe(false)) {
-            return MaybeLocal<Object>();
+            return false;
           }
           existing = containers.emplace(path, space).first;
           namespaces.push_back(space);
@@ -2608,18 +3189,18 @@ class Builder {
                ->Set(_context, tns::ToV8String(_isolate, LastComponent(type->jsName)),
                      values[type->index])
                .FromMaybe(false)) {
-        return MaybeLocal<Object>();
+        return false;
       }
     }
 
     for (const MemberGroup* group : enumGroups) {
       if (!InstallOnObject(enums[group->owner], *group)) {
-        return MaybeLocal<Object>();
+        return false;
       }
     }
     for (const MemberGroup* group : moduleGroups) {
-      if (!InstallOnObject(exports, *group)) {
-        return MaybeLocal<Object>();
+      if (!InstallOnObject(exports[group->swiftModule], *group)) {
+        return false;
       }
     }
     for (Local<Object> enumObject : enums) {
@@ -2630,8 +3211,11 @@ class Builder {
     for (Local<Object> space : namespaces) {
       space->SetIntegrityLevel(_context, IntegrityLevel::kFrozen).Check();
     }
-    exports->SetIntegrityLevel(_context, IntegrityLevel::kFrozen).Check();
-    return exports;
+    for (auto& entry : exports) {
+      entry.second->SetIntegrityLevel(_context, IntegrityLevel::kFrozen).Check();
+      _loaded.exports[entry.first].Reset(_isolate, entry.second);
+    }
+    return true;
   }
 
  private:
@@ -2761,6 +3345,49 @@ void LoadModuleCallback(const FunctionCallbackInfo<Value>& info) {
   }
 }
 
+// `track(read, changed)`: Observation tracking through any loaded unit.
+void TrackCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  if (info.Length() < 2 || !info[0]->IsFunction() || !info[1]->IsFunction()) {
+    isolate->ThrowException(Exception::TypeError(
+        tns::ToV8String(isolate, "track(read, onChange) takes two functions")));
+    return;
+  }
+  std::shared_ptr<const ModuleInfo> unit;
+  {
+    std::lock_guard<std::mutex> lock(gModulesMutex);
+    for (const auto& entry : gModules) {
+      if (entry.second->error.empty() && entry.second->tracker != nullptr) {
+        unit = entry.second;
+        break;
+      }
+    }
+  }
+  auto* state = Caches::StateFor<IsolateState>(isolate);
+  if (!unit || state == nullptr) {
+    isolate->ThrowException(Exception::Error(tns::ToV8String(
+        isolate, "track() needs a loaded Swift module (swift.module(name)) to observe through")));
+    return;
+  }
+  ValueCode code;
+  code.kind = ValueCode::Kind::Function;
+  auto* read = new SwiftCallback(isolate, unit.get(), code, "track", info[0].As<Object>());
+  auto* changed = new SwiftCallback(isolate, unit.get(), code, "track", info[1].As<Object>());
+  // Collects what `read` throws, as a call does.
+  CallContext call;
+  state->calls.push_back(&call);
+  uint8_t tracked = unit->tracker(&kAPI, read, changed);
+  state->calls.pop_back();
+  ReleaseCallback(read);
+  ReleaseCallback(changed);
+  if (!call.callbackException.IsEmpty()) {
+    isolate->ThrowException(call.callbackException.Get(isolate));
+  } else if (!tracked) {
+    isolate->ThrowException(
+        Exception::Error(tns::ToV8String(isolate, "Observation tracking needs iOS 17 or newer")));
+  }
+}
+
 void ModuleInfoCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
@@ -2774,7 +3401,8 @@ void ModuleInfoCallback(const FunctionCallbackInfo<Value>& info) {
     return;
   }
   Local<Object> result = Object::New(isolate);
-  result->Set(context, tns::ToV8String(isolate, "name"), tns::ToV8String(isolate, module->name))
+  result->Set(context, tns::ToV8String(isolate, "name"), info[0]).Check();
+  result->Set(context, tns::ToV8String(isolate, "unit"), tns::ToV8String(isolate, module->name))
       .Check();
   result
       ->Set(context, tns::ToV8String(isolate, "fingerprint"),
@@ -2805,11 +3433,6 @@ MaybeLocal<Object> LoadModule(Local<Context> context, const std::string& name) {
   if (state == nullptr) {
     return MaybeLocal<Object>();
   }
-  auto cached = state->modules.find(name);
-  if (cached != state->modules.end()) {
-    return cached->second->exports.Get(isolate);
-  }
-
   std::string error;
   std::shared_ptr<const ModuleInfo> module = LoadModuleInfo(name, error);
   if (!module) {
@@ -2817,18 +3440,18 @@ MaybeLocal<Object> LoadModule(Local<Context> context, const std::string& name) {
     return MaybeLocal<Object>();
   }
 
-  auto loaded = std::make_unique<LoadedModule>();
-  loaded->info = module;
-  LoadedModule* raw = loaded.get();
-  state->byInfo[module.get()] = raw;
-  Local<Object> exports;
-  if (!Builder(isolate, context, *raw).Build().ToLocal(&exports)) {
-    state->byInfo.erase(module.get());
-    return MaybeLocal<Object>();
+  auto loaded = state->byInfo.find(module.get());
+  if (loaded == state->byInfo.end()) {
+    auto unit = std::make_unique<LoadedModule>();
+    unit->info = module;
+    LoadedModule* raw = unit.get();
+    loaded = state->byInfo.emplace(module.get(), std::move(unit)).first;
+    if (!Builder(isolate, context, *raw).Build()) {
+      state->byInfo.erase(module.get());
+      return MaybeLocal<Object>();
+    }
   }
-  loaded->exports.Reset(isolate, exports);
-  state->modules.emplace(name, std::move(loaded));
-  return exports;
+  return loaded->second->exports[name].Get(isolate);
 }
 
 MaybeLocal<Object> CreateBinding(Local<Context> context) {
@@ -2836,8 +3459,11 @@ MaybeLocal<Object> CreateBinding(Local<Context> context) {
   Local<Object> binding = Object::New(isolate);
   Local<v8::Function> loadModule;
   Local<v8::Function> moduleInfo;
+  Local<v8::Function> track;
   if (!v8::Function::New(context, LoadModuleCallback).ToLocal(&loadModule) ||
       !v8::Function::New(context, ModuleInfoCallback).ToLocal(&moduleInfo) ||
+      !v8::Function::New(context, TrackCallback).ToLocal(&track) ||
+      !binding->Set(context, tns::ToV8String(isolate, "track"), track).FromMaybe(false) ||
       !binding->Set(context, tns::ToV8String(isolate, "loadModule"), loadModule).FromMaybe(false) ||
       !binding->Set(context, tns::ToV8String(isolate, "moduleInfo"), moduleInfo).FromMaybe(false) ||
       !binding

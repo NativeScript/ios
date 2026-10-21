@@ -46,6 +46,41 @@ the fixture sources together with the generated `Interop/` file, whose
 contents the generator tests keep identical to the generator's output. The
 fixture's `Package.swift` builds the same files as two SwiftPM modules.
 
+## Generation units
+
+Modules generated together form a unit: `--swift-unit <Name>` with one
+`--swift-symbolgraph-dir` per module writes one `<Name>+NativeScript.swift`
+and one `swift!<Module>.d.ts` per module. Within a unit, a module's
+declarations can take and return another module's types, and its extensions
+of those types become their members (`Money.doubled()` declared in SwiftDemo
+on SwiftDemoKit's `Money`). Every module keeps its own `ns:swift/<Module>`
+namespace; a type has one JS class wherever it appears.
+
+A module that is an implementation detail of another (SwiftUICore of
+SwiftUI) cannot be imported, so its declarations join the module that
+re-exports it: `--swift-reexport SwiftUICore=SwiftUI` (implied for that
+pair). Generate everything an app uses as one unit: modules of different
+units cannot share types.
+
+## Generic types
+
+A generic type is bridged through the concrete instantiations the unit's
+declarations spell: WeatherKit's `lowTemperature: Measurement<UnitTemperature>`
+makes `Measurement<UnitTemperature>` callable. To use an instantiation no API
+spells, declare a public typealias in the app's Swift code:
+
+```swift
+public typealias LengthMeasurement = Measurement<UnitLength>
+```
+
+Every instantiation of a generic type shares one JS class, declared in
+TypeScript as the generic class (`Measurement<UnitType>`): `new
+Measurement(...)` picks the instantiation from its arguments, an instance
+calls the members of its own instantiation, and `instanceof Measurement`
+holds for all of them. A member that does not exist for an instantiation
+(a constrained extension's) is left out of that instantiation. Generic
+functions and methods are not bridged yet.
+
 ## Value model
 
 | Swift | JavaScript |
@@ -136,6 +171,95 @@ as Swift holds the closure, and drops it when Swift releases the closure.
   parameters, closures with `inout` parameters, and closures returned from
   Swift are not bridged yet.
 
+## Protocols
+
+A parameter typed by a protocol (`any Greeting`) accepts a Swift value that
+conforms to it, or a JS object implementing it:
+
+```js
+SwiftDemo.introduce({
+    name: "js",
+    punctuation: "?",
+    greet(other) { return "hey " + other; },
+    reset() {},
+}, "ada");
+```
+
+The object must provide every requirement (the call throws `TypeError`
+naming the missing ones), including those of a protocol it refines; TypeScript
+declares the protocol as an interface. Swift calls it through a generated
+adapter: on the JS thread the member runs before the call returns, and from
+any other thread the call waits while it runs on the JS thread, so a Swift
+thread must not hold up the JS thread while waiting on such a call. When the
+member throws, a throwing requirement throws a Swift error (and a call in
+progress from JS rethrows the JS exception); any other requirement returns
+its type's zero value (`0`, `""`, `nil`, an empty collection), or traps when
+the type has none.
+
+A protocol value returned to JS is the JS object it came from, a Swift
+object of its own registered class, or else a boxed value of the protocol.
+Swift holds the adapter, and through it the JS object, as long as it keeps
+the value; a `weak` reference does not keep it.
+
+Protocols with associated types, `Self` requirements, static or `async`
+requirements, initializers, or more than one refined module protocol stay
+type-only.
+
+## SwiftUI views
+
+A bridged struct that conforms to SwiftUI's `View` gains
+`hostingController()`, which returns a `UIHostingController` showing a copy
+of the view, as an ordinary NativeScript `UIViewController` (main thread
+only):
+
+```ts
+const controller = new Badge("Inbox", 3).hostingController();
+```
+
+To place it in a NativeScript layout, return `controller.view` from a
+custom view's `createNativeView()` and add the controller as a child of the
+page's view controller (`addChildViewController`, then
+`didMoveToParentViewController`). The view is copied in: to change what it
+shows, create a new controller, or drive it from an `@Observable` model the
+view reads.
+
+## Asynchronous sequences
+
+A function or property returning `AsyncStream<T>`, `AsyncThrowingStream<T, E>`
+or `some AsyncSequence<T, E>` returns a JS async iterator:
+
+```js
+for await (const value of SwiftDemo.countUp(3)) {
+    console.log(value);
+}
+```
+
+Each `next()` advances the Swift iterator in a `Task` and settles on the JS
+thread; calls run one at a time, in order. A sequence that throws rejects
+the pending `next()` with the Swift error. Other `AsyncSequence` types,
+sequences as parameters, and cancelling an iteration are not supported yet.
+
+## Observation
+
+`@Observable` classes (iOS 17+) can be watched from JS:
+
+```js
+const swift = require("ns:swift");
+const stop = swift.observe(() => thermostat.celsius, () => {
+    console.log("now", thermostat.celsius);
+});
+```
+
+`swift.track(read, onChange)` is Swift's `withObservationTracking`: it runs
+`read`, recording the observable properties it reads, and calls `onChange`
+once, when one of them is about to change. `swift.observe` re-arms after
+every change and calls `onChange` once a change made on the JS thread is
+stored; it returns a function that stops observing. Changes made on other
+threads are reported on the JS thread too, but Observation reports a change
+before it is made, so `onChange` can run before the other thread stores the
+new value; share such state through an actor or a lock, as Swift requires.
+Both need a loaded Swift module (its thunks carry the tracking code).
+
 ## Async, actors and the main actor
 
 - `async` functions return a Promise. The call reads its arguments
@@ -181,8 +305,10 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 ## Not yet supported
 
-Closures that return values, async cancellation, generics
-(including `Result`), protocols as values, tuples, sets, optional collection
+Closures that return values, async cancellation, Combine publishers,
+concrete `AsyncSequence` types, generic functions,
+`Result` and other standard library generics, protocols with associated
+types, tuples, sets, optional collection
 elements, subscripts and operators. Each appears in the coverage report with
 its reason.
 

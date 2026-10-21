@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <functional>
 #include <set>
 
 #include "SwiftSource.h"
@@ -17,6 +18,8 @@ namespace {
 constexpr int kRegisterModuleSlot = 10 * 8;
 constexpr int kRegisterTypeSlot = 11 * 8;
 constexpr int kRegisterMemberSlot = 12 * 8;
+constexpr int kRegisterUnitModuleSlot = 42 * 8;
+constexpr int kRegisterTrackerSlot = 48 * 8;
 
 std::string quoted(const std::string& text) {
   std::string out = "\"";
@@ -38,7 +41,9 @@ class Emitter {
 
   ThunkSource run() {
     ThunkSource result;
-    result.registerSymbol = "ns_swift_register_" + _module.name;
+    for (const auto& name : _module.swiftModules()) {
+      result.registerSymbols.push_back("ns_swift_register_" + name);
+    }
 
     std::string thunks;
     for (const auto& member : _surface.members) {
@@ -47,8 +52,8 @@ class Emitter {
 
     result.fingerprint = fingerprint(_registrations);
     result.thunkCount = _thunkCount;
-    result.source = header() + support() + enumHelpers() + typeIndexFunction() +
-                    thunks + registration(result);
+    result.source = header() + support() + enumHelpers() + protocolHelpers() +
+                    typeIndexFunction() + thunks + registration(result);
     return result;
   }
 
@@ -111,6 +116,10 @@ class Emitter {
         return {read("object") + " as? " + typeName(type.symbolId), true};
       case Bridge::ObjCObject:
         return {read("object") + " as? " + valueTypeName(type), true};
+      case Bridge::Protocol:
+        return {"__nsProtocol" + std::to_string(typeIndexOf(type.symbolId)) +
+                    "(" + slots + ", " + index + ")",
+                true};
       case Bridge::StructBox:
         return {"(" + read("object") + " as? __NSBox<" +
                     typeName(type.symbolId) + ">)?.value",
@@ -164,10 +173,16 @@ class Emitter {
                 false};
       }
       case Bridge::Void:
+      case Bridge::TypeParameter:
+      case Bridge::AsyncSequence:
       case Bridge::None:
         break;
     }
     return {"nil", true};
+  }
+
+  static std::string annotation(const std::string& type) {
+    return type.empty() ? "" : ": " + type;
   }
 
   // Lines binding `name` to argument `slot`; `label` describes it in errors.
@@ -212,6 +227,9 @@ class Emitter {
         return typeName(type.symbolId);
       case Bridge::ObjCObject:
         return "a " + valueTypeName(type);
+      case Bridge::Protocol:
+        return "a " + typeName(type.symbolId) +
+               " (a Swift value or JS implementation)";
       default:
         return valueTypeName(type);
     }
@@ -251,6 +269,14 @@ class Emitter {
                std::to_string(typeIndexOf(type.symbolId)) + ")";
       case Bridge::ObjCObject:
         return reporter + ".returnObjC(" + value + ")";
+      case Bridge::Protocol:
+        return "__nsReportProtocol" +
+               std::to_string(typeIndexOf(type.symbolId)) + "(" + reporter +
+               ", " + value + ")";
+      case Bridge::AsyncSequence:
+        return reporter + ".returnAsyncSequence(__NSAsyncIterator(" + value +
+               ") { r, element in " +
+               returnValue(type.elements.at(0), "r", "element") + " })";
       case Bridge::EnumCase:
         return reporter + ".returnString(__nsEnumName" +
                std::to_string(typeIndexOf(type.symbolId)) + "(" + value + "))";
@@ -272,6 +298,7 @@ class Emitter {
                reporter + ".returnString(key); " +
                returnValue(type.elements.at(0), reporter, "element") + " }";
       case Bridge::Closure:
+      case Bridge::TypeParameter:
       case Bridge::None:
         return reporter + ".returnVoid()";
     }
@@ -299,6 +326,12 @@ class Emitter {
               "> else { " + failure + " }\n";
       // Mutating members and setters change the boxed copy in place.
       return "box.value";
+    }
+    if (owner.kind == SymbolKind::Protocol) {
+      body += "  guard let receiver = __nsProtocol" +
+              std::to_string(typeIndexOf(owner.preciseId)) +
+              "(rt.slots, 0) else { " + failure + " }\n";
+      return "receiver";
     }
     if (owner.kind == SymbolKind::Enum) {
       std::string index = std::to_string(typeIndexOf(owner.preciseId));
@@ -377,12 +410,13 @@ class Emitter {
     }
     code += "  Task {\n" + unpack;
     if (throwing) {
-      code += "    do {\n      let " + binding + ": " + resultType + " = " +
-              expression + "\n" + returnResult(result, "      ", "completion") +
+      code += "    do {\n      let " + binding + annotation(resultType) +
+              " = " + expression + "\n" +
+              returnResult(result, "      ", "completion") +
               "    } catch {\n      completion.throwError(error)\n    }\n";
     } else {
-      code += "    let " + binding + ": " + resultType + " = " + expression +
-              "\n" + returnResult(result, "    ", "completion");
+      code += "    let " + binding + annotation(resultType) + " = " +
+              expression + "\n" + returnResult(result, "    ", "completion");
     }
     return code + "  }\n";
   }
@@ -393,16 +427,15 @@ class Emitter {
     Invocation invocation = describeInvocation(_module, symbol, capability);
     const Symbol* owner =
         symbol.parentId.empty() ? nullptr : _module.find(symbol.parentId);
-    int ownerIndex = member.owner;
-    int kind = member.kind;
     int flags = member.flags;
-    const std::string& signature = member.signature;
     const BridgedType& result = member.result;
 
-    if (kind == SwiftSurface::kEnumCase) {
-      // Case values are their names; nothing to call.
-      addRegistration(ownerIndex, kind, flags, capability.jsName, symbol.name,
-                      signature, "nil", "nil");
+    if (member.hostsView) {
+      return emitHosting(member);
+    }
+    if (member.kind == SwiftSurface::kEnumCase) {
+      // Cases are values (names, or objects JS builds); nothing to call.
+      addRegistration(member, "nil", "nil");
       return "";
     }
 
@@ -442,7 +475,9 @@ class Emitter {
     std::string expression =
         invocationExpression(invocation, receiver, arguments);
     std::string binding = result.bridge == Bridge::Void ? "_" : "result";
-    std::string resultType = invocation.resultType;
+    // An opaque result (`some P`) is bound without naming its type.
+    std::string resultType =
+        result.node.kind == TypeNode::Kind::Opaque ? "" : invocation.resultType;
     if (invocation.isAsync) {
       code += asyncCall(owner, hasReceiver, arguments, expression, binding,
                         resultType, result, symbol.isThrowing);
@@ -458,13 +493,13 @@ class Emitter {
       };
       std::string body;
       if (symbol.isThrowing) {
-        body = "  do {\n    let " + binding + ": " + resultType + " = " +
+        body = "  do {\n    let " + binding + annotation(resultType) + " = " +
                expression + "\n" + indented("    ") +
                returnResult(result, "    ") +
                "  } catch {\n    rt.throwError(error)\n  }\n";
       } else {
-        body = "  let " + binding + ": " + resultType + " = " + expression +
-               "\n" + indented("  ") + returnResult(result, "  ");
+        body = "  let " + binding + annotation(resultType) + " = " +
+               expression + "\n" + indented("  ") + returnResult(result, "  ");
       }
       code += invocation.isMainActor ? onMainActor(symbol, body) : body;
     }
@@ -490,33 +525,55 @@ class Emitter {
       setterName = "__nsThunk" + std::to_string(setterIndex);
     }
 
-    addRegistration(ownerIndex, kind, flags, capability.jsName, symbol.name,
-                    signature, "__nsThunk" + std::to_string(getterIndex),
+    addRegistration(member, "__nsThunk" + std::to_string(getterIndex),
                     setterName);
     return code;
   }
 
-  void addRegistration(int owner, int kind, int flags,
-                       const std::string& jsName, const std::string& swiftName,
-                       const std::string& signature, const std::string& thunk,
-                       const std::string& setter) {
+  // `view.hostingController()`: the boxed view in a UIHostingController,
+  // created on the main actor.
+  std::string emitHosting(const SwiftSurface::Member& member) {
+    const Symbol& view = *_module.find(member.symbol->parentId);
+    int index = _thunkCount++;
+    std::string code =
+        "// " + view.preciseId + " (hosting)\n" + thunkHeader(index);
+    std::string availability = availabilityCondition(_module, view);
+    if (!availability.empty()) {
+      code +=
+          "  guard #available(" + availability +
+          ") else { return rt.throwMessage(" +
+          quoted(view.name + " requires " +
+                 llvm::StringRef(availability).rsplit(',').first.trim().str()) +
+          ") }\n";
+    }
+    std::string receiver = bindReceiver(view, code);
+    code += onMainActor(
+        *member.symbol,
+        "  rt.returnObjC(UIHostingController(rootView: " + receiver + "))\n");
+    code += "}\n\n";
+    addRegistration(member, "__nsThunk" + std::to_string(index), "nil");
+    return code;
+  }
+
+  void addRegistration(const SwiftSurface::Member& member,
+                       const std::string& thunk, const std::string& setter) {
     _registrations.push_back(
-        "  registerMember(registrar, " + std::to_string(owner) + ", " +
-        std::to_string(kind) + ", " + std::to_string(flags) + ", " +
-        quoted(jsName) + ", " + quoted(swiftName) + ", " + quoted(signature) +
-        ", " + thunk + ", " + setter + ")");
+        "  registerMember(registrar, " + std::to_string(member.owner) + ", " +
+        std::to_string(member.kind) + ", " + std::to_string(member.flags) +
+        ", " + quoted(member.module) + ", " +
+        quoted(member.capability->jsName) + ", " + quoted(member.symbol->name) +
+        ", " + quoted(member.signature) + ", " + thunk + ", " + setter + ")");
   }
 
   std::string header() const {
-    std::string out = "// Generated by objc-metadata-generator from the " +
-                      _module.name +
-                      " symbol graphs. Do not edit.\n"
-                      "// NativeScript Swift interop thunks, ABI " +
-                      std::to_string(kThunkABIVersion) +
-                      ": see NativeScript/runtime/SwiftInterop.h.\n"
-                      "import Foundation\n"
-                      "import " +
-                      _module.name + "\n";
+    std::string out =
+        "// Generated by objc-metadata-generator from the " + _module.name +
+        " symbol graphs. Do not edit.\n"
+        "// NativeScript Swift interop thunks, ABI " +
+        std::to_string(kThunkABIVersion) +
+        ": see NativeScript/runtime/SwiftInterop.h.\n"
+        "import Foundation\n"
+        "#if canImport(Observation)\nimport Observation\n#endif\n";
     return out + swiftImports(_module, _classification) + "\n";
   }
 
@@ -527,6 +584,16 @@ private typealias __NSRelease = @convention(c) (UnsafeMutableRawPointer) -> Void
 private final class __NSBox<Value> {
   var value: Value
   init(_ value: Value) { self.value = value }
+}
+
+// A boxed struct as a value of a protocol it conforms to.
+private protocol __NSAnyBox { var anyValue: Any { get } }
+extension __NSBox: __NSAnyBox { var anyValue: Any { value } }
+
+// What a Swift adapter reports when its JavaScript implementation throws.
+private struct __NSJSError: Error, CustomStringConvertible {
+  let requirement: String
+  var description: String { "the JavaScript implementation of \(requirement) failed" }
 }
 
 // The result entries calls and completions share, so value reporting code
@@ -545,6 +612,8 @@ private protocol __NSReporter {
   func returnObject(_ object: AnyObject, _ typeIndex: UInt32)
   func returnCase(_ index: Int, _ values: () -> Void)
   func returnObjC(_ object: AnyObject)
+  func returnJSObject(_ object: __NSJSObject)
+  func returnAsyncSequence(_ iterator: __NSAsyncIterator)
 }
 
 // Reads arguments (24-byte slots) and reports results through the runtime's
@@ -553,7 +622,10 @@ private protocol __NSReporter {
 // maps point at their own slots (a map's are key, value, key, value, ...).
 private struct __NSSlots {
   let base: UnsafeRawPointer?
+  // The API table, for values that call back into the runtime.
+  let api: UnsafeRawPointer
 
+  func tag(_ i: Int) -> UInt32 { base!.load(fromByteOffset: i * 24, as: UInt32.self) }
   func isNull(_ i: Int) -> Bool { base!.load(fromByteOffset: i * 24, as: UInt32.self) == 0 }
   func bool(_ i: Int) -> Bool { base!.load(fromByteOffset: i * 24 + 8, as: UInt8.self) != 0 }
   func int64(_ i: Int) -> Int64 { base!.load(fromByteOffset: i * 24 + 8, as: Int64.self) }
@@ -575,7 +647,8 @@ private struct __NSSlots {
   }
   func elements(_ i: Int) -> (__NSSlots, Int) {
     let start = base!.load(fromByteOffset: i * 24 + 8, as: UnsafeRawPointer?.self)
-    return (__NSSlots(base: start), Int(base!.load(fromByteOffset: i * 24 + 16, as: UInt64.self)))
+    return (__NSSlots(base: start, api: api),
+            Int(base!.load(fromByteOffset: i * 24 + 16, as: UInt64.self)))
   }
 }
 
@@ -610,7 +683,7 @@ private struct __NSCall: __NSReporter {
 
   init(call: UnsafeMutableRawPointer, args: UnsafeRawPointer?) {
     self.call = call
-    self.slots = __NSSlots(base: args)
+    self.slots = __NSSlots(base: args, api: call.load(as: UnsafeRawPointer.self))
   }
 
   private func slot<Function>(_ index: Int, _: Function.Type) -> Function {
@@ -688,6 +761,14 @@ private struct __NSCall: __NSReporter {
   func returnObjC(_ object: AnyObject) {
     slot(40, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void).self)(
       call, Unmanaged.passRetained(object).toOpaque())
+  }
+  func returnJSObject(_ object: __NSJSObject) {
+    slot(46, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void).self)(
+      call, object.handle)
+  }
+  func returnAsyncSequence(_ iterator: __NSAsyncIterator) {
+    slot(49, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer, __NSThunk) -> Void).self)(
+      call, Unmanaged.passRetained(iterator).toOpaque(), __nsIteratorNext)
   }
   func throwError(_ error: any Error) {
     report(String(describing: error), String(reflecting: type(of: error)))
@@ -786,6 +867,14 @@ private struct __NSCompletion: @unchecked Sendable, __NSReporter {
     slot(41, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void).self)(
       token, Unmanaged.passRetained(object).toOpaque())
   }
+  func returnJSObject(_ object: __NSJSObject) {
+    slot(47, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void).self)(
+      token, object.handle)
+  }
+  func returnAsyncSequence(_ iterator: __NSAsyncIterator) {
+    slot(50, (@convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer, __NSThunk) -> Void).self)(
+      token, Unmanaged.passRetained(iterator).toOpaque(), __nsIteratorNext)
+  }
   func throwError(_ error: any Error) {
     var message = String(describing: error)
     var type = String(reflecting: Swift.type(of: error))
@@ -823,6 +912,97 @@ private final class __NSCallback: @unchecked Sendable {
     arguments(completion)
     api.load(fromByteOffset: 28 * 8, as: (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(completion.token)
   }
+}
+
+// A JS object implementing a protocol; adapters call its members. Calls from
+// other threads run on the isolate's thread and wait for it.
+private final class __NSJSObject: @unchecked Sendable {
+  let api: UnsafeRawPointer
+  let handle: UnsafeMutableRawPointer
+
+  init(api: UnsafeRawPointer, handle: UnsafeMutableRawPointer) {
+    self.api = api
+    self.handle = handle
+    api.load(fromByteOffset: 32 * 8, as: (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(handle)
+  }
+
+  deinit {
+    api.load(fromByteOffset: 33 * 8, as: (@convention(c) (UnsafeMutableRawPointer) -> Void).self)(handle)
+  }
+
+  // Requirement `index` (2 * position, +1 for a setter) with the arguments
+  // `arguments` reports; nil when the JS side threw or returned a value
+  // `read` cannot convert.
+  func call<T>(_ index: Int, _ arguments: (__NSCompletion) -> Void,
+               _ read: (__NSSlots) -> T?) -> T? {
+    let begin = api.load(fromByteOffset: 43 * 8,
+                         as: (@convention(c) (UnsafeMutableRawPointer, Int) -> UnsafeMutableRawPointer).self)
+    let completion = __NSCompletion(api: api, token: begin(handle, index))
+    arguments(completion)
+    let end = api.load(fromByteOffset: 44 * 8,
+                       as: (@convention(c) (UnsafeMutableRawPointer) -> UnsafeRawPointer?).self)
+    guard let result = end(completion.token) else { return nil }
+    defer {
+      api.load(fromByteOffset: 45 * 8, as: (@convention(c) (UnsafeRawPointer) -> Void).self)(result)
+    }
+    return read(__NSSlots(base: result, api: api))
+  }
+}
+
+// Runs `read`, then calls `changed` once when an observable property it read
+// is about to change (withObservationTracking); 0 without Observation.
+private typealias __NSTracker = @convention(c) (UnsafeRawPointer, UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> UInt8
+private func __nsTrack(_ api: UnsafeRawPointer, _ read: UnsafeMutableRawPointer,
+                       _ changed: UnsafeMutableRawPointer) -> UInt8 {
+#if canImport(Observation)
+  if #available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *) {
+    let reader = __NSCallback(api: api, handle: read)
+    let notify = __NSCallback(api: api, handle: changed)
+    withObservationTracking { reader.invoke { _ in } } onChange: { notify.invoke { _ in } }
+    return 1
+  }
+#endif
+  return 0
+}
+
+// An asynchronous sequence JS iterates. Each step reports the next element as
+// a one-element array, or an empty one at the end; the runtime runs one step
+// at a time.
+private final class __NSAsyncIterator: @unchecked Sendable {
+  private let advance: (__NSCompletion) async -> Void
+
+  init<S: AsyncSequence>(_ sequence: S, _ report: @escaping (__NSCompletion, S.Element) -> Void) {
+    let state = __NSIteratorState(sequence.makeAsyncIterator())
+    advance = { completion in
+      do {
+        if let element = try await state.iterator.next() {
+          completion.returnArray(CollectionOfOne(element)) { report(completion, $0) }
+        } else {
+          completion.returnArray(EmptyCollection<S.Element>()) { report(completion, $0) }
+        }
+      } catch {
+        completion.throwError(error)
+      }
+    }
+  }
+
+  func next(_ completion: __NSCompletion) {
+    let advance = self.advance
+    Task { await advance(completion) }
+  }
+}
+
+private final class __NSIteratorState<Iterator: AsyncIteratorProtocol>: @unchecked Sendable {
+  var iterator: Iterator
+  init(_ iterator: Iterator) { self.iterator = iterator }
+}
+
+private func __nsIteratorNext(_ call: UnsafeMutableRawPointer, _ args: UnsafeRawPointer?, _ count: Int) {
+  let rt = __NSCall(call: call, args: args)
+  guard let iterator = rt.object(0) as? __NSAsyncIterator else {
+    return rt.throwTypeError("not a Swift asynchronous sequence")
+  }
+  iterator.next(rt.beginAsync())
 }
 
 private func __nsRelease(_ object: UnsafeMutableRawPointer) {
@@ -1019,6 +1199,233 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
            " else { return nil }\n      " + name + " = value\n    }\n";
   }
 
+  // For every adoptable protocol: __NSAdapter<n>, a class implementing it
+  // by calling a JS object; __nsProtocol<n>, which reads a protocol value
+  // (a JS implementation, a Swift object, or a boxed struct); and
+  // __nsReportProtocol<n>, which reports one as the JS object it came from,
+  // as its own registered type, or boxed as the protocol.
+  std::string protocolHelpers() const {
+    std::string out;
+    for (const auto& type : _surface.types) {
+      if (type.kind == SwiftSurface::kProtocol) {
+        out += protocolHelper(type);
+      }
+    }
+    return out;
+  }
+
+  std::string protocolHelper(const SwiftSurface::Type& type) const {
+    const Symbol& symbol = *type.symbol;
+    std::string name = qualifiedTypeName(_module, symbol);
+    std::string existential = "any " + name;
+    std::string index = std::to_string(type.index);
+    std::string availability = availabilityCondition(_module, symbol);
+    std::string attribute =
+        availability.empty() ? "" : "@available(" + availability + ")\n";
+    std::string adapter = "__NSAdapter" + index;
+
+    std::string out =
+        "// " + symbol.preciseId + "\n" + attribute + "private final class " +
+        adapter + ": " + name +
+        ", @unchecked Sendable {\n  let object: __NSJSObject\n"
+        "  init(_ object: __NSJSObject) { self.object = object }\n";
+    auto requirements = _surface.requirementsOf(type.index);
+    for (size_t k = 0; k < requirements.size(); k++) {
+      out += requirementImplementation(*requirements[k], static_cast<int>(k));
+    }
+    out += "}\n\n";
+
+    out += attribute + "private func __nsProtocol" + index +
+           "(_ slots: __NSSlots, _ i: Int) -> (" + existential +
+           ")? {\n"
+           "  if slots.tag(i) == 12 {\n    return " +
+           adapter +
+           "(__NSJSObject(api: slots.api, handle: slots.callback(i)))\n  }\n"
+           "  let object = slots.object(i)\n"
+           "  if let box = object as? __NSAnyBox { return box.anyValue as? " +
+           existential + " }\n  return object as? " + existential + "\n}\n\n";
+
+    out += attribute + "private func __nsReportProtocol" + index +
+           "<R: __NSReporter>(_ r: R, _ value: " + existential +
+           ") {\n"
+           "  if let adapter = value as? " +
+           adapter + " { return r.returnJSObject(adapter.object) }\n";
+    for (const SwiftSurface::Type* conformer : conformersOf(type)) {
+      std::string conformerName =
+          qualifiedTypeName(_module, *conformer->symbol);
+      std::string conformerIndex = std::to_string(conformer->index);
+      bool isClass = conformer->kind == SwiftSurface::kClass ||
+                     conformer->kind == SwiftSurface::kActor;
+      std::string report =
+          isClass
+              ? "r.returnObject(v, __nsTypeIndex(v, " + conformerIndex + "))"
+              : "r.returnObject(__NSBox(v), " + conformerIndex + ")";
+      std::string gate = availabilityCondition(_module, *conformer->symbol);
+      out += "  if " +
+             (gate.empty() || gate == availability
+                  ? ""
+                  : "#available(" + gate + "), ") +
+             "let v = value as? " + conformerName + " { return " + report +
+             " }\n";
+    }
+    out += "  r.returnObject(__NSBox<" + existential + ">(value), " + index +
+           ")\n}\n\n";
+    return out;
+  }
+
+  // Registered classes and structs conforming to `protocol`, most derived
+  // classes first.
+  std::vector<const SwiftSurface::Type*> conformersOf(
+      const SwiftSurface::Type& protocol) const {
+    std::function<bool(const Symbol&)> conforms = [&](const Symbol& symbol) {
+      for (const auto& id : symbol.conformances) {
+        const Symbol* other = _module.find(id);
+        if (id == protocol.symbol->preciseId ||
+            (other && other->kind == SymbolKind::Protocol &&
+             conforms(*other))) {
+          return true;
+        }
+      }
+      return false;
+    };
+    auto depth = [&](const Symbol* symbol) {
+      int value = 0;
+      for (const Symbol* current = symbol;
+           current && !current->superclassId.empty();
+           current = _module.find(current->superclassId)) {
+        value++;
+      }
+      return value;
+    };
+    std::vector<const SwiftSurface::Type*> result;
+    for (const auto& type : _surface.types) {
+      if ((type.kind == SwiftSurface::kClass ||
+           type.kind == SwiftSurface::kActor ||
+           type.kind == SwiftSurface::kStruct) &&
+          conforms(*type.symbol)) {
+        result.push_back(&type);
+      }
+    }
+    std::stable_sort(
+        result.begin(), result.end(),
+        [&](const SwiftSurface::Type* a, const SwiftSurface::Type* b) {
+          return depth(a->symbol) > depth(b->symbol);
+        });
+    return result;
+  }
+
+  // What a requirement returns when its JS implementation fails, or "" when
+  // its type has no such value.
+  static std::string zeroValue(const BridgedType& type) {
+    if (type.optional) {
+      return "nil";
+    }
+    switch (type.bridge) {
+      case Bridge::Void:
+        return "()";
+      case Bridge::Bool:
+        return "false";
+      case Bridge::Integer:
+      case Bridge::Floating:
+        return "0";
+      case Bridge::String:
+        return "\"\"";
+      case Bridge::Array:
+        return "[]";
+      case Bridge::Dictionary:
+        return "[:]";
+      case Bridge::Data:
+        return "Data()";
+      default:
+        return "";
+    }
+  }
+
+  // Requirement `k` of an adapter: a method or property calling the JS
+  // object's member of the same name.
+  std::string requirementImplementation(const SwiftSurface::Member& member,
+                                        int k) const {
+    const Symbol& symbol = *member.symbol;
+    const Capability& capability = *member.capability;
+    Invocation invocation = describeInvocation(_module, symbol, capability);
+    const BridgedType& result = member.result;
+    std::string resultType = result.bridge == Bridge::Void
+                                 ? "Void"
+                                 : swiftTypeText(result.node, _module);
+    std::string owner = llvm::join(symbol.pathComponents, ".");
+
+    auto readClosure = [&]() -> std::string {
+      if (result.bridge == Bridge::Void) {
+        return "{ (_: __NSSlots) -> Void? in () }";
+      }
+      ValueExpression value = valueExpression(result, "s", "0");
+      if (!result.optional) {
+        return "{ (s: __NSSlots) -> " + resultType + "? in " + value.code +
+               " }";
+      }
+      std::string inner = swiftTypeText(unwrappedNode(result), _module);
+      return "{ (s: __NSSlots) -> " + inner +
+             "?? in if s.isNull(0) { return .some(nil) }; " +
+             (value.failable ? "return (" + value.code + ").map { .some($0) }"
+                             : "return .some(" + value.code + ")") +
+             " }";
+    };
+    auto body = [&](int index, const std::string& reports,
+                    const std::string& indent) {
+      std::string zero = zeroValue(result);
+      std::string failure =
+          symbol.isThrowing
+              ? "throw __NSJSError(requirement: " + quoted(owner) + ")"
+          : zero.empty()
+              ? "fatalError(" +
+                    quoted(owner + ": its JavaScript implementation failed") +
+                    ")"
+              : "return " + zero;
+      return indent + "let result: " +
+             (result.bridge == Bridge::Void ? "Void" : resultType) +
+             "? = object.call(" + std::to_string(index) + ", { r in " +
+             reports + " }, " + readClosure() + ")\n" + indent +
+             "guard let result else { " + failure + " }\n" + indent +
+             "return result\n";
+    };
+
+    if (symbol.kind == SymbolKind::InstanceProperty) {
+      std::string effects = symbol.isThrowing ? " throws" : "";
+      std::string out = "  var " + swiftIdentifier(symbol.baseName) + ": " +
+                        resultType + " {\n    get" + effects + " {\n" +
+                        body(2 * k, "", "      ") + "    }\n";
+      if (symbol.isSettable) {
+        out += "    set { _ = object.call(" + std::to_string(2 * k + 1) +
+               ", { r in " +
+               (result.optional ? "if let newValue { " +
+                                      returnValue(result, "r", "newValue") +
+                                      " } else { r.returnNull() }"
+                                : returnValue(result, "r", "newValue")) +
+               " }, { (_: __NSSlots) -> Void? in () }) }\n";
+      }
+      return out + "  }\n";
+    }
+
+    std::vector<std::string> parameters;
+    std::vector<std::string> reports;
+    for (size_t i = 0; i < capability.parameters.size(); i++) {
+      const BridgedType& parameter = capability.parameters[i];
+      std::string name = "p" + std::to_string(i);
+      const std::string& label =
+          i < symbol.parameters.size() ? symbol.parameters[i].label : "";
+      parameters.push_back((label.empty() ? "_" : swiftIdentifier(label)) +
+                           " " + name + ": " + invocation.parameterTypes[i]);
+      std::string report = returnValue(parameter, "r", name);
+      reports.push_back(parameter.optional ? "if let " + name + " { " + report +
+                                                 " } else { r.returnNull() }"
+                                           : report);
+    }
+    return "  func " + swiftIdentifier(symbol.baseName) + "(" +
+           llvm::join(parameters, ", ") + ")" +
+           (symbol.isThrowing ? " throws" : "") + " -> " + resultType + " {\n" +
+           body(2 * k, llvm::join(reports, "; "), "    ") + "  }\n";
+  }
+
   // Dynamic type index of a returned object: most derived classes first.
   std::string typeIndexFunction() const {
     std::vector<const SwiftSurface::Type*> classes;
@@ -1065,39 +1472,46 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
   }
 
   std::string registration(const ThunkSource& result) const {
-    std::string out = "#if hasAttribute(c)\n@c(" + result.registerSymbol +
-                      ")\n#else\n@_cdecl(\"" + result.registerSymbol +
-                      "\")\n#endif\n"
-                      "public func __nsRegister_" +
-                      _module.name +
-                      "(_ registrar: UnsafeMutableRawPointer) {\n"
-                      "  let api = registrar.load(as: UnsafeRawPointer.self)\n"
-                      "  let registerModule = api.load(fromByteOffset: " +
-                      std::to_string(kRegisterModuleSlot) +
-                      ", as: (@convention(c) (UnsafeMutableRawPointer, UInt32, "
-                      "UnsafePointer<CChar>, "
-                      "UnsafePointer<CChar>, __NSRelease) -> Void).self)\n"
-                      "  let registerType = api.load(fromByteOffset: " +
-                      std::to_string(kRegisterTypeSlot) +
-                      ", as: (@convention(c) (UnsafeMutableRawPointer, UInt32, "
-                      "UInt32, UnsafePointer<CChar>, "
-                      "UnsafePointer<CChar>, Int32) -> Void).self)\n"
-                      "  let registerMember = api.load(fromByteOffset: " +
-                      std::to_string(kRegisterMemberSlot) +
-                      ", as: (@convention(c) (UnsafeMutableRawPointer, Int32, "
-                      "UInt32, UInt32, "
-                      "UnsafePointer<CChar>, UnsafePointer<CChar>, "
-                      "UnsafePointer<CChar>, __NSThunk?, "
-                      "__NSThunk?) -> Void).self)\n\n"
-                      "  registerModule(registrar, " +
-                      std::to_string(kThunkABIVersion) + ", " +
-                      quoted(_module.name) + ", " + quoted(result.fingerprint) +
-                      ", __nsRelease)\n";
+    std::string out =
+        "private func __nsRegister(_ registrar: UnsafeMutableRawPointer) {\n"
+        "  let api = registrar.load(as: UnsafeRawPointer.self)\n"
+        "  let registerModule = api.load(fromByteOffset: " +
+        std::to_string(kRegisterModuleSlot) +
+        ", as: (@convention(c) (UnsafeMutableRawPointer, UInt32, "
+        "UnsafePointer<CChar>, "
+        "UnsafePointer<CChar>, __NSRelease) -> Void).self)\n"
+        "  let registerType = api.load(fromByteOffset: " +
+        std::to_string(kRegisterTypeSlot) +
+        ", as: (@convention(c) (UnsafeMutableRawPointer, UInt32, "
+        "UInt32, UnsafePointer<CChar>, UnsafePointer<CChar>, "
+        "UnsafePointer<CChar>, Int32) -> Void).self)\n"
+        "  let registerMember = api.load(fromByteOffset: " +
+        std::to_string(kRegisterMemberSlot) +
+        ", as: (@convention(c) (UnsafeMutableRawPointer, Int32, "
+        "UInt32, UInt32, UnsafePointer<CChar>, "
+        "UnsafePointer<CChar>, UnsafePointer<CChar>, "
+        "UnsafePointer<CChar>, __NSThunk?, "
+        "__NSThunk?) -> Void).self)\n"
+        "  let registerUnitModule = api.load(fromByteOffset: " +
+        std::to_string(kRegisterUnitModuleSlot) +
+        ", as: (@convention(c) (UnsafeMutableRawPointer, "
+        "UnsafePointer<CChar>) -> Void).self)\n"
+        "  let registerTracker = api.load(fromByteOffset: " +
+        std::to_string(kRegisterTrackerSlot) +
+        ", as: (@convention(c) (UnsafeMutableRawPointer, __NSTracker) -> "
+        "Void).self)\n\n"
+        "  registerModule(registrar, " +
+        std::to_string(kThunkABIVersion) + ", " + quoted(_module.name) + ", " +
+        quoted(result.fingerprint) + ", __nsRelease)\n";
+    for (const auto& name : _module.swiftModules()) {
+      out += "  registerUnitModule(registrar, " + quoted(name) + ")\n";
+    }
+    out += "  registerTracker(registrar, __nsTrack)\n";
     for (const auto& type : _surface.types) {
       const Symbol& symbol = *type.symbol;
       int kind = type.kind;
       out += "  registerType(registrar, " + std::to_string(type.index) + ", " +
-             std::to_string(kind) + ", " +
+             std::to_string(kind) + ", " + quoted(type.module) + ", " +
              quoted(llvm::join(symbol.pathComponents, ".")) + ", " +
              quoted(qualifiedTypeName(_module, symbol)) + ", " +
              std::to_string(type.superIndex) + ")\n";
@@ -1105,7 +1519,16 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
     for (const auto& line : _registrations) {
       out += line + "\n";
     }
-    return out + "}\n";
+    out += "}\n";
+    for (size_t i = 0; i < result.registerSymbols.size(); i++) {
+      const std::string& symbol = result.registerSymbols[i];
+      out += "\n#if hasAttribute(c)\n@c(" + symbol + ")\n#else\n@_cdecl(\"" +
+             symbol + "\")\n#endif\npublic func __nsRegister_" +
+             _module.swiftModules()[i] +
+             "(_ registrar: UnsafeMutableRawPointer) {\n  "
+             "__nsRegister(registrar)\n}\n";
+    }
+    return out;
   }
 
   std::string fingerprint(const std::vector<std::string>& registrations) const {

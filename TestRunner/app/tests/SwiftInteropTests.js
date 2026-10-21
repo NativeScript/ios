@@ -8,8 +8,8 @@ describe("ns:swift", function () {
     describe("modules", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
-            expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module"]);
-            expect(swift.abiVersion).toBe(7);
+            expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module", "observe", "track"]);
+            expect(swift.abiVersion).toBe(11);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(7);
+            expect(info.abiVersion).toBe(11);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -491,6 +491,282 @@ describe("ns:swift", function () {
                 fail(error);
                 done();
             });
+        });
+    });
+
+    describe("units", function () {
+        // SwiftDemo and SwiftDemoKit are generated as one unit.
+        var Kit = swift.module("SwiftDemoKit");
+
+        it("gives each module of a unit its own namespace", function () {
+            expect(Kit).not.toBe(SwiftDemo);
+            expect(typeof Kit.Money).toBe("function");
+            expect(SwiftDemo.Money).toBeUndefined();
+            expect(require("ns:swift/SwiftDemoKit")).toBe(Kit);
+            expect(swift.info("SwiftDemoKit").unit).toBe("SwiftDemo");
+        });
+
+        it("passes another module's types", function () {
+            var wallet = SwiftDemo.starterWallet("ada");
+            expect(wallet instanceof Kit.Wallet).toBe(true);
+            expect(wallet.balance.amount).toBe(5);
+            expect(SwiftDemo.flip("penny")).toBe("dime");
+            var sum = SwiftDemo.sum([new Kit.Money(1, "EUR"), new Kit.Money(2, "EUR")]);
+            expect(sum instanceof Kit.Money).toBe(true);
+            expect(sum.amount).toBe(3);
+            expect(Kit.formatted(sum)).toBe("3 EUR");
+        });
+
+        it("installs extensions on the extended type", function () {
+            expect(new Kit.Money(0, "EUR").isZero).toBe(true);
+            expect(new Kit.Money(4, "EUR").doubled().amount).toBe(8);
+            expect(SwiftDemo.starterWallet("ada").summary()).toBe("ada: 5 EUR");
+        });
+    });
+
+    describe("generic types", function () {
+        var Kit = swift.module("SwiftDemoKit");
+
+        it("gives every instantiation of a generic type one JS class", function () {
+            var pair = new Kit.Pair(1, "one");
+            var score = SwiftDemo.makeScore("ada", 3);
+            expect(pair instanceof Kit.Pair).toBe(true);
+            expect(score instanceof Kit.Pair).toBe(true);
+            expect(pair.first).toBe(1);
+            expect(pair.second).toBe("one");
+            expect(score.first).toBe("ada");
+            expect(score.second).toBe(3);
+        });
+
+        it("picks the instantiation from the constructor's arguments", function () {
+            expect(SwiftDemo.describe(new Kit.Pair(2, "two"))).toBe("2:two");
+            expect(function () { SwiftDemo.describe(new Kit.Pair("two", 2)); })
+                .toThrowError(TypeError);
+            var swapped = new Kit.Pair(2, "two").swapped();
+            expect(swapped.first).toBe("two");
+            expect(swapped.second).toBe(2);
+            expect(swapped.swapped().first).toBe(2);
+        });
+
+        it("calls members of the receiver's own instantiation", function () {
+            var count = SwiftDemo.countBox(4);
+            var money = SwiftDemo.boxed(new Kit.Money(7, "EUR"));
+            expect(count.value).toBe(4);
+            expect(money.value.amount).toBe(7);
+            count.value = 5;
+            expect(count.value).toBe(5);
+            expect(count.replaced(9).value).toBe(9);
+            expect(function () { count.value = "x"; }).toThrowError(TypeError);
+            expect(new Kit.Box(new Kit.Money(1, "EUR")).value.amount).toBe(1);
+        });
+
+        it("bridges generic enums with associated values", function () {
+            expect(SwiftDemo.settle(3)).toEqual({ case: "done", value: 3 });
+            expect(SwiftDemo.settle(-1)).toEqual({ case: "failed", reason: "negative" });
+        });
+    });
+
+    describe("protocols", function () {
+        function jsGreeting(name) {
+            return {
+                name: name,
+                punctuation: "?",
+                greet: function (other) { return "hey " + other + " from " + this.name; },
+                reset: function () { this.punctuation = "."; },
+            };
+        }
+
+        it("passes JS objects implementing a protocol", function () {
+            expect(SwiftDemo.introduce(jsGreeting("js"), "ada")).toBe("hey ada from js?");
+        });
+
+        it("assigns properties through the implementation", function () {
+            var greeting = jsGreeting("js");
+            SwiftDemo.excite(greeting);
+            expect(greeting.punctuation).toBe("!");
+        });
+
+        it("returns a JS implementation as the object it was given", function () {
+            var greeting = jsGreeting("js");
+            expect(SwiftDemo.same(greeting)).toBe(greeting);
+        });
+
+        it("passes Swift conformers as their own class", function () {
+            var formal = SwiftDemo.makeGreeting("ada");
+            expect(formal instanceof SwiftDemo.FormalGreeting).toBe(true);
+            expect(SwiftDemo.introduce(formal, "bo")).toBe("Good day, bo, from ada.");
+            expect(SwiftDemo.same(formal)).toBe(formal);
+            var scorer = SwiftDemo.makeScorer();
+            expect(scorer instanceof SwiftDemo.DoublingScorer).toBe(true);
+            expect(SwiftDemo.scoreAll(scorer, [1, 2])).toEqual([2, 4]);
+        });
+
+        it("throws a JS implementation's exception from the call", function () {
+            var scorer = {
+                score: function (value) {
+                    if (value > 1) {
+                        throw new Error("too big");
+                    }
+                    return value;
+                },
+            };
+            expect(SwiftDemo.scoreAll(scorer, [1])).toEqual([1]);
+            expect(function () { SwiftDemo.scoreAll(scorer, [1, 2]); }).toThrowError("too big");
+        });
+
+        it("implements refined protocols' requirements too", function () {
+            var scorer = { rank: 3, score: function (value) { return value + 10; } };
+            expect(SwiftDemo.topRank(scorer)).toBe("3:11");
+            scorer.rank = null;
+            expect(SwiftDemo.topRank(scorer)).toBe("-1:11");
+        });
+
+        it("refuses incomplete implementations", function () {
+            expect(function () {
+                SwiftDemo.introduce({ name: "x", greet: function () { return ""; } }, "y");
+            }).toThrowError(TypeError, /missing .*punctuation.*reset|missing .*reset.*punctuation/);
+        });
+
+        it("keeps implementations Swift holds", function () {
+            var holder = new SwiftDemo.GreetingHolder();
+            holder.greeting = jsGreeting("held");
+            gc();
+            expect(holder.greet("you")).toBe("hey you from held");
+            expect(holder.greeting.name).toBe("held");
+            holder.greeting = null;
+            expect(holder.greet("you")).toBeNull();
+        });
+
+        it("runs requirements called from other threads on the JS thread", function (done) {
+            var greeting = jsGreeting("js");
+            greeting.greet = function (other) { return other + ":" + NSThread.isMainThread; };
+            SwiftDemo.greetInBackground(greeting).then(function (text) {
+                expect(text).toBe("background:true");
+                done();
+            }, function (error) {
+                fail(error);
+                done();
+            });
+        });
+    });
+
+    describe("observation", function () {
+        it("calls onChange once when a property read is about to change", function () {
+            var thermostat = new SwiftDemo.Thermostat();
+            var changes = 0;
+            var seen;
+            swift.track(function () { seen = thermostat.celsius; }, function () { changes++; });
+            expect(seen).toBe(20);
+            thermostat.label = "office";
+            expect(changes).toBe(0);
+            thermostat.celsius = 21;
+            expect(changes).toBe(1);
+            thermostat.warm(1);
+            expect(changes).toBe(1);
+        });
+
+        it("keeps observing after each change, from any thread", function (done) {
+            var thermostat = new SwiftDemo.Thermostat();
+            var values = [];
+            var stop = swift.observe(function () { return thermostat.celsius; }, function () {
+                values.push(thermostat.celsius);
+                if (values.length === 1) {
+                    thermostat.warmLater(2);
+                    return;
+                }
+                stop();
+                // The background thread may not have stored the value it reported yet.
+                (function settle(tries) {
+                    if (thermostat.celsius !== 23 && tries > 0) {
+                        setTimeout(function () { settle(tries - 1); }, 10);
+                        return;
+                    }
+                    expect([values[0], thermostat.celsius]).toEqual([21, 23]);
+                    done();
+                })(100);
+            });
+            thermostat.warm(1);
+        });
+
+        it("throws what read throws", function () {
+            expect(function () {
+                swift.track(function () { throw new Error("nope"); }, function () {});
+            }).toThrowError("nope");
+        });
+    });
+
+    describe("asynchronous sequences", function () {
+        function settle(promise, done) {
+            promise.then(done, function (error) {
+                fail(error);
+                done();
+            });
+        }
+
+        it("iterates AsyncStream results with for await", function (done) {
+            settle((async function () {
+                var values = [];
+                for await (var value of SwiftDemo.countUp(3)) {
+                    values.push(value);
+                }
+                expect(values).toEqual([1, 2, 3]);
+            })(), done);
+        });
+
+        it("rejects with the sequence's error", function (done) {
+            settle((async function () {
+                var values = [];
+                try {
+                    for await (var value of SwiftDemo.countDown(3, 1)) {
+                        values.push(value);
+                    }
+                    fail("expected the sequence to throw");
+                } catch (error) {
+                    expect(error.name).toBe("SwiftError");
+                    expect(error.swiftType).toBe("SwiftDemo.CountdownError");
+                }
+                expect(values).toEqual([3, 2]);
+            })(), done);
+        });
+
+        it("iterates opaque sequences and collection elements", function (done) {
+            settle((async function () {
+                var letters = [];
+                for await (var letter of SwiftDemo.letters("abc")) {
+                    letters.push(letter);
+                }
+                expect(letters).toEqual(["a", "b", "c"]);
+                var pages = [];
+                for await (var page of SwiftDemo.pages(2)) {
+                    pages.push(page);
+                }
+                expect(pages).toEqual([["page 0", "item"], ["page 1", "item"]]);
+            })(), done);
+        });
+
+        it("runs one step at a time and stays done at the end", function (done) {
+            var iterator = SwiftDemo.countUp(2);
+            settle(Promise.all([iterator.next(), iterator.next(), iterator.next(), iterator.next()])
+                .then(function (results) {
+                    expect(results.map(function (r) { return r.done; })).toEqual([false, false, true, true]);
+                    expect(results[0].value).toBe(1);
+                    expect(results[1].value).toBe(2);
+                }), done);
+        });
+    });
+
+    describe("SwiftUI views", function () {
+        it("hosts a view in a UIHostingController", function () {
+            var badge = new SwiftDemo.Badge("Inbox", 3);
+            var controller = badge.hostingController();
+            expect(controller instanceof UIViewController).toBe(true);
+            expect(controller.view instanceof UIView).toBe(true);
+            var size = controller.view.sizeThatFits(CGSizeMake(1000, 1000));
+            expect(size.width).toBeGreaterThan(0);
+            expect(size.height).toBeGreaterThan(0);
+            // The struct is copied in: later changes do not reach the host.
+            badge.count = 4;
+            expect(badge.hostingController()).not.toBe(controller);
         });
     });
 

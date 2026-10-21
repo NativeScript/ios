@@ -6,15 +6,28 @@
 #include <set>
 #include <tuple>
 
+#include "SwiftSurface.h"
+
 namespace Swift {
 
 std::string declaringModuleName(const Module& module, const Symbol& symbol) {
-  return symbol.declaringModule.empty() ? module.name : symbol.declaringModule;
+  if (!symbol.declaringModule.empty()) {
+    return symbol.declaringModule;
+  }
+  return symbol.module.empty() ? module.name : symbol.module;
 }
 
 std::string qualifiedTypeName(const Module& module, const Symbol& symbol) {
-  return declaringModuleName(module, symbol) + "." +
-         llvm::join(symbol.pathComponents, ".");
+  std::string name = declaringModuleName(module, symbol) + "." +
+                     llvm::join(symbol.pathComponents, ".");
+  if (!symbol.typeArguments.empty()) {
+    std::vector<std::string> arguments;
+    for (const auto& argument : symbol.typeArguments) {
+      arguments.push_back(swiftTypeText(argument, module));
+    }
+    name += "<" + llvm::join(arguments, ", ") + ">";
+  }
+  return name;
 }
 
 namespace {
@@ -46,6 +59,12 @@ TypeNode qualify(const TypeNode& node, const Module& module) {
       }
       components.back().usr = symbol->preciseId;
       components.back().arguments = result.components.back().arguments;
+      if (components.back().arguments.empty()) {
+        // A reference to an instantiation by its id.
+        for (const auto& argument : symbol->typeArguments) {
+          components.back().arguments.push_back(qualify(argument, module));
+        }
+      }
       result.components = std::move(components);
     }
   }
@@ -53,7 +72,8 @@ TypeNode qualify(const TypeNode& node, const Module& module) {
 }
 
 std::string ownerTypeText(const Module& module, const Symbol& owner) {
-  return qualifiedTypeName(module, owner);
+  return (owner.kind == SymbolKind::Protocol ? "any " : "") +
+         qualifiedTypeName(module, owner);
 }
 
 std::string typeText(const BridgedType& bridged, const Module& module) {
@@ -129,6 +149,10 @@ namespace {
 const char* frameworkOfObjCClass(llvm::StringRef name) {
   static const std::pair<const char*, const char*> prefixes[] = {
       {"UI", "UIKit"},
+      {"NSManaged", "CoreData"},
+      {"NSPersistent", "CoreData"},
+      {"NSFetch", "CoreData"},
+      {"NSEntity", "CoreData"},
       {"NS", "Foundation"},
       {"CL", "CoreLocation"},
       {"AV", "AVFoundation"},
@@ -198,6 +222,16 @@ std::string swiftImports(const Module& module,
     collectObjCClasses(capability->result, classes);
   }
   std::set<std::string> frameworks;
+  for (const auto& entry : module.symbols) {
+    const Capability* capability = classification.find(entry.first);
+    if (capability && capability->tier == Tier::SwiftGenerated &&
+        entry.second.kind == SymbolKind::Struct &&
+        isSwiftUIView(entry.second)) {
+      // hostingController() (SwiftSurface).
+      frameworks.insert("SwiftUI");
+      frameworks.insert("UIKit");
+    }
+  }
   for (const auto& name : classes) {
     const char* framework = frameworkOfObjCClass(name);
     if (framework && llvm::StringRef(framework) != "Foundation" &&
@@ -206,6 +240,9 @@ std::string swiftImports(const Module& module,
     }
   }
   std::string out;
+  for (const auto& name : module.swiftModules()) {
+    out += "import " + name + "\n";
+  }
   for (const auto& overlay : overlays) {
     out += "import " + overlay + "\n";
   }
@@ -221,7 +258,8 @@ Invocation describeInvocation(const Module& module, const Symbol& symbol,
   Invocation invocation;
   const Symbol* owner =
       symbol.parentId.empty() ? nullptr : module.find(symbol.parentId);
-  invocation.owner = owner ? ownerTypeText(module, *owner) : module.name;
+  invocation.owner = owner ? ownerTypeText(module, *owner)
+                           : declaringModuleName(module, symbol);
   invocation.member = symbol.baseName;
   invocation.isThrowing = symbol.isThrowing;
   invocation.isAsync = capability.isAsync;

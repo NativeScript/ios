@@ -14,8 +14,8 @@
 // Helpers for tests that run the Swift compiler against the fixture module.
 namespace TestSupport {
 
-// Directory holding SwiftDemo.swiftmodule built from the fixture sources, or
-// "" when no Swift toolchain is available.
+// Directory holding SwiftDemoKit.swiftmodule and SwiftDemo.swiftmodule built
+// from the fixture sources, or "" when no Swift toolchain is available.
 inline const std::string& fixtureModuleDirectory() {
   static std::string directory = [] {
     if (!llvm::sys::findProgramByName("xcrun")) {
@@ -25,12 +25,17 @@ inline const std::string& fixtureModuleDirectory() {
     if (llvm::sys::fs::createUniqueDirectory("swift-fixture", path)) {
       return std::string();
     }
-    std::string command =
-        "xcrun swiftc -emit-module -module-name SwiftDemo "
+    std::string flags =
         "-target arm64-apple-ios15.0-simulator "
-        "-sdk \"$(xcrun --sdk iphonesimulator --show-sdk-path)\" "
-        "-emit-module-path '" +
-        path.str().str() +
+        "-sdk \"$(xcrun --sdk iphonesimulator --show-sdk-path)\" -I '" +
+        path.str().str() + "' ";
+    std::string command =
+        "xcrun swiftc -emit-module -module-name SwiftDemoKit " + flags +
+        "-emit-module-path '" + path.str().str() +
+        "/SwiftDemoKit.swiftmodule' '" SWIFT_FIXTURE_DIR
+        "'/Sources/SwiftDemoKit/*.swift && "
+        "xcrun swiftc -emit-module -module-name SwiftDemo " + flags +
+        "-emit-module-path '" + path.str().str() +
         "/SwiftDemo.swiftmodule' '" SWIFT_FIXTURE_DIR
         "'/Sources/SwiftDemo/*.swift";
     auto shell = llvm::sys::findProgramByName("sh");

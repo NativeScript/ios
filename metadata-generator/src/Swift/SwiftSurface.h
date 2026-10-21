@@ -1,5 +1,6 @@
 #pragma once
 
+#include <deque>
 #include <map>
 #include <string>
 #include <vector>
@@ -20,6 +21,7 @@ struct SwiftSurface {
     kStruct = 2,
     kEnum = 3,
     kTaggedEnum = 4,
+    kProtocol = 5,
   };
   enum MemberKind {
     kInitializer = 0,
@@ -37,14 +39,20 @@ struct SwiftSurface {
     kAmbiguous = 1 << 2,
     kAsync = 1 << 3,
     kMainActor = 1 << 4,
+    // A protocol requirement; its position among the protocol's
+    // requirements is the index adapters call it by.
+    kRequirement = 1 << 5,
   };
 
   struct Type {
     const Symbol* symbol;
     int index;
     TypeKind kind;
-    // Type index of the registered superclass, or -1.
+    // Type index of the registered superclass (for a protocol, the protocol
+    // it refines), or -1.
     int superIndex;
+    // The Swift module whose JS namespace exposes the type.
+    std::string module;
   };
 
   struct Member {
@@ -52,17 +60,25 @@ struct SwiftSurface {
     const Capability* capability;
     // Type index, or -1 for module-level functions and variables.
     int owner;
+    // The owner's module, or the declaring module of a module-level member.
+    std::string module;
     MemberKind kind;
     int flags;
     std::string signature;
     // The value the member produces: the owner for initializers and enum
     // cases, the property type for properties.
     BridgedType result;
+    // `hostingController()`, added to SwiftUI views: a UIHostingController
+    // showing the view.
+    bool hostsView = false;
   };
 
   // A tagged enum's cases in registration order, which is the case index
   // the runtime and the thunks share.
   std::vector<const Member*> casesOf(int typeIndex) const;
+  // A protocol's requirements, those of the protocol it refines first, then
+  // its own in registration order: the index adapters call them by.
+  std::vector<const Member*> requirementsOf(int typeIndex) const;
 
   std::vector<Type> types;
   std::vector<Member> members;
@@ -71,7 +87,15 @@ struct SwiftSurface {
   int indexOf(const std::string& symbolId) const;
 
   std::map<std::string, int> typeIndex;
+
+  // Declarations of members the surface adds (hostsView), which Member
+  // points into.
+  std::deque<Symbol> syntheticSymbols;
+  std::deque<Capability> syntheticCapabilities;
 };
+
+// Whether `symbol` conforms to SwiftUI.View.
+bool isSwiftUIView(const Symbol& symbol);
 
 SwiftSurface describeSurface(const Module& module,
                              const Classification& classification);

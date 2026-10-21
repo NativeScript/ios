@@ -1,5 +1,7 @@
 #include "SwiftSurface.h"
 
+#include <algorithm>
+
 namespace Swift {
 
 namespace {
@@ -42,9 +44,28 @@ SwiftSurface::MemberKind memberKind(SymbolKind kind) {
 
 }  // namespace
 
+bool isSwiftUIView(const Symbol& symbol) {
+  return std::find(symbol.conformances.begin(), symbol.conformances.end(),
+                   "s:7SwiftUI4ViewP") != symbol.conformances.end();
+}
+
 int SwiftSurface::indexOf(const std::string& symbolId) const {
   auto it = typeIndex.find(symbolId);
   return it == typeIndex.end() ? -1 : it->second;
+}
+
+std::vector<const SwiftSurface::Member*> SwiftSurface::requirementsOf(
+    int typeIndex) const {
+  std::vector<const Member*> requirements;
+  if (types[typeIndex].superIndex >= 0) {
+    requirements = requirementsOf(types[typeIndex].superIndex);
+  }
+  for (const auto& member : members) {
+    if ((member.flags & kRequirement) && member.owner == typeIndex) {
+      requirements.push_back(&member);
+    }
+  }
+  return requirements;
 }
 
 std::vector<const SwiftSurface::Member*> SwiftSurface::casesOf(
@@ -110,6 +131,12 @@ std::string signatureCode(const SwiftSurface& surface,
     case Bridge::ObjCObject:
       code = "@" + type.objcClass;
       break;
+    case Bridge::Protocol:
+      code = "p" + std::to_string(surface.indexOf(type.symbolId));
+      break;
+    case Bridge::AsyncSequence:
+      code = "~" + signatureCode(surface, type.elements.at(0));
+      break;
     case Bridge::Date:
       code = "D";
       break;
@@ -133,6 +160,7 @@ std::string signatureCode(const SwiftSurface& surface,
       code += ")";
       break;
     }
+    case Bridge::TypeParameter:
     case Bridge::None:
       code = "?";
       break;
@@ -147,22 +175,32 @@ SwiftSurface describeSurface(const Module& module,
     const Symbol& symbol = entry.second;
     const Capability* capability = classification.find(entry.first);
     if (!capability || capability->tier != Tier::SwiftGenerated ||
-        !isNominalType(symbol.kind) || symbol.kind == SymbolKind::Protocol) {
+        !isNominalType(symbol.kind)) {
       continue;
     }
     SwiftSurface::TypeKind kind =
-        symbol.kind == SymbolKind::Struct ? SwiftSurface::kStruct
+        symbol.kind == SymbolKind::Protocol ? SwiftSurface::kProtocol
+        : symbol.kind == SymbolKind::Struct ? SwiftSurface::kStruct
         : symbol.kind == SymbolKind::Enum
             ? (hasAssociatedValues(module, symbol) ? SwiftSurface::kTaggedEnum
                                                    : SwiftSurface::kEnum)
         : symbol.kind == SymbolKind::Actor ? SwiftSurface::kActor
                                            : SwiftSurface::kClass;
     int index = static_cast<int>(surface.types.size());
-    surface.types.push_back(SwiftSurface::Type{&symbol, index, kind, -1});
+    surface.types.push_back(SwiftSurface::Type{
+        &symbol, index, kind, -1,
+        symbol.module.empty() ? module.name : symbol.module});
     surface.typeIndex[symbol.preciseId] = index;
   }
   for (auto& type : surface.types) {
     type.superIndex = surface.indexOf(type.symbol->superclassId);
+    if (type.kind == SwiftSurface::kProtocol) {
+      for (const auto& id : type.symbol->conformances) {
+        if (surface.indexOf(id) >= 0) {
+          type.superIndex = surface.indexOf(id);
+        }
+      }
+    }
   }
 
   for (const auto& entry : module.symbols) {
@@ -179,6 +217,9 @@ SwiftSurface describeSurface(const Module& module,
     member.symbol = &symbol;
     member.capability = capability;
     member.owner = owner ? surface.indexOf(owner->preciseId) : -1;
+    member.module = member.owner >= 0       ? surface.types[member.owner].module
+                    : symbol.module.empty() ? module.name
+                                            : symbol.module;
     member.kind = memberKind(symbol.kind);
     member.flags =
         (symbol.isThrowing ? SwiftSurface::kThrows : 0) |
@@ -189,13 +230,61 @@ SwiftSurface describeSurface(const Module& module,
         (capability->isAsync ? SwiftSurface::kAsync : 0) |
         (capability->isMainActor && !capability->isAsync
              ? SwiftSurface::kMainActor
-             : 0);
+             : 0) |
+        (capability->isRequirement ? SwiftSurface::kRequirement : 0);
     member.result = capability->result;
     for (size_t i = 0; i < capability->parameters.size(); i++) {
       member.signature += (i > 0 ? "," : "") +
                           signatureCode(surface, capability->parameters[i]);
     }
     member.signature += ">" + signatureCode(surface, member.result);
+    surface.members.push_back(std::move(member));
+  }
+
+  for (const auto& type : surface.types) {
+    const Symbol& view = *type.symbol;
+    if (type.kind != SwiftSurface::kStruct || !isSwiftUIView(view)) {
+      continue;
+    }
+    bool taken = false;
+    for (const auto& member : surface.members) {
+      taken |= member.owner == type.index &&
+               member.capability->jsName == "hostingController";
+    }
+    if (taken) {
+      continue;
+    }
+    Symbol symbol;
+    symbol.preciseId = view.preciseId;
+    symbol.kind = SymbolKind::InstanceMethod;
+    symbol.name = "hostingController()";
+    symbol.baseName = "hostingController";
+    symbol.pathComponents = view.pathComponents;
+    symbol.pathComponents.push_back(symbol.name);
+    symbol.parentId = view.preciseId;
+    symbol.module = view.module;
+    symbol.docComment =
+        "A UIHostingController showing this view (main thread only).";
+    surface.syntheticSymbols.push_back(std::move(symbol));
+
+    Capability capability;
+    capability.tier = Tier::SwiftGenerated;
+    capability.jsName = "hostingController";
+    capability.isMainActor = true;
+    capability.result.bridge = Bridge::ObjCObject;
+    capability.result.objcClass = "UIViewController";
+    surface.syntheticCapabilities.push_back(std::move(capability));
+
+    SwiftSurface::Member member;
+    member.symbol = &surface.syntheticSymbols.back();
+    member.capability = &surface.syntheticCapabilities.back();
+    member.owner = type.index;
+    member.module = type.module;
+    member.kind = SwiftSurface::kInstanceMethod;
+    member.flags = SwiftSurface::kMainActor;
+    member.result = member.capability->result;
+    member.signature = ">" + signatureCode(surface, member.result);
+    member.hostsView = true;
     surface.members.push_back(std::move(member));
   }
   return surface;

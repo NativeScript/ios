@@ -48,7 +48,6 @@ ProbeSource emitProbes(const Module& module,
       "for");
   out.line("// the Swift-generated surface of module " + module.name + ".");
   out.line("import Foundation");
-  out.line("import " + module.name);
   llvm::SmallVector<llvm::StringRef, 8> imports;
   std::string text = swiftImports(module, classification);
   llvm::StringRef(text).split(imports, '\n', -1, false);
@@ -68,7 +67,8 @@ ProbeSource emitProbes(const Module& module,
     if (isNominalType(symbol.kind)) {
       // Bridged types are copied in and out of boxes and handles, which
       // requires Copyable (not visible in symbol graphs).
-      std::string type = qualifiedTypeName(module, symbol);
+      std::string type = (symbol.kind == SymbolKind::Protocol ? "any " : "") +
+                         qualifiedTypeName(module, symbol);
       std::string availability = availabilityCondition(module, symbol);
       out.begin(symbol.preciseId);
       out.line("// " + symbol.preciseId);
@@ -121,7 +121,9 @@ ProbeSource emitProbes(const Module& module,
              ")" + (invocation.isAsync ? " async" : "") +
              (invocation.isThrowing ? " throws" : "") + " {");
     const std::string receiver = "receiver";
-    out.line("  let _: " + invocation.resultType + " = " +
+    bool opaque = capability->result.node.kind == TypeNode::Kind::Opaque;
+    out.line("  let _" +
+             (opaque ? std::string() : ": " + invocation.resultType) + " = " +
              invocationExpression(invocation, receiver, arguments));
     if (invocation.isSettable) {
       out.line("  " + assignmentStatement(invocation, receiver, "newValue"));

@@ -23,10 +23,15 @@ inline const ModuleSet& fixture() {
   return set;
 }
 
+// SwiftDemo and SwiftDemoKit as one generation unit, named SwiftDemo.
 inline const Module& demo() {
-  static const Module empty;
-  auto it = fixture().modules.find("SwiftDemo");
-  return it == fixture().modules.end() ? empty : it->second;
+  static const Module unit = [] {
+    ModuleSet set = loadSymbolGraphDirectory(SWIFT_FIXTURE_GRAPHS_DIR);
+    Module unit = mergeUnit(set, "SwiftDemo");
+    instantiateGenerics(unit);
+    return unit;
+  }();
+  return unit;
 }
 
 inline std::vector<const Symbol*> symbolsAt(const Module& module,

@@ -18,9 +18,12 @@
 // Any change to a layout, an API table slot, a tag, a kind or a signature
 // code requires bumping NS_SWIFT_ABI_VERSION in both places.
 //
-// A Swift module `M` exposes one C symbol, `ns_swift_register_M`, taking an
-// NSSwiftRegistrar*. It registers the module, its types and its members with
-// the API table's register* entries. Each member carries a thunk:
+// Thunks are generated per unit: one or more Swift modules whose declarations
+// may name and extend each other's types. Every module `M` of a unit exposes
+// a C symbol, `ns_swift_register_M`, taking an NSSwiftRegistrar*; each
+// registers the whole unit (its modules, types and members) with the API
+// table's register* entries. Types and members name the module whose
+// `ns:swift/<M>` namespace exposes them. Each member carries a thunk:
 //
 //   void thunk(NSSwiftCall* call, const NSSwiftValue* args, intptr_t count)
 //
@@ -37,7 +40,7 @@
 // calls it by reporting the arguments as an array: callbackBegin, each
 // argument through the complete* entries, then completeArrayEnd.
 
-#define NS_SWIFT_ABI_VERSION 7
+#define NS_SWIFT_ABI_VERSION 11
 
 #ifdef __cplusplus
 extern "C" {
@@ -80,6 +83,9 @@ enum {
   NSSwiftTagCase = 10,
   // An Objective-C object borrowed (+0) for the duration of the call.
   NSSwiftTagObjC = 11,
+  // A JS object implementing a protocol: payload.object is a handle,
+  // borrowed for the call like a callback handle.
+  NSSwiftTagJSObject = 12,
 };
 
 typedef struct NSSwiftAPI NSSwiftAPI;
@@ -95,6 +101,12 @@ typedef struct NSSwiftRegistrar {
 
 typedef void (*NSSwiftThunk)(NSSwiftCall* call, const NSSwiftValue* args,
                              intptr_t count);
+// Runs callback handle `read` (no arguments) tracking the observable
+// properties it reads, then calls handle `changed` once, when one of them is
+// about to change (Observation's withObservationTracking). Returns 0 when
+// Observation is unavailable on this OS.
+typedef uint8_t (*NSSwiftTracker)(const NSSwiftAPI* api, void* read,
+                                  void* changed);
 typedef void (*NSSwiftRelease)(void* object);
 
 enum {
@@ -104,6 +116,10 @@ enum {
   NSSwiftTypeEnum = 3,
   // An enum with associated values.
   NSSwiftTypeTaggedEnum = 4,
+  // A protocol JS objects can implement; `superIndex` names the protocol it
+  // refines. Its members are its requirements (NSSwiftMemberRequirement)
+  // and extension members, called on boxed values of the protocol.
+  NSSwiftTypeProtocol = 5,
 };
 
 enum {
@@ -127,6 +143,10 @@ enum {
   NSSwiftMemberAsync = 1 << 3,
   // Isolated to the main actor; the thunk rejects calls from other threads.
   NSSwiftMemberMainActor = 1 << 4,
+  // A protocol requirement. A protocol's requirement table is its refined
+  // protocol's, then its own requirements in registration order; adapters
+  // call entry k as 2k (2k + 1 for a property setter).
+  NSSwiftMemberRequirement = 1 << 5,
 };
 
 // Member signatures: comma-separated parameter codes, '>', result code.
@@ -149,8 +169,12 @@ enum {
 //   (<code>,...)
 //               closure returning Void, of the listed parameters
 //               (NSSwiftTagFunction) <- JS function; parameters only
+//   p<n>        value of protocol type index n: a Swift object (tag Object)
+//               or a JS object implementing it (NSSwiftTagJSObject)
 //   @<Name>     instance of Objective-C class <Name> (its runtime name)
 //               (NSSwiftTagObjC) <-> NativeScript's Objective-C wrapper
+//   ~<code>     asynchronous sequence of <code> (results only) -> JS async
+//               iterator; see returnAsyncSequence
 //   <code>?     optional: JS null/undefined <-> NSSwiftTagNull
 //   &<code>     inout parameter: JS passes a reference object `{ value }`;
 //               the slot holds its value, and a successful call reports the
@@ -185,20 +209,23 @@ struct NSSwiftAPI {
                              intptr_t typeLength);
   /* 9 */ void (*throwTypeError)(NSSwiftCall* call, const uint8_t* message,
                                  intptr_t length);
+  // `name` names the unit.
   /* 10 */ void (*registerModule)(NSSwiftRegistrar* registrar,
                                   uint32_t abiVersion, const char* name,
                                   const char* fingerprint,
                                   NSSwiftRelease release);
   // `superIndex` is the type index of a registered superclass, or -1.
   /* 11 */ void (*registerType)(NSSwiftRegistrar* registrar, uint32_t index,
-                                uint32_t kind, const char* jsName,
-                                const char* swiftName, int32_t superIndex);
-  // `owner` is a type index, or -1 for module-level functions and variables.
+                                uint32_t kind, const char* module,
+                                const char* jsName, const char* swiftName,
+                                int32_t superIndex);
+  // `owner` is a type index, or -1 for module-level functions and
+  // variables; a member of a type belongs to the type's module.
   /* 12 */ void (*registerMember)(NSSwiftRegistrar* registrar, int32_t owner,
                                   uint32_t kind, uint32_t flags,
-                                  const char* jsName, const char* swiftName,
-                                  const char* signature, NSSwiftThunk thunk,
-                                  NSSwiftThunk setter);
+                                  const char* module, const char* jsName,
+                                  const char* swiftName, const char* signature,
+                                  NSSwiftThunk thunk, NSSwiftThunk setter);
 
   // Async calls. beginAsync makes the call's JS result a Promise and returns
   // a token; exactly one complete* entry settles it. Those may be called from
@@ -256,6 +283,35 @@ struct NSSwiftAPI {
   // An Objective-C object, retained (+1); the runtime takes ownership.
   /* 40 */ void (*returnObjC)(NSSwiftCall* call, void* object);
   /* 41 */ void (*completeObjC)(void* token, void* object);
+
+  // A Swift module of the unit, registered before its types and members.
+  /* 42 */ void (*registerUnitModule)(NSSwiftRegistrar* registrar,
+                                      const char* name);
+
+  // Calls requirement `index` of a JS object handle: Begin, the arguments
+  // through the complete* entries, then End, which runs the JS member on the
+  // isolate's thread (waiting for it from any other thread) and returns its
+  // result as one slot, or null when it threw or returned a value that does
+  // not convert. A non-null result is released with objectResultRelease.
+  // Handles are retained and released with callbackRetain/Release.
+  /* 43 */ void* (*objectCallBegin)(void* object, intptr_t index);
+  /* 44 */ const NSSwiftValue* (*objectCallEnd)(void* token);
+  /* 45 */ void (*objectResultRelease)(const NSSwiftValue* result);
+  // A JS object handle, as the JS object itself.
+  /* 46 */ void (*returnJSObject)(NSSwiftCall* call, void* object);
+  /* 47 */ void (*completeJSObject)(void* token, void* object);
+
+  /* 48 */ void (*registerTracker)(NSSwiftRegistrar* registrar,
+                                   NSSwiftTracker tracker);
+
+  // An asynchronous sequence, as a retained (+1) iterator object the runtime
+  // takes ownership of. Each JS `next()` calls `next` with the iterator as
+  // args[0] once the previous step settled; it reports the next element as
+  // a one-element array, or an empty array at the end, through beginAsync.
+  /* 49 */ void (*returnAsyncSequence)(NSSwiftCall* call, void* iterator,
+                                       NSSwiftThunk next);
+  /* 50 */ void (*completeAsyncSequence)(void* token, void* iterator,
+                                         NSSwiftThunk next);
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);
