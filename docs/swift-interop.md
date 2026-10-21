@@ -545,6 +545,11 @@ Xcode 27.1 (lower is better):
   function costs about 0.2 µs per call against about 0.1 µs for an
   Objective-C block or a JS subclass, because each invocation reports its
   arguments as a stream the runtime assembles before calling into JS.
+- Startup and size: in a Release app whose unit is the app's own module,
+  WeatherKit (424 callables) and a SwiftPM package, the compiled thunks are
+  0.8 MB and the first `ns:swift` import, which registers the unit and builds
+  every module's JS classes, takes 2.7 ms on the simulator. Later imports of
+  the unit's modules return the built namespaces.
 - A Debug build (unoptimized thunks) is slower on both paths; there Swift's
   scalar calls are about 1.2x Objective-C's while the collection, batch and
   async cases keep most of their lead.
