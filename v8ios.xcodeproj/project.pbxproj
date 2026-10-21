@@ -2245,7 +2245,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cd ${PROJECT_DIR}/metadata-generator/build/bin\ncp ../../build-step-metadata-generator.py .\n./build-step-metadata-generator.py\n\n# create temporary empty metadata files for XCode LD/LDPLUSPLUS flag analysis\nfor arch in $VALID_ARCHS\ndo :\n    echo \"creating empty $CONFIGURATION_BUILD_DIR/metadata-$arch.bin\"\n    touch \"$CONFIGURATION_BUILD_DIR/metadata-$arch.bin\"\ndone\n";
+			shellScript = "cd ${PROJECT_DIR}/metadata-generator/build/bin\ncp ../../build-step-metadata-generator.py .\n# The SwiftDemo fixture's Objective-C-visible classes, as an app's -Swift.h header\n# reaches its metadata (see internal/nsld.sh): ns:swift installs their Swift-only members.\nSWIFT_HEADER=$(find \"${PROJECT_TEMP_DIR}/${CONFIGURATION}${EFFECTIVE_PLATFORM_NAME}/SwiftDemo.build\" -name SwiftDemo-Swift.h 2>/dev/null | head -1)\nif [ -n \"$SWIFT_HEADER\" ]; then\n    MAP_DIR=\"${DERIVED_FILE_DIR}/SwiftDemoHeader\"\n    mkdir -p \"$MAP_DIR\"\n    printf 'module SwiftDemoObjC {\\n header \"%s\"\\n export *\\n}\\n' \"$SWIFT_HEADER\" > \"$MAP_DIR/module.modulemap\"\n    export OTHER_CFLAGS=\"$OTHER_CFLAGS -fmodule-map-file=$MAP_DIR/module.modulemap\"\nfi\n./build-step-metadata-generator.py\n\n# create temporary empty metadata files for XCode LD/LDPLUSPLUS flag analysis\nfor arch in $VALID_ARCHS\ndo :\n    echo \"creating empty $CONFIGURATION_BUILD_DIR/metadata-$arch.bin\"\n    touch \"$CONFIGURATION_BUILD_DIR/metadata-$arch.bin\"\ndone\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

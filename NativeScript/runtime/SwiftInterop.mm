@@ -419,9 +419,14 @@ struct TypeInfo {
   int family = -1;
   // NSSwiftTypeProtocol: the requirement table adapters call by index.
   std::vector<const MemberInfo*> requirements;
+  // NSSwiftTypeObjCClass: the class `jsName` names, or nil when not loaded.
+  Class objcClass = nil;
 };
 
 bool IsEnumKind(uint32_t kind) { return kind == NSSwiftTypeEnum || kind == NSSwiftTypeTaggedEnum; }
+
+// Types without a JS class of their own.
+bool HasNoTemplate(uint32_t kind) { return IsEnumKind(kind) || kind == NSSwiftTypeObjCClass; }
 
 // A registered unit: one or more Swift modules sharing one type table.
 struct ModuleInfo {
@@ -590,6 +595,9 @@ void ApiRegisterType(NSSwiftRegistrar* registrar, uint32_t index, uint32_t kind,
   type.jsName = jsName ? jsName : "";
   type.swiftName = swiftName ? swiftName : "";
   type.superIndex = superIndex;
+  if (kind == NSSwiftTypeObjCClass) {
+    type.objcClass = objc_getClass(type.jsName.c_str());
+  }
   module->types.push_back(std::move(type));
 }
 
@@ -3179,6 +3187,15 @@ MaybeLocal<Value> Invoke(Isolate* isolate, const MemberGroup& group, const Membe
       if (!Convert(isolate, context, module, member, 0, code, receiver, slot, arena)) {
         return MaybeLocal<Value>();
       }
+    } else if (owner.kind == NSSwiftTypeObjCClass) {
+      id object = ObjCObjectOf(isolate, receiver);
+      if (object == nil || owner.objcClass == nil || ![object isKindOfClass:owner.objcClass]) {
+        isolate->ThrowException(Exception::TypeError(tns::ToV8String(
+            isolate, "Illegal invocation: " + member.swiftName + " needs a " + owner.swiftName)));
+        return MaybeLocal<Value>();
+      }
+      slot.tag = NSSwiftTagObjC;
+      slot.payload.object = object;
     } else {
       SwiftObjectWrapper* wrapper = SwiftWrapperOf(isolate, receiver);
       if (!wrapper || wrapper->Module() != &module ||
@@ -3483,7 +3500,7 @@ class Builder {
     _loaded.templates.resize(_module.types.size());
     std::vector<Local<FunctionTemplate>> templates(_module.types.size());
     for (const TypeInfo& type : _module.types) {
-      if (IsEnumKind(type.kind) || type.family != static_cast<int>(type.index)) {
+      if (HasNoTemplate(type.kind) || type.family != static_cast<int>(type.index)) {
         continue;
       }
       Local<FunctionTemplate> tmpl =
@@ -3493,7 +3510,7 @@ class Builder {
       templates[type.index] = tmpl;
     }
     for (const TypeInfo& type : _module.types) {
-      if (!IsEnumKind(type.kind)) {
+      if (!HasNoTemplate(type.kind)) {
         templates[type.index] = templates[type.family];
       }
     }
@@ -3516,6 +3533,7 @@ class Builder {
     // function exists.
     std::vector<const MemberGroup*> moduleGroups;
     std::vector<const MemberGroup*> enumGroups;
+    std::vector<const MemberGroup*> objcGroups;
     for (const auto& group : _module.groups) {
       if (group->owner < 0) {
         moduleGroups.push_back(group.get());
@@ -3526,6 +3544,10 @@ class Builder {
         enumGroups.push_back(group.get());
         continue;
       }
+      if (owner.kind == NSSwiftTypeObjCClass) {
+        objcGroups.push_back(group.get());
+        continue;
+      }
       InstallOnTemplate(templates[group->owner], *group);
     }
 
@@ -3533,6 +3555,9 @@ class Builder {
     for (const TypeInfo& type : _module.types) {
       if (IsEnumKind(type.kind)) {
         values[type.index] = enums[type.index];
+        continue;
+      }
+      if (type.kind == NSSwiftTypeObjCClass) {
         continue;
       }
       if (type.family != static_cast<int>(type.index)) {
@@ -3555,11 +3580,15 @@ class Builder {
     // Keyed by module and path: modules have their own namespaces.
     std::map<std::string, Local<Object>> containers;
     for (const TypeInfo& type : _module.types) {
-      containers[type.swiftModule + ":" + type.jsName] = values[type.index];
+      if (type.kind != NSSwiftTypeObjCClass) {
+        containers[type.swiftModule + ":" + type.jsName] = values[type.index];
+      }
     }
     std::vector<const TypeInfo*> byDepth;
     for (const TypeInfo& type : _module.types) {
-      byDepth.push_back(&type);
+      if (type.kind != NSSwiftTypeObjCClass) {
+        byDepth.push_back(&type);
+      }
     }
     std::stable_sort(byDepth.begin(), byDepth.end(), [](const TypeInfo* a, const TypeInfo* b) {
       return std::count(a->jsName.begin(), a->jsName.end(), '.') <
@@ -3602,6 +3631,21 @@ class Builder {
     }
     for (const MemberGroup* group : moduleGroups) {
       if (!InstallOnObject(exports[group->swiftModule], *group)) {
+        return false;
+      }
+    }
+    std::map<int, std::pair<Local<Object>, Local<Object>>> objcClasses;
+    for (const MemberGroup* group : objcGroups) {
+      auto found = objcClasses.find(group->owner);
+      if (found == objcClasses.end()) {
+        Local<Object> constructor;
+        Local<Object> prototype;
+        if (!NativeScriptClass(_module.types[group->owner], constructor, prototype)) {
+          continue;
+        }
+        found = objcClasses.emplace(group->owner, std::make_pair(constructor, prototype)).first;
+      }
+      if (!InstallOnObjCClass(found->second.first, found->second.second, *group)) {
         return false;
       }
     }
@@ -3674,6 +3718,89 @@ class Builder {
     Local<v8::Function> function;
     return tmpl->GetFunction(_context).ToLocal(&function) &&
            target->Set(_context, tns::ToV8String(_isolate, key), function).FromMaybe(false);
+  }
+
+  // NativeScript's constructor and prototype for `type`'s Objective-C class;
+  // false when its metadata does not describe that exact class, as the
+  // nearest described superclass would be the wrong one to extend.
+  bool NativeScriptClass(const TypeInfo& type, Local<Object>& constructor,
+                         Local<Object>& prototype) {
+    const Meta* meta = type.objcClass ? ArgConverter::FindMeta(type.objcClass) : nullptr;
+    // Metadata names a Swift class by its mangled runtime name and also
+    // records the demangled one, which class_getName returns.
+    const char* className = type.objcClass ? class_getName(type.objcClass) : "";
+    if (meta == nullptr || meta->type() != MetaType::Interface ||
+        (strcmp(meta->name(), className) != 0 && strcmp(meta->demangledName(), className) != 0)) {
+      return false;
+    }
+    Local<Value> value;
+    Local<Value> proto;
+    if (!_context->Global()
+             ->Get(_context, tns::ToV8String(_isolate, meta->jsName()))
+             .ToLocal(&value) ||
+        !value->IsFunction()) {
+      return false;
+    }
+    constructor = value.As<Object>();
+    if (!constructor->Get(_context, tns::ToV8String(_isolate, "prototype")).ToLocal(&proto) ||
+        !proto->IsObject()) {
+      return false;
+    }
+    prototype = proto.As<Object>();
+    return true;
+  }
+
+  // Swift-only members of an Objective-C-visible class, beside the members
+  // NativeScript gives it, which they never replace.
+  bool InstallOnObjCClass(Local<Object> constructor, Local<Object> prototype,
+                          const MemberGroup& group) {
+    bool instance =
+        group.kind == NSSwiftMemberInstanceMethod || group.kind == NSSwiftMemberInstanceProperty;
+    Local<Object> target = instance ? prototype : constructor;
+    std::string key = group.kind == NSSwiftMemberInitializer ? "init" : group.jsName;
+    auto define = [&](const std::string& name, Local<FunctionTemplate> tmpl) {
+      Local<v8::String> property = tns::ToV8String(_isolate, name);
+      Local<v8::Function> function;
+      if (target->Has(_context, property).FromMaybe(true)) {
+        return true;
+      }
+      return tmpl->GetFunction(_context).ToLocal(&function) &&
+             target->DefineOwnProperty(_context, property, function, DontEnum).FromMaybe(false);
+    };
+    switch (group.kind) {
+      case NSSwiftMemberInstanceProperty:
+      case NSSwiftMemberStaticProperty: {
+        Local<v8::String> property = tns::ToV8String(_isolate, key);
+        if (target->Has(_context, property).FromMaybe(true)) {
+          return true;
+        }
+        Local<v8::Function> getter;
+        Local<v8::Function> setter;
+        if (!MethodTemplate(group, GetterCallback)->GetFunction(_context).ToLocal(&getter) ||
+            (HasSetter(group) &&
+             !MethodTemplate(group, SetterCallback)->GetFunction(_context).ToLocal(&setter))) {
+          return false;
+        }
+        target->SetAccessorProperty(property, getter, setter, DontEnum);
+        return true;
+      }
+      case NSSwiftMemberInitializer:
+      case NSSwiftMemberInstanceMethod:
+      case NSSwiftMemberStaticMethod: {
+        if (!define(key, MethodTemplate(group))) {
+          return false;
+        }
+        for (const auto& overload : OverloadKeys(group)) {
+          if (!define(overload.first,
+                      MethodTemplate(*ExactGroupFor(group, *overload.second), ExactCallback))) {
+            return false;
+          }
+        }
+        return true;
+      }
+      default:
+        return true;
+    }
   }
 
   // Enum and module-level members, on a plain object.

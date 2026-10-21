@@ -22,6 +22,10 @@ struct SwiftSurface {
     kEnum = 3,
     kTaggedEnum = 4,
     kProtocol = 5,
+    // An Objective-C-visible class declared in Swift, registered under its
+    // Objective-C name: its Swift-only members install on NativeScript's
+    // class, which has no TypeScript or JS class of its own here.
+    kObjCClass = 6,
   };
   enum MemberKind {
     kInitializer = 0,

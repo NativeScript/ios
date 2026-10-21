@@ -19,6 +19,26 @@ public func firstSubview(of view: UIView) -> UIView? { view.subviews.first }
 public final class Note: NSObject {
     public let text: String
     public init(text: String) { self.text = text }
+
+    // Swift-only members, installed on NativeScript's Note class.
+    public var tags: Set<String> = []
+    public func tagged(_ tag: String) -> Note {
+        tags.insert(tag)
+        return self
+    }
+    public func summary(maxLength: Int) -> String { String(text.prefix(maxLength)) }
+    public static func blank() -> Note { Note(text: "") }
+    // Objective-C-visible: NativeScript's own.
+    @objc public var revision = 1
+}
+
+// A view written in Swift with a Swift-typed API.
+public final class CounterView: UIView {
+    public private(set) var count = 0
+    public func configure(start: Int, step: Int?) -> Int {
+        count = start + (step ?? 1)
+        return count
+    }
 }
 
 public func makeNote(_ text: String) -> Note { Note(text: text) }

@@ -358,7 +358,7 @@ declare module "ns:swift/SwiftDemo" {
   export function ramp(count: number | bigint): Uint8Array;
   export function same(greeting: Greeting): Greeting;
   export function tags(views: readonly (UIView)[]): (number)[];
-  export function text(note: NSObject): string;
+  export function text(note: Note): string;
   export function zero(): number;
   export function boxed(money: import("ns:swift/SwiftDemoKit").Money): import("ns:swift/SwiftDemoKit").Box<import("ns:swift/SwiftDemoKit").Money>;
   export function clear(name: { value: (string) | null | undefined }): void;
@@ -403,7 +403,7 @@ declare module "ns:swift/SwiftDemo" {
   export function describe(pair: import("ns:swift/SwiftDemoKit").Pair<number, string>): string;
   export function describe(view: UIView): string;
   export function echoInt8(value: number | bigint): number;
-  export function makeNote(text: string): NSObject;
+  export function makeNote(text: string): Note;
   export function midpoint(a: { readonly x: number; readonly y: number }, b: { readonly x: number; readonly y: number }): { x: number; y: number };
   export function mirrored(grid: readonly (readonly (number | bigint)[])[]): ((number)[])[];
   export function popCount(value: number | bigint): number;
@@ -420,9 +420,26 @@ declare module "ns:swift/SwiftDemo" {
   export function introduce(greeting: Greeting, other: string): string;
   export function makeLabel(text: string): UILabel;
   export function makeScore(name: string, points: number | bigint): import("ns:swift/SwiftDemoKit").Pair<string, number>;
-  export function noteLater(text: string): Promise<NSObject>;
+  export function noteLater(text: string): Promise<Note>;
   export function onMeasure(body: (arg0: Measurement) => void): void;
   export function transform(values: readonly (number | bigint)[], body: (arg0: number) => string): (string)[];
+
+  global {
+    interface CounterView {
+      readonly count: number;
+      configure(start: number | bigint, step: (number | bigint) | null | undefined): number;
+    }
+    interface Note {
+      tags: Set<string>;
+      readonly text: string;
+      tagged(tag: string): Note;
+      summary(maxLength: number | bigint): string;
+    }
+    namespace Note {
+      function init(text: string): Note;
+      function blank(): Note;
+    }
+  }
 }
 
 declare module "ns:swift" {

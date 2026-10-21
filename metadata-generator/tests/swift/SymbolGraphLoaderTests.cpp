@@ -208,6 +208,7 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "tags(_:)",
                                        "firstSubview(of:)",
                                        "Note",
+                                       "CounterView",
                                        "makeNote(_:)",
                                        "text(of:)",
                                        "noteLater(_:)",

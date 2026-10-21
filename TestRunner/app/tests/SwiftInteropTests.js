@@ -806,6 +806,42 @@ describe("ns:swift", function () {
         });
     });
 
+    describe("Objective-C-visible Swift classes", function () {
+        it("installs Swift-only members on NativeScript's class", function () {
+            var note = Note.init("hello world");
+            expect(note instanceof Note).toBe(true);
+            expect(note.text).toBe("hello world");
+            expect(note.summary(5)).toBe("hello");
+            expect(note.tagged("a").tagged("b")).toBe(note);
+            expect(Array.from(note.tags).sort()).toEqual(["a", "b"]);
+            note.tags = new Set(["c"]);
+            expect(Array.from(note.tags)).toEqual(["c"]);
+            expect(Note.blank().text).toBe("");
+            expect(SwiftDemo.text(note)).toBe("hello world");
+        });
+
+        it("leaves NativeScript's own members alone", function () {
+            var note = Note.init("x");
+            expect(note.revision).toBe(1);
+            note.revision = 2;
+            expect(note.revision).toBe(2);
+            expect(Object.keys(Note.prototype)).not.toContain("summary");
+        });
+
+        it("refuses receivers of other classes", function () {
+            expect(function () { Note.prototype.summary.call(NSObject.new(), 1); })
+                .toThrowError(TypeError, /Illegal invocation/);
+        });
+
+        it("calls a UIView subclass's Swift-only members", function () {
+            var view = CounterView.new();
+            expect(view instanceof UIView).toBe(true);
+            expect(view.configure(1, null)).toBe(2);
+            expect(view.configure(5, 3)).toBe(8);
+            expect(view.count).toBe(8);
+        });
+    });
+
     describe("C structs", function () {
         it("copies known C structs as plain objects", function () {
             expect(SwiftDemo.midpoint({ x: 0, y: 0 }, { x: 4, y: 2 })).toEqual({ x: 2, y: 1 });

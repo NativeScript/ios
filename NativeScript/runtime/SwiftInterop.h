@@ -120,6 +120,12 @@ enum {
   // refines. Its members are its requirements (NSSwiftMemberRequirement)
   // and extension members, called on boxed values of the protocol.
   NSSwiftTypeProtocol = 5,
+  // An Objective-C-visible class declared in Swift; `jsName` is its
+  // Objective-C class name. Its Swift-only members install on NativeScript's
+  // class for it (instance members on its prototype, `init` and static
+  // members on its constructor), called with NativeScript's wrapper of the
+  // object as the receiver (NSSwiftTagObjC). The type has no JS class here.
+  NSSwiftTypeObjCClass = 6,
 };
 
 enum {

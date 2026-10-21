@@ -182,8 +182,8 @@ Thunks import the framework an Objective-C class most likely comes from
 (`UIView` -> UIKit), guessed from its prefix since symbol graphs do not
 record it; compiler verification drops declarations whose types still do not
 resolve. TypeScript names these classes by their global `@nativescript/types`
-name, and Swift classes without `@objc(Name)` as `NSObject`. Swift-only
-members of Objective-C-visible Swift classes are not exposed yet.
+name, and Swift classes without `@objc(Name)` as `NSObject`, except the
+unit's own Objective-C-visible classes (below).
 
 Structs have value semantics: reading a struct-typed property, passing a struct
 argument, or returning one copies it, so a JS object never aliases another
@@ -245,6 +245,37 @@ as Swift holds the closure, and drops it when Swift releases the closure.
 - `async` closures, `@autoclosure` parameters, closures with `inout`
   parameters, closures returning closures or sequences, and closures returned
   from Swift are not bridged yet.
+
+## Objective-C-visible Swift classes
+
+A Swift class that subclasses `NSObject` (a `UIView` or `UIViewController`
+subclass, say) is an Objective-C class to NativeScript: JS creates and holds
+it through NativeScript's own class, and its `@objc` members work as before.
+Its Swift-only members, the ones Objective-C cannot see, install on that same
+class when the module loads:
+
+```swift
+public final class CounterView: UIView {
+    public private(set) var count = 0
+    public func configure(start: Int, step: Int?) -> Int { ... }
+}
+```
+
+```js
+require("ns:swift/MyApp");
+const view = CounterView.new();      // NativeScript's class
+view.configure(1, null);             // Swift-only, through a thunk
+Note.init("hello");                  // a Swift-only initializer
+```
+
+- Instance members go on the class's prototype; static members and
+  Swift-only initializers (as `init`) on its constructor. They never replace
+  a member NativeScript already gives the class.
+- The class needs NativeScript metadata, which an app gets from its
+  `-Swift.h` header; members of a class without metadata are not installed.
+- Members of `UIResponder` subclasses (views, controllers) are isolated to the
+  main thread, as UIKit declares them.
+- TypeScript merges the members into the global declaration of the class.
 
 ## Protocols
 

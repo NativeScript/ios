@@ -1717,9 +1717,13 @@ private func __nsRelease(_ object: UnsafeMutableRawPointer) {
     for (const auto& type : _surface.types) {
       const Symbol& symbol = *type.symbol;
       int kind = type.kind;
+      const Capability* capability = _classification.find(symbol.preciseId);
+      std::string jsName = type.kind == SwiftSurface::kObjCClass
+                               ? capability->objcName
+                               : llvm::join(symbol.pathComponents, ".");
       out += "  registerType(registrar, " + std::to_string(type.index) + ", " +
              std::to_string(kind) + ", " + quoted(type.module) + ", " +
-             quoted(llvm::join(symbol.pathComponents, ".")) + ", " +
+             quoted(jsName) + ", " +
              quoted(qualifiedTypeName(_module, symbol)) + ", " +
              std::to_string(type.superIndex) + ")\n";
     }

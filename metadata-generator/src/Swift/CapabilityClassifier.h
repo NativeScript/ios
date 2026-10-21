@@ -154,6 +154,11 @@ struct Capability {
   bool isSettable = false;
   // A requirement of an adoptable protocol, which JS implementations provide.
   bool isRequirement = false;
+  // An Objective-C-visible class declared in Swift (ObjCDirect): its
+  // Swift-only members are generated and installed on NativeScript's class
+  // for `objcName`, its Objective-C runtime name.
+  bool objcBacked = false;
+  std::string objcName;
 
   // Bridges for SwiftGenerated callables: parameters in order, then the
   // result (or the property value type).

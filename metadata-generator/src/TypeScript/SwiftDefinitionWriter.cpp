@@ -193,6 +193,11 @@ class Writer {
       if (!type.symbol->genericBase.empty()) {
         _families.emplace(type.symbol->genericBase, type.index);
       }
+      if (type.kind == SwiftSurface::kObjCClass) {
+        _objcGlobals.emplace(
+            _classification.find(type.symbol->preciseId)->objcName,
+            globalName(type));
+      }
     }
   }
 
@@ -211,6 +216,7 @@ class Writer {
     }
     writeTypeAliases();
     writeModuleMembers();
+    writeObjCClasses();
 
     _out << "}\n\n"
          << "declare module \"ns:swift\" {\n"
@@ -470,7 +476,11 @@ class Writer {
 
   // NativeScript's Objective-C typings declare classes globally by their
   // runtime name; Swift classes without @objc(Name) have none there.
-  static std::string objcTypeName(const BridgedType& type) {
+  std::string objcTypeName(const BridgedType& type) const {
+    auto global = _objcGlobals.find(type.objcClass);
+    if (global != _objcGlobals.end()) {
+      return global->second;
+    }
     return isIdentifier(type.objcClass) ? type.objcClass : "NSObject";
   }
 
@@ -771,7 +781,8 @@ class Writer {
   void buildTree() {
     for (const auto& type : _surface.types) {
       int family = familyOf(type.index);
-      if (type.module != _name || (family >= 0 && family != type.index)) {
+      if (type.module != _name || (family >= 0 && family != type.index) ||
+          type.kind == SwiftSurface::kObjCClass) {
         continue;
       }
       const auto& components = type.symbol->pathComponents;
@@ -1042,8 +1053,98 @@ class Writer {
     }
   }
 
+  // NativeScript's global name for an Objective-C-visible Swift class: its
+  // name in the generated -Swift.h header.
+  std::string globalName(const SwiftSurface::Type& type) const {
+    const std::string& objcName =
+        _classification.find(type.symbol->preciseId)->objcName;
+    return isIdentifier(objcName) ? objcName : type.symbol->name;
+  }
+
+  // Swift-only members of Objective-C-visible classes, merged into
+  // NativeScript's global declaration of each class: instance members into
+  // its interface, initializers (`init`) and static members into a
+  // namespace.
+  void writeObjCClasses() {
+    bool opened = false;
+    for (const auto& type : _surface.types) {
+      if (type.kind != SwiftSurface::kObjCClass || type.module != _name) {
+        continue;
+      }
+      std::vector<const Group*> instance;
+      std::vector<const Group*> statics;
+      for (const Group& group : _groups) {
+        if (group.owner != type.index) {
+          continue;
+        }
+        bool isInstance = group.kind == SwiftSurface::kInstanceMethod ||
+                          group.kind == SwiftSurface::kInstanceProperty;
+        (isInstance ? instance : statics).push_back(&group);
+      }
+      if (instance.empty() && statics.empty()) {
+        continue;
+      }
+      if (!opened) {
+        _out << "\n  global {\n";
+        opened = true;
+      }
+      std::string name = globalName(type);
+      if (!instance.empty()) {
+        _out << "    interface " << name << " {\n";
+        for (const Group* group : instance) {
+          const Member& first = *group->overloads[0];
+          if (group->kind == SwiftSurface::kInstanceMethod) {
+            writeMethodGroup(*group, "      ", "");
+            continue;
+          }
+          writeDoc(*first.symbol, "      ");
+          _out << "      "
+               << ((first.flags & SwiftSurface::kSettable) ? "" : "readonly ")
+               << propertyKey(group->jsName) << ": " << resultOf(first)
+               << ";\n";
+        }
+        _out << "    }\n";
+      }
+      if (!statics.empty()) {
+        _out << "    namespace " << name << " {\n";
+        for (const Group* group : statics) {
+          std::string key = group->kind == SwiftSurface::kInitializer
+                                ? "init"
+                                : group->jsName;
+          if (!isIdentifier(key) || (key != "init" && isReserved(key))) {
+            continue;
+          }
+          const Member& first = *group->overloads[0];
+          if (group->kind == SwiftSurface::kStaticProperty) {
+            writeDoc(*first.symbol, "      ");
+            _out << "      "
+                 << ((first.flags & SwiftSurface::kSettable) ? "let "
+                                                             : "const ")
+                 << key << ": " << resultOf(first) << ";\n";
+            continue;
+          }
+          for (const Member* member : group->overloads) {
+            if (ambiguousWithin(*group, *member)) {
+              continue;
+            }
+            writeDoc(*member->symbol, "      ");
+            _out << "      function " << key << "(" << parameterList(*member)
+                 << "): " << resultOf(*member) << ";\n";
+          }
+        }
+        _out << "    }\n";
+      }
+    }
+    if (opened) {
+      _out << "  }\n";
+    }
+  }
+
   const Module& _module;
   const Classification& _classification;
+  // Objective-C runtime name -> global name of the unit's
+  // Objective-C-visible classes.
+  std::map<std::string, std::string> _objcGlobals;
   // The unit module these declarations are for.
   std::string _name;
   // Generic type id -> the instantiation that declares the family.

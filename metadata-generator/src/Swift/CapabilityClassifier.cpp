@@ -312,6 +312,13 @@ class Classifier {
   Capability classifyType(const Symbol& symbol) const {
     Capability capability;
     if (commonRejection(symbol, capability)) {
+      if (capability.tier == Tier::ObjCDirect &&
+          symbol.kind == SymbolKind::Class && symbol.parentId.empty() &&
+          symbol.genericParameters.empty() &&
+          llvm::StringRef(symbol.usr).startswith("c:@M@")) {
+        capability.objcBacked = true;
+        capability.objcName = objcClassName(symbol.usr, &symbol);
+      }
       return capability;
     }
     if (symbol.kind == SymbolKind::Protocol) {
@@ -573,7 +580,8 @@ class Classifier {
         }
       }
       const Capability* ownerCapability = _result.find(owner->preciseId);
-      if (!ownerCapability || ownerCapability->tier != Tier::SwiftGenerated) {
+      if (!ownerCapability || (ownerCapability->tier != Tier::SwiftGenerated &&
+                               !ownerCapability->objcBacked)) {
         Tier tier =
             ownerCapability && ownerCapability->tier == Tier::SwiftSpecialized
                 ? Tier::SwiftSpecialized
@@ -621,7 +629,8 @@ class Classifier {
     }
     capability.isMainActor =
         !nonisolated && (hasAttribute(symbol, "@MainActor") ||
-                         (owner && hasAttribute(*owner, "@MainActor")));
+                         (owner && (hasAttribute(*owner, "@MainActor") ||
+                                    inheritsMainActor(*owner))));
     // Another actor's state cannot be assigned from outside it.
     capability.isSettable = symbol.isSettable && !capability.isAsync;
 
@@ -714,8 +723,50 @@ class Classifier {
     return capability;
   }
 
+  // Whether `type` subclasses a UIKit class isolated to the main actor
+  // (UIResponder and its views and controllers), which symbol graphs do not
+  // record on the subclass.
+  bool inheritsMainActor(const Symbol& type) const {
+    std::string superclass = type.superclassId;
+    for (int depth = 0; !superclass.empty() && depth < 32; depth++) {
+      if (const Symbol* parent = _module.find(superclass)) {
+        if (hasAttribute(*parent, "@MainActor")) {
+          return true;
+        }
+        superclass = parent->superclassId;
+        continue;
+      }
+      llvm::StringRef name(superclass);
+      if (!name.consume_front("c:objc(cs)") || !name.startswith("UI")) {
+        return false;
+      }
+      for (const char* suffix :
+           {"Responder", "View", "ViewController", "Controller", "Control",
+            "Window", "Application", "Button", "Label", "Field", "Bar", "Cell",
+            "Switch", "Slider", "Stepper"}) {
+        if (name.endswith(suffix)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    return false;
+  }
+
   BridgedType bridgeOwner(const Symbol& owner) const {
     BridgedType bridged;
+    if (const Capability* capability = _result.find(owner.preciseId);
+        capability && capability->objcBacked) {
+      // NativeScript's wrapper of the object, as for any Objective-C class.
+      bridged.bridge = Bridge::ObjCObject;
+      bridged.objcClass = capability->objcName;
+      TypeNode::Component component;
+      component.name = owner.name;
+      component.usr = owner.preciseId;
+      bridged.node.kind = TypeNode::Kind::Nominal;
+      bridged.node.components.push_back(std::move(component));
+      return bridged;
+    }
     bridged.symbolId = owner.preciseId;
     bridged.bridge = owner.kind == SymbolKind::Struct      ? Bridge::StructBox
                      : owner.kind != SymbolKind::Enum      ? Bridge::ClassHandle

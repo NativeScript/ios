@@ -159,6 +159,7 @@
     "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
     "s:9SwiftDemo12firstSubview2ofSo6UIViewCSgAE_tF",
     "c:@M@SwiftDemo@objc(cs)Note",
+    "c:@M@SwiftDemo@objc(cs)CounterView",
     "s:9SwiftDemo8makeNoteyAA0D0CSSF",
     "s:9SwiftDemo4text2ofSSAA4NoteC_tF",
     "s:9SwiftDemo9noteLateryAA4NoteCSSYaF",
@@ -198,8 +199,29 @@
   ],
   "externalNames": {
     "c:objc(cs)NSObject": "ObjectiveC.NSObject",
+    "c:objc(cs)UIView": "UIKit.UIView",
+    "c:objc(pl)CALayerDelegate": "QuartzCore.CALayerDelegate",
+    "c:objc(pl)CLBodyIdentifiable": "CoreLocation.CLBodyIdentifiable",
+    "c:objc(pl)CMBodyIdentifiable": "CoreMotion.CMBodyIdentifiable",
+    "c:objc(pl)NSCoding": "Foundation.NSCoding",
     "c:objc(pl)NSObject": "ObjectiveC.NSObjectProtocol",
+    "c:objc(pl)UIAccessibilityIdentification": "UIKit.UIAccessibilityIdentification",
+    "c:objc(pl)UIActivityItemsConfigurationProviding": "UIKit.UIActivityItemsConfigurationProviding",
+    "c:objc(pl)UIAppearance": "UIKit.UIAppearance",
+    "c:objc(pl)UIAppearanceContainer": "UIKit.UIAppearanceContainer",
+    "c:objc(pl)UICoordinateSpace": "UIUtilities.UICoordinateSpace",
+    "c:objc(pl)UIDynamicItem": "UIKit.UIDynamicItem",
+    "c:objc(pl)UIFocusEnvironment": "UIKit.UIFocusEnvironment",
+    "c:objc(pl)UIFocusItem": "UIKit.UIFocusItem",
+    "c:objc(pl)UIFocusItemContainer": "UIKit.UIFocusItemContainer",
+    "c:objc(pl)UILargeContentViewerItem": "UIKit.UILargeContentViewerItem",
+    "c:objc(pl)UIPasteConfigurationSupporting": "UIKit.UIPasteConfigurationSupporting",
+    "c:objc(pl)UIPopoverPresentationControllerSourceItem": "UIKit.UIPopoverPresentationControllerSourceItem",
+    "c:objc(pl)UIResponderStandardEditActions": "UIKit.UIResponderStandardEditActions",
+    "c:objc(pl)UITraitEnvironment": "UIKit.UITraitEnvironment",
+    "c:objc(pl)UIUserActivityRestoring": "UIKit.UIUserActivityRestoring",
     "s:11Observation10ObservableP": "Observation.Observable",
+    "s:5UIKit23UITraitChangeObservableP": "UIKit.UITraitChangeObservable",
     "s:7SwiftUI4ViewP": "SwiftUICore.View",
     "s:SH": "Swift.Hashable",
     "s:SQ": "Swift.Equatable",
@@ -218,6 +240,55 @@
   },
   "symbols": [
     {
+      "id": "c:@M@SwiftDemo@objc(cs)CounterView",
+      "kind": "class",
+      "path": "CounterView",
+      "name": "CounterView",
+      "access": "public",
+      "declaration": "@MainActor final class CounterView",
+      "attributes": [
+        "@MainActor"
+      ],
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Views.swift:35:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo11CounterViewC5countSivp",
+        "s:9SwiftDemo11CounterViewC9configure5start4stepS2i_SiSgtF"
+      ],
+      "conformances": [
+        "c:objc(pl)CALayerDelegate",
+        "c:objc(pl)CLBodyIdentifiable",
+        "c:objc(pl)CMBodyIdentifiable",
+        "c:objc(pl)NSCoding",
+        "c:objc(pl)NSObject",
+        "c:objc(pl)UIAccessibilityIdentification",
+        "c:objc(pl)UIActivityItemsConfigurationProviding",
+        "c:objc(pl)UIAppearance",
+        "c:objc(pl)UIAppearanceContainer",
+        "c:objc(pl)UICoordinateSpace",
+        "c:objc(pl)UIDynamicItem",
+        "c:objc(pl)UIFocusEnvironment",
+        "c:objc(pl)UIFocusItem",
+        "c:objc(pl)UIFocusItemContainer",
+        "c:objc(pl)UILargeContentViewerItem",
+        "c:objc(pl)UIPasteConfigurationSupporting",
+        "c:objc(pl)UIPopoverPresentationControllerSourceItem",
+        "c:objc(pl)UIResponderStandardEditActions",
+        "c:objc(pl)UITraitEnvironment",
+        "c:objc(pl)UIUserActivityRestoring",
+        "s:5UIKit23UITraitChangeObservableP",
+        "s:SH",
+        "s:SQ",
+        "s:s23CustomStringConvertibleP",
+        "s:s28CustomDebugStringConvertibleP",
+        "s:s7CVarArgP"
+      ],
+      "superclass": "c:objc(cs)UIView"
+    },
+    {
       "id": "c:@M@SwiftDemo@objc(cs)Note",
       "kind": "class",
       "path": "Note",
@@ -231,7 +302,12 @@
       "graph": "SwiftDemo.symbols.json",
       "members": [
         "s:9SwiftDemo4NoteC4textSSvp",
-        "s:9SwiftDemo4NoteC4textACSS_tcfc"
+        "s:9SwiftDemo4NoteC4textACSS_tcfc",
+        "s:9SwiftDemo4NoteC4tagsShySSGvp",
+        "s:9SwiftDemo4NoteC6taggedyACSSF",
+        "s:9SwiftDemo4NoteC7summary9maxLengthSSSi_tF",
+        "s:9SwiftDemo4NoteC5blankACyFZ",
+        "c:@M@SwiftDemo@objc(cs)Note(py)revision"
       ],
       "conformances": [
         "c:objc(pl)NSObject",
@@ -242,6 +318,27 @@
         "s:s7CVarArgP"
       ],
       "superclass": "c:objc(cs)NSObject"
+    },
+    {
+      "id": "c:@M@SwiftDemo@objc(cs)Note(py)revision",
+      "kind": "instanceProperty",
+      "path": "Note.revision",
+      "name": "revision",
+      "access": "public",
+      "declaration": "@objc var revision: Int",
+      "attributes": [
+        "@objc"
+      ],
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Views.swift:31:21",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "c:@M@SwiftDemo@objc(cs)Note"
     },
     {
       "id": "s:12SwiftDemoKit3BoxC",
@@ -66224,6 +66321,69 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo11CounterViewC5countSivp",
+      "kind": "instanceProperty",
+      "path": "CounterView.count",
+      "name": "count",
+      "access": "public",
+      "declaration": "@MainActor var count: Int { get }",
+      "attributes": [
+        "@MainActor"
+      ],
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Views.swift:36:28",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "c:@M@SwiftDemo@objc(cs)CounterView"
+    },
+    {
+      "id": "s:9SwiftDemo11CounterViewC9configure5start4stepS2i_SiSgtF",
+      "kind": "instanceMethod",
+      "path": "CounterView.configure(start:step:)",
+      "name": "configure(start:step:)",
+      "access": "public",
+      "declaration": "@MainActor func configure(start: Int, step: Int?) -> Int",
+      "attributes": [
+        "@MainActor"
+      ],
+      "parameters": [
+        {
+          "label": "start",
+          "internalName": "start",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "label": "step",
+          "internalName": "step",
+          "type": {
+            "spelling": "Int?",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:37:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "c:@M@SwiftDemo@objc(cs)CounterView"
+    },
+    {
       "id": "s:9SwiftDemo11MeasurementO",
       "kind": "enum",
       "path": "Measurement",
@@ -66768,7 +66928,7 @@
           "s:Sd"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Views.swift:39:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:59:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -67561,6 +67721,25 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo4NoteC4tagsShySSGvp",
+      "kind": "instanceProperty",
+      "path": "Note.tags",
+      "name": "tags",
+      "access": "public",
+      "declaration": "var tags: Set<String>",
+      "valueType": {
+        "spelling": "Set<String>",
+        "references": [
+          "s:Sh",
+          "s:SS"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Views.swift:23:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "c:@M@SwiftDemo@objc(cs)Note"
+    },
+    {
       "id": "s:9SwiftDemo4NoteC4textACSS_tcfc",
       "kind": "initializer",
       "path": "Note.init(text:)",
@@ -67599,6 +67778,84 @@
       "settable": false,
       "let": true,
       "location": "file://Sources/SwiftDemo/Views.swift:19:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "c:@M@SwiftDemo@objc(cs)Note"
+    },
+    {
+      "id": "s:9SwiftDemo4NoteC5blankACyFZ",
+      "kind": "typeMethod",
+      "path": "Note.blank()",
+      "name": "blank()",
+      "access": "public",
+      "declaration": "static func blank() -> Note",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "returns": {
+        "spelling": "Note",
+        "references": [
+          "c:@M@SwiftDemo@objc(cs)Note"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:29:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "c:@M@SwiftDemo@objc(cs)Note"
+    },
+    {
+      "id": "s:9SwiftDemo4NoteC6taggedyACSSF",
+      "kind": "instanceMethod",
+      "path": "Note.tagged(_:)",
+      "name": "tagged(_:)",
+      "access": "public",
+      "declaration": "func tagged(_ tag: String) -> Note",
+      "parameters": [
+        {
+          "internalName": "tag",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Note",
+        "references": [
+          "c:@M@SwiftDemo@objc(cs)Note"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:24:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "c:@M@SwiftDemo@objc(cs)Note"
+    },
+    {
+      "id": "s:9SwiftDemo4NoteC7summary9maxLengthSSSi_tF",
+      "kind": "instanceMethod",
+      "path": "Note.summary(maxLength:)",
+      "name": "summary(maxLength:)",
+      "access": "public",
+      "declaration": "func summary(maxLength: Int) -> String",
+      "parameters": [
+        {
+          "label": "maxLength",
+          "internalName": "maxLength",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:28:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "c:@M@SwiftDemo@objc(cs)Note"
     },
@@ -68021,7 +68278,7 @@
           "s:SS"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Views.swift:24:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:44:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -69491,7 +69748,7 @@
           "c:@S@CGRect"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Views.swift:37:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:57:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -72144,7 +72401,7 @@
           "c:@S@CGSize"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Views.swift:38:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:58:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -72468,7 +72725,7 @@
           "rhsPrecise": "c:objc(cs)UIView"
         }
       ],
-      "location": "file://Sources/SwiftDemo/Views.swift:31:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:51:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -72495,7 +72752,7 @@
           "s:Si"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Views.swift:31:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:51:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -72986,7 +73243,7 @@
           "c:@M@SwiftDemo@objc(cs)Note"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Views.swift:23:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:43:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -73022,7 +73279,7 @@
           "c:@S@CGPoint"
         ]
       },
-      "location": "file://Sources/SwiftDemo/Views.swift:34:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:54:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -73622,7 +73879,7 @@
         ]
       },
       "async": true,
-      "location": "file://Sources/SwiftDemo/Views.swift:26:12",
+      "location": "file://Sources/SwiftDemo/Views.swift:46:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {

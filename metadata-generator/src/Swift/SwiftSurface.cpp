@@ -197,13 +197,14 @@ SwiftSurface describeSurface(const Module& module,
   for (const auto& entry : module.symbols) {
     const Symbol& symbol = entry.second;
     const Capability* capability = classification.find(entry.first);
-    if (!capability || capability->tier != Tier::SwiftGenerated ||
-        !isNominalType(symbol.kind)) {
+    if (!capability || !isNominalType(symbol.kind) ||
+        (capability->tier != Tier::SwiftGenerated && !capability->objcBacked)) {
       continue;
     }
     SwiftSurface::TypeKind kind =
-        symbol.kind == SymbolKind::Protocol ? SwiftSurface::kProtocol
-        : symbol.kind == SymbolKind::Struct ? SwiftSurface::kStruct
+        capability->objcBacked                ? SwiftSurface::kObjCClass
+        : symbol.kind == SymbolKind::Protocol ? SwiftSurface::kProtocol
+        : symbol.kind == SymbolKind::Struct   ? SwiftSurface::kStruct
         : symbol.kind == SymbolKind::Enum
             ? (hasAssociatedValues(module, symbol) ? SwiftSurface::kTaggedEnum
                                                    : SwiftSurface::kEnum)
