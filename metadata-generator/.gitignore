@@ -207,3 +207,6 @@ test-results/
 
 # CLion
 .idea
+
+# Snapshot test output written next to the expected file on a mismatch
+*.actual

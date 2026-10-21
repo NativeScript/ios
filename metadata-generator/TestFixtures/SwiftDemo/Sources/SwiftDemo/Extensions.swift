@@ -27,3 +27,15 @@ extension Array where Element == Point {
         return Point(x: sx / Double(count), y: sy / Double(count))
     }
 }
+
+extension Polygon {
+    public enum Style: String { case solid, dashed }
+
+    public struct Metrics {
+        public var perimeter: Double
+        public init(perimeter: Double) { self.perimeter = perimeter }
+    }
+
+    public var style: Style { vertexCount > 3 ? .dashed : .solid }
+    public func metrics(side: Double) -> Metrics { Metrics(perimeter: side * Double(vertexCount)) }
+}

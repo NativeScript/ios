@@ -46,6 +46,7 @@ enum class WrapperType {
   ExtVector = 1 << 18,
   Worker = 1 << 19,
   UnmanagedType = 1 << 20,
+  SwiftObject = 1 << 21,
 };
 
 struct V8Args {

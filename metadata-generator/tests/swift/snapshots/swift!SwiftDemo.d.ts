@@ -11,14 +11,48 @@ declare module "ns:swift/SwiftDemo" {
     static readonly version: string;
   }
 
+  export type ShapeError =
+    | { case: "invalidSide"; value: number }
+    | { case: "tooManySides"; count: number; limit: number }
+    | { case: "unknown" };
+  export namespace ShapeError {
+    /**
+     * Retrieve the localized description for this error.
+     */
+    export function localizedDescription(value: ShapeError): string;
+  }
+
+  export type Measurement =
+    | { case: "area"; width: number; height: number }
+    | { case: "none" }
+    | { case: "length"; value: number };
+  export namespace Measurement {
+    export function isNone(value: Measurement): boolean;
+    export class Unit {
+      constructor(symbol: string);
+      constructor(args: { symbol: string });
+      symbol: string;
+    }
+
+  }
+
   export type Precipitation = "none" | "rain" | "snow";
-  export const Precipitation: {
-    readonly none: "none";
-    readonly rain: "rain";
-    readonly snow: "snow";
-    init(rawValue: string): Precipitation | null;
-    hashValue(value: Precipitation): number;
-  };
+  export namespace Precipitation {
+    export const none: "none";
+    export const rain: "rain";
+    export const snow: "snow";
+    export function init(rawValue: string): Precipitation | null;
+    export function hashValue(value: Precipitation): number;
+  }
+
+  export namespace Job {
+    export class Ticket {
+      constructor(id: number | bigint);
+      constructor(args: { id: number | bigint });
+      id: number;
+    }
+
+  }
 
   export class Ring {
     constructor(inner: Point, outer: Point);
@@ -38,17 +72,17 @@ declare module "ns:swift/SwiftDemo" {
   }
 
   export class Canvas {
-    private constructor();
+    constructor();
   }
 
   export type Flavor = "vanilla" | "chocolate";
-  export const Flavor: {
-    description(value: Flavor): string;
-    readonly vanilla: "vanilla";
-    init(rawValue: number | bigint): Flavor | null;
-    readonly chocolate: "chocolate";
-    hashValue(value: Flavor): number;
-  };
+  export namespace Flavor {
+    export function description(value: Flavor): string;
+    export const vanilla: "vanilla";
+    export function init(rawValue: number | bigint): Flavor | null;
+    export const chocolate: "chocolate";
+    export function hashValue(value: Flavor): number;
+  }
 
   export class Loader {
     constructor();
@@ -60,6 +94,12 @@ declare module "ns:swift/SwiftDemo" {
      * @deprecated Use fetch(url:) instead
      */
     legacyFetch(): void;
+    each(body: (arg0: number) => void): void;
+    load(path: string): Uint8Array;
+    wait(seconds: number): Promise<void>;
+    fetch(url: string | URL): Promise<string>;
+    lookup(table: Readonly<Record<string, number | bigint>>, key: string): number | null;
+    update(point: { value: Point }): void;
     /**
      * @deprecated Renamed to `fetch(url:)`.
      */
@@ -81,7 +121,34 @@ declare module "ns:swift/SwiftDemo" {
 
   export class Counter {
     constructor();
+    readonly step: Promise<number>;
     label(): string;
+    readonly value: Promise<number>;
+    increment(): Promise<number>;
+  }
+
+  export type Formula =
+    | { case: "sum"; "0": Formula; "1": Formula }
+    | { case: "negate"; value: Formula }
+    | { case: "number"; value: number };
+  export namespace Formula {
+    export function value(value: Formula): number;
+  }
+
+  export class Palette {
+    constructor();
+    strokeLater(): Promise<number>;
+    stroke(): number;
+    readonly strokes: number;
+  }
+
+  export type Payload =
+    | { case: "maybe"; value: number | null }
+    | { case: "names"; value: (string)[] }
+    | { case: "point"; value: Point }
+    | { case: "flavor"; value: Flavor }
+    | { case: "tracker"; value: Tracker };
+  export namespace Payload {
   }
 
   export class Polygon {
@@ -96,8 +163,27 @@ declare module "ns:swift/SwiftDemo" {
     "scale(x:y:)"(x: number, y: number): void;
     "scale(by: Double)"(factor: number): void;
     "scale(by: Int)"(factor: number | bigint): void;
+    readonly style: Polygon.Style;
     static readonly shared: Polygon;
-    static describe(polygon: Polygon | null | undefined): string;
+    metrics(side: number): Polygon.Metrics;
+    static describe(polygon: (Polygon) | null | undefined): string;
+  }
+
+  export namespace Polygon {
+    export type Style = "solid" | "dashed";
+    export namespace Style {
+      export const solid: "solid";
+      export const dashed: "dashed";
+      export function init(rawValue: string): Polygon.Style | null;
+      export function hashValue(value: Polygon.Style): number;
+    }
+
+    export class Metrics {
+      constructor(perimeter: number);
+      constructor(args: { perimeter: number });
+      perimeter: number;
+    }
+
   }
 
   export class Tracker {
@@ -108,14 +194,61 @@ declare module "ns:swift/SwiftDemo" {
     static readonly liveCount: number;
   }
 
+  export class Notifier {
+    constructor();
+    publishLater(message: string): void;
+    clear(): void;
+    readonly count: number;
+    publish(message: string): void;
+    subscribe(handler: (arg0: string) => void): void;
+  }
+
+  export function allFlavors(): (Flavor)[];
   export function echoUInt64(value: number | bigint): number;
+  export function greetLater(name: (string) | null | undefined, completion: (arg0: string | null) => void): void;
   export function largestInt(): number;
+  export function namesLater(count: number | bigint): Promise<(string)[]>;
+  export function wordCounts(words: readonly (string)[]): Record<string, number>;
   export function checkedSide(side: number): number;
+  export function delayedEcho(text: string, seconds: number): Promise<string>;
+  export function firstSubview(view: UIView): UIView | null;
+  export function measureLater(width: number): Promise<Measurement>;
+  export function measurements(): (Measurement)[];
+  export function swapTrackers(a: { value: Tracker }, b: { value: Tracker }): void;
   export const defaultFlavor: Flavor;
   export let globalCounter: number;
   export function makeDefaultPoint(): Point;
-  export function shout(name: string | null | undefined): string | null;
+  export function makeTrackerLater(id: number | bigint): Promise<Tracker>;
+  export function area(measurement: Measurement): number;
+  export function bump(value: { value: number | bigint }): void;
+  export function echo(payload: Payload): Payload;
+  export function host(url: string | URL): string | null;
+  export function ramp(count: number | bigint): Uint8Array;
+  export function tags(views: readonly (UIView)[]): (number)[];
+  export function text(note: NSObject): string;
+  export function clear(name: { value: (string) | null | undefined }): void;
+  export function halve(value: { value: number | bigint }): void;
+  export function names(count: number | bigint): (string)[];
+  export function shout(name: (string) | null | undefined): string | null;
+  export function total(values: readonly (number)[]): number;
+  export function append(word: string, words: { value: readonly (string)[] }): void;
+  export function explain(error: ShapeError): string;
+  export function lengths(table: Readonly<Record<string, string>>): Record<string, number>;
+  export function measure(width: number, height: (number) | null | undefined): Measurement;
+  export function nextDay(date: Date): Date;
+  export function resolve(path: string, base: string | URL): URL;
+  export function centroid(points: readonly (Point)[]): Point;
+  export function checksum(data: ArrayBuffer | ArrayBufferView): number;
+  export function describe(view: UIView): string;
   export function echoInt8(value: number | bigint): number;
+  export function makeNote(text: string): NSObject;
+  export function mirrored(grid: readonly (readonly (number | bigint)[])[]): ((number)[])[];
+  export function simplify(formula: Formula): Formula;
+  export function trackers(ids: readonly (number | bigint)[]): (Tracker)[];
+  export function countdown(start: number | bigint, tick: (arg0: number, arg1: boolean) => void): void;
+  export function makeLabel(text: string): UILabel;
+  export function noteLater(text: string): Promise<NSObject>;
+  export function onMeasure(body: (arg0: Measurement) => void): void;
 }
 
 declare module "ns:swift" {

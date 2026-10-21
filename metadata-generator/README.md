@@ -83,9 +83,8 @@ codes):
 | `unsupported` | not bridgeable yet; `reasons` say why |
 | `not-applicable` | not an API surface (deinitializers, macros) |
 
-The generated surface currently bridges `Bool`, integer and floating-point
-types, `String`, optionals of those, module classes and actors (handles),
-module structs (boxed copies) and payload-less enums (case-name strings).
+`docs/swift-interop.md` lists the Swift types and declaration kinds the
+generated surface bridges, and how each looks from JavaScript.
 
 `--swift-coverage-output <dir>` writes `<Module>.coverage.json`: counts per
 tier and kind, a histogram of reasons, and every symbol's classification.

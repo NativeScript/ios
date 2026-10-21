@@ -8,6 +8,7 @@
 #include <llvm/Support/raw_ostream.h>
 
 #include "ProbeEmitter.h"
+#include "ThunkEmitter.h"
 
 namespace Swift {
 
@@ -41,6 +42,30 @@ std::map<std::string, std::string> rejectionsFromLog(
   return rejections;
 }
 
+std::map<std::string, std::string> rejectionsFromThunkLog(
+    const std::string& log, const std::string& thunkPath,
+    const std::string& source, const Module& module,
+    std::vector<std::string>& unmapped) {
+  // Every thunk and helper is preceded by a `// <symbol id>` line.
+  llvm::SmallVector<llvm::StringRef, 256> lines;
+  llvm::StringRef(source).split(lines, '\n');
+  std::map<int, std::string> lineToSymbol;
+  std::string current;
+  for (size_t i = 0; i < lines.size(); i++) {
+    llvm::StringRef line = lines[i];
+    if (line.consume_front("// ")) {
+      std::string id = line.split(" (").first.str();
+      if (module.find(id)) {
+        current = id;
+      }
+    }
+    if (!current.empty()) {
+      lineToSymbol[static_cast<int>(i) + 1] = current;
+    }
+  }
+  return rejectionsFromLog(log, thunkPath, lineToSymbol, unmapped);
+}
+
 VerifyResult verifyWithCompiler(const Module& module,
                                 const VerifyOptions& options) {
   VerifyResult result;
@@ -56,6 +81,9 @@ VerifyResult verifyWithCompiler(const Module& module,
 
   llvm::SmallString<256> probePath(options.workDirectory);
   llvm::sys::path::append(probePath, module.name + ".verify.swift");
+  llvm::SmallString<256> thunkPath(options.workDirectory);
+  llvm::sys::path::append(thunkPath,
+                          module.name + "+NativeScript.verify.swift");
   llvm::SmallString<256> logPath(options.workDirectory);
   llvm::sys::path::append(logPath, module.name + ".verify.log");
   llvm::sys::fs::create_directories(options.workDirectory);
@@ -64,15 +92,19 @@ VerifyResult verifyWithCompiler(const Module& module,
   // only guards against a compiler that keeps reporting the same errors.
   for (int pass = 0; pass < 8; pass++) {
     result.classification = classify(module, result.rejections);
+    // The probes check every call; the thunks are what ships, including the
+    // helpers the probes do not exercise.
     ProbeSource probes = emitProbes(module, result.classification);
-    {
+    ThunkSource thunks = emitThunks(module, result.classification);
+    for (const auto& file : {std::make_pair(&probePath, &probes.source),
+                             std::make_pair(&thunkPath, &thunks.source)}) {
       std::error_code error;
-      llvm::raw_fd_ostream out(probePath, error, llvm::sys::fs::OF_Text);
+      llvm::raw_fd_ostream out(*file.first, error, llvm::sys::fs::OF_Text);
       if (error) {
-        result.failure = probePath.str().str() + ": " + error.message();
+        result.failure = file.first->str().str() + ": " + error.message();
         return result;
       }
-      out << probes.source;
+      out << *file.second;
     }
 
     std::vector<std::string> arguments(options.compiler.begin(),
@@ -86,6 +118,7 @@ VerifyResult verifyWithCompiler(const Module& module,
       arguments.insert(arguments.end(), {"-F", path});
     }
     arguments.push_back(probePath.str().str());
+    arguments.push_back(thunkPath.str().str());
     std::vector<llvm::StringRef> argv(arguments.begin(), arguments.end());
     std::optional<llvm::StringRef> redirects[] = {
         std::nullopt, llvm::StringRef(logPath), llvm::StringRef(logPath)};
@@ -103,9 +136,12 @@ VerifyResult verifyWithCompiler(const Module& module,
 
     auto log = llvm::MemoryBuffer::getFile(logPath);
     std::vector<std::string> unmapped;
-    auto rejections =
-        rejectionsFromLog(log ? (*log)->getBuffer().str() : "",
-                          probePath.str().str(), probes.lineToSymbol, unmapped);
+    std::string text = log ? (*log)->getBuffer().str() : "";
+    auto rejections = rejectionsFromLog(text, probePath.str().str(),
+                                        probes.lineToSymbol, unmapped);
+    auto thunkRejections = rejectionsFromThunkLog(
+        text, thunkPath.str().str(), thunks.source, module, unmapped);
+    rejections.insert(thunkRejections.begin(), thunkRejections.end());
     if (!unmapped.empty()) {
       result.failure = "compiler errors outside any probe (see " +
                        logPath.str().str() + "): " + unmapped.front();

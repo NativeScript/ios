@@ -45,8 +45,22 @@ TEST(ThunkRegistration) {
   CHECK_EQ(thunks().registerSymbol, std::string("ns_swift_register_SwiftDemo"));
   CHECK_EQ(thunks().fingerprint.size(), size_t(16));
   CHECK(thunks().thunkCount > 0);
-  CHECK(registers("registerModule(registrar, 1, \"SwiftDemo\", \"" +
+  CHECK(registers("registerModule(registrar, 7, \"SwiftDemo\", \"" +
                   thunks().fingerprint + "\", __nsRelease)"));
+  // Cases of a tagged enum register their associated values' codes.
+  CHECK(registers("\"tooManySides\", \"tooManySides(count:limit:)\", \"i64,i64>t"));
+  CHECK(registers("\"area\", \"area(of:)\", \"t"));
+  // Objective-C classes travel by runtime name; their framework is imported.
+  CHECK(registers("\"firstSubview\", \"firstSubview(of:)\", \"@UIView>@UIView?\""));
+  CHECK(registers("\"makeNote\", \"makeNote(_:)\", \"s>@SwiftDemo.Note\""));
+  CHECK(thunks().source.find("#if canImport(UIKit)\nimport UIKit\n#endif") != std::string::npos);
+  // Inout parameters are marked; the thunk writes their final value back.
+  CHECK(registers("\"append\", \"append(_:to:)\", \"s,&[s]>v\""));
+  CHECK(registers("\"swapTrackers\", \"swapTrackers(_:_:)\", \"&o"));
+  CHECK(thunks().source.find("rt.writeBack(1) { rt.returnArray(a1)") != std::string::npos);
+  // Closure parameters list the closure's own parameter codes.
+  CHECK(registers("\"countdown\", \"countdown(from:_:)\", \"i64,(i64,b)>v\""));
+  CHECK(registers("\"greetLater\", \"greetLater(_:completion:)\", \"s?,(s?)>v\""));
   // Instance method with labels; signature (String, Int) -> String.
   CHECK(registers("\"greet\", \"greet(name:times:)\", \"s,i64>s\""));
   // Failable initializer of a class returns an optional object.
@@ -108,6 +122,8 @@ TEST(TypeScriptUsageCompiles) {
   std::string usagePath =
       write("usage.ts", "/// <reference path=\"" SWIFT_TYPES_DIR
                         "/index.d.ts\" />\n"
+                        "/// <reference path=\"" SWIFT_TEST_DIR
+                        "/typescript/objc-globals.d.ts\" />\n"
                         "/// <reference path=\"./swift-SwiftDemo.d.ts\" />\n" +
                             (*usage)->getBuffer().str());
 

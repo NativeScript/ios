@@ -32,9 +32,9 @@ struct VerifyResult {
   std::string failure;
 };
 
-// Classifies `module`, type-checks probes for the result, demotes every
-// symbol whose probe the compiler rejects, and repeats until the probes
-// type-check (demoting a type changes its members' classification).
+// Classifies `module`, type-checks probes and thunks for the result,
+// demotes every symbol whose code the compiler rejects, and repeats until
+// both type-check (demoting a type changes its members' classification).
 VerifyResult verifyWithCompiler(const Module& module,
                                 const VerifyOptions& options);
 
@@ -43,6 +43,13 @@ VerifyResult verifyWithCompiler(const Module& module,
 std::map<std::string, std::string> rejectionsFromLog(
     const std::string& log, const std::string& probePath,
     const std::map<int, std::string>& lineToSymbol,
+    std::vector<std::string>& unmapped);
+
+// The same for errors in generated thunks (`thunkPath` holding `source`),
+// attributed to the symbol whose `// <id>` comment precedes the line.
+std::map<std::string, std::string> rejectionsFromThunkLog(
+    const std::string& log, const std::string& thunkPath,
+    const std::string& source, const Module& module,
     std::vector<std::string>& unmapped);
 
 }  // namespace Swift

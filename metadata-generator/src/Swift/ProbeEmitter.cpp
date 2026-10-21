@@ -1,5 +1,8 @@
 #include "ProbeEmitter.h"
 
+#include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/StringRef.h>
+
 #include <set>
 
 #include "SwiftSource.h"
@@ -46,16 +49,11 @@ ProbeSource emitProbes(const Module& module,
   out.line("// the Swift-generated surface of module " + module.name + ".");
   out.line("import Foundation");
   out.line("import " + module.name);
-  std::set<std::string> overlays;
-  for (const auto& entry : module.symbols) {
-    const Capability* capability = classification.find(entry.first);
-    if (capability && capability->tier == Tier::SwiftGenerated &&
-        !entry.second.declaringModule.empty()) {
-      overlays.insert(entry.second.declaringModule);
-    }
-  }
-  for (const auto& overlay : overlays) {
-    out.line("import " + overlay);
+  llvm::SmallVector<llvm::StringRef, 8> imports;
+  std::string text = swiftImports(module, classification);
+  llvm::StringRef(text).split(imports, '\n', -1, false);
+  for (llvm::StringRef line : imports) {
+    out.line(line.str());
   }
   out.line("");
 
@@ -116,8 +114,12 @@ ProbeSource emitProbes(const Module& module,
     if (!invocation.availability.empty()) {
       out.line("@available(" + invocation.availability + ")");
     }
+    if (invocation.isMainActor) {
+      out.line("@MainActor");
+    }
     out.line("func __nsProbe" + std::to_string(index++) + "(" + signature +
-             ")" + (invocation.isThrowing ? " throws" : "") + " {");
+             ")" + (invocation.isAsync ? " async" : "") +
+             (invocation.isThrowing ? " throws" : "") + " {");
     const std::string receiver = "receiver";
     out.line("  let _: " + invocation.resultType + " = " +
              invocationExpression(invocation, receiver, arguments));

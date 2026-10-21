@@ -19,6 +19,12 @@ std::string declaringModuleName(const Module& module, const Symbol& symbol);
 // `Module.Outer.Inner` for a module-local type.
 std::string qualifiedTypeName(const Module& module, const Symbol& symbol);
 
+// The modules generated Swift imports besides Foundation and `module`:
+// cross-import overlays, and frameworks of Objective-C classes in bridged
+// signatures (as `#if canImport` blocks).
+std::string swiftImports(const Module& module,
+                         const Classification& classification);
+
 // `name` escaped for use as a Swift identifier or member name.
 std::string swiftIdentifier(const std::string& name);
 
@@ -43,9 +49,15 @@ struct Invocation {
   std::string member;
   std::vector<std::string> labels;
   std::vector<std::string> parameterTypes;
+  // Per parameter: passed `inout` (the argument is written `&name`).
+  std::vector<bool> inoutParameters;
   // Qualified result type ("Void" when there is none).
   std::string resultType;
   bool isThrowing = false;
+  // The call is awaited (`async`, or an actor member called from outside).
+  bool isAsync = false;
+  // Synchronous main-actor isolation: the caller must be on the main actor.
+  bool isMainActor = false;
   bool isSettable = false;
   // The receiver must be passed `inout` (mutating members and setters of
   // value types).
@@ -63,7 +75,7 @@ Invocation describeInvocation(const Module& module, const Symbol& symbol,
 // deployment target, empty otherwise.
 std::string availabilityCondition(const Module& module, const Symbol& symbol);
 
-// The expression that reads/calls the symbol, including `try`.
+// The expression that reads/calls the symbol, including `try`/`await`.
 std::string invocationExpression(const Invocation& invocation,
                                  const std::string& receiver,
                                  const std::vector<std::string>& arguments);

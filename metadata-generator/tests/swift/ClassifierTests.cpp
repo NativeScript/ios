@@ -52,9 +52,16 @@ TEST(ClassifyNominalTypes) {
   EXPECT_TIER("Counter", Tier::SwiftGenerated);
   EXPECT_TIER("Canvas", Tier::SwiftGenerated);
   EXPECT_TIER("Greeter", Tier::TypeOnly, "protocol");
-  EXPECT_TIER("Measurement", Tier::Unsupported, "enum-associated-values");
-  EXPECT_TIER("ShapeError", Tier::Unsupported, "enum-associated-values");
-  EXPECT_TIER("Measurement.Unit", Tier::Unsupported, "nested-type");
+  EXPECT_TIER("Measurement", Tier::SwiftGenerated);
+  EXPECT_TIER("ShapeError", Tier::SwiftGenerated);
+  EXPECT_TIER("Formula", Tier::SwiftGenerated);
+  EXPECT_TIER("Payload", Tier::SwiftGenerated);
+  EXPECT_TIER("Job", Tier::Unsupported, "enum-associated-values,closure");
+  EXPECT_TIER("Measurement.Unit", Tier::SwiftGenerated);
+  EXPECT_TIER("Polygon.Style", Tier::SwiftGenerated);
+  EXPECT_TIER("Polygon.Metrics", Tier::SwiftGenerated);
+  EXPECT_TIER("Polygon.Metrics.init(perimeter:)", Tier::SwiftGenerated);
+  EXPECT_TIER("Polygon.style", Tier::SwiftGenerated);
   EXPECT_TIER("Coordinates", Tier::TypeOnly, "type-alias");
 }
 
@@ -74,8 +81,7 @@ TEST(ClassifyCallables) {
   EXPECT_TIER("Polygon.make()", Tier::SwiftGenerated);
   EXPECT_TIER("Polygon.shared", Tier::SwiftGenerated);
   EXPECT_TIER("Ring.expand(by:)", Tier::SwiftGenerated);
-  EXPECT_TIER("Loader.load(path:)", Tier::Unsupported,
-              "unbridged-type:Foundation.Data");
+  EXPECT_TIER("Loader.load(path:)", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.modernOnly()", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.legacyFetch()", Tier::SwiftGenerated);
   EXPECT_TIER("makeDefaultPoint()", Tier::SwiftGenerated);
@@ -87,23 +93,75 @@ TEST(ClassifyCallables) {
 
 TEST(ClassifyRejections) {
   EXPECT_TIER("Greeter.greet(name:)", Tier::TypeOnly, "protocol-requirement");
-  EXPECT_TIER("Loader.fetch(url:)", Tier::Unsupported, "async");
-  EXPECT_TIER("Loader.wait(seconds:)", Tier::Unsupported, "async");
+  EXPECT_TIER("Loader.fetch(url:)", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.transform(_:)", Tier::SwiftSpecialized, "generic");
   EXPECT_TIER("Loader.first(of:)", Tier::SwiftSpecialized, "generic");
-  EXPECT_TIER("Loader.withCompletion(_:)", Tier::Unsupported, "closure");
-  EXPECT_TIER("Loader.each(_:)", Tier::Unsupported, "closure");
-  EXPECT_TIER("Loader.update(_:)", Tier::Unsupported, "inout-parameter");
-  EXPECT_TIER("Loader.lookup(table:key:)", Tier::Unsupported, "collection");
-  EXPECT_TIER("Counter.increment()", Tier::Unsupported, "actor-isolated");
-  EXPECT_TIER("Counter.value", Tier::Unsupported, "actor-isolated");
-  EXPECT_TIER("Canvas.init()", Tier::Unsupported, "main-actor");
-  EXPECT_TIER("Canvas.draw(_:)", Tier::Unsupported, "main-actor");
+  EXPECT_TIER("Loader.withCompletion(_:)", Tier::Unsupported, "unbridged-type:Swift.Result");
+  EXPECT_TIER("Loader.each(_:)", Tier::SwiftGenerated);
+  EXPECT_TIER("countdown(from:_:)", Tier::SwiftGenerated);
+  EXPECT_TIER("greetLater(_:completion:)", Tier::SwiftGenerated);
+  EXPECT_TIER("Notifier.subscribe(_:)", Tier::SwiftGenerated);
+  EXPECT_TIER("Loader.update(_:)", Tier::SwiftGenerated);
+  EXPECT_TIER("tags(_:)", Tier::SwiftGenerated);
+  EXPECT_TIER("Note", Tier::ObjCDirect, "objc-visible");
+  EXPECT_TIER("halve(_:)", Tier::SwiftGenerated);
+  EXPECT_TIER("Loader.lookup(table:key:)", Tier::SwiftGenerated);
+  EXPECT_TIER("Canvas.draw(_:)", Tier::Unsupported, "existential");
   EXPECT_TIER("Ring.+(_:_:)", Tier::Unsupported, "operator");
   EXPECT_TIER("Polygon.subscript(_:)", Tier::Unsupported, "subscript");
   EXPECT_TIER("String.shouted", Tier::Unsupported, "external-type-extension");
-  EXPECT_TIER("Measurement.isNone", Tier::Unsupported, "owner-not-bridged");
-  EXPECT_TIER("Flavor.hash(into:)", Tier::Unsupported, "inout-parameter");
+  EXPECT_TIER("Measurement.isNone", Tier::SwiftGenerated);
+  EXPECT_TIER("Job.idle", Tier::Unsupported, "owner-not-bridged");
+  EXPECT_TIER("Flavor.hash(into:)", Tier::Unsupported, "unbridged-type:Swift.Hasher");
+}
+
+TEST(ClassifyIsolationAndAsync) {
+  auto flags = [](const std::string& path) {
+    const Capability* capability = capabilityAt(path);
+    if (!capability || capability->tier != Tier::SwiftGenerated) {
+      return std::string("not generated");
+    }
+    return std::string(capability->isAsync ? "async" : "sync") +
+           (capability->isMainActor ? ",main" : "") +
+           (capability->isSettable ? ",settable" : "");
+  };
+  CHECK_EQ(flags("Loader.wait(seconds:)"), std::string("async"));
+  CHECK_EQ(flags("delayedEcho(_:after:)"), std::string("async"));
+  CHECK_EQ(flags("makeTrackerLater(id:)"), std::string("async"));
+  // Actor members are awaited from outside, and never assignable.
+  CHECK_EQ(flags("Counter.increment()"), std::string("async"));
+  CHECK_EQ(flags("Counter.value"), std::string("async"));
+  CHECK_EQ(flags("Counter.step"), std::string("async"));
+  CHECK_EQ(flags("Counter.label()"), std::string("sync"));
+  CHECK_EQ(flags("Counter.init()"), std::string("sync"));
+  // Main-actor members run on the main thread; async ones hop there.
+  CHECK_EQ(flags("Palette.init()"), std::string("sync,main"));
+  CHECK_EQ(flags("Palette.stroke()"), std::string("sync,main"));
+  CHECK_EQ(flags("Palette.strokes"), std::string("sync,main"));
+  CHECK_EQ(flags("Palette.strokeLater()"), std::string("async,main"));
+  CHECK_EQ(flags("Canvas.init()"), std::string("sync,main"));
+}
+
+TEST(ClassifyCollectionsAndFoundation) {
+  const Capability* grid = capabilityAt("mirrored(_:)");
+  REQUIRE(grid && grid->tier == Tier::SwiftGenerated);
+  CHECK(grid->result.bridge == Bridge::Array);
+  REQUIRE(grid->result.elements.size() == 1);
+  CHECK(grid->result.elements[0].bridge == Bridge::Array);
+  CHECK(grid->result.elements[0].elements.at(0).bridge == Bridge::Integer);
+
+  const Capability* counts = capabilityAt("wordCounts(_:)");
+  REQUIRE(counts && counts->tier == Tier::SwiftGenerated);
+  CHECK(counts->result.bridge == Bridge::Dictionary);
+
+  CHECK(capabilityAt("nextDay(after:)")->result.bridge == Bridge::Date);
+  CHECK(capabilityAt("resolve(_:against:)")->parameters[1].bridge ==
+        Bridge::URL);
+  CHECK(capabilityAt("ramp(_:)")->result.bridge == Bridge::Data);
+  CHECK(capabilityAt("trackers(_:)")->result.elements.at(0).bridge ==
+        Bridge::ClassHandle);
+  CHECK(capabilityAt("allFlavors()")->result.elements.at(0).bridge ==
+        Bridge::EnumCase);
 }
 
 TEST(ClassifyBridges) {
@@ -181,6 +239,36 @@ TEST(VerifierParsesDiagnostics) {
            std::string("value of type 'X' has no member 'y'"));
   REQUIRE(unmapped.size() == 1);
   CHECK_EQ(unmapped[0], std::string("99: outside probes"));
+}
+
+TEST(VerifierAttributesThunkErrors) {
+  const std::string greet = symbolAt(demo(), "Demo.greet(name:)")->preciseId;
+  const std::string flavor = symbolAt(demo(), "Flavor")->preciseId;
+  std::string source =
+      "import Foundation\n"  // 1
+      "// " +
+      greet +
+      "\n"                        // 2
+      "private func thunk() {\n"  // 3
+      "}\n"                       // 4
+      "// " +
+      greet +
+      " (setter)\n"  // 5
+      "// " +
+      flavor +
+      "\n"                           // 6
+      "private func helper() {}\n";  // 7
+  std::string log =
+      "/t.swift:3:1: error: in the thunk\n"
+      "/t.swift:7:1: error: in the enum helper\n"
+      "/t.swift:1:1: error: before any symbol\n";
+  std::vector<std::string> unmapped;
+  auto rejections =
+      rejectionsFromThunkLog(log, "/t.swift", source, demo(), unmapped);
+  CHECK_EQ(rejections.size(), size_t(2));
+  CHECK_EQ(rejections[greet], std::string("in the thunk"));
+  CHECK_EQ(rejections[flavor], std::string("in the enum helper"));
+  CHECK_EQ(unmapped.size(), size_t(1));
 }
 
 TEST(VerifierAcceptsFixture) {

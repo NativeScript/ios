@@ -55,6 +55,37 @@ jobs:
         with:
           name: NativeScript-dSYMs
           path: dist/dSYMs
+  metadata-generator-tests:
+    name: Metadata generator tests
+    runs-on: macos-15
+    steps:
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: ${{env.XCODE_VERSION}}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false # disable to prevent leaking credentials to build scripts
+      - name: LLVM cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ./llvm
+          key: ${{ hashFiles('download_llvm.sh') }}
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - name: Build
+        run: |
+          ./download_llvm.sh
+          cmake -S metadata-generator -B metadata-generator/build -DCMAKE_BUILD_TYPE=Release -DMETADATA_BINARY_ARCH=arm64 -DCMAKE_OSX_ARCHITECTURES=arm64
+          cmake --build metadata-generator/build -j$(sysctl -n hw.ncpu) --target swift-symbolgraph-tests
+      # Swift interop: symbol graph loading, classification, compiler
+      # verification, thunk and TypeScript snapshots (tsc checks the
+      # declarations).
+      - name: Swift interop tests
+        run: |
+          npm install --no-save --prefix "$RUNNER_TEMP/tsc" typescript@5.9.3
+          NS_TSC="$RUNNER_TEMP/tsc/node_modules/.bin/tsc" ./metadata-generator/build/bin/swift-symbolgraph-tests
   test:
     name: ${{ matrix.name }}
     runs-on: macos-15

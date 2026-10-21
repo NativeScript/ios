@@ -329,6 +329,8 @@
 		F1CB51832D5C37100042555E /* URLPatternImpl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F1CB51822D5C37100042555E /* URLPatternImpl.cpp */; };
 		F1CB51842D5C37100042555E /* URLPatternImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = F1CB51812D5C37100042555E /* URLPatternImpl.h */; };
 		F1F30E742B58FC74006A62C0 /* URLImpl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F1F30E702B58FC74006A62C0 /* URLImpl.cpp */; };
+		6063D0D92D4AA4ED4C1F798C /* SwiftInterop.mm in Sources */ = {isa = PBXBuildFile; fileRef = C963491A0E1DB7DE246D8763 /* SwiftInterop.mm */; };
+		2CE758102F5E752AE5F9DECD /* SwiftInterop.h in Headers */ = {isa = PBXBuildFile; fileRef = 62EA5A65A7C4273D6341789E /* SwiftInterop.h */; };
 		F1F30E752B58FC74006A62C0 /* URLSearchParamsImpl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F1F30E712B58FC74006A62C0 /* URLSearchParamsImpl.cpp */; };
 		F1F30E762B58FC74006A62C0 /* URLSearchParamsImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = F1F30E722B58FC74006A62C0 /* URLSearchParamsImpl.h */; };
 		F1F30E772B58FC74006A62C0 /* URLImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = F1F30E732B58FC74006A62C0 /* URLImpl.h */; };
@@ -343,6 +345,13 @@
 		F6191AB629C0FF87003F588F /* utils.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AB429C0FF86003F588F /* utils.h */; };
 		F6191AB729C0FF87003F588F /* utils.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AB529C0FF86003F588F /* utils.mm */; };
 		D3FA1E7A0000000000000004 /* NativeScriptDefaultMetadata.c in Sources */ = {isa = PBXBuildFile; fileRef = D3FA1E7A0000000000000002 /* NativeScriptDefaultMetadata.c */; };
+		B7AE7851BE7065026BB3D36B /* Demo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26BB7293E7339CA12962242F /* Demo.swift */; };
+		A09586F9A155253666BE4E0E /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B33BDC0F84408229452C85B /* Extensions.swift */; };
+		EF918E4F1A6F3E39721F8C44 /* Shapes.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA98D6B239608C28AFB14F15 /* Shapes.swift */; };
+		1A9C83B48771CCA1BBEA3F77 /* Values.swift in Sources */ = {isa = PBXBuildFile; fileRef = D76F7C886215EB9DB96CA88E /* Values.swift */; };
+		2B7A41C09E3F4D21A6C0B001 /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7A41C09E3F4D21A6C0B002 /* Views.swift */; };
+		F84875BB70573F18E4D9BA12 /* SwiftDemo+NativeScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9283D493244254925F2F5D4D /* SwiftDemo+NativeScript.swift */; };
+		D3DEE264C143B4BB31683835 /* SwiftRuntimeLinkage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FFACD5929635A9739D992FE /* SwiftRuntimeLinkage.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -394,6 +403,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = C2F4CBB222C60BFD0036B56F;
 			remoteInfo = "metadata-generator";
+		};
+		EAC6F6059220EE00658E50B4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C27E277822202663009C10A3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 25D322C92AC1521571A8C2F4;
+			remoteInfo = SwiftDemo;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -863,6 +879,8 @@
 		F1CB51812D5C37100042555E /* URLPatternImpl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = URLPatternImpl.h; sourceTree = "<group>"; };
 		F1CB51822D5C37100042555E /* URLPatternImpl.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = URLPatternImpl.cpp; sourceTree = "<group>"; };
 		F1F30E702B58FC74006A62C0 /* URLImpl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLImpl.cpp; sourceTree = "<group>"; };
+		C963491A0E1DB7DE246D8763 /* SwiftInterop.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = SwiftInterop.mm; sourceTree = "<group>"; };
+		62EA5A65A7C4273D6341789E /* SwiftInterop.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SwiftInterop.h; sourceTree = "<group>"; };
 		F1F30E712B58FC74006A62C0 /* URLSearchParamsImpl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLSearchParamsImpl.cpp; sourceTree = "<group>"; };
 		F1F30E722B58FC74006A62C0 /* URLSearchParamsImpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLSearchParamsImpl.h; sourceTree = "<group>"; };
 		F1F30E732B58FC74006A62C0 /* URLImpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLImpl.h; sourceTree = "<group>"; };
@@ -879,6 +897,14 @@
 		D3FA1E7A0000000000000001 /* NativeScriptDefaultMetadata.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NativeScriptDefaultMetadata.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D3FA1E7A0000000000000002 /* NativeScriptDefaultMetadata.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = NativeScriptDefaultMetadata.c; sourceTree = "<group>"; };
 		D3FA1E7A0000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		26BB7293E7339CA12962242F /* Demo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Demo.swift"; sourceTree = "<group>"; };
+		9B33BDC0F84408229452C85B /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Extensions.swift"; sourceTree = "<group>"; };
+		CA98D6B239608C28AFB14F15 /* Shapes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Shapes.swift"; sourceTree = "<group>"; };
+		D76F7C886215EB9DB96CA88E /* Values.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Values.swift"; sourceTree = "<group>"; };
+		2B7A41C09E3F4D21A6C0B002 /* Views.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/SwiftDemo/Views.swift"; sourceTree = "<group>"; };
+		9283D493244254925F2F5D4D /* SwiftDemo+NativeScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Interop/SwiftDemo+NativeScript.swift"; sourceTree = "<group>"; };
+		8431D102ADFEC30630A1D9EB /* libSwiftDemo.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libSwiftDemo.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		2FFACD5929635A9739D992FE /* SwiftRuntimeLinkage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftRuntimeLinkage.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -936,6 +962,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D3FA1E7A0000000000000008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		67C5137D65E8C782880B46DC /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -1116,6 +1149,7 @@
 				C23992C8236C2D6E00D2F720 /* TestRunnerTests */,
 				C27E5D8C22F31CCA00498ED0 /* AppWithModules */,
 				C29374E3229FC0F60075CB16 /* TestFixtures */,
+				ED7A0A8FFBC394ED679DC81C /* SwiftDemo */,
 				C2A5DFE62328C4B900A91A76 /* TKLiveSync */,
 				D3FA1E7A0000000000000005 /* NativeScriptDefaultMetadata */,
 				C27E278122202664009C10A3 /* Products */,
@@ -1127,6 +1161,7 @@
 			isa = PBXGroup;
 			children = (
 				C2DDEB16229EA89000345BFE /* TestRunner.app */,
+				8431D102ADFEC30630A1D9EB /* libSwiftDemo.a */,
 				C2DDEB32229EAB3B00345BFE /* NativeScript.framework */,
 				C29374E2229FC0F60075CB16 /* libTestFixtures.a */,
 				C2F4CBB322C60BFD0036B56F /* metadata-generator */,
@@ -1424,6 +1459,7 @@
 		C2DDEB17229EA89000345BFE /* TestRunner */ = {
 			isa = PBXGroup;
 			children = (
+				2FFACD5929635A9739D992FE /* SwiftRuntimeLinkage.swift */,
 				C2DDEBDD229EB4A900345BFE /* app */,
 				C2DDEBDA229EB37A00345BFE /* Source Files */,
 				C2DDEB26229EA89200345BFE /* Info.plist */,
@@ -1461,6 +1497,8 @@
 			children = (
 				F1CB51812D5C37100042555E /* URLPatternImpl.h */,
 				F1CB51822D5C37100042555E /* URLPatternImpl.cpp */,
+				62EA5A65A7C4273D6341789E /* SwiftInterop.h */,
+				C963491A0E1DB7DE246D8763 /* SwiftInterop.mm */,
 				F1F30E702B58FC74006A62C0 /* URLImpl.cpp */,
 				F1F30E732B58FC74006A62C0 /* URLImpl.h */,
 				F1F30E712B58FC74006A62C0 /* URLSearchParamsImpl.cpp */,
@@ -1644,6 +1682,20 @@
 			path = inspector;
 			sourceTree = "<group>";
 		};
+		ED7A0A8FFBC394ED679DC81C /* SwiftDemo */ = {
+			isa = PBXGroup;
+			children = (
+				26BB7293E7339CA12962242F /* Demo.swift */,
+				9B33BDC0F84408229452C85B /* Extensions.swift */,
+				CA98D6B239608C28AFB14F15 /* Shapes.swift */,
+				D76F7C886215EB9DB96CA88E /* Values.swift */,
+				2B7A41C09E3F4D21A6C0B002 /* Views.swift */,
+				9283D493244254925F2F5D4D /* SwiftDemo+NativeScript.swift */,
+			);
+			name = SwiftDemo;
+			path = "metadata-generator/TestFixtures/SwiftDemo";
+			sourceTree = SOURCE_ROOT;
+		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -1676,6 +1728,7 @@
 				6573B9CD291FE29F00B0ED7C /* V8Runtime.h in Headers */,
 				C22536B5241A318900192740 /* ffitarget.h in Headers */,
 				F1F30E772B58FC74006A62C0 /* URLImpl.h in Headers */,
+				2CE758102F5E752AE5F9DECD /* SwiftInterop.h in Headers */,
 				F6191AAE29C0FCE8003F588F /* JsV8InspectorClient.h in Headers */,
 				A1B2C3D40000000000000003 /* WorkerInspectorClient.h in Headers */,
 				6573B9D0291FE29F00B0ED7C /* JSIV8ValueConverter.h in Headers */,
@@ -1854,6 +1907,7 @@
 			dependencies = (
 				C22C091F22CA2E860080D176 /* PBXTargetDependency */,
 				C293752B229FC4740075CB16 /* PBXTargetDependency */,
+				F2C55AEF2ADD88FECF5E82E9 /* PBXTargetDependency */,
 				C2F4CBBC22C61CF20036B56F /* PBXTargetDependency */,
 				C2253788241A41C500192740 /* PBXTargetDependency */,
 			);
@@ -1916,6 +1970,22 @@
 			productReference = D3FA1E7A0000000000000001 /* NativeScriptDefaultMetadata.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		25D322C92AC1521571A8C2F4 /* SwiftDemo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DF47F91AC9C3AB512FE03BEE /* Build configuration list for PBXNativeTarget "SwiftDemo" */;
+			buildPhases = (
+				39094EAFF1026F65E06FE889 /* Sources */,
+				67C5137D65E8C782880B46DC /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SwiftDemo;
+			productName = SwiftDemo;
+			productReference = 8431D102ADFEC30630A1D9EB /* libSwiftDemo.a */;
+			productType = "com.apple.product-type.library.static";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1970,6 +2040,7 @@
 				C27E5D8A22F31CC900498ED0 /* AppWithModules */,
 				C2DDEB31229EAB3B00345BFE /* NativeScript */,
 				C29374E1229FC0F60075CB16 /* TestFixtures */,
+				25D322C92AC1521571A8C2F4 /* SwiftDemo */,
 				C2F4CBB222C60BFD0036B56F /* metadata-generator */,
 				C23992C6236C2D6E00D2F720 /* TestRunnerTests */,
 				C2253781241A41C500192740 /* TKLiveSync */,
@@ -2295,6 +2366,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D3DEE264C143B4BB31683835 /* SwiftRuntimeLinkage.swift in Sources */,
 				C2DDEBDC229EB37A00345BFE /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2369,6 +2441,7 @@
 				C2DDEBAA229EAC8300345BFE /* ModuleInternal.mm in Sources */,
 				F1F30E752B58FC74006A62C0 /* URLSearchParamsImpl.cpp in Sources */,
 				F1F30E742B58FC74006A62C0 /* URLImpl.cpp in Sources */,
+				6063D0D92D4AA4ED4C1F798C /* SwiftInterop.mm in Sources */,
 				C2DDEBA3229EAC8300345BFE /* ArrayAdapter.mm in Sources */,
 				C2C8EE7422CE3266001F8CEC /* ConcurrentQueue.cpp in Sources */,
 				C2DDEBA0229EAC8300345BFE /* Interop.mm in Sources */,
@@ -2403,6 +2476,19 @@
 			buildActionMask = 2147483647;
 			files = (
 				D3FA1E7A0000000000000004 /* NativeScriptDefaultMetadata.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		39094EAFF1026F65E06FE889 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B7AE7851BE7065026BB3D36B /* Demo.swift in Sources */,
+				A09586F9A155253666BE4E0E /* Extensions.swift in Sources */,
+				EF918E4F1A6F3E39721F8C44 /* Shapes.swift in Sources */,
+				1A9C83B48771CCA1BBEA3F77 /* Values.swift in Sources */,
+				2B7A41C09E3F4D21A6C0B001 /* Views.swift in Sources */,
+				F84875BB70573F18E4D9BA12 /* SwiftDemo+NativeScript.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2456,6 +2542,15 @@
 			isa = PBXTargetDependency;
 			target = C2F4CBB222C60BFD0036B56F /* metadata-generator */;
 			targetProxy = C2F4CBBB22C61CF20036B56F /* PBXContainerItemProxy */;
+		};
+		F2C55AEF2ADD88FECF5E82E9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilters = (
+				ios,
+				xros,
+			);
+			target = 25D322C92AC1521571A8C2F4 /* SwiftDemo */;
+			targetProxy = EAC6F6059220EE00658E50B4 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -2872,6 +2967,8 @@
 					CoreGraphics,
 					"-force_load",
 					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libTestFixtures.a",
+					"-Wl,-u,_ns_swift_register_SwiftDemo",
+					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libSwiftDemo.a",
 					"-sectcreate",
 					__DATA,
 					__TNSMetadata,
@@ -2879,6 +2976,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = vm.org.nativescript.TestRunner;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				STRIPFLAGS = "-s $(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
@@ -2928,6 +3026,8 @@
 					CoreGraphics,
 					"-force_load",
 					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libTestFixtures.a",
+					"-Wl,-u,_ns_swift_register_SwiftDemo",
+					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/libSwiftDemo.a",
 					"-sectcreate",
 					__DATA,
 					__TNSMetadata,
@@ -2935,6 +3035,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = vm.org.nativescript.TestRunner;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				STRIPFLAGS = "-s $(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
@@ -3237,6 +3338,32 @@
 			};
 			name = Release;
 		};
+		367136433311CFF0FDB0C91E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				SYMROOT = build;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		445B0766107C823B92906250 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				SYMROOT = build;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -3317,6 +3444,15 @@
 			buildConfigurations = (
 				D3FA1E7A000000000000000A /* Debug */,
 				D3FA1E7A000000000000000B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DF47F91AC9C3AB512FE03BEE /* Build configuration list for PBXNativeTarget "SwiftDemo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				367136433311CFF0FDB0C91E /* Debug */,
+				445B0766107C823B92906250 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

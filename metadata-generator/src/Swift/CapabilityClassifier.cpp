@@ -50,6 +50,31 @@ bool isCallableKind(SymbolKind kind) {
   }
 }
 
+bool hasAssociatedValues(const Module& module, const Symbol& symbol) {
+  if (symbol.kind != SymbolKind::Enum) {
+    return false;
+  }
+  for (const auto& id : symbol.memberIds) {
+    const Symbol* member = module.find(id);
+    if (member && member->kind == SymbolKind::EnumCase &&
+        !member->parameters.empty()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+std::vector<std::string> caseKeys(const Symbol& enumCase) {
+  std::vector<std::string> keys;
+  const auto& parameters = enumCase.parameters;
+  for (size_t i = 0; i < parameters.size(); i++) {
+    keys.push_back(!parameters[i].label.empty() ? parameters[i].label
+                   : parameters.size() == 1     ? "value"
+                                                : std::to_string(i));
+  }
+  return keys;
+}
+
 namespace {
 
 std::string availabilityDomain(const Platform& platform) {
@@ -124,6 +149,7 @@ class Classifier {
         _result.bySymbol[entry.first] = classifyType(entry.second);
       }
     }
+    rejectUnbridgedPayloads();
     for (const auto& entry : _module.symbols) {
       if (!isNominalType(entry.second.kind)) {
         _result.bySymbol[entry.first] = classifyOther(entry.second);
@@ -186,8 +212,17 @@ class Classifier {
     if (!symbol.genericParameters.empty()) {
       return make(Tier::SwiftSpecialized, "generic");
     }
-    if (!symbol.parentId.empty()) {
-      return make(Tier::Unsupported, "nested-type");
+    // A nested type is reached through its parent's JS path; it is generic
+    // when any enclosing type is.
+    for (const Symbol* current = &symbol; !current->parentId.empty();) {
+      const Symbol* parent = _module.find(current->parentId);
+      if (!parent) {
+        return make(Tier::Unsupported, "external-type-extension");
+      }
+      if (!parent->genericParameters.empty()) {
+        return make(Tier::SwiftSpecialized, "generic");
+      }
+      current = parent;
     }
     // Graphs show suppressed conformances only when the declaration spells
     // them; other noncopyable types are caught by compiler verification.
@@ -197,16 +232,68 @@ class Classifier {
     if (llvm::StringRef(symbol.declarationText).contains("~Escapable")) {
       return make(Tier::Unsupported, "nonescapable");
     }
-    if (symbol.kind == SymbolKind::Enum) {
-      for (const auto& id : symbol.memberIds) {
-        const Symbol* member = _module.find(id);
-        if (member && member->kind == SymbolKind::EnumCase &&
-            !member->parameters.empty()) {
-          return make(Tier::Unsupported, "enum-associated-values");
+    return make(Tier::SwiftGenerated);
+  }
+
+  // An enum with associated values crosses whole, so every case JS may see
+  // must bridge. Payloads can name other such enums: demote until nothing
+  // changes.
+  void rejectUnbridgedPayloads() {
+    bool changed = true;
+    while (changed) {
+      changed = false;
+      for (const auto& entry : _module.symbols) {
+        const Symbol& symbol = entry.second;
+        Capability& capability = _result.bySymbol[entry.first];
+        if (capability.tier != Tier::SwiftGenerated ||
+            !hasAssociatedValues(_module, symbol)) {
+          continue;
+        }
+        std::vector<std::string> reasons;
+        for (const auto& id : symbol.memberIds) {
+          const Symbol* member = _module.find(id);
+          if (!member || member->kind != SymbolKind::EnumCase ||
+              isUnavailable(*member)) {
+            continue;
+          }
+          auto rejected = _rejections.find(member->preciseId);
+          if (rejected != _rejections.end()) {
+            reasons.push_back("compiler-rejected:" + rejected->second);
+          }
+          for (const auto& key : caseKeys(*member)) {
+            if (key == "case") {
+              reasons.push_back("js-name-conflict");
+            }
+          }
+          std::set<std::string> generics;
+          for (const auto& parameter : member->parameters) {
+            BridgedType bridged = bridge(parameter.type, generics, reasons);
+            if (bridged.bridge == Bridge::Closure) {
+              reasons.push_back("closure");
+            }
+          }
+        }
+        if (!reasons.empty()) {
+          std::sort(reasons.begin(), reasons.end());
+          reasons.erase(std::unique(reasons.begin(), reasons.end()),
+                        reasons.end());
+          capability = make(Tier::Unsupported, "enum-associated-values");
+          capability.reasons.insert(capability.reasons.end(), reasons.begin(),
+                                    reasons.end());
+          changed = true;
         }
       }
     }
-    return make(Tier::SwiftGenerated);
+  }
+
+  bool isUnavailable(const Symbol& symbol) const {
+    for (const Availability* availability :
+         applicableAvailability(_module, symbol)) {
+      if (availability->isUnconditionallyUnavailable) {
+        return true;
+      }
+    }
+    return false;
   }
 
   Capability classifyOther(const Symbol& symbol) const {
@@ -266,9 +353,16 @@ class Classifier {
       return make(Tier::Unsupported, "subscript");
     }
     if (symbol.kind == SymbolKind::EnumCase) {
-      // Only payload-less enums are bridged (see classifyType).
+      // The owner bridged, so its payloads do (rejectUnbridgedPayloads).
       capability = make(Tier::SwiftGenerated);
       capability.jsName = symbol.baseName;
+      std::set<std::string> generics;
+      std::vector<std::string> reasons;
+      for (const auto& parameter : symbol.parameters) {
+        capability.parameters.push_back(
+            bridge(parameter.type, generics, reasons));
+      }
+      capability.result = bridgeOwner(*owner);
       return capability;
     }
 
@@ -276,23 +370,29 @@ class Classifier {
       return make(Tier::SwiftSpecialized, "generic");
     }
 
+    // Isolation decides how a call is made, not whether it can be: actor
+    // members are awaited from outside their actor, main-actor members run
+    // only on the main thread.
     bool nonisolated = hasAttribute(symbol, "nonisolated");
-    if (!nonisolated && (hasAttribute(symbol, "@MainActor") ||
-                         (owner && hasAttribute(*owner, "@MainActor")))) {
-      return make(Tier::Unsupported, "main-actor");
+    bool actorIsolated = owner && owner->kind == SymbolKind::Actor &&
+                         !nonisolated && !symbol.isStatic &&
+                         symbol.kind != SymbolKind::Initializer;
+    capability.isAsync = symbol.isAsync || actorIsolated;
+    if (capability.isAsync && symbol.kind == SymbolKind::Initializer) {
+      // `new` cannot await.
+      return make(Tier::Unsupported, "async-initializer");
     }
-    if (owner && owner->kind == SymbolKind::Actor && !nonisolated &&
-        !symbol.isStatic && symbol.kind != SymbolKind::Initializer) {
-      return make(Tier::Unsupported, "actor-isolated");
-    }
-    if (symbol.isAsync) {
-      return make(Tier::Unsupported, "async");
-    }
+    capability.isMainActor =
+        !nonisolated && (hasAttribute(symbol, "@MainActor") ||
+                         (owner && hasAttribute(*owner, "@MainActor")));
+    // Another actor's state cannot be assigned from outside it.
+    capability.isSettable = symbol.isSettable && !capability.isAsync;
 
     std::set<std::string> generics = genericNamesInScope(_module, symbol);
     std::vector<std::string> reasons;
     for (const auto& parameter : symbol.parameters) {
-      if (parameter.modifier == "inout") {
+      // An async call returns before its arguments' final values exist.
+      if (parameter.modifier == "inout" && capability.isAsync) {
         reasons.push_back("inout-parameter");
         continue;
       }
@@ -306,6 +406,25 @@ class Classifier {
         continue;
       }
       BridgedType bridged = bridge(parameter.type, generics, reasons);
+      if (parameter.modifier == "inout") {
+        if (bridged.bridge == Bridge::Closure) {
+          reasons.push_back("inout-parameter");
+        }
+        bridged.isInout = true;
+      }
+      if (bridged.bridge == Bridge::Closure) {
+        // The declaration parser lifts type attributes onto the parameter;
+        // the closure type needs them back (@Sendable, @MainActor).
+        TypeNode& node =
+            bridged.optional ? bridged.node.children[0] : bridged.node;
+        for (const auto& attribute : parameter.attributes) {
+          if (attribute == "@escaping") {
+            bridged.escaping = true;
+          } else if (!node.hasAttribute(attribute)) {
+            node.attributes.push_back(attribute);
+          }
+        }
+      }
       capability.parameters.push_back(std::move(bridged));
     }
 
@@ -316,8 +435,14 @@ class Classifier {
       capability.result = std::move(self);
     } else if (symbol.valueType) {
       capability.result = bridge(*symbol.valueType, generics, reasons);
+      if (capability.result.bridge == Bridge::Closure) {
+        reasons.push_back("closure");
+      }
     } else if (symbol.returnType) {
       capability.result = bridge(*symbol.returnType, generics, reasons);
+      if (capability.result.bridge == Bridge::Closure) {
+        reasons.push_back("closure");
+      }
     } else {
       capability.result.bridge = Bridge::Void;
     }
@@ -328,13 +453,10 @@ class Classifier {
       bool onlyGeneric =
           std::all_of(reasons.begin(), reasons.end(),
                       [](const std::string& r) { return r == "generic"; });
-      return Capability{
-          onlyGeneric ? Tier::SwiftSpecialized : Tier::Unsupported,
-          reasons,
-          "",
-          false,
-          {},
-          {}};
+      Capability rejected;
+      rejected.tier = onlyGeneric ? Tier::SwiftSpecialized : Tier::Unsupported;
+      rejected.reasons = reasons;
+      return rejected;
     }
 
     capability.tier = Tier::SwiftGenerated;
@@ -347,9 +469,10 @@ class Classifier {
   BridgedType bridgeOwner(const Symbol& owner) const {
     BridgedType bridged;
     bridged.symbolId = owner.preciseId;
-    bridged.bridge = owner.kind == SymbolKind::Struct ? Bridge::StructBox
-                     : owner.kind == SymbolKind::Enum ? Bridge::EnumCase
-                                                      : Bridge::ClassHandle;
+    bridged.bridge = owner.kind == SymbolKind::Struct      ? Bridge::StructBox
+                     : owner.kind != SymbolKind::Enum      ? Bridge::ClassHandle
+                     : hasAssociatedValues(_module, owner) ? Bridge::TaggedEnum
+                                                           : Bridge::EnumCase;
     TypeNode::Component component;
     component.name = owner.name;
     component.usr = owner.preciseId;
@@ -385,6 +508,26 @@ class Classifier {
     return bridged;
   }
 
+  // Bridges a collection's element (value) type into `container.elements`.
+  std::string bridgeElement(const TypeNode& node,
+                            BridgedType& container) const {
+    BridgedType element;
+    element.node = node;
+    if (node.kind == TypeNode::Kind::Optional ||
+        node.kind == TypeNode::Kind::ImplicitlyUnwrappedOptional) {
+      return "optional-element";
+    }
+    std::string reason = bridgeNonOptional(node, element);
+    if (reason.empty() && element.bridge == Bridge::Void) {
+      reason = "unbridged-type:Void";
+    }
+    if (reason.empty() && element.bridge == Bridge::Closure) {
+      reason = "closure";
+    }
+    container.elements.push_back(std::move(element));
+    return reason;
+  }
+
   // Returns the rejection reason, or "" with `bridged` filled in.
   std::string bridgeNonOptional(const TypeNode& node,
                                 BridgedType& bridged) const {
@@ -394,13 +537,53 @@ class Classifier {
         return "";
       case TypeNode::Kind::GenericParameter:
         return "generic";
-      case TypeNode::Kind::Function:
-        return "closure";
+      case TypeNode::Kind::Function: {
+        // JS functions stand in for closures that return nothing: a Swift
+        // caller cannot wait for a value from another thread's JS.
+        if (node.isAsync || node.isThrowing ||
+            (!node.result.empty() &&
+             node.result[0].kind != TypeNode::Kind::Void)) {
+          return "closure";
+        }
+        bridged.bridge = Bridge::Closure;
+        for (const auto& parameter : node.children) {
+          BridgedType element;
+          element.node = parameter;
+          const TypeNode* inner = &parameter;
+          if (!parameter.modifier.empty()) {
+            return "closure";
+          }
+          if (inner->kind == TypeNode::Kind::Optional ||
+              inner->kind == TypeNode::Kind::ImplicitlyUnwrappedOptional) {
+            element.optional = true;
+            inner = &inner->children[0];
+          }
+          std::string reason = bridgeNonOptional(*inner, element);
+          if (reason.empty() && (element.bridge == Bridge::Void ||
+                                 element.bridge == Bridge::Closure)) {
+            reason = "closure";
+          }
+          if (!reason.empty()) {
+            return reason;
+          }
+          bridged.elements.push_back(std::move(element));
+        }
+        return "";
+      }
       case TypeNode::Kind::Tuple:
         return "tuple";
       case TypeNode::Kind::Array:
-      case TypeNode::Kind::Dictionary:
-        return "collection";
+        bridged.bridge = Bridge::Array;
+        return bridgeElement(node.children[0], bridged);
+      case TypeNode::Kind::Dictionary: {
+        const TypeNode& key = node.children[0];
+        if (key.kind != TypeNode::Kind::Nominal ||
+            key.usr() != KnownTypes::kString) {
+          return "dictionary-key";
+        }
+        bridged.bridge = Bridge::Dictionary;
+        return bridgeElement(node.children[1], bridged);
+      }
       case TypeNode::Kind::Existential:
       case TypeNode::Kind::Composition:
         return "existential";
@@ -422,13 +605,31 @@ class Classifier {
         isPrimitive(usr, bridged.bridge)) {
       return "";
     }
+    if (usr == KnownTypes::kDate) {
+      bridged.bridge = Bridge::Date;
+      return "";
+    }
+    if (usr == KnownTypes::kURL) {
+      bridged.bridge = Bridge::URL;
+      return "";
+    }
+    if (usr == KnownTypes::kData) {
+      bridged.bridge = Bridge::Data;
+      return "";
+    }
     const Symbol* target = usr.empty() ? nullptr : _module.find(usr);
+    std::string objcClass = objcClassName(usr, target);
+    if (!objcClass.empty()) {
+      bridged.bridge = Bridge::ObjCObject;
+      bridged.objcClass = objcClass;
+      return "";
+    }
     if (target) {
       const Capability* capability = _result.find(target->preciseId);
       if (capability && capability->tier == Tier::SwiftGenerated &&
           target->kind != SymbolKind::Protocol) {
-        bridged = BridgedType{bridgeOwner(*target).bridge, bridged.optional,
-                              target->preciseId, bridged.node};
+        bridged.bridge = bridgeOwner(*target).bridge;
+        bridged.symbolId = target->preciseId;
         return "";
       }
       return "unbridged-type:" + llvm::join(target->pathComponents, ".");
@@ -439,6 +640,31 @@ class Classifier {
     }
     std::string qualified = qualifiedNameFromUSR(usr);
     return "unbridged-type:" + (qualified.empty() ? spelling(node) : qualified);
+  }
+
+  // The runtime name of the Objective-C class `usr` names, or "" when it
+  // names no class. Swift classes keep their module-qualified name unless
+  // they declare @objc(Name).
+  std::string objcClassName(const std::string& usr,
+                            const Symbol* target) const {
+    llvm::StringRef ref(usr);
+    if (ref.consume_front("c:objc(cs)")) {
+      return ref.str();
+    }
+    size_t marker = ref.find("@objc(cs)");
+    if (!ref.startswith("c:@M@") || marker == llvm::StringRef::npos) {
+      return "";
+    }
+    if (target) {
+      for (const auto& attribute : target->attributes) {
+        llvm::StringRef text(attribute);
+        if (text.consume_front("@objc(") && text.consume_back(")")) {
+          return text.str();
+        }
+      }
+    }
+    llvm::StringRef module = ref.substr(5).split('@').first;
+    return module.str() + "." + ref.substr(marker + 9).str();
   }
 
   // JS names for SwiftGenerated members and overload ambiguity.
@@ -499,6 +725,9 @@ class Classifier {
   }
 
   static std::string jsKind(const BridgedType& type) {
+    if (type.isInout) {
+      return "record";
+    }
     std::string kind;
     switch (type.bridge) {
       case Bridge::Bool:
@@ -515,6 +744,29 @@ class Classifier {
       case Bridge::ClassHandle:
       case Bridge::StructBox:
         kind = "object:" + type.symbolId;
+        break;
+      case Bridge::URL:
+        // A URL parameter also accepts a string.
+        kind = "string";
+        break;
+      case Bridge::Date:
+        kind = "date";
+        break;
+      case Bridge::Data:
+        kind = "bytes";
+        break;
+      case Bridge::Array:
+        kind = "array";
+        break;
+      case Bridge::Dictionary:
+      case Bridge::TaggedEnum:
+        kind = "record";
+        break;
+      case Bridge::Closure:
+        kind = "function";
+        break;
+      case Bridge::ObjCObject:
+        kind = "objc";
         break;
       default:
         kind = "other";
