@@ -923,10 +923,11 @@ void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>
     // Plain ES `class X extends NativeType {}` subclasses reach this callback
     // through super(); use new.target to lazily register (and construct) the
     // derived class.
-    klass = ClassBuilder::ResolveConstructedClass(context, info.NewTarget(), klass);
+    bool esDerived = false;
+    klass = ClassBuilder::ResolveConstructedClass(context, info.NewTarget(), klass, &esDerived);
 
     const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(item->meta_);
-    ArgConverter::ConstructObject(context, info, klass, interfaceMeta);
+    ArgConverter::ConstructObject(context, info, klass, interfaceMeta, esDerived);
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
   }
@@ -1068,7 +1069,7 @@ void MetadataBuilder::PropertySetterCallback(const FunctionCallbackInfo<Value>& 
 // `JSClass.someStaticProperty`).
 static Class ResolveStaticReceiverClass(Local<Context> context, Local<Object> receiver,
                                         Class fallback) {
-  if (receiver.IsEmpty() || !receiver->IsFunction()) {
+  if (!ClassBuilder::MayBeESClass(receiver)) {
     return fallback;
   }
 

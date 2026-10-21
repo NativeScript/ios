@@ -57,10 +57,18 @@ class ClassBuilder {
 
   // Resolves the Objective-C class that should be instantiated for a construct
   // call, honoring `new.target` so that plain ES subclasses of native classes
-  // get their own registered class.
+  // get their own registered class. Sets *esDerived when that class is one, so
+  // the construct path need not look new.target up again.
   static Class ResolveConstructedClass(v8::Local<v8::Context> context,
                                        v8::Local<v8::Value> newTarget,
-                                       Class fallback);
+                                       Class fallback,
+                                       bool* esDerived = nullptr);
+
+  // False for constructors the runtime builds from templates (native classes,
+  // `.extend()`), which have no script and so can never be ES classes. Lets hot
+  // paths skip the wrapper lookup on a function, which is a private-symbol
+  // read.
+  static bool MayBeESClass(v8::Local<v8::Value> function);
 
   // True when a construct call's new.target is a plain ES class registered by
   // EnsureExtendedClass, whose super(...) follows the interop.initializer

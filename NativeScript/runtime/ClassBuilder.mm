@@ -433,9 +433,11 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
   try {
     CacheItem* item = static_cast<CacheItem*>(
         info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
-    Class klass = ClassBuilder::ResolveConstructedClass(context, info.NewTarget(), item->data_);
+    bool esDerived = false;
+    Class klass =
+        ClassBuilder::ResolveConstructedClass(context, info.NewTarget(), item->data_, &esDerived);
 
-    ArgConverter::ConstructObject(context, info, klass);
+    ArgConverter::ConstructObject(context, info, klass, nullptr, esDerived);
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
   }
@@ -844,9 +846,17 @@ Class ClassBuilder::EnsureExtendedClass(Local<Context> context, Local<v8::Functi
   return extendedClass;
 }
 
+bool ClassBuilder::MayBeESClass(Local<Value> function) {
+  return !function.IsEmpty() && function->IsFunction() &&
+         function.As<v8::Function>()->ScriptId() != UnboundScript::kNoScriptId;
+}
+
 Class ClassBuilder::ResolveConstructedClass(Local<Context> context, Local<Value> newTarget,
-                                            Class fallback) {
-  if (newTarget.IsEmpty() || !newTarget->IsFunction()) {
+                                            Class fallback, bool* esDerived) {
+  if (esDerived != nullptr) {
+    *esDerived = false;
+  }
+  if (!MayBeESClass(newTarget)) {
     return fallback;
   }
 
@@ -854,19 +864,24 @@ Class ClassBuilder::ResolveConstructedClass(Local<Context> context, Local<Value>
   Local<v8::Function> newTargetFunc = newTarget.As<v8::Function>();
 
   BaseDataWrapper* wrapper = tns::GetValue(isolate, newTargetFunc);
-  if (wrapper != nullptr) {
-    if (wrapper->Type() == WrapperType::ObjCClass) {
-      return static_cast<ObjCClassWrapper*>(wrapper)->Klass();
+  if (wrapper == nullptr) {
+    if (ClassBuilder::EnsureExtendedClass(context, newTargetFunc) == nil) {
+      return fallback;
     }
+    wrapper = tns::GetValue(isolate, newTargetFunc);
+  }
+  if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCClass) {
     return fallback;
   }
-
-  Class ensured = ClassBuilder::EnsureExtendedClass(context, newTargetFunc);
-  return ensured != nil ? ensured : fallback;
+  ObjCClassWrapper* classWrapper = static_cast<ObjCClassWrapper*>(wrapper);
+  if (esDerived != nullptr) {
+    *esDerived = classWrapper->ESDerivedClass();
+  }
+  return classWrapper->Klass();
 }
 
 bool ClassBuilder::IsESDerivedConstructor(Isolate* isolate, Local<Value> newTarget) {
-  if (newTarget.IsEmpty() || !newTarget->IsFunction()) {
+  if (!MayBeESClass(newTarget)) {
     return false;
   }
   BaseDataWrapper* wrapper = tns::GetValue(isolate, newTarget);

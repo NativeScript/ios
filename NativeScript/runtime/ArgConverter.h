@@ -94,7 +94,8 @@ class ArgConverter {
   static void ConstructObject(v8::Local<v8::Context> context,
                               const v8::FunctionCallbackInfo<v8::Value>& info,
                               Class klass,
-                              const InterfaceMeta* interfaceMeta = nullptr);
+                              const InterfaceMeta* interfaceMeta = nullptr,
+                              bool esDerivedNewTarget = false);
   static std::vector<const MethodMeta*> GetInitializers(
       Caches* cache, Class klass, const InterfaceMeta* interfaceMeta);
   // An initializer's constructor tokens in selector order, e.g. { "int",

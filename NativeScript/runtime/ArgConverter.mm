@@ -578,11 +578,12 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
 }
 
 void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbackInfo<Value>& info,
-                                   Class klass, const InterfaceMeta* interfaceMeta) {
+                                   Class klass, const InterfaceMeta* interfaceMeta,
+                                   bool esDerivedNewTarget) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   tns::Assert(klass != nullptr, isolate);
 
-  if (ClassBuilder::IsESDerivedConstructor(isolate, info.NewTarget())) {
+  if (esDerivedNewTarget) {
     ClassBuilder::ConstructESObject(context, info, klass);
     return;
   }
