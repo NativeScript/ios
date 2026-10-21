@@ -462,6 +462,31 @@ describe("ns:swift", function () {
         });
     });
 
+    describe("subscripts", function () {
+        it("reads and assigns subscripts through subscript() and setSubscript()", function () {
+            var shelf = new SwiftDemo.Shelf();
+            expect(shelf.subscript("apples")).toBeNull();
+            shelf.setSubscript("apples", 3);
+            expect(shelf.subscript("apples")).toBe(3);
+            shelf.setSubscript("apples", null);
+            expect(shelf.subscript("apples")).toBeNull();
+            expect(shelf.subscript(2, 5)).toBe("2,5");
+        });
+
+        it("assigns a struct's subscript in place", function () {
+            var grid = new SwiftDemo.Grid(3);
+            grid.setSubscript(1, 7);
+            expect(grid.subscript(1)).toBe(7);
+            expect(grid.cells).toEqual([0, 7, 0]);
+        });
+
+        it("has no setter for a read-only subscript", function () {
+            var square = new SwiftDemo.Square(2);
+            expect(square.subscript(3).x).toBe(3);
+            expect(square.setSubscript).toBeUndefined();
+        });
+    });
+
     describe("cancellation", function () {
         it("rejects an aborted call with the signal's reason and cancels the task", function (done) {
             var controller = new AbortController();

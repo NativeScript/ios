@@ -267,3 +267,22 @@ public func waitForCancel(_ seconds: Double) async -> Bool {
         return true
     }
 }
+
+// Subscripts: `subscript(...)` and `setSubscript(..., value)` in JS.
+public final class Shelf {
+    private var counts: [String: Int] = [:]
+    public init() {}
+    public subscript(name: String) -> Int? {
+        get { counts[name] }
+        set { counts[name] = newValue }
+    }
+    public subscript(row: Int, column: Int) -> String { "\(row),\(column)" }
+}
+public struct Grid {
+    public var cells: [Int]
+    public init(size: Int) { cells = Array(repeating: 0, count: size) }
+    public subscript(index: Int) -> Int {
+        get { cells[index] }
+        set { cells[index] = newValue }
+    }
+}

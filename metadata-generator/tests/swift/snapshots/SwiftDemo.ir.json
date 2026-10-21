@@ -166,6 +166,8 @@
     "s:9SwiftDemo9greetOnceySSx_SStAA8GreetingRzlF@<any Greeting>",
     "s:9SwiftDemo9CancelLogC",
     "s:9SwiftDemo13waitForCancelySbSdYaF",
+    "s:9SwiftDemo5ShelfC",
+    "s:9SwiftDemo4GridV",
     "s:9SwiftDemo8describeySSSo6UIViewCF",
     "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
     "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
@@ -68973,6 +68975,97 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo4GridV",
+      "kind": "struct",
+      "path": "Grid",
+      "name": "Grid",
+      "access": "public",
+      "declaration": "struct Grid",
+      "location": "file://Sources/SwiftDemo/Values.swift:280:14",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo4GridV5cellsSaySiGvp",
+        "s:9SwiftDemo4GridV4sizeACSi_tcfc",
+        "s:9SwiftDemo4GridVyS2icip"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo4GridV4sizeACSi_tcfc",
+      "kind": "initializer",
+      "path": "Grid.init(size:)",
+      "name": "init(size:)",
+      "access": "public",
+      "declaration": "init(size: Int)",
+      "parameters": [
+        {
+          "label": "size",
+          "internalName": "size",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:282:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo4GridV"
+    },
+    {
+      "id": "s:9SwiftDemo4GridV5cellsSaySiGvp",
+      "kind": "instanceProperty",
+      "path": "Grid.cells",
+      "name": "cells",
+      "access": "public",
+      "declaration": "var cells: [Int]",
+      "valueType": {
+        "spelling": "[Int]",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:281:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo4GridV"
+    },
+    {
+      "id": "s:9SwiftDemo4GridVyS2icip",
+      "kind": "instanceSubscript",
+      "path": "Grid.subscript(_:)",
+      "name": "subscript(_:)",
+      "access": "public",
+      "declaration": "subscript(index: Int) -> Int { get set }",
+      "parameters": [
+        {
+          "internalName": "index",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:283:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo4GridV"
+    },
+    {
       "id": "s:9SwiftDemo4NoteC4tagsShySSGvp",
       "kind": "instanceProperty",
       "path": "Note.tags",
@@ -70878,6 +70971,114 @@
       "location": "file://Sources/SwiftDemo/Shapes.swift:4:15",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo5ShapeP"
+    },
+    {
+      "id": "s:9SwiftDemo5ShelfC",
+      "kind": "class",
+      "path": "Shelf",
+      "name": "Shelf",
+      "access": "public",
+      "declaration": "final class Shelf",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:271:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo5ShelfCACycfc",
+        "s:9SwiftDemo5ShelfCySiSgSScip",
+        "s:9SwiftDemo5ShelfCySSSi_Sitcip"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo5ShelfCACycfc",
+      "kind": "initializer",
+      "path": "Shelf.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "location": "file://Sources/SwiftDemo/Values.swift:273:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5ShelfC"
+    },
+    {
+      "id": "s:9SwiftDemo5ShelfCySSSi_Sitcip",
+      "kind": "instanceSubscript",
+      "path": "Shelf.subscript(_:_:)",
+      "name": "subscript(_:_:)",
+      "access": "public",
+      "declaration": "subscript(row: Int, column: Int) -> String { get }",
+      "parameters": [
+        {
+          "internalName": "row",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "internalName": "column",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Values.swift:278:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5ShelfC"
+    },
+    {
+      "id": "s:9SwiftDemo5ShelfCySiSgSScip",
+      "kind": "instanceSubscript",
+      "path": "Shelf.subscript(_:)",
+      "name": "subscript(_:)",
+      "access": "public",
+      "declaration": "subscript(name: String) -> Int? { get set }",
+      "parameters": [
+        {
+          "internalName": "name",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int?",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "valueType": {
+        "spelling": "Int?",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:274:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5ShelfC"
     },
     {
       "id": "s:9SwiftDemo5boxedy0aB3Kit3BoxCyAC5MoneyVGAGF",

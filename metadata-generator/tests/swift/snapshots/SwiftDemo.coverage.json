@@ -2,24 +2,24 @@
   "module": "SwiftDemo",
   "totals": {
     "declarations": {
-      "total": 1234,
+      "total": 1242,
       "objc-direct": 3,
-      "swift-generated": 334,
+      "swift-generated": 343,
       "swift-specialized": 371,
       "type-only": 5,
-      "unsupported": 521,
-      "not-applicable": 0
-    },
-    "callable": {
-      "total": 1181,
-      "objc-direct": 1,
-      "swift-generated": 290,
-      "swift-specialized": 368,
-      "type-only": 2,
       "unsupported": 520,
       "not-applicable": 0
     },
-    "effectiveCallable": 291,
+    "callable": {
+      "total": 1187,
+      "objc-direct": 1,
+      "swift-generated": 297,
+      "swift-specialized": 368,
+      "type-only": 2,
+      "unsupported": 519,
+      "not-applicable": 0
+    },
+    "effectiveCallable": 298,
     "compilerVerified": false,
     "compiledThunks": null,
     "runtimeTested": null
@@ -35,9 +35,9 @@
       "not-applicable": 0
     },
     "class": {
-      "total": 21,
+      "total": 22,
       "objc-direct": 2,
-      "swift-generated": 18,
+      "swift-generated": 19,
       "swift-specialized": 1,
       "type-only": 0,
       "unsupported": 0,
@@ -71,9 +71,9 @@
       "not-applicable": 0
     },
     "initializer": {
-      "total": 35,
+      "total": 37,
       "objc-direct": 0,
-      "swift-generated": 33,
+      "swift-generated": 35,
       "swift-specialized": 2,
       "type-only": 0,
       "unsupported": 0,
@@ -89,21 +89,21 @@
       "not-applicable": 0
     },
     "instanceProperty": {
-      "total": 67,
+      "total": 68,
       "objc-direct": 1,
-      "swift-generated": 57,
+      "swift-generated": 58,
       "swift-specialized": 3,
       "type-only": 1,
       "unsupported": 5,
       "not-applicable": 0
     },
     "instanceSubscript": {
-      "total": 1,
+      "total": 4,
       "objc-direct": 0,
-      "swift-generated": 0,
+      "swift-generated": 4,
       "swift-specialized": 0,
       "type-only": 0,
-      "unsupported": 1,
+      "unsupported": 0,
       "not-applicable": 0
     },
     "operator": {
@@ -125,9 +125,9 @@
       "not-applicable": 0
     },
     "struct": {
-      "total": 13,
+      "total": 14,
       "objc-direct": 0,
-      "swift-generated": 12,
+      "swift-generated": 13,
       "swift-specialized": 1,
       "type-only": 0,
       "unsupported": 0,
@@ -179,7 +179,6 @@
     "opaque-type": 413,
     "operator": 5,
     "owner-not-bridged": 12,
-    "subscript": 1,
     "unavailable": 5,
     "unbridged-type": 536,
     "variadic-parameter": 8
@@ -9618,6 +9617,37 @@
       "location": "file://Sources/SwiftDemo/Purse.swift:11"
     },
     {
+      "id": "s:9SwiftDemo4GridV",
+      "path": "Grid",
+      "kind": "struct",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Values.swift:281"
+    },
+    {
+      "id": "s:9SwiftDemo4GridV4sizeACSi_tcfc",
+      "path": "Grid.init(size:)",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Values.swift:283"
+    },
+    {
+      "id": "s:9SwiftDemo4GridV5cellsSaySiGvp",
+      "path": "Grid.cells",
+      "kind": "instanceProperty",
+      "tier": "swift-generated",
+      "jsName": "cells",
+      "location": "file://Sources/SwiftDemo/Values.swift:282"
+    },
+    {
+      "id": "s:9SwiftDemo4GridVyS2icip",
+      "path": "Grid.subscript(_:)",
+      "kind": "instanceSubscript",
+      "tier": "swift-generated",
+      "jsName": "subscript",
+      "location": "file://Sources/SwiftDemo/Values.swift:284"
+    },
+    {
       "id": "s:9SwiftDemo4NoteC4tagsShySSGvp",
       "path": "Note.tags",
       "kind": "instanceProperty",
@@ -9975,6 +10005,37 @@
         "protocol-requirement"
       ],
       "location": "file://Sources/SwiftDemo/Shapes.swift:5"
+    },
+    {
+      "id": "s:9SwiftDemo5ShelfC",
+      "path": "Shelf",
+      "kind": "class",
+      "tier": "swift-generated",
+      "location": "file://Sources/SwiftDemo/Values.swift:272"
+    },
+    {
+      "id": "s:9SwiftDemo5ShelfCACycfc",
+      "path": "Shelf.init()",
+      "kind": "initializer",
+      "tier": "swift-generated",
+      "jsName": "constructor",
+      "location": "file://Sources/SwiftDemo/Values.swift:274"
+    },
+    {
+      "id": "s:9SwiftDemo5ShelfCySSSi_Sitcip",
+      "path": "Shelf.subscript(_:_:)",
+      "kind": "instanceSubscript",
+      "tier": "swift-generated",
+      "jsName": "subscript",
+      "location": "file://Sources/SwiftDemo/Values.swift:279"
+    },
+    {
+      "id": "s:9SwiftDemo5ShelfCySiSgSScip",
+      "path": "Shelf.subscript(_:)",
+      "kind": "instanceSubscript",
+      "tier": "swift-generated",
+      "jsName": "subscript",
+      "location": "file://Sources/SwiftDemo/Values.swift:275"
     },
     {
       "id": "s:9SwiftDemo5boxedy0aB3Kit3BoxCyAC5MoneyVGAGF",
@@ -10770,10 +10831,8 @@
       "id": "s:9SwiftDemo7PolygonCyAA5PointVSicip",
       "path": "Polygon.subscript(_:)",
       "kind": "instanceSubscript",
-      "tier": "unsupported",
-      "reasons": [
-        "subscript"
-      ],
+      "tier": "swift-generated",
+      "jsName": "subscript",
       "location": "file://Sources/SwiftDemo/Shapes.swift:30"
     },
     {

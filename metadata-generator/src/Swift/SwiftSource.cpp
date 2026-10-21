@@ -329,6 +329,14 @@ Invocation describeInvocation(const Module& module, const Symbol& symbol,
       invocation.form = Invocation::Form::EnumCase;
       invocation.resultType = invocation.owner;
       break;
+    case SymbolKind::InstanceSubscript:
+      invocation.form = Invocation::Form::InstanceSubscript;
+      invocation.needsReceiver = true;
+      invocation.receiverIsInout = valueOwner && symbol.isSettable;
+      break;
+    case SymbolKind::TypeSubscript:
+      invocation.form = Invocation::Form::StaticSubscript;
+      break;
     default:
       break;
   }
@@ -340,9 +348,10 @@ Invocation describeInvocation(const Module& module, const Symbol& symbol,
   return invocation;
 }
 
-std::string invocationExpression(const Invocation& invocation,
-                                 const std::string& receiver,
-                                 const std::vector<std::string>& arguments) {
+namespace {
+
+std::string argumentListOf(const Invocation& invocation,
+                           const std::vector<std::string>& arguments) {
   std::string argumentList;
   for (size_t i = 0; i < arguments.size(); i++) {
     if (i > 0) {
@@ -357,7 +366,15 @@ std::string invocationExpression(const Invocation& invocation,
         arguments[i];
     argumentList += label.empty() ? argument : label + ": " + argument;
   }
+  return argumentList;
+}
 
+}  // namespace
+
+std::string invocationExpression(const Invocation& invocation,
+                                 const std::string& receiver,
+                                 const std::vector<std::string>& arguments) {
+  std::string argumentList = argumentListOf(invocation, arguments);
   std::string expression;
   std::string member = swiftIdentifier(invocation.member);
   switch (invocation.form) {
@@ -382,6 +399,12 @@ std::string invocationExpression(const Invocation& invocation,
       expression = invocation.owner + "." + member +
                    (arguments.empty() ? "" : "(" + argumentList + ")");
       break;
+    case Invocation::Form::InstanceSubscript:
+      expression = receiver + "[" + argumentList + "]";
+      break;
+    case Invocation::Form::StaticSubscript:
+      expression = invocation.owner + "[" + argumentList + "]";
+      break;
   }
   std::string effects = std::string(invocation.isThrowing ? "try " : "") +
                         (invocation.isAsync ? "await " : "");
@@ -390,10 +413,16 @@ std::string invocationExpression(const Invocation& invocation,
 
 std::string assignmentStatement(const Invocation& invocation,
                                 const std::string& receiver,
-                                const std::string& value) {
-  std::string target = invocation.form == Invocation::Form::InstanceProperty
-                           ? receiver
-                           : invocation.owner;
+                                const std::string& value,
+                                const std::vector<std::string>& arguments) {
+  bool instance = invocation.form == Invocation::Form::InstanceProperty ||
+                  invocation.form == Invocation::Form::InstanceSubscript;
+  std::string target = instance ? receiver : invocation.owner;
+  if (invocation.form == Invocation::Form::InstanceSubscript ||
+      invocation.form == Invocation::Form::StaticSubscript) {
+    return target + "[" + argumentListOf(invocation, arguments) +
+           "] = " + value;
+  }
   return target + "." + swiftIdentifier(invocation.member) + " = " + value;
 }
 

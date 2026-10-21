@@ -593,8 +593,9 @@ class Classifier {
     if (symbol.kind == SymbolKind::Operator) {
       return make(Tier::Unsupported, "operator");
     }
-    if (symbol.kind == SymbolKind::InstanceSubscript ||
-        symbol.kind == SymbolKind::TypeSubscript) {
+    if ((symbol.kind == SymbolKind::InstanceSubscript ||
+         symbol.kind == SymbolKind::TypeSubscript) &&
+        symbol.parameters.empty()) {
       return make(Tier::Unsupported, "subscript");
     }
     if (symbol.kind == SymbolKind::EnumCase) {

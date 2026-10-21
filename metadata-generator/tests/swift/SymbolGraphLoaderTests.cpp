@@ -210,6 +210,8 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "greetOnce(_:_:)",
                                        "CancelLog",
                                        "waitForCancel(_:)",
+                                       "Shelf",
+                                       "Grid",
                                        "describe(_:)",
                                        "makeLabel(_:)",
                                        "tags(_:)",

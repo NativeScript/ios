@@ -137,6 +137,14 @@ declare module "ns:swift/SwiftDemo" {
 
   }
 
+  export class Grid {
+    constructor(size: number | bigint);
+    constructor(args: { size: number | bigint });
+    cells: (number)[];
+    subscript(index: number | bigint): number;
+    setSubscript(index: number | bigint, value: number | bigint): void;
+  }
+
   export class Ring {
     constructor(inner: Point, outer: Point);
     constructor(args: { inner: Point; outer: Point });
@@ -170,6 +178,15 @@ declare module "ns:swift/SwiftDemo" {
     x: number;
     y: number;
     readonly length: number;
+  }
+
+  export class Shelf {
+    constructor();
+    subscript(row: number | bigint, column: number | bigint): string;
+    subscript(name: string): number | null;
+    "subscript(_:_:)"(row: number | bigint, column: number | bigint): string;
+    "subscript(_:)"(name: string): number | null;
+    setSubscript(name: string, value: (number | bigint) | null | undefined): void;
   }
 
   export class Canvas {
@@ -283,6 +300,7 @@ declare module "ns:swift/SwiftDemo" {
     static readonly shared: Polygon;
     metrics(side: number): Polygon.Metrics;
     static describe(polygon: (Polygon) | null | undefined): string;
+    subscript(index: number | bigint): Point;
   }
 
   export namespace Polygon {

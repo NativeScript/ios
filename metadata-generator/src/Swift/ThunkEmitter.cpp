@@ -590,6 +590,9 @@ class Emitter {
     if (member.hostsView) {
       return emitHosting(member);
     }
+    if (member.assignsSubscript) {
+      return emitSubscriptAssignment(member);
+    }
     if (member.kind == SwiftSurface::kEnumCase) {
       // Cases are values (names, or objects JS builds); nothing to call.
       addRegistration(member, "nil", "nil");
@@ -684,6 +687,44 @@ class Emitter {
 
     addRegistration(member, "__nsThunk" + std::to_string(getterIndex),
                     setterName);
+    return code;
+  }
+
+  // `setSubscript(..., value)`: assigns the subscript at the indices.
+  std::string emitSubscriptAssignment(const SwiftSurface::Member& member) {
+    const Symbol& subscript = *member.assignsSubscript;
+    const Capability& capability = *_classification.find(subscript.preciseId);
+    Invocation invocation = describeInvocation(_module, subscript, capability);
+    const Symbol* owner =
+        subscript.parentId.empty() ? nullptr : _module.find(subscript.parentId);
+    int index = _thunkCount++;
+    std::string code =
+        "// " + subscript.preciseId + " (setter)\n" + thunkHeader(index);
+    code += availabilityGuard(invocation, subscript);
+    std::string receiver;
+    int firstArgument = 0;
+    if (invocation.needsReceiver) {
+      receiver = bindReceiver(*owner, code);
+      firstArgument = 1;
+    }
+    std::vector<std::string> indices;
+    for (size_t i = 0; i < capability.parameters.size(); i++) {
+      std::string name = "a" + std::to_string(i);
+      code += readArgument(capability.parameters[i],
+                           firstArgument + static_cast<int>(i), name,
+                           "argument " + std::to_string(i + 1));
+      indices.push_back(name);
+    }
+    code += readArgument(
+        capability.result,
+        firstArgument + static_cast<int>(capability.parameters.size()),
+        "newValue", "value");
+    std::string body =
+        "  " + assignmentStatement(invocation, receiver, "newValue", indices) +
+        "\n  rt.returnVoid()\n";
+    code += invocation.isMainActor ? onMainActor(subscript, body) : body;
+    code += "}\n\n";
+    addRegistration(member, "__nsThunk" + std::to_string(index), "nil");
     return code;
   }
 

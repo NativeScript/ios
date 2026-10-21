@@ -75,6 +75,9 @@ struct SwiftSurface {
     // `hostingController()`, added to SwiftUI views: a UIHostingController
     // showing the view.
     bool hostsView = false;
+    // `setSubscript(..., value)`, added for a settable subscript: assigns
+    // that subscript (its symbol here).
+    const Symbol* assignsSubscript = nullptr;
   };
 
   // A tagged enum's cases in registration order, which is the case index

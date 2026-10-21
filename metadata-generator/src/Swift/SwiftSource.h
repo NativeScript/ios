@@ -33,14 +33,16 @@ std::string swiftIdentifier(const std::string& name);
 // vouches for the thunk's call.
 struct Invocation {
   enum class Form {
-    Construct,         // Owner(args)
-    InstanceMethod,    // receiver.name(args)
-    StaticMethod,      // Owner.name(args)
-    Function,          // Module.name(args)
-    InstanceProperty,  // receiver.name
-    StaticProperty,    // Owner.name
-    Variable,          // Module.name
-    EnumCase,          // Owner.name
+    Construct,          // Owner(args)
+    InstanceMethod,     // receiver.name(args)
+    StaticMethod,       // Owner.name(args)
+    Function,           // Module.name(args)
+    InstanceProperty,   // receiver.name
+    StaticProperty,     // Owner.name
+    Variable,           // Module.name
+    EnumCase,           // Owner.name
+    InstanceSubscript,  // receiver[args]
+    StaticSubscript,    // Owner[args]
   };
 
   Form form = Form::Function;
@@ -81,8 +83,10 @@ std::string invocationExpression(const Invocation& invocation,
                                  const std::vector<std::string>& arguments);
 
 // The statement that assigns `value` to a settable property or variable.
+// `arguments` are a subscript's indices.
 std::string assignmentStatement(const Invocation& invocation,
                                 const std::string& receiver,
-                                const std::string& value);
+                                const std::string& value,
+                                const std::vector<std::string>& arguments = {});
 
 }  // namespace Swift

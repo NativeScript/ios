@@ -37,6 +37,11 @@ SwiftSurface::MemberKind memberKind(SymbolKind kind) {
       return SwiftSurface::kVariable;
     case SymbolKind::EnumCase:
       return SwiftSurface::kEnumCase;
+    // Subscripts are methods: `subscript(...)` and `setSubscript(..., value)`.
+    case SymbolKind::InstanceSubscript:
+      return SwiftSurface::kInstanceMethod;
+    case SymbolKind::TypeSubscript:
+      return SwiftSurface::kStaticMethod;
     default:
       return SwiftSurface::kFunction;
   }
@@ -245,9 +250,12 @@ SwiftSurface describeSurface(const Module& module,
                     : symbol.module.empty() ? module.name
                                             : symbol.module;
     member.kind = memberKind(symbol.kind);
+    bool subscript = symbol.kind == SymbolKind::InstanceSubscript ||
+                     symbol.kind == SymbolKind::TypeSubscript;
     member.flags =
         (symbol.isThrowing ? SwiftSurface::kThrows : 0) |
-        (capability->isSettable && member.kind != SwiftSurface::kEnumCase
+        (capability->isSettable && member.kind != SwiftSurface::kEnumCase &&
+                 !subscript
              ? SwiftSurface::kSettable
              : 0) |
         (capability->ambiguousOverload ? SwiftSurface::kAmbiguous : 0) |
@@ -262,6 +270,46 @@ SwiftSurface describeSurface(const Module& module,
                           signatureCode(surface, capability->parameters[i]);
     }
     member.signature += ">" + signatureCode(surface, member.result);
+    if (subscript && capability->isSettable && !capability->isAsync) {
+      Symbol setter = symbol;
+      setter.name = "setSubscript(";
+      for (size_t i = 0; i < symbol.parameters.size(); i++) {
+        setter.name += "_:";
+      }
+      setter.name += "_:)";
+      setter.baseName = "setSubscript";
+      Parameter value;
+      value.internalName = "value";
+      value.type = *symbol.valueType;
+      setter.parameters.push_back(value);
+      setter.valueType.reset();
+      setter.returnType.reset();
+      surface.syntheticSymbols.push_back(std::move(setter));
+
+      Capability assign = *capability;
+      assign.jsName = "setSubscript";
+      assign.isSettable = false;
+      assign.parameters.push_back(capability->result);
+      assign.result = BridgedType();
+      assign.result.bridge = Bridge::Void;
+      surface.syntheticCapabilities.push_back(std::move(assign));
+
+      SwiftSurface::Member assigner = member;
+      assigner.symbol = &surface.syntheticSymbols.back();
+      assigner.capability = &surface.syntheticCapabilities.back();
+      assigner.result = assigner.capability->result;
+      assigner.assignsSubscript = &symbol;
+      assigner.signature.clear();
+      for (size_t i = 0; i < assigner.capability->parameters.size(); i++) {
+        assigner.signature +=
+            (i > 0 ? "," : "") +
+            signatureCode(surface, assigner.capability->parameters[i]);
+      }
+      assigner.signature += ">v";
+      surface.members.push_back(std::move(member));
+      surface.members.push_back(std::move(assigner));
+      continue;
+    }
     surface.members.push_back(std::move(member));
   }
 

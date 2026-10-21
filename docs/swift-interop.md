@@ -203,6 +203,9 @@ holds.
   the overloads' keys; call one directly by key: `polygon["scale(by: Int)"](2)`.
   Every overload is also reachable by its Swift name when that is unique
   (`demo["greet(name:times:)"]("a", 2)`).
+- Subscripts are methods: `shelf.subscript("apples")` reads one and
+  `shelf.setSubscript("apples", 3)` assigns it (settable subscripts only),
+  overloaded like any method by their indices.
 - Initializers run through `new` and also accept one object naming every
   argument label: `new Point({ x: 2, y: 3 })`. A failable initializer that
   returns `nil` throws.
@@ -449,7 +452,7 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 Combine publishers, concrete `AsyncSequence` types,
 generic methods of generic types, other standard library generics,
-protocols with associated types, subscripts and operators. Each appears in
+protocols with associated types and operators. Each appears in
 the coverage report with its reason.
 
 ## Swift language mode

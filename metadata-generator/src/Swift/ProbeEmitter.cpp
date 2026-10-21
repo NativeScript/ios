@@ -126,7 +126,8 @@ ProbeSource emitProbes(const Module& module,
              (opaque ? std::string() : ": " + invocation.resultType) + " = " +
              invocationExpression(invocation, receiver, arguments));
     if (invocation.isSettable) {
-      out.line("  " + assignmentStatement(invocation, receiver, "newValue"));
+      out.line("  " + assignmentStatement(invocation, receiver, "newValue",
+                                          arguments));
     }
     out.line("}");
     out.end();
