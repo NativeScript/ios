@@ -27,3 +27,5 @@ public func noteLater(_ text: String) async -> Note {
     await Task.yield()
     return Note(text: text)
 }
+
+public func viewTag<V: UIView>(_ view: V) -> Int { view.tag }

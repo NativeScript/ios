@@ -195,3 +195,19 @@ public func lookup(_ key: String, _ resolve: (String) -> Int?) -> Int { resolve(
 public func computeInBackground(_ provider: @escaping @Sendable () -> Int) async -> Int {
     await Task.detached { provider() * 2 }.value
 }
+
+// Generic functions: one overload per stand-in for each type parameter.
+public func largest<T: Comparable>(_ values: [T]) -> T? { values.max() }
+public func repeated<T>(_ value: T, times: Int) -> [T] { Array(repeating: value, count: times) }
+public func popCount<I: FixedWidthInteger>(_ value: I) -> Int { value.nonzeroBitCount }
+public func zero<N: Numeric>() -> N { 0 }
+public func greetTwice<G: Greeting>(_ greeting: G, _ other: String) -> String {
+    greeting.greet(other) + " " + greeting.greet(other)
+}
+// Not instantiated: a metatype, an associated type, and too many
+// combinations.
+public func decodeJSON<T: Decodable>(_ type: T.Type, from text: String) -> T? {
+    try? JSONDecoder().decode(type, from: Data(text.utf8))
+}
+public func firstElement<C: Collection>(_ values: C) -> C.Element? { values.first }
+public func joined<A, B>(_ first: A, _ second: B) -> String { "\(first)/\(second)" }

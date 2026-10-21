@@ -107,8 +107,33 @@ TypeScript as the generic class (`Measurement<UnitType>`): `new
 Measurement(...)` picks the instantiation from its arguments, an instance
 calls the members of its own instantiation, and `instanceof Measurement`
 holds for all of them. A member that does not exist for an instantiation
-(a constrained extension's) is left out of that instantiation. Generic
-functions and methods are not bridged yet.
+(a constrained extension's) is left out of that instantiation.
+
+## Generic functions
+
+A generic function, method or initializer is instantiated once for each
+concrete stand-in of its type parameters, and every instantiation is an
+overload of its JS name:
+
+| Constraint on `T` | Stand-ins |
+|---|---|
+| none | `Double`, `String`, `Bool` |
+| standard library protocols (`Comparable`, `Numeric`, `StringProtocol`, ...) | those of `Double` (or `Int` for integer protocols), `String` and `Bool` that conform |
+| one protocol of the unit (`G: Greeting`) | `any Greeting`, which Swift opens at the call: Swift values and JS objects implementing it |
+| a superclass (`V: UIView`) | the superclass, which also takes its subclasses' instances |
+
+`largest<T: Comparable>(_ values: [T]) -> T?` takes `largest([3, 9])` and
+`largest(["b", "a"])`, and TypeScript declares both overloads. A call picks
+the instantiation its arguments convert to; an array decides by its first
+element, so `largest([])` throws a `TypeError` naming the overloads' keys.
+At most one number type stands in, since a JS number converts to every one.
+
+A generic function is left out when a type parameter appears as a metatype
+(`T.Type`) or through an associated type (`C.Element`), when it is
+constrained by another module's protocol, when its arguments could not tell
+several instantiations apart (a type parameter only in the result or in a
+closure), or when it would need more than six instantiations. Generic
+methods of generic types, and `some P` parameters, are not instantiated yet.
 
 ## Value model
 
@@ -158,7 +183,8 @@ holds.
 
 - Methods and functions take positional arguments. Overloads with the same
   JavaScript name are resolved by argument count and by which overloads accept
-  the arguments' JS types.
+  the arguments' JS types; overloads taking arrays of different element types
+  are told apart by the arrays' first elements.
 - When more than one overload accepts the arguments (`scale(by: Double)` and
   `scale(by: Int)` both accept a number), the call throws a `TypeError` naming
   the overloads' keys; call one directly by key: `polygon["scale(by: Int)"](2)`.
@@ -363,7 +389,7 @@ verification is what makes the generated surface trustworthy at SDK scale.
 ## Not yet supported
 
 Async cancellation, Combine publishers,
-concrete `AsyncSequence` types, generic functions,
+concrete `AsyncSequence` types, generic methods of generic types,
 `Result` and other standard library generics, protocols with associated
 types, tuples, sets, optional collection
 elements, subscripts and operators. Each appears in the coverage report with

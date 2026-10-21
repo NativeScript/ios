@@ -2735,6 +2735,29 @@ bool Select(Isolate* isolate, Local<Context> context, const MemberGroup& group,
     }
   }
 
+  if (matches.size() > 1) {
+    // Overloads taking arrays of different element types (a generic
+    // function's instantiations): the first elements decide.
+    std::vector<const MemberInfo*> preferred;
+    for (const MemberInfo* member : matches) {
+      bool accepts = true;
+      for (size_t i = 0; accepts && i < arguments.size(); i++) {
+        const ValueCode& code = member->signature.parameters[i];
+        Local<Value> first;
+        accepts = code.kind != ValueCode::Kind::Array || code.inout || !arguments[i]->IsArray() ||
+                  arguments[i].As<v8::Array>()->Length() == 0 ||
+                  (arguments[i].As<v8::Array>()->Get(context, 0).ToLocal(&first) &&
+                   Accepts(isolate, module, code.element[0], first));
+      }
+      if (accepts) {
+        preferred.push_back(member);
+      }
+    }
+    if (preferred.size() < 2) {
+      matches = std::move(preferred);
+    }
+  }
+
   if (matches.size() == 1) {
     selection.member = matches[0];
     selection.arguments = arguments;

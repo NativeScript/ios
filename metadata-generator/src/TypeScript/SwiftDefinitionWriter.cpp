@@ -335,9 +335,15 @@ class Writer {
     auto record = [](Bridge bridge) {
       return bridge == Bridge::Dictionary || bridge == Bridge::TaggedEnum;
     };
+    if (a.bridge == Bridge::Array && b.bridge == Bridge::Array) {
+      // The runtime tells arrays apart by their first element; an empty
+      // array still matches both.
+      return a.elements.empty() || b.elements.empty() ||
+             overlaps(a.elements[0], b.elements[0]);
+    }
     if (a.bridge == b.bridge &&
         (a.bridge == Bridge::Date || a.bridge == Bridge::Data ||
-         a.bridge == Bridge::Array || a.bridge == Bridge::Closure)) {
+         a.bridge == Bridge::Closure)) {
       return true;
     }
     if (record(a.bridge) && record(b.bridge)) {

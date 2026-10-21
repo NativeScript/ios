@@ -5,6 +5,7 @@
 #include <llvm/Support/raw_ostream.h>
 
 #include <map>
+#include <set>
 
 namespace Swift {
 
@@ -32,6 +33,11 @@ void writeCounts(llvm::json::OStream& out, const Counts& counts) {
   }
 }
 
+// A generic function's synthetic instantiation (see instantiateGenerics).
+bool isFunctionInstantiation(const Symbol& symbol) {
+  return !isNominalType(symbol.kind) && !symbol.substitutions.empty();
+}
+
 }  // namespace
 
 std::string coverageJSON(const Module& module,
@@ -42,19 +48,34 @@ std::string coverageJSON(const Module& module,
   std::map<std::string, Counts> byKind;
   std::map<std::string, int> reasons;
 
+  // Instantiations count as their generic function: generated when any of
+  // them is.
+  std::set<std::string> instantiated;
+  for (const auto& entry : module.symbols) {
+    const Capability* capability = classification.find(entry.first);
+    if (isFunctionInstantiation(entry.second) && capability &&
+        capability->tier == Tier::SwiftGenerated) {
+      instantiated.insert(entry.second.genericBase);
+    }
+  }
+  auto tierOf = [&](const Symbol& symbol, const Capability& capability) {
+    return instantiated.count(symbol.preciseId) ? Tier::SwiftGenerated
+                                                : capability.tier;
+  };
+
   for (const auto& entry : module.symbols) {
     const Symbol& symbol = entry.second;
     const Capability* capability = classification.find(entry.first);
-    if (!capability) {
+    if (!capability || isFunctionInstantiation(symbol)) {
       continue;
     }
-    declarations.add(capability->tier);
-    byKind[toString(symbol.kind)].add(capability->tier);
+    Tier tier = tierOf(symbol, *capability);
+    declarations.add(tier);
+    byKind[toString(symbol.kind)].add(tier);
     if (isCallableKind(symbol.kind)) {
-      callable.add(capability->tier);
+      callable.add(tier);
     }
-    if (capability->tier == Tier::Unsupported ||
-        capability->tier == Tier::SwiftSpecialized) {
+    if (tier == Tier::Unsupported || tier == Tier::SwiftSpecialized) {
       for (const auto& reason : capability->reasons) {
         reasons[llvm::StringRef(reason).split(':').first.str()]++;
       }
@@ -98,15 +119,17 @@ std::string coverageJSON(const Module& module,
       for (const auto& entry : module.symbols) {
         const Symbol& symbol = entry.second;
         const Capability* capability = classification.find(entry.first);
-        if (!capability) {
+        if (!capability || (isFunctionInstantiation(symbol) &&
+                            capability->tier != Tier::SwiftGenerated)) {
           continue;
         }
+        Tier tier = tierOf(symbol, *capability);
         out.object([&] {
           out.attribute("id", symbol.preciseId);
           out.attribute("path", llvm::join(symbol.pathComponents, "."));
           out.attribute("kind", toString(symbol.kind));
-          out.attribute("tier", toString(capability->tier));
-          if (!capability->reasons.empty()) {
+          out.attribute("tier", toString(tier));
+          if (tier != Tier::SwiftGenerated && !capability->reasons.empty()) {
             out.attributeArray("reasons", [&] {
               for (const auto& reason : capability->reasons) {
                 out.value(reason);

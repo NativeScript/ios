@@ -859,6 +859,48 @@ describe("ns:swift", function () {
         });
     });
 
+    describe("generic functions", function () {
+        it("picks the instantiation the arguments call for", function () {
+            expect(SwiftDemo.largest([3, 9, 2])).toBe(9);
+            expect(SwiftDemo.largest(["b", "c", "a"])).toBe("c");
+            expect(SwiftDemo.repeated("x", 2)).toEqual(["x", "x"]);
+            expect(SwiftDemo.repeated(true, 1)).toEqual([true]);
+            expect(SwiftDemo.repeated(1.5, 2)).toEqual([1.5, 1.5]);
+            expect(new SwiftDemo.Loader().first(["a", "b"])).toBe("a");
+            expect(new SwiftDemo.Loader().first([4])).toBe(4);
+        });
+
+        it("instantiates with integers, protocols and superclasses", function () {
+            expect(SwiftDemo.popCount(7)).toBe(3);
+            expect(SwiftDemo.zero()).toBe(0);
+            var greeting = {
+                name: "js",
+                punctuation: "!",
+                greet: function (other) { return "hi " + other; },
+                reset: function () {}
+            };
+            expect(SwiftDemo.greetTwice(greeting, "ada")).toBe("hi ada hi ada");
+            expect(SwiftDemo.greetTwice(SwiftDemo.makeGreeting("swift"), "ada"))
+                .toBe("Good day, ada, from swift Good day, ada, from swift");
+            var view = UILabel.new();
+            view.tag = 5;
+            expect(SwiftDemo.viewTag(view)).toBe(5);
+        });
+
+        it("throws when the arguments do not decide the instantiation", function () {
+            expect(function () { SwiftDemo.largest([]); })
+                .toThrowError(TypeError, /Ambiguous call to largest/);
+            expect(function () { SwiftDemo.largest([true]); })
+                .toThrowError(TypeError, /No overload of largest/);
+        });
+
+        it("leaves functions without known stand-ins out", function () {
+            expect(SwiftDemo.decodeJSON).toBeUndefined();
+            expect(SwiftDemo.firstElement).toBeUndefined();
+            expect(SwiftDemo.joined).toBeUndefined();
+        });
+    });
+
     describe("closures", function () {
         it("calls JS functions passed for closures while the call runs", function () {
             var ticks = [];

@@ -1025,7 +1025,9 @@ class Classifier {
         kind = "bytes";
         break;
       case Bridge::Array:
-        kind = "array";
+        // The runtime tells arrays apart by their first element.
+        kind = "array:" + (type.elements.empty() ? std::string()
+                                                 : jsKind(type.elements[0]));
         break;
       case Bridge::Dictionary:
       case Bridge::TaggedEnum:

@@ -113,6 +113,22 @@
     "s:9SwiftDemo10firstMatch_5whereSiSgSaySiG_SbSiKXEtKF",
     "s:9SwiftDemo6lookupySiSS_SiSgSSXEtF",
     "s:9SwiftDemo19computeInBackgroundyS2iyYbcYaF",
+    "s:9SwiftDemo7largestyxSgSayxGSLRzlF",
+    "s:9SwiftDemo7largestyxSgSayxGSLRzlF@<s:Sd>",
+    "s:9SwiftDemo7largestyxSgSayxGSLRzlF@<s:SS>",
+    "s:9SwiftDemo8repeated_5timesSayxGx_SitlF",
+    "s:9SwiftDemo8repeated_5timesSayxGx_SitlF@<s:Sd>",
+    "s:9SwiftDemo8repeated_5timesSayxGx_SitlF@<s:SS>",
+    "s:9SwiftDemo8repeated_5timesSayxGx_SitlF@<s:Sb>",
+    "s:9SwiftDemo8popCountySixs17FixedWidthIntegerRzlF",
+    "s:9SwiftDemo8popCountySixs17FixedWidthIntegerRzlF@<s:Si>",
+    "s:9SwiftDemo4zeroxySjRzlF",
+    "s:9SwiftDemo4zeroxySjRzlF@<s:Sd>",
+    "s:9SwiftDemo10greetTwiceySSx_SStAA8GreetingRzlF",
+    "s:9SwiftDemo10greetTwiceySSx_SStAA8GreetingRzlF@<any Greeting>",
+    "s:9SwiftDemo10decodeJSON_4fromxSgxm_SStSeRzlF",
+    "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF",
+    "s:9SwiftDemo6joinedySSx_q_tr0_lF",
     "s:9SwiftDemo8describeySSSo6UIViewCF",
     "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
     "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
@@ -121,6 +137,8 @@
     "s:9SwiftDemo8makeNoteyAA0D0CSSF",
     "s:9SwiftDemo4text2ofSSAA4NoteC_tF",
     "s:9SwiftDemo9noteLateryAA4NoteCSSYaF",
+    "s:9SwiftDemo7viewTagySixSo6UIViewCRbzlF",
+    "s:9SwiftDemo7viewTagySixSo6UIViewCRbzlF@<c:objc(cs)UIView>",
     "s:12SwiftDemoKit5MoneyV",
     "s:12SwiftDemoKit6WalletC",
     "s:12SwiftDemoKit4CoinO",
@@ -65618,6 +65636,55 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo10decodeJSON_4fromxSgxm_SStSeRzlF",
+      "kind": "function",
+      "path": "decodeJSON(_:from:)",
+      "name": "decodeJSON(_:from:)",
+      "access": "public",
+      "declaration": "func decodeJSON<T>(_ type: T.Type, from text: String) -> T? where T : Decodable",
+      "parameters": [
+        {
+          "internalName": "type",
+          "type": {
+            "spelling": "T.Type",
+            "references": [
+              "s:9SwiftDemo10decodeJSON_4fromxSgxm_SStSeRzlF1TL_xmfp"
+            ]
+          }
+        },
+        {
+          "label": "from",
+          "internalName": "text",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "T?"
+      },
+      "genericParameters": [
+        {
+          "name": "T",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "T",
+          "rhs": "Decodable",
+          "rhsPrecise": "s:Se"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:208:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo10echoStringyS2SF",
       "kind": "function",
       "path": "echoString(_:)",
@@ -65744,6 +65811,93 @@
         }
       ],
       "location": "file://Sources/SwiftDemo/Values.swift:80:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo10greetTwiceySSx_SStAA8GreetingRzlF",
+      "kind": "function",
+      "path": "greetTwice(_:_:)",
+      "name": "greetTwice(_:_:)",
+      "access": "public",
+      "declaration": "func greetTwice<G>(_ greeting: G, _ other: String) -> String where G : Greeting",
+      "parameters": [
+        {
+          "internalName": "greeting",
+          "type": {
+            "spelling": "G",
+            "references": [
+              "s:9SwiftDemo10greetTwiceySSx_SStAA8GreetingRzlF1GL_xmfp"
+            ]
+          }
+        },
+        {
+          "internalName": "other",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "G",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "G",
+          "rhs": "Greeting",
+          "rhsPrecise": "s:9SwiftDemo8GreetingP"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:203:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo10greetTwiceySSx_SStAA8GreetingRzlF@<any Greeting>",
+      "kind": "function",
+      "path": "greetTwice(_:_:)",
+      "name": "greetTwice(_:_:)",
+      "access": "public",
+      "declaration": "func greetTwice<G>(_ greeting: G, _ other: String) -> String where G : Greeting",
+      "parameters": [
+        {
+          "internalName": "greeting",
+          "type": {
+            "spelling": "G",
+            "references": [
+              "s:9SwiftDemo10greetTwiceySSx_SStAA8GreetingRzlF1GL_xmfp"
+            ]
+          }
+        },
+        {
+          "internalName": "other",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:203:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -66147,6 +66301,48 @@
       "location": "file://Sources/SwiftDemo/Protocols.swift:15:8",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo12RankedScorerP"
+    },
+    {
+      "id": "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF",
+      "kind": "function",
+      "path": "firstElement(_:)",
+      "name": "firstElement(_:)",
+      "access": "public",
+      "declaration": "func firstElement<C>(_ values: C) -> C.Element? where C : Collection",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "C",
+            "references": [
+              "s:9SwiftDemo12firstElementy0D0QzSgxSlRzlF1CL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "C.Element?",
+        "references": [
+          "s:ST7ElementQa"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "C",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "C",
+          "rhs": "Collection",
+          "rhsPrecise": "s:Sl"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:211:12",
+      "graph": "SwiftDemo.symbols.json"
     },
     {
       "id": "s:9SwiftDemo12firstSubview2ofSo6UIViewCSgAE_tF",
@@ -67372,6 +67568,47 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Views.swift:23:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo4zeroxySjRzlF",
+      "kind": "function",
+      "path": "zero()",
+      "name": "zero()",
+      "access": "public",
+      "declaration": "func zero<N>() -> N where N : Numeric",
+      "returns": {
+        "spelling": "N"
+      },
+      "genericParameters": [
+        {
+          "name": "N",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "N",
+          "rhs": "Numeric",
+          "rhsPrecise": "s:Sj"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:202:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo4zeroxySjRzlF@<s:Sd>",
+      "kind": "function",
+      "path": "zero()",
+      "name": "zero()",
+      "access": "public",
+      "declaration": "func zero<N>() -> N where N : Numeric",
+      "returns": {
+        "spelling": "N"
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:202:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -69026,7 +69263,11 @@
         "s:9SwiftDemo6LoaderC5fetch3urlSS10Foundation3URLV_tYaKF",
         "s:9SwiftDemo6LoaderC4wait7secondsySd_tYaF",
         "s:9SwiftDemo6LoaderC9transformyxxAA5ShapeRzlF",
+        "s:9SwiftDemo6LoaderC9transformyxxAA5ShapeRzlF@<any Shape>",
         "s:9SwiftDemo6LoaderC5first2ofxSgSayxG_tlF",
+        "s:9SwiftDemo6LoaderC5first2ofxSgSayxG_tlF@<s:Sd>",
+        "s:9SwiftDemo6LoaderC5first2ofxSgSayxG_tlF@<s:SS>",
+        "s:9SwiftDemo6LoaderC5first2ofxSgSayxG_tlF@<s:Sb>",
         "s:9SwiftDemo6LoaderC14withCompletionyyys6ResultOySSAA10ShapeErrorOGcF",
         "s:9SwiftDemo6LoaderC4eachyyySiXEF",
         "s:9SwiftDemo6LoaderC6lookup5table3keySiSgSDySSSiG_SStF",
@@ -69241,6 +69482,84 @@
       "parent": "s:9SwiftDemo6LoaderC"
     },
     {
+      "id": "s:9SwiftDemo6LoaderC5first2ofxSgSayxG_tlF@<s:SS>",
+      "kind": "instanceMethod",
+      "path": "Loader.first(of:)",
+      "name": "first(of:)",
+      "access": "public",
+      "declaration": "func first<Element>(of items: [Element]) -> Element?",
+      "parameters": [
+        {
+          "label": "of",
+          "internalName": "items",
+          "type": {
+            "spelling": "[Element]",
+            "references": [
+              "s:9SwiftDemo6LoaderC5first2ofxSgSayxG_tlF7ElementL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Element?"
+      },
+      "location": "file://Sources/SwiftDemo/Shapes.swift:120:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC5first2ofxSgSayxG_tlF@<s:Sb>",
+      "kind": "instanceMethod",
+      "path": "Loader.first(of:)",
+      "name": "first(of:)",
+      "access": "public",
+      "declaration": "func first<Element>(of items: [Element]) -> Element?",
+      "parameters": [
+        {
+          "label": "of",
+          "internalName": "items",
+          "type": {
+            "spelling": "[Element]",
+            "references": [
+              "s:9SwiftDemo6LoaderC5first2ofxSgSayxG_tlF7ElementL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Element?"
+      },
+      "location": "file://Sources/SwiftDemo/Shapes.swift:120:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC5first2ofxSgSayxG_tlF@<s:Sd>",
+      "kind": "instanceMethod",
+      "path": "Loader.first(of:)",
+      "name": "first(of:)",
+      "access": "public",
+      "declaration": "func first<Element>(of items: [Element]) -> Element?",
+      "parameters": [
+        {
+          "label": "of",
+          "internalName": "items",
+          "type": {
+            "spelling": "[Element]",
+            "references": [
+              "s:9SwiftDemo6LoaderC5first2ofxSgSayxG_tlF7ElementL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Element?"
+      },
+      "location": "file://Sources/SwiftDemo/Shapes.swift:120:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
       "id": "s:9SwiftDemo6LoaderC6lookup5table3keySiSgSDySSSiG_SStF",
       "kind": "instanceMethod",
       "path": "Loader.lookup(table:key:)",
@@ -69358,6 +69677,31 @@
           "rhsPrecise": "s:9SwiftDemo5ShapeP"
         }
       ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:119:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC9transformyxxAA5ShapeRzlF@<any Shape>",
+      "kind": "instanceMethod",
+      "path": "Loader.transform(_:)",
+      "name": "transform(_:)",
+      "access": "public",
+      "declaration": "func transform<T>(_ shape: T) -> T where T : Shape",
+      "parameters": [
+        {
+          "internalName": "shape",
+          "type": {
+            "spelling": "T",
+            "references": [
+              "s:9SwiftDemo6LoaderC9transformyxxAA5ShapeRzlF1TL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "T"
+      },
       "location": "file://Sources/SwiftDemo/Shapes.swift:119:16",
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo6LoaderC"
@@ -69633,6 +69977,54 @@
         }
       ],
       "location": "file://Sources/SwiftDemo/Protocols.swift:41:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo6joinedySSx_q_tr0_lF",
+      "kind": "function",
+      "path": "joined(_:_:)",
+      "name": "joined(_:_:)",
+      "access": "public",
+      "declaration": "func joined<A, B>(_ first: A, _ second: B) -> String",
+      "parameters": [
+        {
+          "internalName": "first",
+          "type": {
+            "spelling": "A",
+            "references": [
+              "s:9SwiftDemo6joinedySSx_q_tr0_lF1AL_xmfp"
+            ]
+          }
+        },
+        {
+          "internalName": "second",
+          "type": {
+            "spelling": "B",
+            "references": [
+              "s:9SwiftDemo6joinedySSx_q_tr0_lF1BL_q_mfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "A",
+          "depth": 0,
+          "index": 0
+        },
+        {
+          "name": "B",
+          "depth": 0,
+          "index": 1
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:212:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -70875,6 +71267,93 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo7largestyxSgSayxGSLRzlF",
+      "kind": "function",
+      "path": "largest(_:)",
+      "name": "largest(_:)",
+      "access": "public",
+      "declaration": "func largest<T>(_ values: [T]) -> T? where T : Comparable",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "[T]",
+            "references": [
+              "s:9SwiftDemo7largestyxSgSayxGSLRzlF1TL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "T?"
+      },
+      "genericParameters": [
+        {
+          "name": "T",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "T",
+          "rhs": "Comparable",
+          "rhsPrecise": "s:SL"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:199:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo7largestyxSgSayxGSLRzlF@<s:SS>",
+      "kind": "function",
+      "path": "largest(_:)",
+      "name": "largest(_:)",
+      "access": "public",
+      "declaration": "func largest<T>(_ values: [T]) -> T? where T : Comparable",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "[T]",
+            "references": [
+              "s:9SwiftDemo7largestyxSgSayxGSLRzlF1TL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "T?"
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:199:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo7largestyxSgSayxGSLRzlF@<s:Sd>",
+      "kind": "function",
+      "path": "largest(_:)",
+      "name": "largest(_:)",
+      "access": "public",
+      "declaration": "func largest<T>(_ values: [T]) -> T? where T : Comparable",
+      "parameters": [
+        {
+          "internalName": "values",
+          "type": {
+            "spelling": "[T]",
+            "references": [
+              "s:9SwiftDemo7largestyxSgSayxGSLRzlF1TL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "T?"
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:199:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo7lengthsySDySSSiGSDyS2SGF",
       "kind": "function",
       "path": "lengths(_:)",
@@ -71067,6 +71546,75 @@
       },
       "throws": true,
       "location": "file://Sources/SwiftDemo/Protocols.swift:46:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo7viewTagySixSo6UIViewCRbzlF",
+      "kind": "function",
+      "path": "viewTag(_:)",
+      "name": "viewTag(_:)",
+      "access": "public",
+      "declaration": "func viewTag<V>(_ view: V) -> Int where V : UIView",
+      "parameters": [
+        {
+          "internalName": "view",
+          "type": {
+            "spelling": "V",
+            "references": [
+              "s:9SwiftDemo7viewTagySixSo6UIViewCRbzlF1VL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "V",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "superclass",
+          "lhs": "V",
+          "rhs": "UIView",
+          "rhsPrecise": "c:objc(cs)UIView"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Views.swift:30:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo7viewTagySixSo6UIViewCRbzlF@<c:objc(cs)UIView>",
+      "kind": "function",
+      "path": "viewTag(_:)",
+      "name": "viewTag(_:)",
+      "access": "public",
+      "declaration": "func viewTag<V>(_ view: V) -> Int where V : UIView",
+      "parameters": [
+        {
+          "internalName": "view",
+          "type": {
+            "spelling": "V",
+            "references": [
+              "s:9SwiftDemo7viewTagySixSo6UIViewCRbzlF1VL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Views.swift:30:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -71585,6 +72133,218 @@
         ]
       },
       "location": "file://Sources/SwiftDemo/Values.swift:57:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8popCountySixs17FixedWidthIntegerRzlF",
+      "kind": "function",
+      "path": "popCount(_:)",
+      "name": "popCount(_:)",
+      "access": "public",
+      "declaration": "func popCount<I>(_ value: I) -> Int where I : FixedWidthInteger",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "I",
+            "references": [
+              "s:9SwiftDemo8popCountySixs17FixedWidthIntegerRzlF1IL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "I",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "I",
+          "rhs": "FixedWidthInteger",
+          "rhsPrecise": "s:s17FixedWidthIntegerP"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:201:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8popCountySixs17FixedWidthIntegerRzlF@<s:Si>",
+      "kind": "function",
+      "path": "popCount(_:)",
+      "name": "popCount(_:)",
+      "access": "public",
+      "declaration": "func popCount<I>(_ value: I) -> Int where I : FixedWidthInteger",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "I",
+            "references": [
+              "s:9SwiftDemo8popCountySixs17FixedWidthIntegerRzlF1IL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:201:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8repeated_5timesSayxGx_SitlF",
+      "kind": "function",
+      "path": "repeated(_:times:)",
+      "name": "repeated(_:times:)",
+      "access": "public",
+      "declaration": "func repeated<T>(_ value: T, times: Int) -> [T]",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "T",
+            "references": [
+              "s:9SwiftDemo8repeated_5timesSayxGx_SitlF1TL_xmfp"
+            ]
+          }
+        },
+        {
+          "label": "times",
+          "internalName": "times",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[T]"
+      },
+      "genericParameters": [
+        {
+          "name": "T",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:200:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8repeated_5timesSayxGx_SitlF@<s:SS>",
+      "kind": "function",
+      "path": "repeated(_:times:)",
+      "name": "repeated(_:times:)",
+      "access": "public",
+      "declaration": "func repeated<T>(_ value: T, times: Int) -> [T]",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "T",
+            "references": [
+              "s:9SwiftDemo8repeated_5timesSayxGx_SitlF1TL_xmfp"
+            ]
+          }
+        },
+        {
+          "label": "times",
+          "internalName": "times",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[T]"
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:200:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8repeated_5timesSayxGx_SitlF@<s:Sb>",
+      "kind": "function",
+      "path": "repeated(_:times:)",
+      "name": "repeated(_:times:)",
+      "access": "public",
+      "declaration": "func repeated<T>(_ value: T, times: Int) -> [T]",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "T",
+            "references": [
+              "s:9SwiftDemo8repeated_5timesSayxGx_SitlF1TL_xmfp"
+            ]
+          }
+        },
+        {
+          "label": "times",
+          "internalName": "times",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[T]"
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:200:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo8repeated_5timesSayxGx_SitlF@<s:Sd>",
+      "kind": "function",
+      "path": "repeated(_:times:)",
+      "name": "repeated(_:times:)",
+      "access": "public",
+      "declaration": "func repeated<T>(_ value: T, times: Int) -> [T]",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "T",
+            "references": [
+              "s:9SwiftDemo8repeated_5timesSayxGx_SitlF1TL_xmfp"
+            ]
+          }
+        },
+        {
+          "label": "times",
+          "internalName": "times",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "[T]"
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:200:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {

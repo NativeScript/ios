@@ -4,7 +4,7 @@
 import * as swift from "ns:swift";
 import * as Kit from "ns:swift/SwiftDemoKit";
 import type * as SwiftDemoTypes from "ns:swift/SwiftDemo";
-import { Demo, Point, Flavor, Polygon, Measurement, Square, Tracker, Counter, Palette, shout, globalCounter, delayedEcho, makeTrackerLater, countdown, greetLater, transform, lookup, Notifier, measure, area, simplify, echo, Formula, bump, append, describe, firstSubview, makeNote } from "ns:swift/SwiftDemo";
+import { Demo, Point, Flavor, Polygon, Measurement, Square, Tracker, Counter, Palette, shout, globalCounter, delayedEcho, makeTrackerLater, countdown, greetLater, transform, lookup, largest, repeated, Notifier, measure, area, simplify, echo, Formula, bump, append, describe, firstSubview, makeNote } from "ns:swift/SwiftDemo";
 
 const SwiftDemo = swift.module("SwiftDemo");
 const demo: Demo = new SwiftDemo.Demo();
@@ -36,6 +36,8 @@ void [echoed, later, counterValue, strokes];
 countdown(3, (value, done) => void (value.toFixed() + (done ? "!" : "")));
 transform([1, 2], (n) => n.toFixed()).concat(["x"]);
 lookup("k", () => null).toFixed();
+(largest([1, 2]) ?? 0).toFixed();
+repeated("x", 2).concat(["y"]);
 greetLater(null, (greeting) => greeting?.toUpperCase());
 const notifier = new Notifier();
 notifier.subscribe((message) => message.length);
@@ -83,6 +85,8 @@ area({ case: "circle" });
 countdown(3, (value: string) => value);
 // @ts-expect-error  closure results are typed
 transform([1], (n) => n);
+// @ts-expect-error  a generic function takes only its stand-ins
+largest([true]);
 // @ts-expect-error  actor state is not assignable from outside the actor
 new Counter().step = 2;
 // @ts-expect-error  description is read-only

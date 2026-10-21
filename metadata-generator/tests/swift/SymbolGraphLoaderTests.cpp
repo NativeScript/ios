@@ -73,7 +73,10 @@ TEST(LoadsFixtureWithoutDiagnostics) {
 TEST(TopLevelDeclarationsInSourceOrder) {
   std::vector<std::string> names;
   for (const auto& id : demo().topLevelIds) {
-    names.push_back(demo().find(id)->name);
+    const Symbol* symbol = demo().find(id);
+    if (symbol->substitutions.empty()) {
+      names.push_back(symbol->name);
+    }
   }
   std::vector<std::string> expected = {"Badge",
                                        "Greeter",
@@ -173,6 +176,14 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "firstMatch(_:where:)",
                                        "lookup(_:_:)",
                                        "computeInBackground(_:)",
+                                       "largest(_:)",
+                                       "repeated(_:times:)",
+                                       "popCount(_:)",
+                                       "zero()",
+                                       "greetTwice(_:_:)",
+                                       "decodeJSON(_:from:)",
+                                       "firstElement(_:)",
+                                       "joined(_:_:)",
                                        "describe(_:)",
                                        "makeLabel(_:)",
                                        "tags(_:)",
@@ -181,6 +192,7 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "makeNote(_:)",
                                        "text(of:)",
                                        "noteLater(_:)",
+                                       "viewTag(_:)",
                                        "Money",
                                        "Wallet",
                                        "Coin",
@@ -537,6 +549,41 @@ TEST(TypeAliases) {
   REQUIRE(alias && alias->aliasedType);
   CHECK_EQ(alias->aliasedType->spelling,
            std::string("(latitude: Double, longitude: Double)"));
+}
+
+TEST(GenericFunctionInstantiations) {
+  auto standIns = [](const std::string& path) {
+    const Symbol* generic = symbolAt(demo(), path);
+    std::vector<std::string> result;
+    if (!generic) {
+      return std::vector<std::string>{"missing"};
+    }
+    for (const auto& entry : demo().symbols) {
+      if (entry.second.genericBase != generic->preciseId) {
+        continue;
+      }
+      std::vector<std::string> parts;
+      for (const auto& substitution : entry.second.substitutions) {
+        parts.push_back(substitution.first + "=" + spelling(substitution.second));
+      }
+      result.push_back(llvm::join(parts, ","));
+    }
+    std::sort(result.begin(), result.end());
+    return result;
+  };
+  using List = std::vector<std::string>;
+  CHECK(standIns("largest(_:)") == List({"T=Double", "T=String"}));
+  CHECK(standIns("repeated(_:times:)") == List({"T=Bool", "T=Double", "T=String"}));
+  CHECK(standIns("popCount(_:)") == List({"I=Int"}));
+  // One stand-in: the result alone decides it.
+  CHECK(standIns("zero()") == List({"N=Double"}));
+  CHECK(standIns("greetTwice(_:_:)") == List({"G=any Greeting"}));
+  CHECK(standIns("viewTag(_:)") == List({"V=UIView"}));
+  CHECK(standIns("Loader.first(of:)") == List({"Element=Bool", "Element=Double", "Element=String"}));
+  CHECK(standIns("decodeJSON(_:from:)").empty());
+  CHECK(standIns("firstElement(_:)").empty());
+  // 3 x 3 combinations.
+  CHECK(standIns("joined(_:_:)").empty());
 }
 
 TEST(IRSnapshot) { checkSnapshot("SwiftDemo.ir.json", dumpModuleJSON(demo())); }

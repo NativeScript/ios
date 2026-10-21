@@ -175,6 +175,12 @@ declare module "ns:swift/SwiftDemo" {
     load(path: string): Uint8Array;
     wait(seconds: number): Promise<void>;
     fetch(url: string | URL): Promise<string>;
+    first(items: readonly (string)[]): string | null;
+    first(items: readonly (boolean)[]): boolean | null;
+    first(items: readonly (number)[]): number | null;
+    "first(of: [String])"(items: readonly (string)[]): string | null;
+    "first(of: [Bool])"(items: readonly (boolean)[]): boolean | null;
+    "first(of: [Double])"(items: readonly (number)[]): number | null;
     lookup(table: Readonly<Record<string, number | bigint>>, key: string): number | null;
     update(point: { value: Point }): void;
     /**
@@ -301,6 +307,7 @@ declare module "ns:swift/SwiftDemo" {
   export function echoUInt64(value: number | bigint): number;
   export function firstMatch(values: readonly (number | bigint)[], predicate: (arg0: number) => boolean): number | null;
   export function greetLater(name: (string) | null | undefined, completion: (arg0: string | null) => void): void;
+  export function greetTwice(greeting: Greeting, other: string): string;
   export function largestInt(): number;
   export function makeScorer(): Scorer;
   export function namesLater(count: number | bigint): Promise<(string)[]>;
@@ -330,6 +337,7 @@ declare module "ns:swift/SwiftDemo" {
   export function same(greeting: Greeting): Greeting;
   export function tags(views: readonly (UIView)[]): (number)[];
   export function text(note: NSObject): string;
+  export function zero(): number;
   export function boxed(money: import("ns:swift/SwiftDemoKit").Money): import("ns:swift/SwiftDemoKit").Box<import("ns:swift/SwiftDemoKit").Money>;
   export function clear(name: { value: (string) | null | undefined }): void;
   export function halve(value: { value: number | bigint }): void;
@@ -344,6 +352,8 @@ declare module "ns:swift/SwiftDemo" {
   export function countUp(limit: number | bigint): AsyncIterableIterator<number>;
   export function echoInt(value: number | bigint): number;
   export function explain(error: ShapeError): string;
+  export function largest(values: readonly (string)[]): string | null;
+  export function largest(values: readonly (number)[]): number | null;
   export function lengths(table: Readonly<Record<string, string>>): Record<string, number>;
   /**
    * @remarks Requires iOS 18.0; throws on earlier versions.
@@ -353,6 +363,7 @@ declare module "ns:swift/SwiftDemo" {
   export function nextDay(date: Date): Date;
   export function resolve(path: string, base: string | URL): URL;
   export function topRank(scorer: RankedScorer): string;
+  export function viewTag(view: UIView): number;
   export function centroid(points: readonly (Point)[]): Point;
   export function checksum(data: ArrayBuffer | ArrayBufferView): number;
   export function countBox(value: number | bigint): import("ns:swift/SwiftDemoKit").Box<number>;
@@ -361,6 +372,10 @@ declare module "ns:swift/SwiftDemo" {
   export function echoInt8(value: number | bigint): number;
   export function makeNote(text: string): NSObject;
   export function mirrored(grid: readonly (readonly (number | bigint)[])[]): ((number)[])[];
+  export function popCount(value: number | bigint): number;
+  export function repeated(value: string, times: number | bigint): (string)[];
+  export function repeated(value: boolean, times: number | bigint): (boolean)[];
+  export function repeated(value: number, times: number | bigint): (number)[];
   export function scoreAll(scorer: Scorer, values: readonly (number | bigint)[]): (number)[];
   export function simplify(formula: Formula): Formula;
   export function trackers(ids: readonly (number | bigint)[]): (Tracker)[];
