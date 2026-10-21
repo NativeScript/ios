@@ -40,7 +40,7 @@
 // calls it by reporting the arguments as an array: callbackBegin, each
 // argument through the complete* entries, then completeArrayEnd.
 
-#define NS_SWIFT_ABI_VERSION 12
+#define NS_SWIFT_ABI_VERSION 13
 
 #ifdef __cplusplus
 extern "C" {
@@ -166,6 +166,13 @@ enum {
 //   B           Data: bytes (NSSwiftTagString) <-> Uint8Array copy
 //   [<code>]    array (NSSwiftTagArray) <-> JS array copy
 //   {<code>}    [String: <code>] (NSSwiftTagMap) <-> plain JS object copy
+//   !           Error: its message (NSSwiftTagString) <- any JS value (an
+//               Error's message); returnErrorValue -> JS Error named
+//               "SwiftError"
+//   R(<success>,<failure>)
+//               Result, as a tagged enum of two cases (NSSwiftTagCase):
+//               { case: "success", value } and { case: "failure", value };
+//               success may be v (no value)
 //   S[<code>]   Set (NSSwiftTagArray, reported as an array) <-> JS Set copy
 //               (arrays accepted as input)
 //   *(<code>,...) or *(<label>:<code>,...)
@@ -322,6 +329,15 @@ struct NSSwiftAPI {
   // throws): runs the function on the isolate's thread, waiting for it from
   // any other thread, and returns its result like objectCallEnd.
   /* 51 */ const NSSwiftValue* (*callbackCallEnd)(void* token);
+
+  // Report an error as a value (code `!`), such as a Result's failure,
+  // instead of throwing it.
+  /* 52 */ void (*returnErrorValue)(NSSwiftCall* call, const uint8_t* message,
+                                    intptr_t messageLength, const uint8_t* type,
+                                    intptr_t typeLength);
+  /* 53 */ void (*completeErrorValue)(void* token, const uint8_t* message,
+                                      intptr_t messageLength,
+                                      const uint8_t* type, intptr_t typeLength);
 };
 
 typedef void (*NSSwiftRegisterFunction)(NSSwiftRegistrar* registrar);

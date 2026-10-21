@@ -162,6 +162,26 @@ class Emitter {
         return {valueExpression(array, slots, index).code + ".map({ Set($0) })",
                 true};
       }
+      case Bridge::Error:
+        return {"__NSJSValueError(message: " + read("string") + ")", false};
+      case Bridge::Result: {
+        std::string own = "t" + std::to_string(_tupleCount++);
+        const BridgedType& success = type.elements.at(0);
+        std::string successCase =
+            success.bridge == Bridge::Void
+                ? "    return .success(())\n"
+                : readCaseElement(success, 1, own + "v", own) +
+                      "    return .success(" + own + "v)\n";
+        return {"({ () -> " + swiftTypeText(unwrappedNode(type), _module) +
+                    "? in\n    let (" + own + ", _) = " + slots + ".elements(" +
+                    index + ")\n    switch " + own +
+                    ".int64(0) {\n    case 0:\n" + successCase +
+                    "    case 1:\n" +
+                    readCaseElement(type.elements.at(1), 1, own + "e", own) +
+                    "    return .failure(" + own +
+                    "e)\n    default: return nil\n    }\n  })()",
+                true};
+      }
       case Bridge::Tuple: {
         // Its own slots name: element readers may nest another tuple's.
         std::string own = "t" + std::to_string(_tupleCount++);
@@ -280,6 +300,8 @@ class Emitter {
         return "a case of " + typeName(type.symbolId);
       case Bridge::URL:
         return "a valid URL";
+      case Bridge::Result:
+        return "a Result ({ case: \"success\" | \"failure\", value })";
       case Bridge::Array:
         return "an array of " + describeElement(type.elements.at(0));
       case Bridge::Dictionary:
@@ -307,9 +329,10 @@ class Emitter {
 
   // Statements returning a collection's `element`, null when it is nil.
   std::string returnElement(const BridgedType& element,
-                            const std::string& reporter) const {
-    std::string write = returnValue(element, reporter, "element");
-    return element.optional ? "if let element { " + write + " } else { " +
+                            const std::string& reporter,
+                            const std::string& name = "element") const {
+    std::string write = returnValue(element, reporter, name);
+    return element.optional ? "if let " + name + " { " + write + " } else { " +
                                   reporter + ".returnNull() }"
                             : write;
   }
@@ -366,6 +389,22 @@ class Emitter {
       case Bridge::Set:
         return reporter + ".returnArray(" + value + ") { element in " +
                returnElement(type.elements.at(0), reporter) + " }";
+      case Bridge::Error:
+        return reporter + ".returnErrorValue(" + value + ")";
+      case Bridge::Result: {
+        std::string own = "t" + std::to_string(_tupleCount++);
+        const BridgedType& success = type.elements.at(0);
+        std::string successCase =
+            success.bridge == Bridge::Void
+                ? "case .success: " + reporter + ".returnCase(0) {}"
+                : "case .success(let " + own + "v): " + reporter +
+                      ".returnCase(0) { " +
+                      returnElement(success, reporter, own + "v") + " }";
+        return "switch " + value + " { " + successCase +
+               "; case .failure(let " + own + "e): " + reporter +
+               ".returnCase(1) { " +
+               returnValue(type.elements.at(1), reporter, own + "e") + " } }";
+      }
       case Bridge::Tuple: {
         std::vector<std::string> reports;
         for (size_t k = 0; k < type.elements.size(); k++) {
@@ -684,6 +723,13 @@ private struct __NSJSError: Error, CustomStringConvertible {
   var description: String { "the JavaScript implementation of \(requirement) failed" }
 }
 
+// An error JavaScript passes as a value; it describes itself by the JS
+// error's message.
+private struct __NSJSValueError: Error, CustomStringConvertible {
+  let message: String
+  var description: String { message }
+}
+
 // The result entries calls and completions share, so value reporting code
 // serves both.
 private protocol __NSReporter {
@@ -700,6 +746,7 @@ private protocol __NSReporter {
   func returnObject(_ object: AnyObject, _ typeIndex: UInt32)
   func returnCase(_ index: Int, _ values: () -> Void)
   func returnTuple(_ count: Int, _ values: () -> Void)
+  func returnErrorValue(_ error: any Error)
   func returnObjC(_ object: AnyObject)
   func returnJSObject(_ object: __NSJSObject)
   func returnAsyncSequence(_ iterator: __NSAsyncIterator)
@@ -866,10 +913,13 @@ private struct __NSCall: __NSReporter {
       call, Unmanaged.passRetained(iterator).toOpaque(), __nsIteratorNext)
   }
   func throwError(_ error: any Error) {
-    report(String(describing: error), String(reflecting: type(of: error)))
+    report(8, String(describing: error), String(reflecting: type(of: error)))
   }
   func throwMessage(_ message: String) {
-    report(message, "")
+    report(8, message, "")
+  }
+  func returnErrorValue(_ error: any Error) {
+    report(52, String(describing: error), String(reflecting: type(of: error)))
   }
   func throwTypeError(_ message: String) {
     var message = message
@@ -878,12 +928,12 @@ private struct __NSCall: __NSReporter {
         call, $0.baseAddress, $0.count)
     }
   }
-  private func report(_ message: String, _ type: String) {
+  private func report(_ entry: Int, _ message: String, _ type: String) {
     var message = message
     var type = type
     message.withUTF8 { messageBytes in
       type.withUTF8 { typeBytes in
-        slot(8, (@convention(c) (UnsafeMutableRawPointer, UnsafePointer<UInt8>?, Int,
+        slot(entry, (@convention(c) (UnsafeMutableRawPointer, UnsafePointer<UInt8>?, Int,
                                  UnsafePointer<UInt8>?, Int) -> Void).self)(
           call, messageBytes.baseAddress, messageBytes.count, typeBytes.baseAddress, typeBytes.count)
       }
@@ -976,11 +1026,17 @@ private struct __NSCompletion: @unchecked Sendable, __NSReporter {
       token, Unmanaged.passRetained(iterator).toOpaque(), __nsIteratorNext)
   }
   func throwError(_ error: any Error) {
+    report(22, error)
+  }
+  func returnErrorValue(_ error: any Error) {
+    report(53, error)
+  }
+  private func report(_ entry: Int, _ error: any Error) {
     var message = String(describing: error)
     var type = String(reflecting: Swift.type(of: error))
     message.withUTF8 { messageBytes in
       type.withUTF8 { typeBytes in
-        slot(22, (@convention(c) (UnsafeMutableRawPointer, UnsafePointer<UInt8>?, Int,
+        slot(entry, (@convention(c) (UnsafeMutableRawPointer, UnsafePointer<UInt8>?, Int,
                                   UnsafePointer<UInt8>?, Int) -> Void).self)(
           token, messageBytes.baseAddress, messageBytes.count, typeBytes.baseAddress, typeBytes.count)
       }

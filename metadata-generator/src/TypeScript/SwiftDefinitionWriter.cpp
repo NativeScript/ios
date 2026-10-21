@@ -123,6 +123,13 @@ std::string codeDisplayName(const SwiftSurface& surface,
     case Bridge::Set:
       name = "Set<" + codeDisplayName(surface, type.elements.at(0)) + ">";
       break;
+    case Bridge::Error:
+      name = "Error";
+      break;
+    case Bridge::Result:
+      name = "Result<" + codeDisplayName(surface, type.elements.at(0)) + ", " +
+             codeDisplayName(surface, type.elements.at(1)) + ">";
+      break;
     case Bridge::Tuple: {
       std::vector<std::string> elements;
       for (size_t i = 0; i < type.elements.size(); i++) {
@@ -344,9 +351,13 @@ class Writer {
       return bridge == Bridge::String || bridge == Bridge::EnumCase ||
              bridge == Bridge::URL;
     };
+    if (a.bridge == Bridge::Error || b.bridge == Bridge::Error) {
+      // Any object or string converts to an error.
+      return true;
+    }
     auto record = [](Bridge bridge) {
       return bridge == Bridge::Dictionary || bridge == Bridge::TaggedEnum ||
-             bridge == Bridge::Tuple;
+             bridge == Bridge::Tuple || bridge == Bridge::Result;
     };
     auto arrayLike = [](const BridgedType& type) {
       return type.bridge == Bridge::Array || type.bridge == Bridge::Set ||
@@ -517,6 +528,12 @@ class Writer {
       case Bridge::Tuple:
         ts = tupleType(type, true);
         break;
+      case Bridge::Error:
+        ts = "Error | string";
+        break;
+      case Bridge::Result:
+        ts = resultType(type, true);
+        break;
       case Bridge::Closure: {
         // The function receives what Swift passes: output types.
         std::vector<std::string> parameters;
@@ -534,6 +551,19 @@ class Writer {
         break;
     }
     return type.optional ? "(" + ts + ") | null | undefined" : ts;
+  }
+
+  // `{ case: "success"; value: S } | { case: "failure"; value: F }`.
+  std::string resultType(const BridgedType& type, bool input) const {
+    std::string readonly = input ? "readonly " : "";
+    auto value = [&](const BridgedType& element) {
+      return "; " + readonly +
+             "value: " + (input ? inputType(element) : outputType(element));
+    };
+    const BridgedType& success = type.elements.at(0);
+    return "{ " + readonly + "case: \"success\"" +
+           (success.bridge == Bridge::Void ? "" : value(success)) + " } | { " +
+           readonly + "case: \"failure\"" + value(type.elements.at(1)) + " }";
   }
 
   // `[A, B]`, or `{ latitude: A; longitude: B }` when labeled.
@@ -601,6 +631,12 @@ class Writer {
         break;
       case Bridge::Tuple:
         ts = tupleType(type, false);
+        break;
+      case Bridge::Error:
+        ts = "Error";
+        break;
+      case Bridge::Result:
+        ts = resultType(type, false);
         break;
       case Bridge::Closure:
         ts = "never";

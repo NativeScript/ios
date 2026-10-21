@@ -227,3 +227,24 @@ public func countUnique(_ values: Set<Int>) -> Int { values.count }
 public func tallyLater(_ words: [String]) async -> (unique: Set<String>, count: Int) {
     (Set(words), words.count)
 }
+
+// Errors as values, and Result (tagged objects naming their case).
+public struct ParseFailure: Error, CustomStringConvertible {
+    public let text: String
+    public var description: String { "not a number: \(text)" }
+}
+public func parseNumber(_ text: String) -> Result<Int, any Error> {
+    if let value = Int(text) { return .success(value) }
+    return .failure(ParseFailure(text: text))
+}
+public func checkSides(_ sides: Int) -> Result<Void, ShapeError> {
+    sides >= 3 ? .success(()) : .failure(.tooManySides(count: sides, limit: 3))
+}
+public func unwrap(_ result: Result<String, any Error>) throws -> String { try result.get() }
+public func parseLater(_ text: String) async -> Result<Int, any Error> { parseNumber(text) }
+public func fetchItem(_ id: Int, _ completion: @escaping @Sendable (Result<String, any Error>) -> Void) {
+    DispatchQueue.global().async {
+        completion(id > 0 ? .success("item \(id)") : .failure(ParseFailure(text: "\(id)")))
+    }
+}
+public func describeError(_ error: (any Error)?) -> String { error.map { "\($0)" } ?? "none" }

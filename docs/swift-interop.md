@@ -161,6 +161,8 @@ methods of generic types, and `some P` parameters, are not instantiated yet.
 | `Set<T>` | `Set` copy (inputs also accept an array) |
 | `(A, B)` | array copy, `[a, b]` |
 | `(x: A, y: B)` | plain object copy, `{ x: a, y: b }` |
+| `any Error` | `Error` named `SwiftError` (with `swiftType`); inputs accept any value, an `Error`'s message describing it |
+| `Result<S, F>` | `{ case: "success", value }` or `{ case: "failure", value }` (no `value` for `Result<Void, F>`) |
 | `(A, B) -> Void` (parameters only) | `function (a, b)` |
 | Objective-C class (`UIView`, an `NSObject` subclass) | NativeScript's ordinary Objective-C wrapper, with the identity Objective-C calls give it |
 
@@ -397,9 +399,9 @@ verification is what makes the generated surface trustworthy at SDK scale.
 ## Not yet supported
 
 Async cancellation, Combine publishers, concrete `AsyncSequence` types,
-generic methods of generic types, `Result` and other standard library
-generics, protocols with associated types, subscripts and operators. Each appears in the coverage report with
-its reason.
+generic methods of generic types, other standard library generics,
+protocols with associated types, subscripts and operators. Each appears in
+the coverage report with its reason.
 
 ## Swift language mode
 

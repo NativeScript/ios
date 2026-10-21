@@ -39,6 +39,8 @@ constexpr double kMaxSafeInteger = 9007199254740991.0;
 
 // --- Signatures --------------------------------------------------------------
 
+struct CaseInfo;
+
 struct ValueCode {
   enum class Kind {
     Void,
@@ -56,6 +58,8 @@ struct ValueCode {
     Map,
     Set,
     Tuple,
+    Error,
+    Result,
     Function,
     Tagged,
     ObjC,
@@ -78,6 +82,15 @@ struct ValueCode {
   // Tuple: its element codes are `element`; its labels, or empty when none
   // is labeled (a JS array rather than an object).
   std::vector<std::string> labels;
+  // Result: its two cases, `success` and `failure`, as a tagged enum's.
+  std::shared_ptr<const std::vector<CaseInfo>> cases;
+};
+
+// One case of a tagged enum: its JS keys and value codes, by position.
+struct CaseInfo {
+  std::string name;
+  std::vector<std::string> keys;
+  std::vector<ValueCode> codes;
 };
 
 // The '>' before the result in "params>result": the last one outside
@@ -135,6 +148,33 @@ bool ParseCode(std::string text, ValueCode& code) {
     ValueCode& element = code.element.back();
     return ParseCode(text.substr(1), element) && element.kind != ValueCode::Kind::Void &&
            element.kind != ValueCode::Kind::Function && !element.optional;
+  }
+  if (text == "!") {
+    code.kind = ValueCode::Kind::Error;
+    return true;
+  }
+  if (text.size() > 3 && text.compare(0, 2, "R(") == 0 && text.back() == ')') {
+    code.kind = ValueCode::Kind::Result;
+    std::vector<std::string> parts;
+    ValueCode success;
+    ValueCode failure;
+    if (!SplitCodes(text.substr(2, text.size() - 3), parts) || parts.size() != 2 ||
+        !ParseCode(parts[0], success) || !ParseCode(parts[1], failure) ||
+        success.kind == ValueCode::Kind::Function || failure.kind == ValueCode::Kind::Void ||
+        failure.optional) {
+      return false;
+    }
+    auto cases = std::make_shared<std::vector<CaseInfo>>(2);
+    (*cases)[0].name = "success";
+    if (success.kind != ValueCode::Kind::Void) {
+      (*cases)[0].keys = {"value"};
+      (*cases)[0].codes = {success};
+    }
+    (*cases)[1].name = "failure";
+    (*cases)[1].keys = {"value"};
+    (*cases)[1].codes = {failure};
+    code.cases = cases;
+    return true;
   }
   if (text.size() > 3 && text.compare(0, 2, "S[") == 0 && text.back() == ']') {
     code.kind = ValueCode::Kind::Set;
@@ -362,13 +402,6 @@ struct MemberGroup {
   std::vector<const MemberInfo*> overloads;
 };
 
-// One case of a tagged enum: its JS keys and value codes, by position.
-struct CaseInfo {
-  std::string name;
-  std::vector<std::string> keys;
-  std::vector<ValueCode> codes;
-};
-
 struct TypeInfo {
   uint32_t index = 0;
   uint32_t kind = 0;
@@ -459,6 +492,16 @@ std::string TypeDisplayName(const ModuleInfo& module, const ValueCode& code) {
     case ValueCode::Kind::Set:
       name = "Set<" + TypeDisplayName(module, code.element.at(0)) + ">";
       break;
+    case ValueCode::Kind::Error:
+      name = "Error";
+      break;
+    case ValueCode::Kind::Result: {
+      const auto& success = (*code.cases)[0].codes;
+      name = "Result<" +
+             (success.empty() ? std::string("Void") : TypeDisplayName(module, success[0])) + ", " +
+             TypeDisplayName(module, (*code.cases)[1].codes[0]) + ">";
+      break;
+    }
     case ValueCode::Kind::Tuple:
       name = "(";
       for (size_t i = 0; i < code.element.size(); i++) {
@@ -642,6 +685,10 @@ void ApiReturnJSObject(NSSwiftCall* call, void* object);
 void ApiCompleteJSObject(void* token, void* object);
 void ApiRegisterTracker(NSSwiftRegistrar* registrar, NSSwiftTracker tracker);
 const NSSwiftValue* ApiCallbackCallEnd(void* token);
+void ApiReturnErrorValue(NSSwiftCall* call, const uint8_t* message, intptr_t messageLength,
+                         const uint8_t* type, intptr_t typeLength);
+void ApiCompleteErrorValue(void* token, const uint8_t* message, intptr_t messageLength,
+                           const uint8_t* type, intptr_t typeLength);
 void ApiReturnAsyncSequence(NSSwiftCall* call, void* iterator, NSSwiftThunk next);
 void ApiCompleteAsyncSequence(void* token, void* iterator, NSSwiftThunk next);
 struct IsolateState;
@@ -671,7 +718,7 @@ const NSSwiftAPI kAPI = {
     ApiRegisterUnitModule,   ApiObjectCallBegin,      ApiObjectCallEnd,
     ApiObjectResultRelease,  ApiReturnJSObject,       ApiCompleteJSObject,
     ApiRegisterTracker,      ApiReturnAsyncSequence,  ApiCompleteAsyncSequence,
-    ApiCallbackCallEnd,
+    ApiCallbackCallEnd,      ApiReturnErrorValue,     ApiCompleteErrorValue,
 };
 
 // "Polygon.Style" -> "Style".
@@ -1327,13 +1374,25 @@ MaybeLocal<Object> NewCaseObject(Isolate* isolate, Local<Context> context, const
   return object;
 }
 
-// The case `caseIndex` of the tagged enum `code` names, or null.
-const CaseInfo* CaseOf(const ModuleInfo& module, const ValueCode* code, intptr_t caseIndex) {
-  if (code == nullptr || code->kind != ValueCode::Kind::Tagged || code->typeIndex < 0 ||
-      code->typeIndex >= static_cast<int>(module.types.size())) {
+// The cases of a tagged enum or Result code, or null.
+const std::vector<CaseInfo>* CasesOf(const ModuleInfo& module, const ValueCode& code) {
+  if (code.kind == ValueCode::Kind::Result) {
+    return code.cases.get();
+  }
+  if (code.kind != ValueCode::Kind::Tagged || code.typeIndex < 0 ||
+      code.typeIndex >= static_cast<int>(module.types.size())) {
     return nullptr;
   }
-  const auto& cases = module.types[code->typeIndex].cases;
+  return &module.types[code.typeIndex].cases;
+}
+
+// The case `caseIndex` of the tagged enum (or Result) `code` names, or null.
+const CaseInfo* CaseOf(const ModuleInfo& module, const ValueCode* code, intptr_t caseIndex) {
+  const std::vector<CaseInfo>* found = code ? CasesOf(module, *code) : nullptr;
+  if (found == nullptr) {
+    return nullptr;
+  }
+  const auto& cases = *found;
   return caseIndex >= 0 && caseIndex < static_cast<intptr_t>(cases.size()) ? &cases[caseIndex]
                                                                            : nullptr;
 }
@@ -1471,6 +1530,14 @@ void ApiThrowError(NSSwiftCall* call, const uint8_t* message, intptr_t messageLe
       SwiftErrorValue(context->isolate, context->context, text, typeName));
 }
 
+void ApiReturnErrorValue(NSSwiftCall* call, const uint8_t* message, intptr_t messageLength,
+                         const uint8_t* type, intptr_t typeLength) {
+  CallContext* context = ContextOf(call);
+  std::string text(reinterpret_cast<const char*>(message), message ? messageLength : 0);
+  std::string typeName(reinterpret_cast<const char*>(type), type ? typeLength : 0);
+  Complete(context, SwiftErrorValue(context->isolate, context->context, text, typeName));
+}
+
 void ApiThrowTypeError(NSSwiftCall* call, const uint8_t* message, intptr_t length) {
   CallContext* context = ContextOf(call);
   context->completed = true;
@@ -1503,6 +1570,8 @@ struct AsyncOutcome {
     Null,
     Object,
     Error,
+    // An error as a value (a Result's failure), rather than a rejection.
+    ErrorValue,
     Array,
     Map,
     Case,
@@ -1729,6 +1798,9 @@ bool OutcomeToJS(Isolate* isolate, Local<Context> context, IsolateState* state,
     case AsyncOutcome::Kind::Error:
       rejection = SwiftErrorValue(isolate, context, node.text, node.errorType);
       return false;
+    case AsyncOutcome::Kind::ErrorValue:
+      out = SwiftErrorValue(isolate, context, node.text, node.errorType);
+      return true;
   }
   return failed("returned an unknown value");
 }
@@ -2023,6 +2095,14 @@ void ApiCompleteError(void* token, const uint8_t* message, intptr_t messageLengt
   Emit(token, outcome);
 }
 
+void ApiCompleteErrorValue(void* token, const uint8_t* message, intptr_t messageLength,
+                           const uint8_t* type, intptr_t typeLength) {
+  auto outcome = Outcome(AsyncOutcome::Kind::ErrorValue);
+  outcome->text.assign(reinterpret_cast<const char*>(message), message ? messageLength : 0);
+  outcome->errorType.assign(reinterpret_cast<const char*>(type), type ? typeLength : 0);
+  Emit(token, outcome);
+}
+
 void ApiCompleteArrayBegin(void* token, intptr_t /*count*/) {
   Emit(token, Outcome(AsyncOutcome::Kind::Array));
 }
@@ -2131,7 +2211,10 @@ bool Accepts(Isolate* isolate, const ModuleInfo& module, const ValueCode& code,
                  : IsRecord(isolate, value);
     case ValueCode::Kind::Map:
     case ValueCode::Kind::Tagged:
+    case ValueCode::Kind::Result:
       return IsRecord(isolate, value);
+    case ValueCode::Kind::Error:
+      return value->IsObject() || value->IsString();
     case ValueCode::Kind::Object: {
       SwiftObjectWrapper* wrapper = SwiftWrapperOf(isolate, value);
       return wrapper && wrapper->Module() == &module &&
@@ -2474,9 +2557,32 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
       return true;
     }
 
+    case ValueCode::Kind::Error: {
+      // Swift receives an error whose description is the message.
+      Local<Value> message = value;
+      if (value->IsObject() && !value->IsString()) {
+        Local<Value> property;
+        if (value.As<Object>()
+                ->Get(context, tns::ToV8String(isolate, "message"))
+                .ToLocal(&property) &&
+            !property->IsUndefined()) {
+          message = property;
+        }
+      }
+      Local<v8::String> text;
+      if (!message->ToString(context).ToLocal(&text)) {
+        return false;
+      }
+      return WriteString(isolate, text, slot, arena);
+    }
+
+    case ValueCode::Kind::Result:
     case ValueCode::Kind::Tagged: {
-      const TypeInfo& type = module.types[code.typeIndex];
-      std::string expected = "must be a case of " + type.jsName + " ({ case: \"...\" })";
+      const std::vector<CaseInfo>& cases = *CasesOf(module, code);
+      std::string expected =
+          code.kind == ValueCode::Kind::Result
+              ? "must be a Result ({ case: \"success\" | \"failure\", value })"
+              : "must be a case of " + module.types[code.typeIndex].jsName + " ({ case: \"...\" })";
       if (!IsRecord(isolate, value)) {
         return ThrowArgument(isolate, member, index, expected);
       }
@@ -2486,13 +2592,13 @@ bool Convert(Isolate* isolate, Local<Context> context, const ModuleInfo& module,
       }
       std::string caseName = name->IsString() ? tns::ToString(isolate, name) : "";
       size_t caseIndex = 0;
-      while (caseIndex < type.cases.size() && type.cases[caseIndex].name != caseName) {
+      while (caseIndex < cases.size() && cases[caseIndex].name != caseName) {
         caseIndex++;
       }
-      if (caseIndex == type.cases.size()) {
+      if (caseIndex == cases.size()) {
         return ThrowArgument(isolate, member, index, expected);
       }
-      const CaseInfo& info = type.cases[caseIndex];
+      const CaseInfo& info = cases[caseIndex];
       arena.slots.emplace_back(1 + info.codes.size());
       std::vector<NSSwiftValue>& values = arena.slots.back();
       values[0].tag = NSSwiftTagInt64;

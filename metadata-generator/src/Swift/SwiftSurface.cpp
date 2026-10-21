@@ -155,6 +155,13 @@ std::string signatureCode(const SwiftSurface& surface,
     case Bridge::Set:
       code = "S[" + signatureCode(surface, type.elements.at(0)) + "]";
       break;
+    case Bridge::Error:
+      code = "!";
+      break;
+    case Bridge::Result:
+      code = "R(" + signatureCode(surface, type.elements.at(0)) + "," +
+             signatureCode(surface, type.elements.at(1)) + ")";
+      break;
     case Bridge::Tuple:
       code = "*(";
       for (size_t i = 0; i < type.elements.size(); i++) {

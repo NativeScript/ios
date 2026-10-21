@@ -84,6 +84,7 @@ constexpr const char* kURL = "s:10Foundation3URLV";
 constexpr const char* kData = "s:10Foundation4DataV";
 constexpr const char* kDate = "s:10Foundation4DateV";
 constexpr const char* kError = "s:s5ErrorP";
+constexpr const char* kResult = "s:s6ResultO";
 }  // namespace KnownTypes
 
 }  // namespace Swift

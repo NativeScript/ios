@@ -147,6 +147,13 @@
     "s:9SwiftDemo10uniqueTagsyShySSGSaySSGF",
     "s:9SwiftDemo11countUniqueySiShySiGF",
     "s:9SwiftDemo10tallyLateryShySSG6unique_Si5counttSaySSGYaF",
+    "s:9SwiftDemo12ParseFailureV",
+    "s:9SwiftDemo11parseNumberys6ResultOySis5Error_pGSSF",
+    "s:9SwiftDemo10checkSidesys6ResultOyytAA10ShapeErrorOGSiF",
+    "s:9SwiftDemo6unwrapySSs6ResultOySSs5Error_pGKF",
+    "s:9SwiftDemo10parseLaterys6ResultOySis5Error_pGSSYaF",
+    "s:9SwiftDemo9fetchItemyySi_ys6ResultOySSs5Error_pGYbctF",
+    "s:9SwiftDemo13describeErrorySSs0D0_pSgF",
     "s:9SwiftDemo8describeySSSo6UIViewCF",
     "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
     "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
@@ -65726,6 +65733,35 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo10checkSidesys6ResultOyytAA10ShapeErrorOGSiF",
+      "kind": "function",
+      "path": "checkSides(_:)",
+      "name": "checkSides(_:)",
+      "access": "public",
+      "declaration": "func checkSides(_ sides: Int) -> Result<Void, ShapeError>",
+      "parameters": [
+        {
+          "internalName": "sides",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Result<Void, ShapeError>",
+        "references": [
+          "s:s6ResultO",
+          "s:s4Voida",
+          "s:9SwiftDemo10ShapeErrorO"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:239:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo10decodeJSON_4fromxSgxm_SStSeRzlF",
       "kind": "function",
       "path": "decodeJSON(_:from:)",
@@ -66048,6 +66084,36 @@
       },
       "async": true,
       "location": "file://Sources/SwiftDemo/Values.swift:69:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo10parseLaterys6ResultOySis5Error_pGSSYaF",
+      "kind": "function",
+      "path": "parseLater(_:)",
+      "name": "parseLater(_:)",
+      "access": "public",
+      "declaration": "func parseLater(_ text: String) async -> Result<Int, any Error>",
+      "parameters": [
+        {
+          "internalName": "text",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Result<Int, any Error>",
+        "references": [
+          "s:s6ResultO",
+          "s:Si",
+          "s:s5ErrorP"
+        ]
+      },
+      "async": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:243:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -66434,6 +66500,35 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo11parseNumberys6ResultOySis5Error_pGSSF",
+      "kind": "function",
+      "path": "parseNumber(_:)",
+      "name": "parseNumber(_:)",
+      "access": "public",
+      "declaration": "func parseNumber(_ text: String) -> Result<Int, any Error>",
+      "parameters": [
+        {
+          "internalName": "text",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Result<Int, any Error>",
+        "references": [
+          "s:s6ResultO",
+          "s:Si",
+          "s:s5ErrorP"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:235:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo11sortedNames_2bySaySSGAD_SbSS_SStXEtF",
       "kind": "function",
       "path": "sortedNames(_:by:)",
@@ -66471,6 +66566,65 @@
       },
       "location": "file://Sources/SwiftDemo/Values.swift:187:12",
       "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo12ParseFailureV",
+      "kind": "struct",
+      "path": "ParseFailure",
+      "name": "ParseFailure",
+      "access": "public",
+      "declaration": "struct ParseFailure",
+      "location": "file://Sources/SwiftDemo/Values.swift:231:14",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo12ParseFailureV4textSSvp",
+        "s:9SwiftDemo12ParseFailureV11descriptionSSvp",
+        "s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo12ParseFailureV"
+      ],
+      "conformances": [
+        "s:s16SendableMetatypeP",
+        "s:s23CustomStringConvertibleP",
+        "s:s5ErrorP",
+        "s:s8SendableP"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo12ParseFailureV11descriptionSSvp",
+      "kind": "instanceProperty",
+      "path": "ParseFailure.description",
+      "name": "description",
+      "access": "public",
+      "declaration": "var description: String { get }",
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Values.swift:233:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo12ParseFailureV",
+      "sourceOrigin": "s:s23CustomStringConvertibleP11descriptionSSvp"
+    },
+    {
+      "id": "s:9SwiftDemo12ParseFailureV4textSSvp",
+      "kind": "instanceProperty",
+      "path": "ParseFailure.text",
+      "name": "text",
+      "access": "public",
+      "declaration": "let text: String",
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "let": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:232:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo12ParseFailureV"
     },
     {
       "id": "s:9SwiftDemo12RankedScorerP",
@@ -66779,6 +66933,33 @@
       "settable": false,
       "let": true,
       "location": "file://Sources/SwiftDemo/Shapes.swift:140:11",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo13describeErrorySSs0D0_pSgF",
+      "kind": "function",
+      "path": "describeError(_:)",
+      "name": "describeError(_:)",
+      "access": "public",
+      "declaration": "func describeError(_ error: (any Error)?) -> String",
+      "parameters": [
+        {
+          "internalName": "error",
+          "type": {
+            "spelling": "(any Error)?",
+            "references": [
+              "s:s5ErrorP"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:249:12",
       "graph": "SwiftDemo.symbols.json"
     },
     {
@@ -70490,6 +70671,36 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo6unwrapySSs6ResultOySSs5Error_pGKF",
+      "kind": "function",
+      "path": "unwrap(_:)",
+      "name": "unwrap(_:)",
+      "access": "public",
+      "declaration": "func unwrap(_ result: Result<String, any Error>) throws -> String",
+      "parameters": [
+        {
+          "internalName": "result",
+          "type": {
+            "spelling": "Result<String, any Error>",
+            "references": [
+              "s:s6ResultO",
+              "s:SS",
+              "s:s5ErrorP"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "throws": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:242:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo7CounterC",
       "kind": "actor",
       "path": "Counter",
@@ -73107,6 +73318,43 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:9SwiftDemo9fetchItemyySi_ys6ResultOySSs5Error_pGYbctF",
+      "kind": "function",
+      "path": "fetchItem(_:_:)",
+      "name": "fetchItem(_:_:)",
+      "access": "public",
+      "declaration": "func fetchItem(_ id: Int, _ completion: @escaping @Sendable (Result<String, any Error>) -> Void)",
+      "parameters": [
+        {
+          "internalName": "id",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "internalName": "completion",
+          "type": {
+            "spelling": "(Result<String, any Error>) -> Void",
+            "references": [
+              "s:s6ResultO",
+              "s:SS",
+              "s:s5ErrorP",
+              "s:s4Voida"
+            ]
+          },
+          "attributes": [
+            "@escaping",
+            "@Sendable"
+          ]
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:244:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
       "id": "s:9SwiftDemo9introduce_2toSSAA8Greeting_p_SStF",
       "kind": "function",
       "path": "introduce(_:to:)",
@@ -74614,6 +74862,47 @@
       ],
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo10ShapeErrorO",
+      "sourceOrigin": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp"
+    },
+    {
+      "id": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo12ParseFailureV",
+      "kind": "instanceProperty",
+      "path": "ParseFailure.localizedDescription",
+      "name": "localizedDescription",
+      "access": "public",
+      "declaration": "var localizedDescription: String { get }",
+      "synthesized": true,
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "8.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.10.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "9.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "2.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo12ParseFailureV",
       "sourceOrigin": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp"
     },
     {

@@ -9,7 +9,7 @@ describe("ns:swift", function () {
         it("exports a frozen loader", function () {
             expect(Object.isFrozen(swift)).toBe(true);
             expect(Object.keys(swift).sort()).toEqual(["abiVersion", "info", "module", "observe", "track"]);
-            expect(swift.abiVersion).toBe(12);
+            expect(swift.abiVersion).toBe(13);
         });
 
         it("returns one frozen namespace per module", function () {
@@ -20,7 +20,7 @@ describe("ns:swift", function () {
         it("describes the linked module", function () {
             var info = swift.info("SwiftDemo");
             expect(info.name).toBe("SwiftDemo");
-            expect(info.abiVersion).toBe(12);
+            expect(info.abiVersion).toBe(13);
             expect(info.fingerprint).toMatch(/^[0-9a-f]{16}$/);
             expect(info.members).toBeGreaterThan(0);
         });
@@ -50,9 +50,9 @@ describe("ns:swift", function () {
         });
 
         it("exposes only the generated surface", function () {
-            // Unsupported declarations (async, generic, closures, ...) are absent.
+            // Unsupported declarations (a type-only protocol's generics, metatypes, ...) are absent.
             expect(SwiftDemo.Loader.prototype.transform).toBeUndefined();
-            expect(SwiftDemo.Loader.prototype.withCompletion).toBeUndefined();
+            expect(SwiftDemo.decodeJSON).toBeUndefined();
         });
     });
 
@@ -892,6 +892,47 @@ describe("ns:swift", function () {
         it("requires a reference object", function () {
             expect(function () { SwiftDemo.bump(1); }).toThrowError(TypeError, /inout Int/);
             expect(function () { SwiftDemo.bump({ value: "1" }); }).toThrowError(TypeError);
+        });
+    });
+
+    describe("Result and errors as values", function () {
+        it("returns a Result as an object naming its case", function () {
+            expect(SwiftDemo.parseNumber("42")).toEqual({ case: "success", value: 42 });
+            var failed = SwiftDemo.parseNumber("x");
+            expect(failed.case).toBe("failure");
+            expect(failed.value instanceof Error).toBe(true);
+            expect(failed.value.name).toBe("SwiftError");
+            expect(failed.value.message).toBe("not a number: x");
+            expect(failed.value.swiftType).toBe("SwiftDemo.ParseFailure");
+            expect(SwiftDemo.checkSides(4)).toEqual({ case: "success" });
+            expect(SwiftDemo.checkSides(2)).toEqual({
+                case: "failure",
+                value: { case: "tooManySides", count: 2, limit: 3 }
+            });
+        });
+
+        it("passes a Result and errors from JS", function () {
+            expect(SwiftDemo.unwrap({ case: "success", value: "ok" })).toBe("ok");
+            expect(function () { SwiftDemo.unwrap({ case: "failure", value: new Error("nope") }); })
+                .toThrowError(/nope/);
+            expect(function () { SwiftDemo.unwrap({ case: "other" }); }).toThrowError(TypeError);
+            expect(SwiftDemo.describeError(new Error("boom"))).toBe("boom");
+            expect(SwiftDemo.describeError("plain")).toBe("plain");
+            expect(SwiftDemo.describeError(null)).toBe("none");
+        });
+
+        it("delivers a Result to completion handlers and promises", function (done) {
+            SwiftDemo.fetchItem(3, function (result) {
+                expect(result).toEqual({ case: "success", value: "item 3" });
+                SwiftDemo.fetchItem(-1, function (failure) {
+                    expect(failure.case).toBe("failure");
+                    expect(failure.value.message).toBe("not a number: -1");
+                    SwiftDemo.parseLater("7").then(function (parsed) {
+                        expect(parsed).toEqual({ case: "success", value: 7 });
+                        done();
+                    }, done.fail);
+                });
+            });
         });
     });
 

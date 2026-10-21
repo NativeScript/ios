@@ -62,6 +62,16 @@ declare module "ns:swift/SwiftDemo" {
 
   }
 
+  export class ParseFailure {
+    private constructor();
+    readonly description: string;
+    readonly text: string;
+    /**
+     * Retrieve the localized description for this error.
+     */
+    readonly localizedDescription: string;
+  }
+
   export interface RankedScorer extends Scorer {
     readonly rank: number | null;
   }
@@ -171,6 +181,7 @@ declare module "ns:swift/SwiftDemo" {
      * @deprecated Use fetch(url:) instead
      */
     legacyFetch(): void;
+    withCompletion(completion: (arg0: { case: "success"; value: string } | { case: "failure"; value: ShapeError }) => void): void;
     each(body: (arg0: number) => void): void;
     load(path: string): Uint8Array;
     wait(seconds: number): Promise<void>;
@@ -304,6 +315,7 @@ declare module "ns:swift/SwiftDemo" {
   export type Score = import("ns:swift/SwiftDemoKit").Pair<string, number>;
   export type Coordinates = { latitude: number; longitude: number };
   export function allFlavors(): (Flavor)[];
+  export function checkSides(sides: number | bigint): { case: "success" } | { case: "failure"; value: ShapeError };
   export function echoString(value: string): string;
   export function echoUInt64(value: number | bigint): number;
   export function firstMatch(values: readonly (number | bigint)[], predicate: (arg0: number) => boolean): number | null;
@@ -312,6 +324,7 @@ declare module "ns:swift/SwiftDemo" {
   export function largestInt(): number;
   export function makeScorer(): Scorer;
   export function namesLater(count: number | bigint): Promise<(string)[]>;
+  export function parseLater(text: string): Promise<{ case: "success"; value: number } | { case: "failure"; value: Error }>;
   export function tallyLater(words: readonly (string)[]): Promise<{ unique: Set<string>; count: number }>;
   export function uniqueTags(tags: readonly (string)[]): Set<string>;
   export function wordCounts(words: readonly (string)[]): Record<string, number>;
@@ -319,6 +332,7 @@ declare module "ns:swift/SwiftDemo" {
   export function countUnique(values: ReadonlySet<number | bigint> | readonly (number | bigint)[]): number;
   export function delayedEcho(text: string, seconds: number): Promise<string>;
   export function knownScores(scores: Readonly<Record<string, (number | bigint) | null | undefined>>): Record<string, number | null>;
+  export function parseNumber(text: string): { case: "success"; value: number } | { case: "failure"; value: Error };
   export function sortedNames(names: readonly (string)[], less: (arg0: string, arg1: string) => boolean): (string)[];
   export function firstSubview(view: UIView): UIView | null;
   export function makeGreeting(name: string): Greeting;
@@ -326,6 +340,7 @@ declare module "ns:swift/SwiftDemo" {
   export function measurements(): (Measurement)[];
   export function swapTrackers(a: { value: Tracker }, b: { value: Tracker }): void;
   export const defaultFlavor: Flavor;
+  export function describeError(error: (Error | string) | null | undefined): string;
   export let globalCounter: number;
   export function starterWallet(owner: string): import("ns:swift/SwiftDemoKit").Wallet;
   export function makeDefaultPoint(): Point;
@@ -360,6 +375,7 @@ declare module "ns:swift/SwiftDemo" {
   export function excite(greeting: Greeting): void;
   export function lookup(key: string, resolve: (arg0: string) => (number | bigint) | null | undefined): number;
   export function settle(value: number | bigint): import("ns:swift/SwiftDemoKit").Outcome<number>;
+  export function unwrap(result: { readonly case: "success"; readonly value: string } | { readonly case: "failure"; readonly value: Error | string }): string;
   export function compact(values: readonly ((number | bigint) | null | undefined)[]): (number)[];
   export function countUp(limit: number | bigint): AsyncIterableIterator<number>;
   export function echoInt(value: number | bigint): number;
@@ -396,6 +412,7 @@ declare module "ns:swift/SwiftDemo" {
   export function trackers(ids: readonly (number | bigint)[]): (Tracker)[];
   export function countDown(start: number | bigint, failure: (number | bigint) | null | undefined): AsyncIterableIterator<number>;
   export function countdown(start: number | bigint, tick: (arg0: number, arg1: boolean) => void): void;
+  export function fetchItem(id: number | bigint, completion: (arg0: { case: "success"; value: string } | { case: "failure"; value: Error }) => void): void;
   export function introduce(greeting: Greeting, other: string): string;
   export function makeLabel(text: string): UILabel;
   export function makeScore(name: string, points: number | bigint): import("ns:swift/SwiftDemoKit").Pair<string, number>;

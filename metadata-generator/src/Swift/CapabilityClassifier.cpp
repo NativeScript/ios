@@ -784,6 +784,11 @@ class Classifier {
       case TypeNode::Kind::Existential: {
         const TypeNode* inner =
             node.children.empty() ? nullptr : &node.children[0];
+        if (inner && inner->kind == TypeNode::Kind::Nominal &&
+            inner->usr() == KnownTypes::kError) {
+          bridged.bridge = Bridge::Error;
+          return "";
+        }
         const Symbol* protocol = inner && inner->kind == TypeNode::Kind::Nominal
                                      ? _module.find(inner->usr())
                                      : nullptr;
@@ -826,6 +831,40 @@ class Classifier {
     const std::string& usr = node.usr();
     if (node.components.size() == 1 && node.components[0].arguments.empty() &&
         isPrimitive(usr, bridged.bridge)) {
+      return "";
+    }
+    if (usr == KnownTypes::kError && node.components.size() == 1) {
+      bridged.bridge = Bridge::Error;
+      return "";
+    }
+    if (usr == KnownTypes::kResult && node.components.size() == 1 &&
+        node.components[0].arguments.size() == 2) {
+      bridged.bridge = Bridge::Result;
+      const TypeNode& success = node.components[0].arguments[0];
+      if (success.kind == TypeNode::Kind::Void) {
+        BridgedType none;
+        none.bridge = Bridge::Void;
+        none.node = success;
+        bridged.elements.push_back(std::move(none));
+      } else if (std::string reason = bridgeElement(success, bridged);
+                 !reason.empty()) {
+        return reason;
+      }
+      BridgedType failure;
+      failure.node = node.components[0].arguments[1];
+      std::string reason = bridgeNonOptional(failure.node, failure);
+      if (!reason.empty()) {
+        return reason;
+      }
+      bool errorLike = failure.bridge == Bridge::Error ||
+                       failure.bridge == Bridge::EnumCase ||
+                       failure.bridge == Bridge::TaggedEnum ||
+                       failure.bridge == Bridge::ClassHandle ||
+                       failure.bridge == Bridge::StructBox;
+      if (!errorLike) {
+        return "unbridged-type:Swift.Result";
+      }
+      bridged.elements.push_back(std::move(failure));
       return "";
     }
     if (usr == KnownTypes::kSet && node.components.size() == 1 &&
@@ -1070,6 +1109,7 @@ class Classifier {
         break;
       case Bridge::Dictionary:
       case Bridge::TaggedEnum:
+      case Bridge::Result:
         kind = "record";
         break;
       case Bridge::Closure:

@@ -65,6 +65,13 @@ enum class Bridge {
   // when every element is labeled; `elements` holds the element types and
   // `labels` their labels.
   Tuple,
+  // `any Error` as a value: a JS Error named "SwiftError"; any JS value
+  // as input, whose message the Swift error describes.
+  Error,
+  // Result<Success, Failure>: a plain JS object copy,
+  // `{ case: "success", value }` or `{ case: "failure", value }`;
+  // `elements` holds Success (Void for none) and Failure.
+  Result,
   // A closure parameter (not async): a JS function. `elements` holds the
   // closure's parameters, `results` its result.
   Closure,
