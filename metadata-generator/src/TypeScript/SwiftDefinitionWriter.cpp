@@ -682,10 +682,13 @@ class Writer {
       parts.push_back("value: " + receiver);
     }
     const auto& parameters = member.capability->parameters;
+    // An instance operator's receiver is its first parameter.
+    size_t skipped = member.capability->operatorInstance ? 1 : 0;
     for (size_t i = 0; i < parameters.size(); i++) {
-      const Parameter* parameter = i < member.symbol->parameters.size()
-                                       ? &member.symbol->parameters[i]
-                                       : nullptr;
+      const Parameter* parameter =
+          i + skipped < member.symbol->parameters.size()
+              ? &member.symbol->parameters[i + skipped]
+              : nullptr;
       std::string name =
           parameter ? parameterName(*parameter, i) : "arg" + std::to_string(i);
       parts.push_back(name + ": " + inputType(parameters[i]));

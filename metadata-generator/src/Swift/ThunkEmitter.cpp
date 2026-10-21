@@ -606,6 +606,9 @@ class Emitter {
     if (member.iteratesSelf) {
       return emitIteration(member);
     }
+    if (member.comparison != SwiftSurface::Member::kNone) {
+      return emitComparison(member);
+    }
     if (member.kind == SwiftSurface::kEnumCase) {
       // Cases are values (names, or objects JS builds); nothing to call.
       addRegistration(member, "nil", "nil");
@@ -700,6 +703,30 @@ class Emitter {
 
     addRegistration(member, "__nsThunk" + std::to_string(getterIndex),
                     setterName);
+    return code;
+  }
+
+  // `equals(other)` (`==`) or `compare(other)` (-1, 0, 1 from `<`).
+  std::string emitComparison(const SwiftSurface::Member& member) {
+    const Symbol& owner = *_module.find(member.symbol->parentId);
+    int index = _thunkCount++;
+    std::string code = "// " + owner.preciseId + " (" +
+                       member.capability->jsName + ")\n" + thunkHeader(index);
+    std::string availability = availabilityCondition(_module, owner);
+    if (!availability.empty()) {
+      code += "  guard #available(" + availability +
+              ") else { return rt.throwMessage(" +
+              quoted(owner.name + " is not available") + ") }\n";
+    }
+    std::string receiver = bindReceiver(owner, code);
+    code += readArgument(member.capability->parameters[0], 1, "other",
+                         "argument 1");
+    code += member.comparison == SwiftSurface::Member::kEquals
+                ? "  rt.returnBool(" + receiver + " == other)\n"
+                : "  rt.returnInt64(" + receiver + " < other ? -1 : (other < " +
+                      receiver + " ? 1 : 0))\n";
+    code += "}\n\n";
+    addRegistration(member, "__nsThunk" + std::to_string(index), "nil");
     return code;
   }
 

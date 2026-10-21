@@ -172,6 +172,7 @@ declare module "ns:swift/SwiftDemo" {
   export class Ring {
     constructor(inner: Point, outer: Point);
     constructor(args: { inner: Point; outer: Point });
+    plus(rhs: Ring): Ring;
     inner: Point;
     outer: Point;
     expand(delta: number): void;
@@ -350,6 +351,36 @@ declare module "ns:swift/SwiftDemo" {
     readonly id: number;
     same(): Tracker;
     static readonly liveCount: number;
+  }
+
+  export class Vector2 {
+    constructor(x: number, y: number);
+    constructor(args: { x: number; y: number });
+    static times(scale: number, vector: Vector2): Vector2;
+    plus(rhs: Vector2): Vector2;
+    negated(): Vector2;
+    x: number;
+    y: number;
+    /**
+     * Whether the values are equal (Swift's `==`).
+     */
+    equals(other: Vector2): boolean;
+  }
+
+  export class Version {
+    constructor(major: number | bigint, minor: number | bigint);
+    constructor(args: { major: number | bigint; minor: number | bigint });
+    lessThan(rhs: Version): boolean;
+    readonly major: number;
+    readonly minor: number;
+    /**
+     * Whether the values are equal (Swift's `==`).
+     */
+    equals(other: Version): boolean;
+    /**
+     * -1, 0 or 1 as this value sorts before, with or after `other` (Swift's `<`): `list.sort((a, b) => a.compare(b))`.
+     */
+    compare(other: Version): number;
   }
 
   export interface Greeting {

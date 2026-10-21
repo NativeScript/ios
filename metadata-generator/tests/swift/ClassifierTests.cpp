@@ -112,7 +112,7 @@ TEST(ClassifyRejections) {
   EXPECT_TIER("halve(_:)", Tier::SwiftGenerated);
   EXPECT_TIER("Loader.lookup(table:key:)", Tier::SwiftGenerated);
   EXPECT_TIER("Canvas.draw(_:)", Tier::Unsupported, "existential");
-  EXPECT_TIER("Ring.+(_:_:)", Tier::Unsupported, "operator");
+  EXPECT_TIER("Ring.+(_:_:)", Tier::SwiftGenerated);
   EXPECT_TIER("Polygon.subscript(_:)", Tier::SwiftGenerated);
   EXPECT_TIER("String.shouted", Tier::Unsupported, "external-type-extension");
   EXPECT_TIER("Measurement.isNone", Tier::SwiftGenerated);

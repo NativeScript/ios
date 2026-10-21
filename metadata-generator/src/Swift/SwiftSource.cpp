@@ -280,14 +280,17 @@ Invocation describeInvocation(const Module& module, const Symbol& symbol,
   invocation.isMainActor = capability.isMainActor && !capability.isAsync;
   invocation.isSettable = capability.isSettable;
 
-  for (size_t i = 0; i < symbol.parameters.size(); i++) {
+  // An instance operator's receiver is its first parameter.
+  size_t skipped = capability.operatorInstance ? 1 : 0;
+  for (size_t i = skipped; i < symbol.parameters.size(); i++) {
     invocation.labels.push_back(symbol.parameters[i].label);
-    std::string type = i < capability.parameters.size()
-                           ? typeText(capability.parameters[i], module)
+    size_t k = i - skipped;
+    std::string type = k < capability.parameters.size()
+                           ? typeText(capability.parameters[k], module)
                            : "";
     bool isInout =
-        i < capability.parameters.size() && capability.parameters[i].isInout;
-    if (i < capability.parameters.size() && capability.parameters[i].escaping) {
+        k < capability.parameters.size() && capability.parameters[k].isInout;
+    if (k < capability.parameters.size() && capability.parameters[k].escaping) {
       type = "@escaping " + type;
     }
     invocation.parameterTypes.push_back(isInout ? "inout " + type : type);
@@ -337,6 +340,12 @@ Invocation describeInvocation(const Module& module, const Symbol& symbol,
       break;
     case SymbolKind::TypeSubscript:
       invocation.form = Invocation::Form::StaticSubscript;
+      break;
+    case SymbolKind::Operator:
+      invocation.form = symbol.parameters.size() == 1
+                            ? Invocation::Form::PrefixOperator
+                            : Invocation::Form::InfixOperator;
+      invocation.needsReceiver = capability.operatorInstance;
       break;
     default:
       break;
@@ -406,6 +415,18 @@ std::string invocationExpression(const Invocation& invocation,
     case Invocation::Form::StaticSubscript:
       expression = invocation.owner + "[" + argumentList + "]";
       break;
+    case Invocation::Form::InfixOperator:
+    case Invocation::Form::PrefixOperator: {
+      std::vector<std::string> operands = arguments;
+      if (invocation.needsReceiver) {
+        operands.insert(operands.begin(), receiver);
+      }
+      expression = invocation.form == Invocation::Form::PrefixOperator
+                       ? invocation.member + "(" + operands.at(0) + ")"
+                       : "(" + operands.at(0) + ") " + invocation.member +
+                             " (" + operands.at(1) + ")";
+      break;
+    }
   }
   std::string effects = std::string(invocation.isThrowing ? "try " : "") +
                         (invocation.isAsync ? "await " : "");

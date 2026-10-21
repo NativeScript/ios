@@ -286,3 +286,20 @@ public struct Grid {
         set { cells[index] = newValue }
     }
 }
+
+// Operators as named methods, and equals()/compare() from Equatable and
+// Comparable.
+public struct Vector2: Equatable {
+    public var x: Double
+    public var y: Double
+    public init(x: Double, y: Double) { self.x = x; self.y = y }
+    public static func + (lhs: Vector2, rhs: Vector2) -> Vector2 { Vector2(x: lhs.x + rhs.x, y: lhs.y + rhs.y) }
+    public static prefix func - (vector: Vector2) -> Vector2 { Vector2(x: -vector.x, y: -vector.y) }
+    public static func * (scale: Double, vector: Vector2) -> Vector2 { Vector2(x: scale * vector.x, y: scale * vector.y) }
+}
+public struct Version: Comparable, Hashable {
+    public let major: Int
+    public let minor: Int
+    public init(major: Int, minor: Int) { self.major = major; self.minor = minor }
+    public static func < (lhs: Version, rhs: Version) -> Bool { (lhs.major, lhs.minor) < (rhs.major, rhs.minor) }
+}

@@ -348,7 +348,18 @@ class Classifier {
     if (llvm::StringRef(symbol.declarationText).contains("~Escapable")) {
       return make(Tier::Unsupported, "nonescapable");
     }
-    return make(Tier::SwiftGenerated);
+    Capability generated = make(Tier::SwiftGenerated);
+    if (symbol.kind == SymbolKind::Struct || symbol.kind == SymbolKind::Class) {
+      auto conforms = [&](const char* usr) {
+        return std::find(symbol.conformances.begin(), symbol.conformances.end(),
+                         usr) != symbol.conformances.end();
+      };
+      generated.comparable = conforms(KnownTypes::kComparable);
+      generated.equatable = generated.comparable ||
+                            conforms(KnownTypes::kEquatable) ||
+                            conforms(KnownTypes::kHashable);
+    }
+    return generated;
   }
 
   // A protocol JS objects can implement: every requirement is an instance
@@ -591,8 +602,12 @@ class Classifier {
       }
     }
 
+    std::string operatorName;
     if (symbol.kind == SymbolKind::Operator) {
-      return make(Tier::Unsupported, "operator");
+      operatorName = jsOperatorName(symbol);
+      if (operatorName.empty() || !owner) {
+        return make(Tier::Unsupported, "operator");
+      }
     }
     if ((symbol.kind == SymbolKind::InstanceSubscript ||
          symbol.kind == SymbolKind::TypeSubscript) &&
@@ -714,6 +729,17 @@ class Classifier {
     capability.jsName = symbol.kind == SymbolKind::Initializer
                             ? "constructor"
                             : symbol.baseName;
+    if (!operatorName.empty()) {
+      capability.jsName = operatorName;
+      // `lhs OP rhs` and `OP operand` on the owner become its methods.
+      if (!capability.parameters.empty() &&
+          capability.parameters[0].symbolId == owner->preciseId &&
+          !capability.parameters[0].optional &&
+          !capability.parameters[0].isInout) {
+        capability.operatorInstance = true;
+        capability.parameters.erase(capability.parameters.begin());
+      }
+    }
     if (owner && owner->kind == SymbolKind::Protocol) {
       capability.isRequirement = symbol.isProtocolRequirement;
       // Assigning through a value of a protocol that is not class-bound
@@ -830,6 +856,35 @@ class Classifier {
       }
     }
     return nullptr;
+  }
+
+  // JS method names for operators JS can call by name; "" for the rest
+  // (compound assignment, bitwise, custom operators, and `!=`, which
+  // `equals` covers).
+  static std::string jsOperatorName(const Symbol& symbol) {
+    llvm::StringRef op = llvm::StringRef(symbol.name).split('(').first;
+    bool prefix = symbol.parameters.size() == 1 &&
+                  std::find(symbol.modifiers.begin(), symbol.modifiers.end(),
+                            "postfix") == symbol.modifiers.end();
+    if (prefix) {
+      return op == "-" ? "negated" : op == "!" ? "not" : "";
+    }
+    if (symbol.parameters.size() != 2) {
+      return "";
+    }
+    static const std::pair<const char*, const char*> kNames[] = {
+        {"+", "plus"},        {"-", "minus"},
+        {"*", "times"},       {"/", "dividedBy"},
+        {"%", "remainder"},   {"==", "equals"},
+        {"<", "lessThan"},    {"<=", "lessThanOrEqualTo"},
+        {">", "greaterThan"}, {">=", "greaterThanOrEqualTo"},
+    };
+    for (const auto& name : kNames) {
+      if (op == name.first) {
+        return name.second;
+      }
+    }
+    return "";
   }
 
   BridgedType bridgeOwner(const Symbol& owner) const {
@@ -1283,7 +1338,7 @@ class Classifier {
                         symbol->kind == SymbolKind::TypeProperty ||
                         symbol->kind == SymbolKind::Variable ||
                         symbol->kind == SymbolKind::EnumCase;
-      bool isStatic = symbol->isStatic ||
+      bool isStatic = (symbol->isStatic && !capability.operatorInstance) ||
                       symbol->kind == SymbolKind::EnumCase ||
                       symbol->kind == SymbolKind::Initializer;
       std::string signature = std::to_string(capability.parameters.size());

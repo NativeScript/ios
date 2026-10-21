@@ -462,6 +462,32 @@ describe("ns:swift", function () {
         });
     });
 
+    describe("operators and comparisons", function () {
+        it("calls operators as named methods", function () {
+            var a = new SwiftDemo.Vector2(1, 2);
+            var b = new SwiftDemo.Vector2(3, 4);
+            var sum = a.plus(b);
+            expect([sum.x, sum.y]).toEqual([4, 6]);
+            var negated = a.negated();
+            expect([negated.x, negated.y]).toEqual([-1, -2]);
+            var scaled = SwiftDemo.Vector2.times(2, b);
+            expect([scaled.x, scaled.y]).toEqual([6, 8]);
+            var ring = new SwiftDemo.Ring(new SwiftDemo.Point(0, 0), new SwiftDemo.Point(1, 1));
+            expect(ring.plus(ring) instanceof SwiftDemo.Ring).toBe(true);
+        });
+
+        it("compares values with equals() and compare()", function () {
+            expect(new SwiftDemo.Vector2(1, 2).equals(new SwiftDemo.Vector2(1, 2))).toBe(true);
+            expect(new SwiftDemo.Vector2(1, 2).equals(new SwiftDemo.Vector2(2, 1))).toBe(false);
+            var versions = [new SwiftDemo.Version(2, 0), new SwiftDemo.Version(1, 5), new SwiftDemo.Version(1, 10)];
+            versions.sort(function (x, y) { return x.compare(y); });
+            expect(versions.map(function (v) { return v.major + "." + v.minor; }))
+                .toEqual(["1.5", "1.10", "2.0"]);
+            expect(versions[0].lessThan(versions[1])).toBe(true);
+            expect(versions[1].equals(new SwiftDemo.Version(1, 10))).toBe(true);
+        });
+    });
+
     describe("subscripts", function () {
         it("reads and assigns subscripts through subscript() and setSubscript()", function () {
             var shelf = new SwiftDemo.Shelf();

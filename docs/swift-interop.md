@@ -203,6 +203,15 @@ holds.
   the overloads' keys; call one directly by key: `polygon["scale(by: Int)"](2)`.
   Every overload is also reachable by its Swift name when that is unique
   (`demo["greet(name:times:)"]("a", 2)`).
+- Operators are methods named for what they do: `a.plus(b)`, `a.minus(b)`,
+  `times`, `dividedBy`, `remainder`, `equals`, `lessThan`,
+  `lessThanOrEqualTo`, `greaterThan`, `greaterThanOrEqualTo`, and prefix
+  `negated()` / `not()`. One whose left operand is its own type is an instance
+  method of that operand; any other is static (`Vector2.times(2, v)`).
+  Compound assignment, bitwise and custom operators are not exposed.
+- `Equatable` classes and structs (also through `Hashable` or `Comparable`)
+  get `equals(other)`, and `Comparable` ones `compare(other)` (-1, 0 or 1),
+  so `list.sort((a, b) => a.compare(b))` sorts by Swift's `<`.
 - Subscripts are methods: `shelf.subscript("apples")` reads one and
   `shelf.setSubscript("apples", 3)` assigns it (settable subscripts only),
   overloaded like any method by their indices.
@@ -459,9 +468,9 @@ verification is what makes the generated surface trustworthy at SDK scale.
 
 ## Not yet supported
 
-Generic methods of generic types, other standard library generics,
-protocols with associated types, and operators. Each appears in the coverage
-report with its reason.
+Generic methods of generic types, other standard library generics, and
+protocols with associated types. Each appears in the coverage report with its
+reason.
 
 ## Swift language mode
 

@@ -43,6 +43,8 @@ struct Invocation {
     EnumCase,           // Owner.name
     InstanceSubscript,  // receiver[args]
     StaticSubscript,    // Owner[args]
+    InfixOperator,      // lhs OP rhs (lhs is the receiver when needsReceiver)
+    PrefixOperator,     // OP operand (the receiver when needsReceiver)
   };
 
   Form form = Form::Function;

@@ -173,6 +173,8 @@
     "s:9SwiftDemo13waitForCancelySbSdYaF",
     "s:9SwiftDemo5ShelfC",
     "s:9SwiftDemo4GridV",
+    "s:9SwiftDemo7Vector2V",
+    "s:9SwiftDemo7VersionV",
     "s:9SwiftDemo8describeySSSo6UIViewCF",
     "s:9SwiftDemo9makeLabelySo7UILabelCSSF",
     "s:9SwiftDemo4tagsySaySiGSaySo6UIViewCGF",
@@ -245,6 +247,7 @@
     "s:5UIKit23UITraitChangeObservableP": "UIKit.UITraitChangeObservable",
     "s:7SwiftUI4ViewP": "SwiftUICore.View",
     "s:SH": "Swift.Hashable",
+    "s:SL": "Swift.Comparable",
     "s:SQ": "Swift.Equatable",
     "s:SS": "Swift.String",
     "s:SY": "Swift.RawRepresentable",
@@ -73888,6 +73891,354 @@
       "parent": "s:9SwiftDemo7TrackerC"
     },
     {
+      "id": "s:9SwiftDemo7Vector2V",
+      "kind": "struct",
+      "path": "Vector2",
+      "name": "Vector2",
+      "access": "public",
+      "declaration": "struct Vector2",
+      "location": "file://Sources/SwiftDemo/Values.swift:291:14",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo7Vector2V1xSdvp",
+        "s:9SwiftDemo7Vector2V1ySdvp",
+        "s:9SwiftDemo7Vector2V1x1yACSd_Sdtcfc",
+        "s:9SwiftDemo7Vector2V1poiyA2C_ACtFZ",
+        "s:9SwiftDemo7Vector2V1sopyA2CFZ",
+        "s:9SwiftDemo7Vector2V1moiyACSd_ACtFZ",
+        "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7Vector2V"
+      ],
+      "conformances": [
+        "s:SQ"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo7Vector2V1moiyACSd_ACtFZ",
+      "kind": "operator",
+      "path": "Vector2.*(_:_:)",
+      "name": "*(_:_:)",
+      "access": "public",
+      "declaration": "static func * (scale: Double, vector: Vector2) -> Vector2",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "scale",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        },
+        {
+          "internalName": "vector",
+          "type": {
+            "spelling": "Vector2",
+            "references": [
+              "s:9SwiftDemo7Vector2V"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Vector2",
+        "references": [
+          "s:9SwiftDemo7Vector2V"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:297:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7Vector2V"
+    },
+    {
+      "id": "s:9SwiftDemo7Vector2V1poiyA2C_ACtFZ",
+      "kind": "operator",
+      "path": "Vector2.+(_:_:)",
+      "name": "+(_:_:)",
+      "access": "public",
+      "declaration": "static func + (lhs: Vector2, rhs: Vector2) -> Vector2",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Vector2",
+            "references": [
+              "s:9SwiftDemo7Vector2V"
+            ]
+          }
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Vector2",
+            "references": [
+              "s:9SwiftDemo7Vector2V"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Vector2",
+        "references": [
+          "s:9SwiftDemo7Vector2V"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:295:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7Vector2V"
+    },
+    {
+      "id": "s:9SwiftDemo7Vector2V1sopyA2CFZ",
+      "kind": "operator",
+      "path": "Vector2.-(_:)",
+      "name": "-(_:)",
+      "access": "public",
+      "declaration": "static func - (vector: Vector2) -> Vector2",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "vector",
+          "type": {
+            "spelling": "Vector2",
+            "references": [
+              "s:9SwiftDemo7Vector2V"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Vector2",
+        "references": [
+          "s:9SwiftDemo7Vector2V"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:296:30",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7Vector2V"
+    },
+    {
+      "id": "s:9SwiftDemo7Vector2V1x1yACSd_Sdtcfc",
+      "kind": "initializer",
+      "path": "Vector2.init(x:y:)",
+      "name": "init(x:y:)",
+      "access": "public",
+      "declaration": "init(x: Double, y: Double)",
+      "parameters": [
+        {
+          "label": "x",
+          "internalName": "x",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        },
+        {
+          "label": "y",
+          "internalName": "y",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:294:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7Vector2V"
+    },
+    {
+      "id": "s:9SwiftDemo7Vector2V1xSdvp",
+      "kind": "instanceProperty",
+      "path": "Vector2.x",
+      "name": "x",
+      "access": "public",
+      "declaration": "var x: Double",
+      "valueType": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:292:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7Vector2V"
+    },
+    {
+      "id": "s:9SwiftDemo7Vector2V1ySdvp",
+      "kind": "instanceProperty",
+      "path": "Vector2.y",
+      "name": "y",
+      "access": "public",
+      "declaration": "var y: Double",
+      "valueType": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:293:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7Vector2V"
+    },
+    {
+      "id": "s:9SwiftDemo7VersionV",
+      "kind": "struct",
+      "path": "Version",
+      "name": "Version",
+      "access": "public",
+      "declaration": "struct Version",
+      "location": "file://Sources/SwiftDemo/Values.swift:299:14",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo7VersionV5majorSivp",
+        "s:9SwiftDemo7VersionV5minorSivp",
+        "s:9SwiftDemo7VersionV5major5minorACSi_Sitcfc",
+        "s:9SwiftDemo7VersionV1loiySbAC_ACtFZ",
+        "s:SLsE3zzloiySnyxGx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SLsE3zzlopys16PartialRangeUpToVyxGxFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SLsE3zzzoPys16PartialRangeFromVyxGxFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SLsE3zzzoiySNyxGx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SLsE3zzzopys19PartialRangeThroughVyxGxFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SLsRi_zRi0_zrlE1goiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SLsRi_zRi0_zrlE2geoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SLsRi_zRi0_zrlE2leoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+        "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV"
+      ],
+      "conformances": [
+        "s:SH",
+        "s:SL",
+        "s:SQ"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo7VersionV1loiySbAC_ACtFZ",
+      "kind": "operator",
+      "path": "Version.<(_:_:)",
+      "name": "<(_:_:)",
+      "access": "public",
+      "declaration": "static func < (lhs: Version, rhs: Version) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Version",
+            "references": [
+              "s:9SwiftDemo7VersionV"
+            ]
+          }
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Version",
+            "references": [
+              "s:9SwiftDemo7VersionV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:303:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SL1loiySbx_xtFZ"
+    },
+    {
+      "id": "s:9SwiftDemo7VersionV5major5minorACSi_Sitcfc",
+      "kind": "initializer",
+      "path": "Version.init(major:minor:)",
+      "name": "init(major:minor:)",
+      "access": "public",
+      "declaration": "init(major: Int, minor: Int)",
+      "parameters": [
+        {
+          "label": "major",
+          "internalName": "major",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "label": "minor",
+          "internalName": "minor",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:302:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV"
+    },
+    {
+      "id": "s:9SwiftDemo7VersionV5majorSivp",
+      "kind": "instanceProperty",
+      "path": "Version.major",
+      "name": "major",
+      "access": "public",
+      "declaration": "let major: Int",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "let": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:300:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV"
+    },
+    {
+      "id": "s:9SwiftDemo7VersionV5minorSivp",
+      "kind": "instanceProperty",
+      "path": "Version.minor",
+      "name": "minor",
+      "access": "public",
+      "declaration": "let minor: Int",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "let": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:301:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV"
+    },
+    {
       "id": "s:9SwiftDemo7compactySaySiGSaySiSgGF",
       "kind": "function",
       "path": "compact(_:)",
@@ -76105,6 +76456,314 @@
       "graph": "SwiftDemo.symbols.json"
     },
     {
+      "id": "s:SLsE3zzloiySnyxGx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version...<(_:_:)",
+      "name": "..<(_:_:)",
+      "access": "public",
+      "declaration": "static func ..< (minimum: Self, maximum: Self) -> Range<Self>",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "minimum",
+          "type": {
+            "spelling": "Self"
+          }
+        },
+        {
+          "internalName": "maximum",
+          "type": {
+            "spelling": "Self"
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Range<Self>",
+        "references": [
+          "s:Sn"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsE3zzloiySnyxGx_xtFZ"
+    },
+    {
+      "id": "s:SLsE3zzlopys16PartialRangeUpToVyxGxFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version...<(_:)",
+      "name": "..<(_:)",
+      "access": "public",
+      "declaration": "static func ..< (maximum: Self) -> PartialRangeUpTo<Self>",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "maximum",
+          "type": {
+            "spelling": "Self"
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "PartialRangeUpTo<Self>",
+        "references": [
+          "s:s16PartialRangeUpToV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsE3zzlopys16PartialRangeUpToVyxGxFZ"
+    },
+    {
+      "id": "s:SLsE3zzzoPys16PartialRangeFromVyxGxFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version....(_:)",
+      "name": "...(_:)",
+      "access": "public",
+      "declaration": "static func ... (minimum: Self) -> PartialRangeFrom<Self>",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "minimum",
+          "type": {
+            "spelling": "Self"
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "PartialRangeFrom<Self>",
+        "references": [
+          "s:s16PartialRangeFromV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsE3zzzoPys16PartialRangeFromVyxGxFZ"
+    },
+    {
+      "id": "s:SLsE3zzzoiySNyxGx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version....(_:_:)",
+      "name": "...(_:_:)",
+      "access": "public",
+      "declaration": "static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self>",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "minimum",
+          "type": {
+            "spelling": "Self"
+          }
+        },
+        {
+          "internalName": "maximum",
+          "type": {
+            "spelling": "Self"
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "ClosedRange<Self>",
+        "references": [
+          "s:SN"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsE3zzzoiySNyxGx_xtFZ"
+    },
+    {
+      "id": "s:SLsE3zzzopys19PartialRangeThroughVyxGxFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version....(_:)",
+      "name": "...(_:)",
+      "access": "public",
+      "declaration": "static func ... (maximum: Self) -> PartialRangeThrough<Self>",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "maximum",
+          "type": {
+            "spelling": "Self"
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "PartialRangeThrough<Self>",
+        "references": [
+          "s:s19PartialRangeThroughV"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsE3zzzopys19PartialRangeThroughVyxGxFZ"
+    },
+    {
+      "id": "s:SLsRi_zRi0_zrlE1goiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version.>(_:_:)",
+      "name": ">(_:_:)",
+      "access": "public",
+      "declaration": "static func > (lhs: borrowing Self, rhs: borrowing Self) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsRi_zRi0_zrlE1goiySbx_xtFZ"
+    },
+    {
+      "id": "s:SLsRi_zRi0_zrlE2geoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version.>=(_:_:)",
+      "name": ">=(_:_:)",
+      "access": "public",
+      "declaration": "static func >= (lhs: borrowing Self, rhs: borrowing Self) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsRi_zRi0_zrlE2geoiySbx_xtFZ"
+    },
+    {
+      "id": "s:SLsRi_zRi0_zrlE2leoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version.<=(_:_:)",
+      "name": "<=(_:_:)",
+      "access": "public",
+      "declaration": "static func <= (lhs: borrowing Self, rhs: borrowing Self) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
+      "sourceOrigin": "s:SLsRi_zRi0_zrlE2leoiySbx_xtFZ"
+    },
+    {
       "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:12SwiftDemoKit4CoinO",
       "kind": "operator",
       "path": "Coin.!=(_:_:)",
@@ -76270,6 +76929,90 @@
       },
       "graph": "SwiftDemo.symbols.json",
       "parent": "s:9SwiftDemo7PolygonC5StyleO",
+      "sourceOrigin": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ"
+    },
+    {
+      "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7Vector2V",
+      "kind": "operator",
+      "path": "Vector2.!=(_:_:)",
+      "name": "!=(_:_:)",
+      "access": "public",
+      "declaration": "static func != (lhs: borrowing Self, rhs: borrowing Self) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7Vector2V",
+      "sourceOrigin": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ"
+    },
+    {
+      "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo7VersionV",
+      "kind": "operator",
+      "path": "Version.!=(_:_:)",
+      "name": "!=(_:_:)",
+      "access": "public",
+      "declaration": "static func != (lhs: borrowing Self, rhs: borrowing Self) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7VersionV",
       "sourceOrigin": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ"
     },
     {

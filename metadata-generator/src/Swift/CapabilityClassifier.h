@@ -161,6 +161,14 @@ struct Capability {
   // for `objcName`, its Objective-C runtime name.
   bool objcBacked = false;
   std::string objcName;
+  // An operator whose left operand is its owner: an instance method of that
+  // operand (`a.plus(b)`); its parameters omit the operand.
+  bool operatorInstance = false;
+  // A bridged class or struct that is Equatable (also through Hashable or
+  // Comparable) or Comparable: JS gets `equals(other)` and
+  // `compare(other)`.
+  bool equatable = false;
+  bool comparable = false;
   // A bridged class or struct conforming to AsyncSequence: its element,
   // which its JS class iterates with `for await` (Symbol.asyncIterator).
   std::optional<BridgedType> asyncElement;

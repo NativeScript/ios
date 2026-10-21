@@ -84,6 +84,9 @@ struct SwiftSurface {
     // `[Symbol.asyncIterator]()`, added to an AsyncSequence type: iterates
     // the value itself.
     bool iteratesSelf = false;
+    // `equals(other)` or `compare(other)`, added to an Equatable or
+    // Comparable type: `==`, or -1, 0 or 1 from `<`.
+    enum Comparison { kNone, kEquals, kCompare } comparison = kNone;
   };
 
   // A tagged enum's cases in registration order, which is the case index

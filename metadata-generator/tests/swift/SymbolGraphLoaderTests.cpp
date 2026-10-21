@@ -217,6 +217,8 @@ TEST(TopLevelDeclarationsInSourceOrder) {
                                        "waitForCancel(_:)",
                                        "Shelf",
                                        "Grid",
+                                       "Vector2",
+                                       "Version",
                                        "describe(_:)",
                                        "makeLabel(_:)",
                                        "tags(_:)",
