@@ -55,4 +55,30 @@ declare module "ns:runtime" {
   export function getConfig<K extends keyof RuntimeConfig | (string & {})>(
     key: K
   ): K extends keyof RuntimeConfig ? RuntimeConfig[K] : unknown;
+
+  /**
+   * Marks `error` to cross the next JS-to-native boundary as a native
+   * exception instead of being reported in JS: `throw escapeException(e)`
+   * inside a native callback reaches the native caller's `@try/@catch`, with
+   * the original `NSException` when `e` carries one. Returns an `Error`
+   * (message and stack copied), so the throw also behaves normally in pure-JS
+   * paths. An already-escaped value is returned unchanged; calling with no
+   * argument throws `TypeError`.
+   */
+  export function escapeException(error: unknown): Error;
+
+  /**
+   * Reports `bytes` of native memory held by `target` (a native object,
+   * pointer, reference, block or function reference) to the garbage
+   * collector, replacing any earlier size; `0` clears it. The charge is
+   * returned when `target` is collected or released. Throws `TypeError` for
+   * any other value and `RangeError` for a byte count outside `0`–`2^34`.
+   */
+  export function setExternalSize(target: object, bytes: number): void;
+
+  /**
+   * The size last reported for `target` through `setExternalSize` or by the
+   * runtime itself, `0` when there is none.
+   */
+  export function getExternalSize(target: unknown): number;
 }
