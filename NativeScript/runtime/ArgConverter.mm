@@ -909,6 +909,12 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
       tns::SetValue(isolate, receiver, wrapper);
       cache->Instances.emplace(target, poValue);
       [target retain];
+      // A wrapper that skips registration is never collected, so charging it
+      // could not pay off.
+      if (!skipGCRegistration) {
+        ExternalMemory::RecordSoleOwnerCandidate(isolate, cache.get(),
+                                                 static_cast<ObjCDataWrapper*>(wrapper), poValue);
+      }
     }
   } else {
     tns::SetValue(isolate, receiver, wrapper);
