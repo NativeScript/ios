@@ -1,5 +1,6 @@
 #include "Interop.h"
 #include <Foundation/Foundation.h>
+#include <atomic>
 #include <sstream>
 #include "ArgConverter.h"
 #include "ArrayAdapter.h"
@@ -338,10 +339,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
   ExecuteWriteValueDebugValidationsIfInDebug(context, typeEncoding, dest, arg);
   ValueCache argHelper(arg);
   if (arg.IsEmpty() || arg->IsNullOrUndefined()) {
-    ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding, true);
-    size_t size = ffiType->size;
-    FFICall::DisposeFFIType(ffiType, typeEncoding);
-    memset(dest, 0, size);
+    memset(dest, 0, FFICall::GetTypeSize(typeEncoding, true));
   } else if (argHelper.isBool()) {
     if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference &&
         isRefTypeEqual(typeEncoding, "NSNumber")) {
@@ -505,11 +503,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
 
       if (wrapper == nullptr &&
           innerType->type == BinaryTypeEncodingType::StructDeclarationReference) {
-        const Meta* meta =
-            ArgConverter::GetMeta(innerType->details.declarationReference.name.valuePtr());
-        tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
-        const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-        const StructInfo& structInfo = FFICall::GetStructInfo(structMeta);
+        const StructInfo& structInfo = FFICall::GetStructInfo(innerType);
         // TODO: How to free this?
         // this is used when you have js obj and wants to pass the data as a struct ponter
         // (MyStruct*) we create a new MyStruct with a snapshot of the jsObject and pass that in but
@@ -541,9 +535,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
           Local<Value> value = referenceWrapper->Value() != nullptr
                                    ? referenceWrapper->Value()->Get(isolate)
                                    : Local<Value>();
-          ffi_type* ffiType = FFICall::GetArgumentType(innerType);
-          data = calloc(1, ffiType->size);
-          FFICall::DisposeFFIType(ffiType, innerType);
+          data = calloc(1, FFICall::GetTypeSize(innerType));
 
           referenceWrapper->SetData(data, true);
           referenceWrapper->SetEncoding(innerType);
@@ -655,31 +647,20 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       } else if (wrapper->Type() == WrapperType::Reference) {
         void* data = Reference::GetWrappedPointer(context, arg, typeEncoding);
         tns::Assert(data != nullptr, isolate);
-        ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding);
-        size_t size = ffiType->size;
-        FFICall::DisposeFFIType(ffiType, typeEncoding);
-        memcpy(dest, data, size);
+        memcpy(dest, data, FFICall::GetTypeSize(typeEncoding));
       } else {
         tns::Assert(false, isolate);
       }
     } else {
       // Create the structure using the struct initializer syntax
-      const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
-      const Meta* meta = ArgConverter::GetMeta(structName);
-      tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
-      const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-      const StructInfo& structInfo = FFICall::GetStructInfo(structMeta);
+      const StructInfo& structInfo = FFICall::GetStructInfo(typeEncoding);
       Interop::InitializeStruct(context, dest, structInfo.Fields(), source);
     }
   } else if (argHelper.isObject() &&
              typeEncoding->type == BinaryTypeEncodingType::AnonymousStructEncoding) {
     BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
     if (wrapper != nullptr && wrapper->Type() == WrapperType::Struct) {
-      size_t fieldsCount = typeEncoding->details.anonymousRecord.fieldsCount;
-      const TypeEncoding* fieldEncoding =
-          typeEncoding->details.anonymousRecord.getFieldsEncodings();
-      const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
-      const StructInfo& structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
+      const StructInfo& structInfo = FFICall::GetStructInfo(typeEncoding);
 
       StructWrapper* structWrapper = static_cast<StructWrapper*>(wrapper);
       void* data = structWrapper->Data();
@@ -688,11 +669,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     } else {
       // Anonymous structs can only be initialized with plain javascript objects
       tns::Assert(wrapper == nullptr, isolate);
-      size_t fieldsCount = typeEncoding->details.anonymousRecord.fieldsCount;
-      const TypeEncoding* fieldEncoding =
-          typeEncoding->details.anonymousRecord.getFieldsEncodings();
-      const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
-      const StructInfo& structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
+      const StructInfo& structInfo = FFICall::GetStructInfo(typeEncoding);
       Interop::InitializeStruct(context, dest, structInfo.Fields(), source);
     }
   } else if (arg->IsFunction() && typeEncoding->type == BinaryTypeEncodingType::ProtocolEncoding) {
@@ -726,16 +703,15 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       Local<v8::Array> array = Interop::ToArray(source.As<Object>());
       Local<Context> context = isolate->GetCurrentContext();
       const TypeEncoding* innerType = typeEncoding->details.constantArray.getInnerType();
-      ffi_type* ffiType = FFICall::GetArgumentType(innerType);
+      size_t elementSize = FFICall::GetTypeSize(innerType);
       uint32_t length = array->Length();
       for (uint32_t i = 0; i < length; i++) {
         Local<Value> element;
         bool success = array->Get(context, i).ToLocal(&element);
         tns::Assert(success, isolate);
-        void* ptr = (uint8_t*)dest + i * ffiType->size;
+        void* ptr = (uint8_t*)dest + i * elementSize;
         Interop::WriteValue(context, innerType, ptr, element);
       }
-      FFICall::DisposeFFIType(ffiType, innerType);
     } else {
       void* data = Reference::GetWrappedPointer(context, arg, typeEncoding);
       Interop::SetValue(dest, data);
@@ -927,27 +903,18 @@ void Interop::InitializeStruct(Local<Context> context, void* destBuffer,
     BinaryTypeEncodingType type = field.Encoding()->type;
 
     if (type == BinaryTypeEncodingType::StructDeclarationReference) {
-      const Meta* meta =
-          ArgConverter::GetMeta(field.Encoding()->details.declarationReference.name.valuePtr());
-      tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
-      const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-      const StructInfo& nestedStructInfo = FFICall::GetStructInfo(structMeta);
+      const StructInfo& nestedStructInfo = FFICall::GetStructInfo(field.Encoding());
       Interop::InitializeStruct(context, destBuffer, nestedStructInfo.Fields(), value, position);
       position += nestedStructInfo.FFIType()->size;
     } else if (type == BinaryTypeEncodingType::AnonymousStructEncoding) {
-      size_t fieldsCount = field.Encoding()->details.anonymousRecord.fieldsCount;
-      const TypeEncoding* fieldEncoding =
-          field.Encoding()->details.anonymousRecord.getFieldsEncodings();
-      const String* fieldNames = field.Encoding()->details.anonymousRecord.getFieldNames();
-      const StructInfo& nestedStructInfo =
-          FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
+      const StructInfo& nestedStructInfo = FFICall::GetStructInfo(field.Encoding());
       ptrdiff_t offset = position + field.Offset();
       uint8_t* dst = (uint8_t*)destBuffer + offset;
       Interop::InitializeStruct(context, dst, nestedStructInfo.Fields(), value, position);
       position += nestedStructInfo.FFIType()->size;
     } else if (type == BinaryTypeEncodingType::ConstantArrayEncoding) {
       const TypeEncoding* innerType = field.Encoding()->details.constantArray.getInnerType();
-      ffi_type* ffiType = FFICall::GetArgumentType(innerType);
+      size_t elementSize = FFICall::GetTypeSize(innerType);
       uint32_t length = field.Encoding()->details.constantArray.size;
       ptrdiff_t offset = position + field.Offset();
 
@@ -963,16 +930,15 @@ void Interop::InitializeStruct(Local<Context> context, void* destBuffer,
           tns::Assert(success, isolate);
           uint8_t* dst = (uint8_t*)destBuffer + offset;
           Interop::WriteValue(context, innerType, dst, element);
-          offset += ffiType->size;
+          offset += elementSize;
         }
       } else {
         void* data = Reference::GetWrappedPointer(context, value, field.Encoding());
         if (data != nullptr) {
           uint8_t* dst = (uint8_t*)destBuffer + offset;
-          memcpy(dst, data, length * ffiType->size);
+          memcpy(dst, data, length * elementSize);
         }
       }
-      FFICall::DisposeFFIType(ffiType, innerType);
     } else if (type == BinaryTypeEncodingType::FunctionPointerEncoding) {
       Interop::WriteValue(context, field.Encoding(), destBuffer, value);
     } else if (type == BinaryTypeEncodingType::PointerEncoding) {
@@ -1061,24 +1027,9 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     return value;
   }
 
-  if (typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
-    const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
-    const Meta* meta = ArgConverter::GetMeta(structName);
-    tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
-
-    void* result = call->ResultBuffer();
-
-    const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-    const StructInfo& structInfo = FFICall::GetStructInfo(structMeta, structName);
-    Local<Value> value = Interop::StructToValue(context, result, structInfo, parentStruct);
-    return value;
-  }
-
-  if (typeEncoding->type == BinaryTypeEncodingType::AnonymousStructEncoding) {
-    size_t fieldsCount = typeEncoding->details.anonymousRecord.fieldsCount;
-    const TypeEncoding* fieldEncoding = typeEncoding->details.anonymousRecord.getFieldsEncodings();
-    const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
-    const StructInfo& structInfo = FFICall::GetStructInfo(fieldsCount, fieldEncoding, fieldNames);
+  if (typeEncoding->type == BinaryTypeEncodingType::StructDeclarationReference ||
+      typeEncoding->type == BinaryTypeEncodingType::AnonymousStructEncoding) {
+    const StructInfo& structInfo = FFICall::GetStructInfo(typeEncoding);
     void* result = call->ResultBuffer();
     Local<Value> value = Interop::StructToValue(context, result, structInfo, parentStruct);
     return value;
@@ -1086,18 +1037,17 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
   if (typeEncoding->type == BinaryTypeEncodingType::ConstantArrayEncoding) {
     const TypeEncoding* innerType = typeEncoding->details.constantArray.getInnerType();
-    ffi_type* innerFFIType = FFICall::GetArgumentType(innerType, isStructMember);
+    size_t elementSize = FFICall::GetTypeSize(innerType, isStructMember);
     int length = typeEncoding->details.constantArray.size;
     Local<v8::Array> array = v8::Array::New(isolate, length);
 
     for (int i = 0; i < length; i++) {
-      size_t offset = i * innerFFIType->size;
+      size_t offset = i * elementSize;
       BaseCall bc((uint8_t*)call->ResultBuffer(), offset);
       Local<Value> element = Interop::GetResult(context, innerType, &bc, false);
       bool success = array->Set(context, i, element).FromMaybe(false);
       tns::Assert(success, isolate);
     }
-    FFICall::DisposeFFIType(innerFFIType, innerType);
     return array;
   }
 
@@ -1590,18 +1540,7 @@ void Interop::SetStructPropertyValue(Local<Context> context, StructWrapper* wrap
   switch (fieldEncoding->type) {
     case BinaryTypeEncodingType::StructDeclarationReference:
     case BinaryTypeEncodingType::AnonymousStructEncoding: {
-      const StructInfo* nestedInfo = nullptr;
-      if (fieldEncoding->type == BinaryTypeEncodingType::StructDeclarationReference) {
-        const Meta* meta =
-            ArgConverter::GetMeta(fieldEncoding->details.declarationReference.name.valuePtr());
-        tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
-        nestedInfo = &FFICall::GetStructInfo(static_cast<const StructMeta*>(meta));
-      } else {
-        nestedInfo =
-            &FFICall::GetStructInfo(fieldEncoding->details.anonymousRecord.fieldsCount,
-                                    fieldEncoding->details.anonymousRecord.getFieldsEncodings(),
-                                    fieldEncoding->details.anonymousRecord.getFieldNames());
-      }
+      const StructInfo* nestedInfo = &FFICall::GetStructInfo(fieldEncoding);
 
       bool isArrayBufferLike = IsArrayBufferLike(value);
       bool isNativeObject =
@@ -1746,23 +1685,35 @@ Local<v8::Array> Interop::ToArray(Local<Object> object) {
   return result;
 }
 
-SEL Interop::GetSwizzledMethodSelector(SEL selector) {
-  static robin_hood::unordered_map<SEL, SEL> swizzledMethodSelectorCache;
-  static SpinMutex p;
-  SpinLock lock(p);
+namespace {
+// Process-wide: a swizzle from any isolate changes the class for all of them.
+std::atomic<bool> anySelectorSwizzled{false};
+SpinMutex swizzledSelectorsMutex;
+robin_hood::unordered_map<SEL, SEL>& SwizzledSelectors() {
+  static auto* selectors = new robin_hood::unordered_map<SEL, SEL>();
+  return *selectors;
+}
+}  // namespace
 
-  auto it = swizzledMethodSelectorCache.find(selector);
-  if (it != swizzledMethodSelectorCache.end()) {
-    return it->second;
+SEL Interop::RegisterSwizzledSelector(SEL selector) {
+  SpinLock lock(swizzledSelectorsMutex);
+  auto it = SwizzledSelectors().find(selector);
+  if (it == SwizzledSelectors().end()) {
+    SEL swizzled =
+        sel_registerName((Constants::SwizzledPrefix + std::string(sel_getName(selector))).c_str());
+    it = SwizzledSelectors().emplace(selector, swizzled).first;
   }
-  SEL swizzledMethodSelector = NULL;
+  anySelectorSwizzled.store(true, std::memory_order_release);
+  return it->second;
+}
 
-  swizzledMethodSelector =
-      sel_registerName((Constants::SwizzledPrefix + std::string(sel_getName(selector))).c_str());
-  // save to cache
-  swizzledMethodSelectorCache.emplace(selector, swizzledMethodSelector);
-
-  return swizzledMethodSelector;
+SEL Interop::GetSwizzledMethodSelector(SEL selector) {
+  if (!anySelectorSwizzled.load(std::memory_order_acquire)) {
+    return nullptr;
+  }
+  SpinLock lock(swizzledSelectorsMutex);
+  auto it = SwizzledSelectors().find(selector);
+  return it != SwizzledSelectors().end() ? it->second : nullptr;
 }
 
 Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
@@ -1804,7 +1755,8 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     SEL selector = methodCall.selector_;
     if (isInstanceMethod) {
       SEL swizzledMethodSelector = Interop::GetSwizzledMethodSelector(selector);
-      if ([methodCall.target_ respondsToSelector:swizzledMethodSelector]) {
+      if (swizzledMethodSelector != nullptr &&
+          [methodCall.target_ respondsToSelector:swizzledMethodSelector]) {
         selector = swizzledMethodSelector;
       }
 
@@ -1829,14 +1781,15 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
   Interop::SetFFIParams(methodCall.context_, methodCall.typeEncoding_, &call, argsCount,
                         initialParameterIndex, methodCall.args_);
 
+  // Zero-initialized: a callee writes *error only on failure, so the
+  // success-path read below must find nil. Garbage here is read through a
+  // __strong pointer -- ARC retains and releases it -- so a stale non-null
+  // value over-releases whatever lives at that address now.
+  void* errorSlot = nullptr;
   void* errorRef = nullptr;
   if (methodCall.provideErrorOutParameter_) {
     void* dest = call.ArgumentBuffer(argsCount);
-    // Zero-initialized: a callee writes *error only on failure, so the
-    // success-path read below must find nil. Garbage here is read through a
-    // __strong pointer -- ARC retains and releases it -- so a stale non-null
-    // value over-releases whatever lives at that address now.
-    errorRef = calloc(1, ffi_type_pointer.size);
+    errorRef = &errorSlot;
     Interop::SetValue(dest, errorRef);
   }
 
@@ -1848,8 +1801,6 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     // reason, and attach the wrapped native object as `nativeException` (mirrors
     // the NSError-out path below). Throw it via NativeScriptException so the JS
     // catch handler receives exactly this object.
-    std::free(errorRef);
-
     Isolate* isolate = v8::Isolate::GetCurrent();
     Local<Context> context = isolate->GetCurrentContext();
 
@@ -1887,7 +1838,6 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
   if (errorRef != nullptr) {
     NSError* __strong* errorPtr = (NSError * __strong*)errorRef;
     NSError* error = errorPtr[0];
-    std::free(errorRef);
     if (error) {
       // Create JS Error with localizedDescription, attach code, domain and nativeException,
       // and throw it into V8 so JS catch handlers receive it (with proper stack).
