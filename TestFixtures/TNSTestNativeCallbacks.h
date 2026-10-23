@@ -73,11 +73,20 @@
 // the block is also enqueued on the main operation queue first.
 + (void)keepBlock:(void (^)(void))block releaseMode:(int)mode;
 
-// Keeps `block` and drops that reference from a global queue after `ms`.
-+ (void)keepBlock:(void (^)(void))block forMilliseconds:(int)ms;
+// Keeps a reference to `block` until one of the releaseKeptBlocks methods
+// drops every reference kept so far. Shared by all isolates.
++ (void)keepBlockUntilReleased:(void (^)(void))block;
 
-// Blocks the calling thread, and with it the current JS turn, for `ms`.
-+ (void)sleepMilliseconds:(int)ms;
+// Drops the kept references on the calling thread and returns how many there
+// were.
++ (int)releaseKeptBlocks;
+
+// Drops the kept references on a global queue and waits up to `ms` until
+// every one of those blocks has started its dispose (libclosure's
+// deallocating flag is set). Returns NO on a timeout or when nothing was kept.
+// The blocks' memory is read until their flags show the dispose, so the
+// caller must hold the lock that dispose waits for: the blocks' isolate.
++ (BOOL)releaseKeptBlocksAwaitingDispose:(int)ms;
 
 // Calls `step` `count` times on the calling thread, each call inside its own
 // autorelease pool, so the runtime's autoreleased copy of a block marshalled
