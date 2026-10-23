@@ -6,6 +6,7 @@
 #include "Caches.h"
 #include "Console.h"
 #include "Helpers.h"
+#include "Interop.h"
 #include "Messaging.h"
 #include "ModuleInternalCallbacks.h"
 #include "Runtime.h"
@@ -48,6 +49,8 @@ struct Registration {
 // requires the `ns:` module it adapts, so the two module objects stay
 // distinct and the standard module never carries compatibility code.
 constexpr Registration kRegistry[] = {
+    {"ns:interop", BuiltinId::kNsInterop, Interop::NsInteropBinding},
+    {"ns:interop/ios", BuiltinId::kNsInteropIos, Interop::NsInteropIosBinding},
     {"ns:module", BuiltinId::kNsModule, NsModuleBinding},
     {"ns:runtime", BuiltinId::kNsRuntime, NsRuntimeBinding},
     {"ns:url", BuiltinId::kNsUrl, NsUrlBinding},
@@ -68,6 +71,28 @@ constexpr Registration kRegistry[] = {
     {"internal/message-event", BuiltinId::kMessageEvent, nullptr, true},
     {"internal/worker-events", BuiltinId::kWorkerEvents, nullptr, true},
 };
+
+// Other spellings of a registered specifier. Every entry point resolves them
+// to the canonical row before touching a cache, so each spelling yields the
+// same exports object and the same ES module (one namespace object).
+struct Alias {
+  const char* specifier;
+  const char* canonical;
+};
+
+constexpr Alias kAliases[] = {
+    {"ns:interop/macos", "ns:interop/ios"},
+    {"ns:interop/visionos", "ns:interop/ios"},
+};
+
+std::string Canonicalize(const std::string& specifier) {
+  for (const Alias& alias : kAliases) {
+    if (specifier == alias.specifier) {
+      return alias.canonical;
+    }
+  }
+  return specifier;
+}
 
 // ns:runtime config keys. Each key defines its value domain and scope here;
 // process-wide keys (see Helpers.h) affect every isolate, so writes are
@@ -202,6 +227,8 @@ MaybeLocal<Object> NsRuntimeBinding(Local<Context> context) {
            .FromMaybe(false)) {
     return MaybeLocal<Object>();
   }
+  Interop::RegisterEscapeExceptionFunction(context, binding);
+  Interop::RegisterExternalSizeFunctions(context, binding);
   return binding;
 }
 
@@ -361,7 +388,7 @@ bool NsBuiltinModules::IsNsScheme(const std::string& specifier) {
 
 bool NsBuiltinModules::IsRegistered(const std::string& specifier,
                                     bool includeInternal) {
-  const Registration* registration = Find(specifier);
+  const Registration* registration = Find(Canonicalize(specifier));
   return registration != nullptr &&
          (includeInternal || !registration->internalOnly);
 }
@@ -371,7 +398,8 @@ std::string NsBuiltinModules::NotFoundMessage(const std::string& specifier) {
 }
 
 MaybeLocal<Object> NsBuiltinModules::GetExports(Local<Context> context,
-                                                const std::string& specifier) {
+                                                const std::string& requested) {
+  const std::string specifier = Canonicalize(requested);
   const Registration* registration = Find(specifier);
   if (registration == nullptr) {
     return MaybeLocal<Object>();
@@ -410,7 +438,8 @@ MaybeLocal<Object> NsBuiltinModules::GetExports(Local<Context> context,
 }
 
 MaybeLocal<Module> NsBuiltinModules::GetModule(Local<Context> context,
-                                               const std::string& specifier) {
+                                               const std::string& requested) {
+  const std::string specifier = Canonicalize(requested);
   // The module system is the app-facing entry point; the internal tier only
   // exists behind the require builtins receive.
   const Registration* registration = Find(specifier);

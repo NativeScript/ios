@@ -132,6 +132,7 @@ require("./ProxyReceiverTests");
 require("./NsRuntimeTests");
 require("./NsWorkerThreadsTests");
 require("./NsUrlTests");
+require("./NsInteropTests");
 require("./GCFinalizerTests");
 require("./BlockCacheRaceTests");
 require("./WorkerConcurrentStartupTests");
