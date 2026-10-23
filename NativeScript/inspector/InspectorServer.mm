@@ -12,14 +12,28 @@ namespace {
 
 std::atomic<uint64_t> gLastConnectionId{0};
 
+// A client this far behind is assumed gone (e.g. a half-open socket whose
+// peer vanished without a FIN): every client receives broadcast events, so
+// its unsent output would otherwise grow without bound. Large enough for a
+// heap snapshot streamed over a slow link.
+constexpr size_t kMaxPendingWriteBytes = 256 * 1024 * 1024;
+
 struct Connection {
   uint64_t id;
   dispatch_queue_t queue;
   dispatch_io_t channel;
+  // Only changes on `queue`.
   std::atomic<bool> open{true};
+  std::atomic<size_t> pendingWriteBytes{0};
   std::function<void(uint64_t)> onDisconnected;
   std::function<void(uint64_t, const std::string&)> onMessage;
 };
+
+// The peer went away or we closed the channel ourselves (ECANCELED: an
+// operation was still queued at close time); routine, not worth a log line.
+bool IsDisconnectError(int error) {
+  return error == ECANCELED || error == ECONNRESET || error == EPIPE;
+}
 
 void CloseConnection(const std::shared_ptr<Connection>& connection) {
   if (!connection->open.exchange(false)) {
@@ -46,7 +60,7 @@ void ReadExactly(std::shared_ptr<Connection> connection, size_t length,
                        return;
                      }
                      if (error != 0 || dispatch_data_get_size(received) < length) {
-                       if (error != 0 && error != ECANCELED) {
+                       if (error != 0 && !IsDisconnectError(error)) {
                          NSLog(@"InspectorServer read error: %s", strerror(error));
                        }
                        CloseConnection(connection);
@@ -70,6 +84,11 @@ void ReadNextMessage(std::shared_ptr<Connection> connection) {
     ReadExactly(connection, length, ^(dispatch_data_t body) {
       NSString* payload = [[NSString alloc] initWithData:(NSData*)body
                                                 encoding:NSUTF16LittleEndianStringEncoding];
+      // A write error may have closed the connection after this read
+      // completed; onMessage must never follow onDisconnected.
+      if (!connection->open.load()) {
+        return;
+      }
       const char* utf8 = [payload UTF8String];
       if (utf8 != nullptr) {
         connection->onMessage(connection->id, utf8);
@@ -99,19 +118,31 @@ void Send(std::shared_ptr<Connection> connection, const std::string& message) {
                range:NSMakeRange(0, str.length)
       remainingRange:NULL];
 
-  dispatch_data_t data =
-      dispatch_data_create(buffer, length + sizeof(uint32_t), connection->queue, ^{
-        free(buffer);
-      });
+  size_t size = length + sizeof(uint32_t);
+  dispatch_data_t data = dispatch_data_create(buffer, size, connection->queue, ^{
+    free(buffer);
+  });
+
+  if (connection->pendingWriteBytes.fetch_add(size) + size > kMaxPendingWriteBytes) {
+    NSLog(@"InspectorServer: closing a client that stopped reading");
+    // Closed on its own queue to keep onDisconnected ordered after onMessage.
+    dispatch_async(connection->queue, ^{
+      CloseConnection(connection);
+    });
+    return;
+  }
 
   dispatch_io_write(connection->channel, 0, data, connection->queue,
                     ^(bool done, dispatch_data_t data, int error) {
-                      // ECANCELED: the write was still queued when the
-                      // connection closed.
-                      if (error == 0 || error == ECANCELED) {
+                      if (done) {
+                        connection->pendingWriteBytes.fetch_sub(size);
+                      }
+                      if (error == 0) {
                         return;
                       }
-                      NSLog(@"InspectorServer::Send error: %s", strerror(error));
+                      if (!IsDisconnectError(error)) {
+                        NSLog(@"InspectorServer::Send error: %s", strerror(error));
+                      }
                       CloseConnection(connection);
                     });
 }
@@ -144,10 +175,6 @@ in_port_t InspectorServer::Init(
     close(serverSocket);
     assert(false);
   }
-
-  // Only touched by the accept handler, which libdispatch never runs
-  // concurrently with itself.
-  __block std::weak_ptr<Connection> activeConnection;
 
   // Set up the dispatch source that will alert us to new incoming connections
   dispatch_queue_t q = dispatch_queue_create("server_queue", DISPATCH_QUEUE_CONCURRENT);
@@ -190,13 +217,8 @@ in_port_t InspectorServer::Init(
         continue;
       }
 
-      // The accept handler is serial, so back-to-back accepts take over in
-      // order and the newest client stays active.
-      std::shared_ptr<Connection> previous = activeConnection.lock();
-      activeConnection = connection;
-      if (previous != nullptr) {
-        CloseConnection(previous);
-      }
+      // Reads start only after this returns, so the client's first message
+      // cannot overtake its own connect.
       onClientConnected(connection->id,
                         [connection](const std::string& message) { Send(connection, message); });
 
