@@ -68,6 +68,9 @@ class DefinitionWriter : Meta::MetaVisitor {
       CompoundMemberMap<Meta::PropertyMeta>* instanceProperties,
       std::unordered_set<Meta::ProtocolMeta*>& visitedProtocols);
 
+  // An initializer's constructor tokens as a TypeScript object type, an
+  // object that may hold no keys for one with none (init).
+  static std::string writeInitializerTokens(Meta::MethodMeta* method);
   static std::string writeConstructor(
       const CompoundMemberMap<Meta::MethodMeta>::value_type& initializer,
       const Meta::BaseClassMeta* owner);

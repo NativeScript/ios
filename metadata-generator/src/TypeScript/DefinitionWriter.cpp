@@ -50,6 +50,37 @@ static std::string getTypeParametersStringOrEmpty(
   return output.str();
 }
 
+// A subclass can declare an initializer it inherits unavailable
+// (NS_UNAVAILABLE), which drops it from that subclass's metadata entirely, so
+// whether the class still answers to it is decided by the declaration nearest
+// to the class.
+static bool isInheritedInitializerUnavailable(const InterfaceMeta* meta,
+                                              const MethodMeta* method) {
+  const auto* interfaceDecl =
+      clang::dyn_cast_or_null<clang::ObjCInterfaceDecl>(meta->declaration);
+  const auto* methodDecl =
+      clang::dyn_cast_or_null<clang::ObjCMethodDecl>(method->declaration);
+  if (interfaceDecl == nullptr || methodDecl == nullptr) {
+    return false;
+  }
+  const clang::ObjCMethodDecl* nearest =
+      interfaceDecl->lookupInstanceMethod(methodDecl->getSelector());
+  if (nearest == nullptr) {
+    return false;
+  }
+  if (nearest->hasAttr<clang::UnavailableAttr>()) {
+    return true;
+  }
+  for (const auto* availability :
+       nearest->specific_attrs<clang::AvailabilityAttr>()) {
+    if (availability->getPlatform()->getName() == "ios" &&
+        availability->getUnavailable()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static std::vector<std::string> getTypeParameterNames(
     const clang::ObjCInterfaceDecl* interfaceDecl) {
   std::vector<std::string> params;
@@ -271,15 +302,65 @@ void DefinitionWriter::visit(InterfaceMeta* meta) {
     _buffer << "\t[Symbol.iterator](): Iterator<any>;" << std::endl;
   }
 
+  // Every initializer the class answers to, inherited ones included: a class
+  // that declares any constructor hides all of its base class's in TypeScript.
+  CompoundMemberMap<MethodMeta> initializers;
   for (auto& methodPair : compoundInstanceMethods) {
     if (methodPair.second.second->getFlags(MethodIsInitializer)) {
-      _buffer << std::endl
-              << _docSet
-                     .getCommentFor(methodPair.second.second,
-                                    methodPair.second.first)
-                     .toString("\t");
-      _buffer << "\t" << writeConstructor(methodPair, meta) << std::endl;
+      initializers.insert(methodPair);
     }
+  }
+  CompoundMemberMap<MethodMeta> inheritedInstanceMethods;
+  getInheritedMembersRecursive(meta, nullptr, &inheritedInstanceMethods,
+                               nullptr, nullptr);
+  for (auto& methodPair : inheritedInstanceMethods) {
+    MethodMeta* method = methodPair.second.second;
+    if (!method->getFlags(MethodIsInitializer) ||
+        initializers.find(methodPair.first) != initializers.end() ||
+        isInheritedInitializerUnavailable(meta, method)) {
+      continue;
+    }
+    initializers.insert(methodPair);
+  }
+
+  // Initializers whose tokens coincide (one with an NSError** out parameter and
+  // one without) are the same overload in TypeScript, so each shape is written
+  // once.
+  std::vector<std::string> initializerTokenTypes;
+  for (auto& methodPair : initializers) {
+    std::string tokenType = writeInitializerTokens(methodPair.second.second);
+    if (std::find(initializerTokenTypes.begin(), initializerTokenTypes.end(),
+                  tokenType) != initializerTokenTypes.end()) {
+      continue;
+    }
+    initializerTokenTypes.push_back(tokenType);
+    _buffer << std::endl
+            << _docSet
+                   .getCommentFor(methodPair.second.second,
+                                  methodPair.second.first)
+                   .toString("\t");
+    _buffer << "\t" << writeConstructor(methodPair, meta) << std::endl;
+  }
+
+  // The form a subclass's super(...) takes: its own options plus
+  // [interop.initializer.args] naming one of the initializers above.
+  std::string initializersTypeName;
+  if (!initializerTokenTypes.empty()) {
+    // Bare names: parametersString may carry constraints, which a reference
+    // can't.
+    std::vector<std::string> typeParameterNames = getTypeParameterNames(
+        clang::cast<clang::ObjCInterfaceDecl>(meta->declaration));
+    std::string typeArguments;
+    for (size_t i = 0; i < typeParameterNames.size(); i++) {
+      typeArguments += (i == 0 ? "<" : ", ") + typeParameterNames[i];
+    }
+    if (!typeArguments.empty()) {
+      typeArguments += ">";
+    }
+    initializersTypeName = metaJsName + ".Initializers" + typeArguments;
+    _buffer << std::endl
+            << "\tconstructor(args: interop.Args<{}, " << initializersTypeName
+            << ">);" << std::endl;
   }
 
   for (auto& methodPair : compoundInstanceMethods) {
@@ -305,6 +386,18 @@ void DefinitionWriter::visit(InterfaceMeta* meta) {
   }
 
   _buffer << "}" << std::endl;
+
+  if (!initializersTypeName.empty()) {
+    _buffer << std::endl
+            << "declare namespace " << metaJsName << " {" << std::endl;
+    _buffer << "\t/** The initializer token objects " << metaJsName
+            << " answers to, for [interop.initializer.args]. */" << std::endl;
+    _buffer << "\ttype Initializers" << parametersString << " = ";
+    for (size_t i = 0; i < initializerTokenTypes.size(); i++) {
+      _buffer << (i > 0 ? " | " : "") << initializerTokenTypes[i];
+    }
+    _buffer << ";" << std::endl << "}" << std::endl;
+  }
 }
 
 void DefinitionWriter::writeProperty(
@@ -528,6 +621,28 @@ void DefinitionWriter::visit(ProtocolMeta* meta) {
   _buffer << "};" << std::endl;
 }
 
+std::string DefinitionWriter::writeInitializerTokens(MethodMeta* method) {
+  if (method->constructorTokens == "") {
+    // Not `{}`: a union holding `{}` skips excess-property checks, so a
+    // misspelled token would type-check.
+    return "Record<string, never>";
+  }
+  std::vector<std::string> ctorTokens;
+  StringUtils::split(method->constructorTokens, ':',
+                     std::back_inserter(ctorTokens));
+  std::ostringstream output;
+  output << "{ ";
+  for (size_t i = 0; i < ctorTokens.size(); i++) {
+    output << ctorTokens[i] << ": ";
+    output << (i + 1 < method->signature.size()
+                   ? tsifyType(*method->signature[i + 1], true)
+                   : "void")
+           << "; ";
+  }
+  output << "}";
+  return output.str();
+}
+
 std::string DefinitionWriter::writeConstructor(
     const CompoundMemberMap<MethodMeta>::value_type& initializer,
     const BaseClassMeta* owner) {
@@ -539,18 +654,7 @@ std::string DefinitionWriter::writeConstructor(
   if (method->constructorTokens == "") {
     output << "constructor();";
   } else {
-    std::vector<std::string> ctorTokens;
-    StringUtils::split(method->constructorTokens, ':',
-                       std::back_inserter(ctorTokens));
-    output << "constructor(o: { ";
-    for (size_t i = 0; i < ctorTokens.size(); i++) {
-      output << ctorTokens[i] << ": ";
-      output << (i + 1 < method->signature.size()
-                     ? tsifyType(*method->signature[i + 1], true)
-                     : "void")
-             << "; ";
-    }
-    output << "});";
+    output << "constructor(o: " << writeInitializerTokens(method) << ");";
   }
 
   BaseClassMeta* initializerOwner = initializer.second.first;
