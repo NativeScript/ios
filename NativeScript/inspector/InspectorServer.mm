@@ -3,11 +3,125 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
+#include <atomic>
+#include <memory>
+
 namespace v8_inspector {
 
+namespace {
+
+std::atomic<uint64_t> gLastConnectionId{0};
+
+struct Connection {
+  uint64_t id;
+  dispatch_queue_t queue;
+  dispatch_io_t channel;
+  std::atomic<bool> open{true};
+  std::function<void(uint64_t)> onDisconnected;
+  std::function<void(uint64_t, const std::string&)> onMessage;
+};
+
+void CloseConnection(const std::shared_ptr<Connection>& connection) {
+  if (!connection->open.exchange(false)) {
+    return;
+  }
+  dispatch_io_close(connection->channel, DISPATCH_IO_STOP);
+  connection->onDisconnected(connection->id);
+}
+
+// The functions below take the connection by value: a block captures a C++
+// reference as a reference, which would dangle once the caller returns.
+
+// Calls onComplete with exactly `length` bytes, or closes the connection if
+// the peer goes away (or errors) first.
+void ReadExactly(std::shared_ptr<Connection> connection, size_t length,
+                 void (^onComplete)(dispatch_data_t data)) {
+  __block dispatch_data_t received = dispatch_data_empty;
+  dispatch_io_read(connection->channel, 0, length, connection->queue,
+                   ^(bool done, dispatch_data_t data, int error) {
+                     if (data != nullptr && dispatch_data_get_size(data) > 0) {
+                       received = dispatch_data_create_concat(received, data);
+                     }
+                     if (!done) {
+                       return;
+                     }
+                     if (error != 0 || dispatch_data_get_size(received) < length) {
+                       if (error != 0 && error != ECANCELED) {
+                         NSLog(@"InspectorServer read error: %s", strerror(error));
+                       }
+                       CloseConnection(connection);
+                       return;
+                     }
+                     onComplete(received);
+                   });
+}
+
+// Messages are a big-endian uint32 byte length followed by UTF-16LE text.
+void ReadNextMessage(std::shared_ptr<Connection> connection) {
+  ReadExactly(connection, sizeof(uint32_t), ^(dispatch_data_t header) {
+    uint32_t length = 0;
+    [(NSData*)header getBytes:&length length:sizeof(length)];
+    length = ntohl(length);
+    if (length == 0) {
+      CloseConnection(connection);
+      return;
+    }
+
+    ReadExactly(connection, length, ^(dispatch_data_t body) {
+      NSString* payload = [[NSString alloc] initWithData:(NSData*)body
+                                                encoding:NSUTF16LittleEndianStringEncoding];
+      const char* utf8 = [payload UTF8String];
+      if (utf8 != nullptr) {
+        connection->onMessage(connection->id, utf8);
+      }
+      ReadNextMessage(connection);
+    });
+  });
+}
+
+void Send(std::shared_ptr<Connection> connection, const std::string& message) {
+  if (!connection->open.load()) {
+    return;
+  }
+
+  NSString* str = [NSString stringWithUTF8String:message.c_str()];
+  NSUInteger length = [str lengthOfBytesUsingEncoding:NSUTF16LittleEndianStringEncoding];
+
+  uint8_t* buffer = (uint8_t*)malloc(length + sizeof(uint32_t));
+
+  *(uint32_t*)buffer = htonl(length);
+
+  [str getBytes:&buffer[sizeof(uint32_t)]
+           maxLength:length
+          usedLength:NULL
+            encoding:NSUTF16LittleEndianStringEncoding
+             options:0
+               range:NSMakeRange(0, str.length)
+      remainingRange:NULL];
+
+  dispatch_data_t data =
+      dispatch_data_create(buffer, length + sizeof(uint32_t), connection->queue, ^{
+        free(buffer);
+      });
+
+  dispatch_io_write(connection->channel, 0, data, connection->queue,
+                    ^(bool done, dispatch_data_t data, int error) {
+                      // ECANCELED: the write was still queued when the
+                      // connection closed.
+                      if (error == 0 || error == ECANCELED) {
+                        return;
+                      }
+                      NSLog(@"InspectorServer::Send error: %s", strerror(error));
+                      CloseConnection(connection);
+                    });
+}
+
+}  // namespace
+
 in_port_t InspectorServer::Init(
-    std::function<void(std::function<void(const std::string&)>)> onClientConnected,
-    std::function<void(const std::string&)> onMessage) {
+    std::function<void(uint64_t connectionId, Sender sender)> onClientConnected,
+    std::function<void(uint64_t connectionId)> onClientDisconnected,
+    std::function<void(uint64_t connectionId, const std::string&)> onMessage) {
   in_port_t listenPort = 18183;
 
   int serverSocket = -1;
@@ -31,6 +145,10 @@ in_port_t InspectorServer::Init(
     assert(false);
   }
 
+  // Only touched by the accept handler, which libdispatch never runs
+  // concurrently with itself.
+  __block std::weak_ptr<Connection> activeConnection;
+
   // Set up the dispatch source that will alert us to new incoming connections
   dispatch_queue_t q = dispatch_queue_create("server_queue", DISPATCH_QUEUE_CONCURRENT);
   dispatch_source_t acceptSource =
@@ -43,68 +161,48 @@ in_port_t InspectorServer::Init(
       unsigned int clntLen = sizeof(echoClntAddr);
 
       // Wait for a client to connect
-      if ((clientSocket = accept(serverSocket, (struct sockaddr*)&echoClntAddr, &clntLen)) >= 0) {
-        dispatch_io_t channel =
-            dispatch_io_create(DISPATCH_IO_STREAM, clientSocket, q, ^(int error) {
-              if (error) {
-                NSLog(@"InspectorServer channel cleanup error: %s", strerror(error));
-              }
-              close(clientSocket);
-            });
-
-        onClientConnected([channel, q](std::string message) { Send(channel, q, message); });
-
-        __block dispatch_io_handler_t receiver = ^(bool done, dispatch_data_t data, int error) {
-          if (error) {
-            NSLog(@"InspectorServer read message header error: %s", strerror(error));
-          }
-
-          const void* bytes = [(NSData*)data bytes];
-          if (!bytes) {
-            dispatch_io_close(channel, DISPATCH_IO_STOP);
-            return;
-          }
-
-          uint32_t length = ntohl(*(uint32_t*)bytes);
-
-          // Configure the channel...
-          dispatch_io_set_low_water(channel, length);
-
-          // Setup read handler
-          dispatch_io_read(channel, 0, length, q, ^(bool done, dispatch_data_t data, int error) {
-            BOOL close = NO;
-            if (error) {
-              NSLog(@"InspectorServer read message body error: %s", strerror(error));
-              close = YES;
-            }
-
-            const size_t size = data ? dispatch_data_get_size(data) : 0;
-            if (size) {
-              NSString* payload = [[NSString alloc] initWithData:(NSData*)data
-                                                        encoding:NSUTF16LittleEndianStringEncoding];
-
-              onMessage([payload UTF8String]);
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-retain-cycles"
-              dispatch_io_read(channel, 0, 4, q, receiver);
-#pragma clang diagnostic pop
-            } else {
-              close = YES;
-            }
-
-            if (close) {
-              dispatch_io_close(channel, DISPATCH_IO_STOP);
-            }
-          });
-        };
-
-        if (channel) {
-          dispatch_io_read(channel, 0, 4, q, receiver);
-        }
-      } else {
+      if ((clientSocket = accept(serverSocket, (struct sockaddr*)&echoClntAddr, &clntLen)) < 0) {
         NSLog(@"InspectorServer accept() failed");
+        continue;
       }
+
+      // A write racing the peer's close must fail with EPIPE, not kill the app.
+      int noSigPipe = 1;
+      setsockopt(clientSocket, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, sizeof(noSigPipe));
+
+      auto connection = std::make_shared<Connection>();
+      connection->id = ++gLastConnectionId;
+      // Serial, so the read handlers that assemble one message never overlap.
+      connection->queue =
+          dispatch_queue_create("NativeScript.v8.inspector.connection", DISPATCH_QUEUE_SERIAL);
+      connection->onDisconnected = onClientDisconnected;
+      connection->onMessage = onMessage;
+      connection->channel =
+          dispatch_io_create(DISPATCH_IO_STREAM, clientSocket, connection->queue, ^(int error) {
+            if (error) {
+              NSLog(@"InspectorServer channel cleanup error: %s", strerror(error));
+            }
+            close(clientSocket);
+          });
+
+      if (connection->channel == nullptr) {
+        close(clientSocket);
+        continue;
+      }
+
+      // The accept handler is serial, so back-to-back accepts take over in
+      // order and the newest client stays active.
+      std::shared_ptr<Connection> previous = activeConnection.lock();
+      activeConnection = connection;
+      if (previous != nullptr) {
+        CloseConnection(previous);
+      }
+      onClientConnected(connection->id,
+                        [connection](const std::string& message) { Send(connection, message); });
+
+      dispatch_async(connection->queue, ^{
+        ReadNextMessage(connection);
+      });
     }
   });
 
@@ -119,34 +217,6 @@ in_port_t InspectorServer::Init(
   }
 
   return listenPort;
-}
-
-void InspectorServer::Send(dispatch_io_t channel, dispatch_queue_t queue,
-                           const std::string& message) {
-  NSString* str = [NSString stringWithUTF8String:message.c_str()];
-  NSUInteger length = [str lengthOfBytesUsingEncoding:NSUTF16LittleEndianStringEncoding];
-
-  uint8_t* buffer = (uint8_t*)malloc(length + sizeof(uint32_t));
-
-  *(uint32_t*)buffer = htonl(length);
-
-  [str getBytes:&buffer[sizeof(uint32_t)]
-           maxLength:length
-          usedLength:NULL
-            encoding:NSUTF16LittleEndianStringEncoding
-             options:0
-               range:NSMakeRange(0, str.length)
-      remainingRange:NULL];
-
-  dispatch_data_t data = dispatch_data_create(buffer, length + sizeof(uint32_t), queue, ^{
-    free(buffer);
-  });
-
-  dispatch_io_write(channel, 0, data, queue, ^(bool done, dispatch_data_t data, int error) {
-    if (error) {
-      NSLog(@"InspectorServer::Send error: %s", strerror(error));
-    }
-  });
 }
 
 }  // namespace v8_inspector
