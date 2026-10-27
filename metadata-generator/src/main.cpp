@@ -1,3 +1,15 @@
+#include <clang/Frontend/CompilerInstance.h>
+#include <clang/Tooling/Tooling.h>
+#include <llvm/Support/CommandLine.h>
+#include <llvm/Support/Debug.h>
+#include <llvm/Support/JSON.h>
+#include <llvm/Support/Path.h>
+#include <pwd.h>
+
+#include <fstream>
+#include <sstream>
+#include <string>
+
 #include "Binary/binarySerializer.h"
 #include "HeadersParser/Parser.h"
 #include "Meta/DeclarationConverterVisitor.h"
@@ -7,16 +19,16 @@
 #include "Meta/Filters/ModulesBlacklist.h"
 #include "Meta/Filters/RemoveDuplicateMembersFilter.h"
 #include "Meta/Filters/ResolveGlobalNamesCollisionsFilter.h"
+#include "Swift/CapabilityClassifier.h"
+#include "Swift/CoverageReport.h"
+#include "Swift/ProbeEmitter.h"
+#include "Swift/ProbeVerifier.h"
+#include "Swift/SymbolGraphLoader.h"
+#include "Swift/ThunkEmitter.h"
 #include "TypeScript/DefinitionWriter.h"
 #include "TypeScript/DocSetManager.h"
+#include "TypeScript/SwiftDefinitionWriter.h"
 #include "Yaml/YamlSerializer.h"
-#include <clang/Frontend/CompilerInstance.h>
-#include <clang/Tooling/Tooling.h>
-#include <fstream>
-#include <llvm/Support/Debug.h>
-#include <llvm/Support/Path.h>
-#include <pwd.h>
-#include <sstream>
 
 // Command line parameters
 llvm::cl::opt<bool>   cla_verbose("verbose", llvm::cl::desc("Set verbose output mode"), llvm::cl::value_desc("bool"));
@@ -33,6 +45,64 @@ llvm::cl::opt<string> cla_whiteListModuleRegexesFile("whitelist-modules-file", l
 llvm::cl::opt<bool>   cla_applyManualDtsChanges("apply-manual-dts-changes", llvm::cl::desc("Specify whether to disable manual adjustments to generated .d.ts files for specific erroneous cases in the iOS SDK"), llvm::cl::init(true));
 llvm::cl::opt<string> cla_clangArgumentsDelimiter(llvm::cl::Positional, llvm::cl::desc("Xclang"), llvm::cl::init("-"));
 llvm::cl::list<string> cla_clangArguments(llvm::cl::ConsumeAfter, llvm::cl::desc("<clang arguments>..."));
+
+// Swift support
+llvm::cl::opt<string> cla_swiftSymbolGraphDir("swift-symbolgraph-dir", llvm::cl::desc("Directory containing Swift .symbolgraph files to import"), llvm::cl::value_desc("<dir_path>"));
+llvm::cl::opt<bool>   cla_skipObjC("skip-objc", llvm::cl::desc("Skip Objective-C parsing and only run Swift symbolgraph import"), llvm::cl::init(false));
+llvm::cl::opt<string> cla_swiftIROutputDir(
+    "swift-ir-output",
+    llvm::cl::desc("Directory to write the Swift IR (<Module>.swift-ir.json) "
+                   "for each imported module"),
+    llvm::cl::value_desc("<dir_path>"));
+llvm::cl::opt<string> cla_swiftDeploymentTarget(
+    "swift-deployment-target",
+    llvm::cl::desc("Deployment target (e.g. 15.0) for Swift availability "
+                   "decisions; defaults to the minimum version recorded in "
+                   "the symbol graphs"),
+    llvm::cl::value_desc("<version>"));
+llvm::cl::opt<bool> cla_swiftVerify(
+    "swift-verify",
+    llvm::cl::desc("Type-check the Swift-generated surface with the Swift "
+                   "compiler and demote every declaration it rejects"),
+    llvm::cl::init(false));
+llvm::cl::opt<string> cla_swiftCompiler(
+    "swift-compiler",
+    llvm::cl::desc("Swift compiler command for --swift-verify"),
+    llvm::cl::init("xcrun swiftc"));
+llvm::cl::opt<string> cla_swiftSDK(
+    "swift-sdk", llvm::cl::desc("SDK path for --swift-verify"),
+    llvm::cl::value_desc("<path>"));
+llvm::cl::opt<string> cla_swiftTarget(
+    "swift-target", llvm::cl::desc("Target triple for --swift-verify"),
+    llvm::cl::value_desc("<triple>"));
+llvm::cl::list<string> cla_swiftSearchPaths(
+    "swift-search-path",
+    llvm::cl::desc("Module search path (-I) for --swift-verify"),
+    llvm::cl::value_desc("<dir_path>"));
+llvm::cl::list<string> cla_swiftFrameworkSearchPaths(
+    "swift-framework-search-path",
+    llvm::cl::desc("Framework search path (-F) for --swift-verify"),
+    llvm::cl::value_desc("<dir_path>"));
+llvm::cl::opt<string> cla_swiftWorkDir(
+    "swift-work-dir",
+    llvm::cl::desc("Scratch directory for --swift-verify (default: a "
+                   "temporary directory)"),
+    llvm::cl::value_desc("<dir_path>"));
+llvm::cl::opt<string> cla_swiftThunkOutputDir(
+    "swift-thunk-output",
+    llvm::cl::desc("Directory to write Swift interop thunks "
+                   "(<Module>+NativeScript.swift)"),
+    llvm::cl::value_desc("<dir_path>"));
+llvm::cl::opt<string> cla_swiftCoverageOutputDir(
+    "swift-coverage-output",
+    llvm::cl::desc("Directory to write Swift coverage reports "
+                   "(<Module>.coverage.json)"),
+    llvm::cl::value_desc("<dir_path>"));
+llvm::cl::opt<string> cla_swiftProbeOutputDir(
+    "swift-probe-output",
+    llvm::cl::desc("Directory to write compiler-validation probes "
+                   "(<Module>.probe.swift and <Module>.probe-map.json)"),
+    llvm::cl::value_desc("<dir_path>"));
 
 class MetaGenerationConsumer : public clang::ASTConsumer {
 public:
@@ -102,7 +172,7 @@ public:
             file.save(cla_outputBinFile);
         }
 
-        // Generate TypeScript definitions
+    // Generate TypeScript definitions (Objective-C)
         if (!cla_outputDtsFolder.empty()) {
             llvm::sys::fs::create_directories(cla_outputDtsFolder);
             std::string docSetPath = cla_docSetFile.empty() ? "" : cla_docSetFile.getValue();
@@ -183,60 +253,211 @@ int main(int argc, const char** argv)
 
         TypeScript::DefinitionWriter::applyManualChanges = cla_applyManualDtsChanges;
 
-        std::vector<std::string> clangArgs{
-            "-v",
-            "-x", "objective-c",
-            "-fno-objc-arc", "-fmodule-maps", "-ferror-limit=0",
-            "-Wno-unknown-pragmas", "-Wno-ignored-attributes", "-Wno-nullability-completeness", "-Wno-expansion-to-defined",
-            "-D__NATIVESCRIPT_METADATA_GENERATOR=1"
-        };
+        if (!cla_skipObjC) {
+            std::vector<std::string> clangArgs{
+                "-v",
+                "-x", "objective-c",
+                "-fno-objc-arc", "-fmodule-maps", "-ferror-limit=0",
+                "-Wno-unknown-pragmas", "-Wno-ignored-attributes", "-Wno-nullability-completeness", "-Wno-expansion-to-defined",
+                "-D__NATIVESCRIPT_METADATA_GENERATOR=1"
+            };
 
-        // merge with hardcoded clang arguments
-        clangArgs.insert(clangArgs.end(), cla_clangArguments.begin(), cla_clangArguments.end());
+            // merge with hardcoded clang arguments
+            clangArgs.insert(clangArgs.end(), cla_clangArguments.begin(), cla_clangArguments.end());
 
-        // Log Clang Arguments
-        std::cout << "Clang Arguments: \n";
-        for (const std::string& arg : clangArgs) {
-            std::cout << "\"" << arg << "\","
-                      << " ";
-        }
-        std::cout << std::endl;
-
-        std::string isysroot;
-        std::vector<string>::const_iterator it = std::find(clangArgs.begin(), clangArgs.end(), "-isysroot");
-        if (it != clangArgs.end() && ++it != clangArgs.end()) {
-            isysroot = *it;
-        }
-
-        std::vector<std::string> includePaths;
-        std::string umbrellaContent = CreateUmbrellaHeader(clangArgs, includePaths);
-
-        if (!cla_inputUmbrellaHeaderFile.empty()) {
-            std::ifstream fs(cla_inputUmbrellaHeaderFile);
-            umbrellaContent = std::string((std::istreambuf_iterator<char>(fs)),
-                                          std::istreambuf_iterator<char>());
-        }
-
-        clangArgs.insert(clangArgs.end(), includePaths.begin(), includePaths.end());
-
-        // Save the umbrella file
-        if (!cla_outputUmbrellaHeaderFile.empty()) {
-            std::error_code errorCode;
-            llvm::raw_fd_ostream umbrellaFileStream(cla_outputUmbrellaHeaderFile, errorCode, llvm::sys::fs::OpenFlags::OF_None);
-            if (!errorCode) {
-                umbrellaFileStream << umbrellaContent;
-                umbrellaFileStream.close();
+            // Log Clang Arguments
+            std::cout << "Clang Arguments: \n";
+            for (const std::string& arg : clangArgs) {
+                std::cout << "\"" << arg << "\"," << " ";
             }
+            std::cout << std::endl;
+
+            std::string isysroot;
+            std::vector<string>::const_iterator it = std::find(clangArgs.begin(), clangArgs.end(), "-isysroot");
+            if (it != clangArgs.end() && ++it != clangArgs.end()) {
+                isysroot = *it;
+            }
+
+            std::vector<std::string> includePaths;
+            std::string umbrellaContent = CreateUmbrellaHeader(clangArgs, includePaths);
+
+            if (!cla_inputUmbrellaHeaderFile.empty()) {
+                std::ifstream fs(cla_inputUmbrellaHeaderFile);
+                umbrellaContent = std::string((std::istreambuf_iterator<char>(fs)), std::istreambuf_iterator<char>());
+            }
+
+            clangArgs.insert(clangArgs.end(), includePaths.begin(), includePaths.end());
+
+            // Save the umbrella file
+            if (!cla_outputUmbrellaHeaderFile.empty()) {
+                std::error_code errorCode;
+                llvm::raw_fd_ostream umbrellaFileStream(cla_outputUmbrellaHeaderFile, errorCode, llvm::sys::fs::OpenFlags::OF_None);
+                if (!errorCode) {
+                    umbrellaFileStream << umbrellaContent;
+                    umbrellaFileStream.close();
+                }
+            }
+            // generate metadata for the intermediate sdk header
+            Meta::ModulesBlacklist modulesBlacklist(cla_whiteListModuleRegexesFile, cla_blackListModuleRegexesFile);
+            clang::tooling::runToolOnCodeWithArgs(std::unique_ptr<MetaGenerationFrontendAction>(new MetaGenerationFrontendAction(/*r*/modulesBlacklist)), umbrellaContent, clangArgs, "umbrella.h", "objc-metadata-generator");
         }
-        // generate metadata for the intermediate sdk header
-        Meta::ModulesBlacklist modulesBlacklist(cla_whiteListModuleRegexesFile, cla_blackListModuleRegexesFile);
-        clang::tooling::runToolOnCodeWithArgs(std::unique_ptr<MetaGenerationFrontendAction>(new MetaGenerationFrontendAction(/*r*/modulesBlacklist)), umbrellaContent, clangArgs, "umbrella.h", "objc-metadata-generator");
+
+        // Swift: read symbol graphs and emit TS
+        bool swiftFailed = false;
+        if (!cla_swiftSymbolGraphDir.empty()) {
+          Swift::ModuleSet swiftModules =
+              Swift::loadSymbolGraphDirectory(cla_swiftSymbolGraphDir);
+          for (const auto& diagnostic : swiftModules.diagnostics) {
+            std::cerr << (diagnostic.severity == Swift::Severity::Error
+                              ? "error"
+                              : "warning")
+                      << ": swift [" << diagnostic.code << "] "
+                      << diagnostic.file;
+            if (!diagnostic.symbolId.empty()) {
+              std::cerr << " (" << diagnostic.symbolId << ")";
+            }
+            std::cerr << ": " << diagnostic.message << std::endl;
+          }
+          swiftFailed = swiftModules.hasErrors();
+
+          auto writeFile = [](llvm::StringRef folder, llvm::StringRef fileName,
+                              const std::string& content) {
+            llvm::sys::fs::create_directories(folder);
+            llvm::SmallString<128> path;
+            llvm::sys::path::append(path, folder, fileName);
+            std::error_code error;
+            llvm::raw_fd_ostream file(path.str(), error,
+                                      llvm::sys::fs::OF_Text);
+            if (error) {
+              std::cerr << "error: " << path.str().str() << ": "
+                        << error.message() << std::endl;
+              return false;
+            }
+            file << content;
+            return true;
+          };
+
+          if (!cla_swiftDeploymentTarget.empty()) {
+            Swift::Version target;
+            llvm::StringRef rest = cla_swiftDeploymentTarget.getValue();
+            auto major = rest.split('.');
+            auto minor = major.second.split('.');
+            if (major.first.getAsInteger(10, target.major) ||
+                (!minor.first.empty() &&
+                 minor.first.getAsInteger(10, target.minor)) ||
+                (!minor.second.empty() &&
+                 minor.second.getAsInteger(10, target.patch))) {
+              std::cerr << "error: invalid --swift-deployment-target '"
+                        << cla_swiftDeploymentTarget << "'" << std::endl;
+              return 1;
+            }
+            for (auto& entry : swiftModules.modules) {
+              entry.second.platform.minimumVersion = target;
+            }
+          }
+
+          for (const auto& entry : swiftModules.modules) {
+            const Swift::Module& module = entry.second;
+            if (!cla_swiftIROutputDir.empty()) {
+              swiftFailed |= !writeFile(cla_swiftIROutputDir,
+                                        module.name + ".swift-ir.json",
+                                        Swift::dumpModuleJSON(module));
+            }
+            if (cla_outputDtsFolder.empty() &&
+                cla_swiftCoverageOutputDir.empty() &&
+                cla_swiftProbeOutputDir.empty() &&
+                cla_swiftThunkOutputDir.empty()) {
+              continue;
+            }
+            Swift::Classification classification;
+            int compilerRuns = -1;
+            if (cla_swiftVerify) {
+              Swift::VerifyOptions options;
+              options.compiler.clear();
+              llvm::SmallVector<llvm::StringRef, 4> words;
+              llvm::StringRef(cla_swiftCompiler).split(words, ' ', -1, false);
+              for (auto word : words) {
+                options.compiler.push_back(word.str());
+              }
+              options.sdk = cla_swiftSDK;
+              options.target = cla_swiftTarget;
+              options.searchPaths.assign(cla_swiftSearchPaths.begin(),
+                                         cla_swiftSearchPaths.end());
+              options.frameworkSearchPaths.assign(
+                  cla_swiftFrameworkSearchPaths.begin(),
+                  cla_swiftFrameworkSearchPaths.end());
+              options.workDirectory = cla_swiftWorkDir;
+              if (options.workDirectory.empty()) {
+                llvm::SmallString<128> temporary;
+                llvm::sys::fs::createUniqueDirectory("ns-swift-verify",
+                                                     temporary);
+                options.workDirectory = temporary.str().str();
+              }
+              Swift::VerifyResult verified =
+                  Swift::verifyWithCompiler(module, options);
+              if (!verified.failure.empty()) {
+                std::cerr << "error: swift [verification-failed] "
+                          << module.name << ": " << verified.failure
+                          << std::endl;
+                swiftFailed = true;
+                continue;
+              }
+              for (const auto& rejection : verified.rejections) {
+                std::cerr << "warning: swift [compiler-rejected] "
+                          << module.name << " (" << rejection.first
+                          << "): " << rejection.second << std::endl;
+              }
+              classification = std::move(verified.classification);
+              compilerRuns = verified.compilerRuns;
+            } else {
+              classification = Swift::classify(module);
+            }
+            if (!cla_outputDtsFolder.empty()) {
+              TypeScript::SwiftDefinitionWriter swiftWriter(module,
+                                                            classification);
+              swiftFailed |= !writeFile(cla_outputDtsFolder,
+                                        "swift!" + module.name + ".d.ts",
+                                        swiftWriter.write());
+            }
+            if (!cla_swiftCoverageOutputDir.empty()) {
+              swiftFailed |= !writeFile(
+                  cla_swiftCoverageOutputDir, module.name + ".coverage.json",
+                  Swift::coverageJSON(module, classification, compilerRuns));
+            }
+            if (!cla_swiftThunkOutputDir.empty()) {
+              Swift::ThunkSource thunks =
+                  Swift::emitThunks(module, classification);
+              swiftFailed |= !writeFile(cla_swiftThunkOutputDir,
+                                        module.name + "+NativeScript.swift",
+                                        thunks.source);
+            }
+            if (!cla_swiftProbeOutputDir.empty()) {
+              Swift::ProbeSource probes =
+                  Swift::emitProbes(module, classification);
+              std::string map;
+              llvm::raw_string_ostream mapStream(map);
+              llvm::json::OStream mapJSON(mapStream, 2);
+              mapJSON.object([&] {
+                for (const auto& line : probes.lineToSymbol) {
+                  mapJSON.attribute(std::to_string(line.first), line.second);
+                }
+              });
+              mapStream << "\n";
+              mapStream.flush();
+              swiftFailed |=
+                  !writeFile(cla_swiftProbeOutputDir,
+                             module.name + ".probe.swift", probes.source);
+              swiftFailed |= !writeFile(cla_swiftProbeOutputDir,
+                                        module.name + ".probe-map.json", map);
+            }
+          }
+        }
 
         std::clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         std::cout << "Done! Running time: " << elapsed_secs << " sec " << std::endl;
 
-        return 0;
+        return swiftFailed ? 1 : 0;
     } catch (const std::exception& e) {
         std::cerr << "error: " << e.what() << std::endl;
         return 1;
