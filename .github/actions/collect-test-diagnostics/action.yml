@@ -14,6 +14,11 @@ inputs:
       Name of the uploaded artifact. Artifact names are unique per workflow
       run, so jobs that can both fail in one run need distinct names.
     default: test-diagnostics
+  host-process-log:
+    description: >
+      "true" when the app ran on the host (Mac Catalyst): also save the host's
+      unified log for TestRunner processes.
+    default: "false"
 runs:
   using: composite
   steps:
@@ -44,6 +49,17 @@ runs:
           kill "$KILLER_PID" 2>/dev/null || true
         else
           echo "No booted simulator; relying on the xcresult's captured app output."
+        fi
+        if [ "${{ inputs.host-process-log }}" = "true" ]; then
+          echo "Collecting host unified log slice"
+          log show --style compact --last 45m \
+            --predicate 'process CONTAINS "TestRunner"' \
+            > "$DIAG/host-unified.log" 2>/dev/null &
+          LOG_PID=$!
+          ( sleep 120 && kill -9 "$LOG_PID" ) 2>/dev/null &
+          KILLER_PID=$!
+          wait "$LOG_PID" || echo "log show failed or was killed after 120s"
+          kill "$KILLER_PID" 2>/dev/null || true
         fi
         echo "Collected diagnostics:"
         du -sh "$DIAG"/* 2>/dev/null || true
