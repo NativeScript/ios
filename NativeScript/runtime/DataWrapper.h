@@ -416,8 +416,26 @@ class ObjCDataWrapper : public BaseDataWrapper {
   // anything keyed on the raw pointer needs this to detect a recycled slot.
   Class Klass() { return this->klass_; }
 
+  // Retains on Data() held by interop.bufferFromData buffers. Those buffers
+  // are JS's as much as the wrapper is, so ExternalMemory does not count them
+  // as native owners. Each buffer's deleter decrements the count from
+  // whichever thread frees it, possibly after this wrapper is gone, hence the
+  // shared counter.
+  std::shared_ptr<std::atomic<uint32_t>> BufferRetains() {
+    if (this->bufferRetains_ == nullptr) {
+      this->bufferRetains_ = std::make_shared<std::atomic<uint32_t>>(0);
+    }
+    return this->bufferRetains_;
+  }
+  uint32_t BufferRetainCount() const {
+    return this->bufferRetains_ != nullptr
+               ? this->bufferRetains_->load(std::memory_order_acquire)
+               : 0;
+  }
+
  private:
   bool adapterClaim_ = false;
+  std::shared_ptr<std::atomic<uint32_t>> bufferRetains_;
   id data_;
   const tns::TypeEncoding* typeEncoding_;
   Class klass_;
