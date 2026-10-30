@@ -4,13 +4,16 @@
 #include <dispatch/dispatch.h>
 #include <netinet/in.h>
 
-#include <atomic>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
+#include <queue>
+#include <set>
 #include <string>
 #include <vector>
 
+#include "InspectorSessions.h"
 #include "include/v8-inspector.h"
 #include "ns-v8-tracing-agent-impl.h"
 #include "runtime/Runtime.h"
@@ -20,30 +23,31 @@ namespace v8_inspector {
 
 class WorkerInspectorClient;
 
-class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
+// Debugs the main isolate and routes worker sessions. Any number of frontends
+// may be connected; each gets its own V8 session on the main isolate and on
+// every worker, and only sees replies to its own commands. Pauses are shared,
+// as in Chrome: every frontend with the debugger enabled sees them, and any
+// of them can resume. Isolate-wide V8 state is shared too: heap object
+// tracking and sampling (any frontend's HeapProfiler.disable, or its
+// disconnect, stops them for all) and the pause-on-exceptions setting (last
+// writer wins).
+class JsV8InspectorClient : V8InspectorClient {
  public:
   JsV8InspectorClient(tns::Runtime* runtime);
   void init();
   void connect(int argc, char** argv);
-  void dispatchMessage(const std::string& message);
 
   // The single instance debugging the main isolate (created when IsDebug);
   // also acts as the router for worker sessions. Null in release builds.
   static JsV8InspectorClient* GetInstance();
 
-  // Thread-safe write to the connected frontend (no-op when disconnected).
-  void SendToFrontend(const std::string& message);
+  // Thread-safe write to one frontend; dropped once it has disconnected.
+  void SendToConnection(uint64_t connectionId, const std::string& message);
 
-  // As SendToFrontend, but skips the source map rewrite (and the full-message
-  // scan and copy it costs) for payloads that cannot contain a sourceMapURL.
-  void SendRawToFrontend(const std::string& message);
-
-  // Bumped, atomically with the sender swap, whenever a frontend goes away
-  // or is replaced. A worker session records it when created, reset or
-  // registered; output it sends with a stale generation belongs to a
-  // departed frontend and is dropped instead of reaching the next one.
-  uint64_t FrontendGeneration();
-  void SendWorkerOutput(uint64_t generation, const std::string& message);
+  // As SendToConnection, but skips the source map rewrite (and the
+  // full-message scan and copy it costs) for payloads that cannot contain a
+  // sourceMapURL.
+  void SendRawToConnection(uint64_t connectionId, const std::string& message);
 
   // Worker targets (Chrome DevTools Target domain, flat-session mode).
   // Register/Unregister are called on the worker's own thread.
@@ -51,11 +55,6 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   void UnregisterWorkerTarget(int workerId);
   // Called on a worker thread by the Debugger.pause interrupt.
   void SchedulePauseInWorker(int workerId);
-
-  // Overrides of V8Inspector::Channel
-  void sendResponse(int callId, std::unique_ptr<StringBuffer> message) override;
-  void sendNotification(std::unique_ptr<StringBuffer> message) override;
-  void flushProtocolNotifications() override;
 
   // Overrides of V8InspectorClient
   void runMessageLoopOnPause(int contextGroupId) override;
@@ -72,49 +71,56 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
  private:
   static constexpr int contextGroupId = 1;
 
-  // Queued on every connect and disconnect, ahead of anything the new
-  // frontend sends. When dispatched it replaces the main session if it served
-  // another connection, then binds the session's output to the current one.
-  static constexpr const char* kSessionSyncMessage =
-      "{\"__nsInternal\":\"syncSession\"}";
+  // Work for the main isolate, in arrival order. Connect and disconnect go
+  // through the same queue as messages so a frontend's session exists before
+  // its first message and outlives its last.
+  struct QueuedMessage {
+    enum class Kind { kConnect, kDisconnect, kMessage };
+    uint64_t connectionId;
+    Kind kind;
+    std::string message;
+  };
 
-  std::atomic<bool> isConnected_{false};
-  // Set when a reset arrives inside the pause loop (which may run on any
-  // thread holding the Locker), where the session may still be on the stack;
-  // the next drain after the loop exits performs it.
-  std::atomic<bool> pendingSessionReset_{false};
   in_port_t listenPort_ = 0;  // main queue only
   std::unique_ptr<V8Inspector> inspector_;
   v8::Persistent<v8::Context> context_;
-  std::unique_ptr<V8InspectorSession> session_;
+  // Main isolate sessions, one per frontend. Touched by whichever thread is
+  // draining messages_ (the main thread, or the pause loop's thread); see
+  // InspectorSessions for the exceptions.
+  std::unique_ptr<InspectorSessions> sessions_;
   tns::Runtime* runtime_;
   v8::Isolate* isolate_;
   bool terminated_ = false;
-  std::queue<std::string> messages_;
+  std::queue<QueuedMessage> messages_;
   bool runningNestedLoops_;
   dispatch_queue_t messagesQueue_;
   dispatch_queue_t messageLoopQueue_;
   dispatch_semaphore_t messageArrived_;
-  // The current connection; guarded by senderMutex_.
-  std::function<void(const std::string&)> sender_;
-  uint64_t connectionId_ = 0;
-  // The connection the main session serves, which lags the current one until
-  // the sync message is dispatched. Session output goes here, so replies to
-  // a replaced frontend's in-flight commands never reach its successor.
-  // Guarded by senderMutex_.
-  std::function<void(const std::string&)> sessionSender_;
-  uint64_t sessionConnectionId_ = 0;
-  uint64_t frontendGeneration_ = 0;  // guarded by senderMutex_
   bool isWaitingForDebugger_ = false;
   bool hasScheduledDebugBreak_ = false;
 
+  // Connected frontends' senders; guarded by frontendsMutex_, which is never
+  // held while taking another lock or calling a sender.
+  std::map<uint64_t, std::function<void(const std::string&)>> frontends_;
+  std::mutex frontendsMutex_;
+
+  // Frontends that sent <Domain>.enable to a JS domain handler (DOM, CSS,
+  // Network, ... from @nativescript/core). Those handlers are global, so a
+  // <Domain>.disable only reaches them once no other frontend wants the
+  // domain. Only touched by whichever thread is draining messages_.
+  std::map<std::string, std::set<uint64_t>> jsDomainEnablers_;
+
+  // The process-global trace controller serves one frontend at a time.
   std::unique_ptr<tns::inspector::TracingAgentImpl> tracing_agent_;
+  uint64_t tracingOwner_ = 0;  // guarded by tracingMutex_
+  std::mutex tracingMutex_;
 
   // Streams backing Network.loadNetworkResource responses, read by the
-  // frontend through IO.read/IO.close (how Chrome DevTools fetches source
-  // maps from the target). Served on the socket thread for any session;
-  // guarded by resourceStreamsMutex_.
+  // frontend that opened them through IO.read/IO.close (how Chrome DevTools
+  // fetches source maps from the target). Served on the socket thread for
+  // any session; guarded by resourceStreamsMutex_.
   struct ResourceStream {
+    uint64_t connectionId;
     std::string data;
     size_t offset = 0;
   };
@@ -122,64 +128,57 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   int lastStreamId_ = 0;
   std::mutex resourceStreamsMutex_;
 
-  // Worker targets announced to the frontend via Target.attachedToTarget,
-  // keyed by their flat-protocol sessionId. Guarded by workerTargetsMutex_;
-  // a registered client pointer stays valid until UnregisterWorkerTarget
-  // (which runs on the worker's own thread, before the client is deleted).
+  // Worker targets, keyed by their flat-protocol sessionId. A registered
+  // client pointer stays valid until UnregisterWorkerTarget (which runs on
+  // the worker's own thread, before the client is deleted).
   struct WorkerTarget {
     int workerId;
     WorkerInspectorClient* client;
-    bool announced = false;
   };
+  // Target domain state of one connected frontend.
+  struct TargetState {
+    bool autoAttach = false;
+    // sessionIds of the workers announced to this frontend.
+    std::set<std::string> announced;
+  };
+  // Both guarded by workerTargetsMutex_, which is taken before
+  // frontendsMutex_. A frontend has a TargetState exactly while it is
+  // connected, so nothing reaches a worker on its behalf after the worker
+  // was told it disconnected.
   std::map<std::string, WorkerTarget> workerTargets_;
+  std::map<uint64_t, TargetState> targetStates_;
   std::mutex workerTargetsMutex_;
-  bool autoAttach_ = false;  // guarded by workerTargetsMutex_
 
   static JsV8InspectorClient* instance_;
 
-  std::mutex senderMutex_;
-  // Serializes onFrontendConnected/onFrontendDisconnected/
-  // onFrontendMessageReceived, which run on different connection queues.
-  // Taken before senderMutex_, workerTargetsMutex_ and resourceStreamsMutex_,
-  // never while holding any of them.
-  std::mutex frontendLifecycleMutex_;
-
   // Routes a frontend message carrying a sessionId to its worker session
   // (socket thread). msgId is -1 when the message has no id.
-  void RouteToWorker(const std::string& sessionId, const std::string& method,
-                     long long msgId, const std::string& message);
-  // Announces all not-yet-announced workers (after Target.setAutoAttach).
-  void AnnounceWorkerTargets();
+  void RouteToWorker(uint64_t connectionId, const std::string& sessionId,
+                     const std::string& method, long long msgId,
+                     const std::string& message);
+  // Announces every worker not yet announced to the frontend. Requires
+  // workerTargetsMutex_.
+  void AnnounceWorkerTargetsLocked(uint64_t connectionId, TargetState& state);
+  void SendAttachedToTarget(uint64_t connectionId,
+                            WorkerInspectorClient* client);
 
   // Override of V8InspectorClient
   v8::Local<v8::Context> ensureDefaultContextInGroup(
       int contextGroupId) override;
 
   void enableInspector(int argc, char** argv);
-  void createInspectorSession();
-  void notify(std::unique_ptr<StringBuffer> message);
-  void notify(const std::string& message);
+  void SendToAll(const std::string& message);
   void onFrontendConnected(uint64_t connectionId,
                            std::function<void(const std::string&)> sender);
   void onFrontendDisconnected(uint64_t connectionId);
   void onFrontendMessageReceived(uint64_t connectionId,
                                  const std::string& message);
-  // Socket thread: drops the state owned by the departing frontend that does
-  // not need the main isolate (IO streams, tracing, worker sessions).
-  void ResetFrontendState();
-  // Pause loop only: resumes and defers the session swap to the next drain.
-  void DeferSessionResetFromPauseLoop();
-  void ResetMainSession();
-  // Binds the session to the current connection unless it served another
-  // one, in which case it binds nothing and returns false.
-  bool TryBindSession();
-  // Never inside the pause loop: replaces the session if needed, then binds.
-  void SyncSessionWithFrontend();
-  bool SessionOwnsFrontend();
-  void QueueSessionSync();
-  void EnqueueMessage(const std::string& message);
+  void EnqueueMessage(QueuedMessage message);
   void ScheduleMessageDrain();
-  std::string PumpMessage();
+  bool PumpMessage(QueuedMessage& message);
+  void HandleQueued(const QueuedMessage& message);
+  void DispatchFrontendMessage(uint64_t connectionId,
+                               const std::string& message);
   static void registerDomainDispatcherCallback(
       const v8::FunctionCallbackInfo<v8::Value>& args);
   static void inspectorSendEventCallback(
@@ -191,12 +190,13 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   // domain). V8's inspector doesn't implement these embedder domains. The
   // handlers are filesystem-only and thread-safe; they serve any session
   // (sessionId is echoed in the reply when non-empty).
-  void HandleLoadNetworkResource(int msgId, const std::string& url,
+  void HandleLoadNetworkResource(uint64_t connectionId, int msgId,
+                                 const std::string& url,
                                  const std::string& sessionId);
-  void HandleIORead(int msgId, const std::string& handle, int size,
-                    const std::string& sessionId);
-  void HandleIOClose(int msgId, const std::string& handle,
-                     const std::string& sessionId);
+  void HandleIORead(uint64_t connectionId, int msgId, const std::string& handle,
+                    int size, const std::string& sessionId);
+  void HandleIOClose(uint64_t connectionId, int msgId,
+                     const std::string& handle, const std::string& sessionId);
 
   // {N} specific helpers
   bool CallDomainHandlerFunction(v8::Local<v8::Context> context,
