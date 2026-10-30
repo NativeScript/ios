@@ -361,30 +361,32 @@ int LogFormat();
 // Unique per split message in the process, for the headers of format 1.
 uint32_t NextLogMessageId();
 
+bool IsDevNull(int fd);
+
 #if TNS_HAVE_OS_LOG
 // Logs the two parts as one entry.
-static inline void TNS_WriteOsLogEntry(os_log_type_t type, std::string_view first,
+static inline void TNS_WriteOsLogEntry(os_log_t log, os_log_type_t type, std::string_view first,
                                        std::string_view second) {
-  os_log_with_type(OS_LOG_DEFAULT, type, "%{public}.*s%{public}.*s",
+  os_log_with_type(log, type, "%{public}.*s%{public}.*s",
                    static_cast<int>(first.size()), first.data(), static_cast<int>(second.size()),
                    second.data());
 }
 
 static inline void TNS_WriteToOsLog(const char* message, os_log_type_t type = OS_LOG_TYPE_DEFAULT,
-                                    std::string_view prefix = "") {
+                                    std::string_view prefix = "", os_log_t log = OS_LOG_DEFAULT) {
   std::string_view text(message);
   if (prefix.size() + text.size() <= kMaxLogChunkBytes) {
-    TNS_WriteOsLogEntry(type, prefix, text);
+    TNS_WriteOsLogEntry(log, type, prefix, text);
   } else if (LogFormat() >= 1) {
     ForEachFramedLogChunk(prefix, text, NextLogMessageId(),
                           [&](std::string_view header, std::string_view piece) {
-                            TNS_WriteOsLogEntry(type, header, piece);
+                            TNS_WriteOsLogEntry(log, type, header, piece);
                           });
   } else {
     // Repeated on every piece, so that each stays a complete log line.
     ForEachLogChunk(text, kMaxLogChunkBytes - prefix.size(),
                     [&](std::string_view chunk, LogChunkBreak) {
-                      TNS_WriteOsLogEntry(type, prefix, chunk);
+                      TNS_WriteOsLogEntry(log, type, prefix, chunk);
                     });
   }
 }
