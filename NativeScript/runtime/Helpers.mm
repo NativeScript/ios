@@ -493,6 +493,27 @@ void tns::InitializeLogCategoriesFromEnvironment() {
   }
 }
 
+static bool IsDevNull(int fd) {
+  struct stat target;
+  struct stat devNull;
+  return fstat(fd, &target) == 0 && stat("/dev/null", &devNull) == 0 &&
+         S_ISCHR(target.st_mode) && target.st_rdev == devNull.st_rdev;
+}
+
+// Syslog-style output shows the markers as visible text and an attached console
+// shows them as they are, so they need a CLI that asked for them and no console.
+bool tns::ShouldMarkLogChunks() {
+  if (RuntimeConfig.ApplicationPath.empty()) {
+    return false;
+  }
+
+  static const bool enabled = [] {
+    id value = Runtime::GetAppConfigValue("logChunkMarkers");
+    return value != nil && [value boolValue] && IsDevNull(STDOUT_FILENO);
+  }();
+  return enabled;
+}
+
 void tns::EmitDebugLog(LogCategory category, const char* format, ...) {
   va_list ap;
   va_start(ap, format);
