@@ -509,7 +509,8 @@ bool tns::ShouldMarkLogChunks() {
 
   static const bool enabled = [] {
     id value = Runtime::GetAppConfigValue("logChunkMarkers");
-    return value != nil && [value boolValue] && IsDevNull(STDOUT_FILENO);
+    return [value isKindOfClass:[NSNumber class]] && [value boolValue] &&
+           IsDevNull(STDOUT_FILENO);
   }();
   return enabled;
 }
