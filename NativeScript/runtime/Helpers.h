@@ -358,10 +358,12 @@ void LogBacktrace(int skip = 1);
 // Whether split messages should carry markers for the CLI to stitch them with.
 bool ShouldMarkLogChunks();
 
+bool IsDevNull(int fd);
+
 #if TNS_HAVE_OS_LOG
 // The prefix is repeated on every chunk, so that each stays a complete log line.
 static inline void TNS_WriteToOsLog(const char* message, os_log_type_t type = OS_LOG_TYPE_DEFAULT,
-                                    std::string_view prefix = "") {
+                                    std::string_view prefix = "", os_log_t log = OS_LOG_DEFAULT) {
   ForEachLogChunk(message, kMaxLogChunkBytes - prefix.size(),
                   [&](std::string_view chunk, LogChunkBreak chunkBreak) {
                     const char* marker = "";
@@ -369,7 +371,7 @@ static inline void TNS_WriteToOsLog(const char* message, os_log_type_t type = OS
                       marker = chunkBreak == LogChunkBreak::kLine ? kLogChunkLineMarker
                                                                   : kLogChunkJoinMarker;
                     }
-                    os_log_with_type(OS_LOG_DEFAULT, type, "%{public}.*s%{public}.*s%{public}s",
+                    os_log_with_type(log, type, "%{public}.*s%{public}.*s%{public}s",
                                      static_cast<int>(prefix.size()), prefix.data(),
                                      static_cast<int>(chunk.size()), chunk.data(), marker);
                   });

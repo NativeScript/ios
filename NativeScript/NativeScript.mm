@@ -11,6 +11,7 @@
 #include "runtime/NativeScriptException.h"
 #include "runtime/Runtime.h"
 #include "runtime/RuntimeConfig.h"
+#include "runtime/StdioForwarder.h"
 #include "runtime/Tasks.h"
 
 using namespace v8;
@@ -242,6 +243,7 @@ static void DestroyMainRuntime() {
     RuntimeConfig.LogToSystemConsole = [config LogToSystemConsole];
 
     Runtime::Initialize();
+    StartStdioForwarding();
     DestroyMainRuntime();
     runtime_ = new Runtime();
 
