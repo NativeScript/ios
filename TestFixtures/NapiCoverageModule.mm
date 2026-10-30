@@ -157,7 +157,7 @@ static napi_value StringStatus(napi_env env, napi_callback_info info) {
 
 //=== Numbers ==============================================================
 
-static napi_value NumberParts(napi_env env, napi_callback_info info) {
+static napi_value NumberPartsMethod(napi_env env, napi_callback_info info) {
   size_t argc = 1;
   napi_value args[1];
   NAPI_CALL(env, napi_get_cb_info(env, info, &argc, args, NULL, NULL));
@@ -1345,7 +1345,7 @@ static napi_value InitNapiCoverageModule(napi_env env, napi_value exports) {
       NAPI_METHOD("copyString", CopyString),
       NAPI_METHOD("createStrings", CreateStrings),
       NAPI_METHOD("stringStatus", StringStatus),
-      NAPI_METHOD("numberParts", NumberParts),
+      NAPI_METHOD("numberParts", NumberPartsMethod),
       NAPI_METHOD("createNumbers", CreateNumbers),
       NAPI_METHOD("numberStatus", NumberStatus),
       NAPI_METHOD("createSymbol", CreateSymbol),
