@@ -16,3 +16,15 @@ for arch in $VALID_ARCHS
 do :
     [ -e "$CONFIGURATION_BUILD_DIR/metadata-$arch.bin" ] || touch "$CONFIGURATION_BUILD_DIR/metadata-$arch.bin"
 done
+
+# The metadata generator reads these during linking, which Xcode would skip when
+# only they changed.
+FILTERS_STAMP="$CONFIGURATION_BUILD_DIR/metadata-filters.stamp"
+FILTERS_HASH=$(cd "$SRCROOT" && shasum whitelist.mdg blacklist.mdg 2>/dev/null || true)
+if [ "$FILTERS_HASH" != "$(cat "$FILTERS_STAMP" 2>/dev/null)" ]; then
+    for arch in $VALID_ARCHS
+    do :
+        touch "$CONFIGURATION_BUILD_DIR/metadata-$arch.bin"
+    done
+    printf '%s' "$FILTERS_HASH" > "$FILTERS_STAMP"
+fi
