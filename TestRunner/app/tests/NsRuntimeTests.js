@@ -10,7 +10,13 @@ describe("ns:runtime", function () {
     // The export set is public API, declared in types/ns-runtime.d.ts and
     // docs/ns-builtin-modules.md — all three must change together.
     it("exposes exactly the declared surface", function () {
-        expect(Object.keys(runtime).sort()).toEqual(["getConfig", "setConfig"]);
+        expect(Object.keys(runtime).sort()).toEqual([
+            "escapeException",
+            "getConfig",
+            "getExternalSize",
+            "setConfig",
+            "setExternalSize",
+        ]);
     });
 
     // Registered before GCFinalizerTests (which toggles the policy and

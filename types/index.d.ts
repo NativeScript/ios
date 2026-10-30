@@ -2,7 +2,8 @@
 // .d.ts per module, mirroring @types/node's layout and the "one module, one
 // source file" rule in docs/ns-builtin-modules.md. The declared surfaces must
 // stay in sync with that document (NsRuntimeTests.js / NsUtilTests.js /
-// HttpEsmLoaderTests.js assert the export sets at runtime).
+// NsInteropTests.js / HttpEsmLoaderTests.js assert the export sets at
+// runtime).
 //
 // `ns:` is not a resolvable package specifier, so these are ambient
 // declarations: they apply program-wide once this file is in the TypeScript
@@ -25,6 +26,8 @@
 // in docs/ns-builtin-modules.md, not something to restate in types that would
 // then conflict.
 
+/// <reference path="./ns-interop.d.ts" />
+/// <reference path="./ns-interop-ios.d.ts" />
 /// <reference path="./ns-module.d.ts" />
 /// <reference path="./ns-runtime.d.ts" />
 /// <reference path="./ns-url.d.ts" />

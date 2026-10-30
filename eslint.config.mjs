@@ -76,7 +76,6 @@ export default [
         Blob: 'readonly',
         File: 'readonly',
         // Native globals resolved through the metadata interceptor at runtime:
-        interop: 'readonly',
         NSUUID: 'readonly',
         CGPoint: 'readonly',
         CGRect: 'readonly',
