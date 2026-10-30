@@ -161,6 +161,9 @@ void JsV8InspectorClient::enableInspector(int argc, char** argv) {
           do {
             CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, false);
           } while (this->isWaitingForDebugger_);
+          if (this->debuggerAttachedWhileWaiting_) {
+            this->pauseBeforeApp();
+          }
         });
         CFRunLoopWakeUp(CFRunLoopGetMain());
       });
@@ -216,14 +219,13 @@ void JsV8InspectorClient::onFrontendConnected(uint64_t connectionId,
                                               std::function<void(const std::string&)> sender) {
   std::lock_guard<std::mutex> lifecycle(this->frontendLifecycleMutex_);
 
-  if (this->isWaitingForDebugger_) {
-    this->isWaitingForDebugger_ = NO;
-    CFRunLoopRef runloop = CFRunLoopGetMain();
-    CFRunLoopPerformBlock(runloop, (__bridge CFTypeRef)(NSRunLoopCommonModes), ^{
-      CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1, false);
-      this->scheduleBreak();
+  if (this->isWaitingForDebugger_ && !this->debuggerAttachedWhileWaiting_) {
+    this->debuggerAttachedWhileWaiting_ = true;
+    // Frontends that don't send Runtime.runIfWaitingForDebugger still get the app
+    // going, once they've had time to enable the debugger.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC * 3), dispatch_get_main_queue(), ^{
+      this->isWaitingForDebugger_ = NO;
     });
-    CFRunLoopWakeUp(runloop);
   }
 
   bool replacesFrontend;
@@ -748,6 +750,13 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
   auto json_message = json::parse(message);
   std::string method = json_message["method"];
 
+  // The frontend's last message before it expects the app to run, so it arrives
+  // after the Debugger.enable that the pause depends on. The Runtime domain still
+  // answers it below.
+  if (method == "Runtime.runIfWaitingForDebugger") {
+    this->isWaitingForDebugger_ = NO;
+  }
+
   // Note: the Tracing domain is handled in onFrontendMessageReceived, so it
   // never waits on the message queue or takes the Locker below.
 
@@ -1097,26 +1106,21 @@ std::string JsV8InspectorClient::PumpMessage() {
   return result;
 }
 
-void JsV8InspectorClient::scheduleBreak() {
+void JsV8InspectorClient::pauseBeforeApp() {
   Isolate* isolate = isolate_;
   v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
   HandleScope handle_scope(isolate);
-  auto context = isolate->GetCurrentContext();
+  Local<Context> context = tns::Caches::Get(isolate)->GetContext();
   Context::Scope context_scope(context);
 
-  if (!this->hasScheduledDebugBreak_) {
-    this->hasScheduledDebugBreak_ = true;
-    // hack: force a debugger; statement in ModuleInternal to actually break before loading the next
-    // (main) script...
-    // FIXME: find a proper fix to not need to resort to this hack.
-    context->Global()
-        ->Set(context, tns::ToV8String(isolate, "__pauseOnNextRequire"),
-              v8::Boolean::New(isolate, true))
-        .ToChecked();
+  // schedulePauseOnNextStatement doesn't break on the evaluation of the main
+  // module, and an ES module has no require call to stop at either. This stops
+  // before any app code has run, so its breakpoints can still be set.
+  Local<Script> script;
+  if (Script::Compile(context, tns::ToV8String(isolate, "debugger;")).ToLocal(&script)) {
+    script->Run(context).IsEmpty();
   }
-
-  this->session_->schedulePauseOnNextStatement({}, {});
 }
 
 void JsV8InspectorClient::registerModules() {
