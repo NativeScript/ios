@@ -74,15 +74,16 @@ describe("JS block whose dispose is waiting for the isolate", function () {
     // stays parked on the Locker for the rest of the turn.
     function strandDispose(fn) {
         TNSTestNativeCallbacks.repeatPausingAfter(1, function () {
-            TNSTestNativeCallbacks.keepBlockForMilliseconds(fn, 1);
+            TNSTestNativeCallbacks.keepBlockUntilReleased(fn);
         });
-        TNSTestNativeCallbacks.sleepMilliseconds(30);
+        expect(TNSTestNativeCallbacks.releaseKeptBlocksAwaitingDispose(5000)).toBe(true);
     }
 
     it("is reported by interop.handleof while native code holds it", function () {
         var fn = function () {};
-        TNSTestNativeCallbacks.keepBlockForMilliseconds(fn, 1000);
+        TNSTestNativeCallbacks.keepBlockUntilReleased(fn);
         expect(interop.handleof(fn) instanceof interop.Pointer).toBe(true);
+        expect(TNSTestNativeCallbacks.releaseKeptBlocks()).toBe(1);
     });
 
     it("is not handed out by interop.handleof", function () {
@@ -129,10 +130,14 @@ describe("JS block outliving its worker", function () {
     // gone.
     it("is released after a teardown that disposed its function", function (done) {
         var worker = new Worker("./blockFunctionReferenceWorker.js");
+        // Dispatched once the worker's runtime has been deleted.
+        worker.addEventListener("nsworkerended", function () {
+            expect(TNSTestNativeCallbacks.releaseKeptBlocks()).toBe(1);
+            done();
+        });
         worker.onmessage = function (msg) {
             expect(msg.data).toBe("kept");
             worker.terminate();
-            setTimeout(done, 600);
         };
         worker.onerror = function (e) {
             expect(String(e && e.message ? e.message : e)).toBe("<no worker error>");

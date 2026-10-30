@@ -391,16 +391,77 @@
   });
 }
 
-+ (void)keepBlock:(void (^)(void))block forMilliseconds:(int)ms {
-  __block void (^kept)(void) = block;
-  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)ms * NSEC_PER_MSEC),
-                 dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
-                   kept = nil;
-                 });
+static NSMutableArray* keptBlocks;
+
++ (void)keepBlockUntilReleased:(void (^)(void))block {
+  @synchronized(self) {
+    if (keptBlocks == nil) {
+      keptBlocks = [NSMutableArray array];
+    }
+    [keptBlocks addObject:[block copy]];
+  }
 }
 
-+ (void)sleepMilliseconds:(int)ms {
-  usleep((useconds_t)ms * 1000);
++ (int)releaseKeptBlocks {
+  int count;
+  // The pool keeps autoreleased temporaries from outliving the release.
+  @autoreleasepool {
+    NSArray* blocks;
+    @synchronized(self) {
+      blocks = keptBlocks;
+      keptBlocks = nil;
+    }
+    count = (int)blocks.count;
+  }
+  return count;
+}
+
+// The head of every block (the Block ABI's Block_layout).
+struct TNSBlockHeader {
+  void* isa;
+  volatile int32_t flags;
+};
+
+// libclosure sets this bit when the last release starts disposing a block.
+static const int32_t TNSBlockDeallocating = 0x0001;
+
++ (BOOL)releaseKeptBlocksAwaitingDispose:(int)ms {
+  NSUInteger count;
+  volatile int32_t** flags;
+  // The pool keeps autoreleased temporaries from outliving the release.
+  @autoreleasepool {
+    __block NSArray* blocks;
+    @synchronized(self) {
+      blocks = keptBlocks;
+      keptBlocks = nil;
+    }
+    count = blocks.count;
+    if (count == 0) {
+      return NO;
+    }
+    flags = calloc(count, sizeof(*flags));
+    for (NSUInteger i = 0; i < count; i++) {
+      flags[i] = &((__bridge struct TNSBlockHeader*)blocks[i])->flags;
+    }
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+      blocks = nil;
+    });
+  }
+
+  BOOL disposing = NO;
+  CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + ms / 1000.0;
+  while (!disposing && CFAbsoluteTimeGetCurrent() < deadline) {
+    disposing = YES;
+    for (NSUInteger i = 0; i < count; i++) {
+      if ((__atomic_load_n(flags[i], __ATOMIC_ACQUIRE) & TNSBlockDeallocating) == 0) {
+        disposing = NO;
+        usleep(100);
+        break;
+      }
+    }
+  }
+  free(flags);
+  return disposing;
 }
 
 + (void)repeat:(int)count pausingAfter:(void (^)(int))step {
