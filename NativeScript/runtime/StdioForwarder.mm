@@ -72,7 +72,8 @@ void StartStdioForwarding() {
     }
 
     id value = Runtime::GetAppConfigValue("forwardStdio");
-    if (value == nil || ![value boolValue] || !IsDevNull(STDOUT_FILENO)) {
+    if (![value isKindOfClass:[NSNumber class]] || ![value boolValue] ||
+        !IsDevNull(STDOUT_FILENO)) {
       return;
     }
 
