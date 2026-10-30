@@ -30,9 +30,14 @@
 
 #include "IsolateWrapper.h"
 
+#include <TargetConditionals.h>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
+#if TARGET_OS_MACCATALYST
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
 #include "HttpLoader.h"
 #include "ModuleBinding.hpp"
 #include "ModuleInternalCallbacks.h"
@@ -328,6 +333,42 @@ Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
   return static_cast<Runtime*>(isolate->GetData(Constants::RUNTIME_SLOT));
 }
 
+#if TARGET_OS_MACCATALYST
+// Mac Catalyst ships V8 with its JIT tiers, but a hardened-runtime process may
+// only map JIT memory with com.apple.security.cs.allow-jit (or
+// allow-unsigned-executable-memory). V8 does not fall back on its own: without
+// --jitless it dies at its first code-space allocation, so ask the kernel the
+// same question V8 will.
+static bool CanMapJitMemory() {
+  const size_t size = static_cast<size_t>(getpagesize());
+  void* memory = mmap(nullptr, size, PROT_READ | PROT_WRITE | PROT_EXEC,
+                      MAP_PRIVATE | MAP_ANON | MAP_JIT, -1, 0);
+  if (memory == MAP_FAILED) {
+    return false;
+  }
+  munmap(memory, size);
+  return true;
+}
+
+// `"ios": { "jit": false }` in the app's package.json forces the interpreter;
+// otherwise the JIT runs whenever the process may map JIT memory.
+static bool ShouldEnableJit() {
+  id iosConfig = Runtime::GetAppConfigValue("ios");
+  id jitValue = [iosConfig isKindOfClass:[NSDictionary class]] ? iosConfig[@"jit"] : nil;
+  if ([jitValue isKindOfClass:[NSNumber class]] && ![jitValue boolValue]) {
+    return false;
+  }
+  if (CanMapJitMemory()) {
+    return true;
+  }
+  if (jitValue != nil) {
+    Log(@"NativeScript: \"ios.jit\" is set, but this process may not map JIT memory (missing "
+        @"the com.apple.security.cs.allow-jit entitlement?). Running without the JIT.");
+  }
+  return false;
+}
+#endif
+
 Isolate* Runtime::CreateIsolate(const IsolateLimits& limits) {
   if (!v8Initialized_) {
     // Runtime::platform_ = RuntimeConfig.IsDebug
@@ -335,10 +376,14 @@ Isolate* Runtime::CreateIsolate(const IsolateLimits& limits) {
     //     : platform::NewDefaultPlatform();
 
     // Flags must be set before V8::Initialize(), which freezes them; changing a
-    // flag afterwards aborts the process. Don't pass --jitless either:
-    // v8_enable_lite_mode already implies it and makes the flag read-only,
-    // which is likewise fatal to set.
+    // flag afterwards aborts the process. iOS V8 is built in lite mode, which
+    // already implies --jitless; only Mac Catalyst decides at launch.
     std::string flags = RuntimeConfig.IsDebug ? "--expose_gc" : "--expose_gc --no-lazy";
+#if TARGET_OS_MACCATALYST
+    if (!ShouldEnableJit()) {
+      flags += " --jitless";
+    }
+#endif
     V8::SetFlagsFromString(flags.c_str(), flags.size());
 
     // wrap the default platform so foreground tasks ride each runtime
