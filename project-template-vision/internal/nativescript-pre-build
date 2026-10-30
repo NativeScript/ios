@@ -1,10 +1,30 @@
 #!/usr/bin/env bash
 
 # Ignore errors while inserting environment variables (some could be readonly)
-(echo "set +e"; echo "set +o posix"; export; echo "set -o posix"; echo "set -e";) > ./.build_env_vars.sh
+ENV_FILE=./.build_env_vars.sh
+(echo "set +e"; echo "set +o posix"; export; echo "set -o posix"; echo "set -e";) > "$ENV_FILE.tmp"
+if cmp -s "$ENV_FILE.tmp" "$ENV_FILE"; then
+    rm "$ENV_FILE.tmp"
+else
+    mv "$ENV_FILE.tmp" "$ENV_FILE"
+fi
 
-# create temporary empty metadata files for XCode LD/LDPLUSPLUS flag analysis
+# create temporary empty metadata files for XCode LD/LDPLUSPLUS flag analysis.
+# Never touch existing ones: the link step reads them, so a newer timestamp
+# would make Xcode relink on every build.
 for arch in $VALID_ARCHS
 do :
-    touch "$CONFIGURATION_BUILD_DIR/metadata-$arch.bin"
+    [ -e "$CONFIGURATION_BUILD_DIR/metadata-$arch.bin" ] || touch "$CONFIGURATION_BUILD_DIR/metadata-$arch.bin"
 done
+
+# The metadata generator reads these during linking, which Xcode would skip when
+# only they changed.
+FILTERS_STAMP="$CONFIGURATION_BUILD_DIR/metadata-filters.stamp"
+FILTERS_HASH=$(cd "$SRCROOT" && shasum whitelist.mdg blacklist.mdg 2>/dev/null || true)
+if [ ! -e "$FILTERS_STAMP" ] || [ "$FILTERS_HASH" != "$(cat "$FILTERS_STAMP")" ]; then
+    for arch in $VALID_ARCHS
+    do :
+        touch "$CONFIGURATION_BUILD_DIR/metadata-$arch.bin"
+    done
+    printf '%s' "$FILTERS_HASH" > "$FILTERS_STAMP"
+fi

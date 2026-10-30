@@ -41,16 +41,21 @@ if [ ! -e "${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}" ]; then
   exit 0
 fi
 
-echo "Stripping frameworks"
+# Simulator builds never ship, so extra architectures in them are harmless.
+if [[ "${PLATFORM_NAME}" == *simulator ]]; then
+  exit 0
+fi
+
 cd "${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}"
 
-for file in $(find . -type f); do
-  # Skip non-dynamic libraries
-  if ! [[ "$(file "$file")" == *"dynamically linked shared library"* ]]; then
+shopt -s nullglob
+for file in *.framework/* *.dylib; do
+  # Only a framework's main binary (named after it) and loose dylibs are Mach-O
+  if [[ "$file" == *.framework/* && "$(basename "$file")" != "$(basename "$(dirname "$file")" .framework)" ]]; then
     continue
   fi
-  # Get architectures for current file
-  archs="$(lipo -info "${file}" | rev | cut -d ':' -f1 | rev)"
+
+  archs="$(lipo -archs "$file" 2>/dev/null)" || continue
   stripped=""
   for arch in $archs; do
     if ! [[ "${VALID_ARCHS}" == *"$arch"* ]]; then
@@ -59,6 +64,7 @@ for file in $(find . -type f); do
       stripped="$stripped $arch"
     fi
   done
+
   if [[ "$stripped" != "" ]]; then
     echo "Stripped $file of architectures:$stripped"
     if [ "${CODE_SIGNING_ALLOWED}" == "YES" ]; then
