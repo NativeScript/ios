@@ -228,8 +228,9 @@ class Interop {
     static JSBlockDescriptor kJSBlockDescriptor;
   } JSBlock;
 
-  // Takes a reference to a cached JSBlock only while it is live. Block_copy
-  // would also revive a block whose last release already started its dispose.
+  friend class BlockWrapper;
+  // Called with the wrapper's mutex held, before its dispose can clear and
+  // free the cached block. Block_copy cannot reject a deallocating block.
   static bool TryRetainJSBlock(JSBlock* block);
 };
 
