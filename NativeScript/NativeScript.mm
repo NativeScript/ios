@@ -243,12 +243,11 @@ static void DestroyMainRuntime() {
 
     Runtime::Initialize();
     DestroyMainRuntime();
-    runtime_ = new Runtime();
-
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-    Isolate* isolate = runtime_->CreateIsolate();
+    runtime_ = new Runtime();
+    Isolate* isolate = runtime_->GetIsolate();
     v8::Locker l(isolate);
-    runtime_->Init(isolate);
+    runtime_->Init();
     std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
     printf("Runtime initialization took %llims (version %s, V8 version %s)\n", duration,

@@ -28,18 +28,25 @@ struct IsolateLimits {
   std::optional<size_t> jsDispatchTableReservationBytes;
 };
 
+struct RuntimeOptions {
+  IsolateLimits limits;
+  // Positive for a worker runtime.
+  int workerId = -1;
+};
+
 class Runtime {
  public:
-  Runtime();
+  // Creates the runtime's isolate, homed on the calling thread. Init must
+  // follow on that thread, with the isolate's Locker held; the isolate is not
+  // published to other threads until then.
+  explicit Runtime(const RuntimeOptions& options = {});
   ~Runtime();
-  v8::Isolate* CreateIsolate(const IsolateLimits& limits = {});
-  void Init(v8::Isolate* isolate, bool isWorker = false);
+  void Init();
   void RunMainScript();
   v8::Isolate* GetIsolate();
 
   const int WorkerId();
 
-  void SetWorkerId(int workerId);
   inline bool IsRuntimeWorker() { return workerId_ > 0; }
 
   inline CFRunLoopRef RuntimeLoop() { return runtimeLoop_; }
@@ -154,6 +161,10 @@ class Runtime {
   // pointer for every isolate, and exit() runs static destructors while the
   // main thread and worker threads are still tearing isolates down.
   static v8::Platform* platform_;
+  // Isolates whose Caches and RUNTIME slots are written. Init publishes an
+  // isolate only after writing them, and the teardown removes it before
+  // clearing them, so a thread that finds an isolate here may read its slots
+  // while holding this lock.
   static std::vector<v8::Isolate*> isolates_;
   static SpinMutex isolatesMutex_;
   static bool v8Initialized_;
@@ -175,6 +186,7 @@ class Runtime {
   static void DrainRejectionsObserver(CFRunLoopObserverRef observer,
                                       CFRunLoopActivity activity, void* info);
   v8::Isolate* isolate_ = nullptr;
+  bool initialized_ = false;
   std::atomic<bool> terminationRequested_{false};
   napi_env napiEnv_ = nullptr;
   std::unique_ptr<ModuleInternal> moduleInternal_;
