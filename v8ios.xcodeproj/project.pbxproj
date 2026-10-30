@@ -340,6 +340,8 @@
 		A1B2C3D40000000000000004 /* WorkerInspectorClient.mm in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000002 /* WorkerInspectorClient.mm */; };
 		F6191AB129C0FCE8003F588F /* InspectorServer.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AA929C0FCE7003F588F /* InspectorServer.h */; };
 		F6191AB229C0FCE8003F588F /* InspectorServer.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AAA29C0FCE7003F588F /* InspectorServer.mm */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
+		A1C0DE5400000000000000A4 /* StdioForwarder.h in Headers */ = {isa = PBXBuildFile; fileRef = A1C0DE5200000000000000A2 /* StdioForwarder.h */; };
+		A1C0DE5500000000000000A5 /* StdioForwarder.mm in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE5300000000000000A3 /* StdioForwarder.mm */; };
 		F6191AB629C0FF87003F588F /* utils.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AB429C0FF86003F588F /* utils.h */; };
 		F6191AB729C0FF87003F588F /* utils.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AB529C0FF86003F588F /* utils.mm */; };
 		D3FA1E7A0000000000000004 /* NativeScriptDefaultMetadata.c in Sources */ = {isa = PBXBuildFile; fileRef = D3FA1E7A0000000000000002 /* NativeScriptDefaultMetadata.c */; };
@@ -819,6 +821,8 @@
 		C2DDEB6B229EAC8200345BFE /* Console.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Console.cpp; sourceTree = "<group>"; };
 		C2DDEB6D229EAC8200345BFE /* Helpers.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Helpers.h; sourceTree = "<group>"; };
 		A1C0DE5100000000000000A1 /* LogChunks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LogChunks.h; sourceTree = "<group>"; };
+		A1C0DE5200000000000000A2 /* StdioForwarder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StdioForwarder.h; sourceTree = "<group>"; };
+		A1C0DE5300000000000000A3 /* StdioForwarder.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = StdioForwarder.mm; sourceTree = "<group>"; };
 		C2DDEB6E229EAC8200345BFE /* Metadata.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Metadata.h; sourceTree = "<group>"; };
 		C2DDEB6F229EAC8200345BFE /* ArrayAdapter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ArrayAdapter.h; sourceTree = "<group>"; };
 		C2DDEB70229EAC8200345BFE /* Metadata.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = Metadata.mm; sourceTree = "<group>"; };
@@ -1499,6 +1503,8 @@
 				C266569C22B282BA00EE15CC /* FunctionReference.cpp */,
 				C2DDEB6D229EAC8200345BFE /* Helpers.h */,
 				A1C0DE5100000000000000A1 /* LogChunks.h */,
+				A1C0DE5200000000000000A2 /* StdioForwarder.h */,
+				A1C0DE5300000000000000A3 /* StdioForwarder.mm */,
 				C2DDEB7D229EAC8200345BFE /* Helpers.mm */,
 				AA5DBFD12EC191F8008D12F9 /* HttpLoader.h */,
 				AA5DBFD22EC191F8008D12F9 /* HttpLoader.mm */,
@@ -1669,6 +1675,7 @@
 				C2DDEB97229EAC8300345BFE /* Metadata.h in Headers */,
 				C247C16522F82842001D2CA2 /* v8-platform.h in Headers */,
 				F6191AB129C0FCE8003F588F /* InspectorServer.h in Headers */,
+				A1C0DE5400000000000000A4 /* StdioForwarder.h in Headers */,
 				C247C16722F82842001D2CA2 /* libplatform.h in Headers */,
 				C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */,
 				F1CB51842D5C37100042555E /* URLPatternImpl.h in Headers */,
@@ -2352,6 +2359,7 @@
 				C266569722AFFFB000EE15CC /* Reference.cpp in Sources */,
 				6573B9EE291FE5B700B0ED7C /* JSIRuntime.m in Sources */,
 				F6191AB229C0FCE8003F588F /* InspectorServer.mm in Sources */,
+				A1C0DE5500000000000000A5 /* StdioForwarder.mm in Sources */,
 				6573B9D3291FE29F00B0ED7C /* HostProxy.cpp in Sources */,
 				6573B9E5291FE2A700B0ED7C /* jsi.cpp in Sources */,
 				C2DDEBB3229EAC8300345BFE /* ClassBuilder.mm in Sources */,
