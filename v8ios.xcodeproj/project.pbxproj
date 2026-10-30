@@ -78,8 +78,8 @@
 		C22536B6241A318900192740 /* ffi.h in Headers */ = {isa = PBXBuildFile; fileRef = C22536B1241A318900192740 /* ffi.h */; };
 		C22536B7241A318900192740 /* ffitarget.h in Headers */ = {isa = PBXBuildFile; fileRef = C22536B3241A318900192740 /* ffitarget.h */; };
 		C22536B8241A318900192740 /* ffi.h in Headers */ = {isa = PBXBuildFile; fileRef = C22536B4241A318900192740 /* ffi.h */; };
-		C2253789241A41C500192740 /* TKLiveSync.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2253782241A41C500192740 /* TKLiveSync.framework */; platformFilters = (ios, xros, ); };
-		C225378A241A41C500192740 /* TKLiveSync.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2253782241A41C500192740 /* TKLiveSync.framework */; platformFilters = (ios, xros, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		C2253789241A41C500192740 /* TKLiveSync.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2253782241A41C500192740 /* TKLiveSync.framework */; platformFilters = (ios, maccatalyst, xros, ); };
+		C225378A241A41C500192740 /* TKLiveSync.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2253782241A41C500192740 /* TKLiveSync.framework */; platformFilters = (ios, maccatalyst, xros, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C2253790241A421E00192740 /* zip_fopen_index_encrypted.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E05A2328CA6F00A91A76 /* zip_fopen_index_encrypted.c */; };
 		C2253791241A422400192740 /* zip_get_num_entries.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0422328CA6F00A91A76 /* zip_get_num_entries.c */; };
 		C2253805241A5C3200192740 /* zip_get_encryption_implementation.c in Sources */ = {isa = PBXBuildFile; fileRef = C2A5E0302328CA6F00A91A76 /* zip_get_encryption_implementation.c */; };
@@ -254,8 +254,8 @@
 		C2A6EF3123745A0B00E8FBE7 /* MetadataInlines.h in Headers */ = {isa = PBXBuildFile; fileRef = C2A6EF3023745A0B00E8FBE7 /* MetadataInlines.h */; };
 		C2C8EE7222CE323C001F8CEC /* ConcurrentMap.h in Headers */ = {isa = PBXBuildFile; fileRef = C2C8EE7022CE323C001F8CEC /* ConcurrentMap.h */; };
 		C2C8EE7422CE3266001F8CEC /* ConcurrentQueue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2C8EE7322CE3266001F8CEC /* ConcurrentQueue.cpp */; };
-		C2C8EE7522CE54EE001F8CEC /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; platformFilters = (ios, xros, ); };
-		C2C8EE7622CE54EE001F8CEC /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; platformFilters = (ios, xros, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		C2C8EE7522CE54EE001F8CEC /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; platformFilters = (ios, maccatalyst, xros, ); };
+		C2C8EE7622CE54EE001F8CEC /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; platformFilters = (ios, maccatalyst, xros, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C2C8EE7A22CF64E4001F8CEC /* SimpleAllocator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2C8EE7822CF64E4001F8CEC /* SimpleAllocator.cpp */; };
 		C2C8EE7B22CF64E4001F8CEC /* SimpleAllocator.h in Headers */ = {isa = PBXBuildFile; fileRef = C2C8EE7922CF64E4001F8CEC /* SimpleAllocator.h */; };
 		C2CC8EEA22BBA01E00B78928 /* FastEnumerationAdapter.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2CC8EE822BBA01E00B78928 /* FastEnumerationAdapter.mm */; };
@@ -2122,7 +2122,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cd ${PROJECT_DIR}/metadata-generator/build/bin\ncp ../../build-step-metadata-generator.py .\n./build-step-metadata-generator.py\n\n# create temporary empty metadata files for XCode LD/LDPLUSPLUS flag analysis\nfor arch in $VALID_ARCHS\ndo :\n    echo \"creating empty $CONFIGURATION_BUILD_DIR/metadata-$arch.bin\"\n    touch \"$CONFIGURATION_BUILD_DIR/metadata-$arch.bin\"\ndone\n";
+			shellScript = "set -e\ncd ${PROJECT_DIR}/metadata-generator/build/bin\ncp ../../build-step-metadata-generator.py .\n./build-step-metadata-generator.py\n\n# create temporary empty metadata files for XCode LD/LDPLUSPLUS flag analysis\nfor arch in $VALID_ARCHS\ndo :\n    echo \"creating empty $CONFIGURATION_BUILD_DIR/metadata-$arch.bin\"\n    touch \"$CONFIGURATION_BUILD_DIR/metadata-$arch.bin\"\ndone\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -2413,6 +2413,7 @@
 			isa = PBXTargetDependency;
 			platformFilters = (
 				ios,
+				maccatalyst,
 				xros,
 			);
 			target = C2253781241A41C500192740 /* TKLiveSync */;
@@ -2422,6 +2423,7 @@
 			isa = PBXTargetDependency;
 			platformFilters = (
 				ios,
+				maccatalyst,
 				xros,
 			);
 			target = C2DDEB31229EAB3B00345BFE /* NativeScript */;
@@ -2447,6 +2449,7 @@
 			isa = PBXTargetDependency;
 			platformFilters = (
 				ios,
+				maccatalyst,
 				xros,
 			);
 			target = C29374E1229FC0F60075CB16 /* TestFixtures */;
@@ -2545,7 +2548,9 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
 				CLANG_ENABLE_MODULES = NO;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
+				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)",
@@ -2556,12 +2561,15 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.TestRunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
+				"TARGETED_DEVICE_FAMILY[sdk=macosx*]" = 2;
 				TEST_TARGET_NAME = TestRunner;
 			};
 			name = Debug;
@@ -2572,7 +2580,9 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
 				CLANG_ENABLE_MODULES = NO;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
+				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)",
@@ -2583,12 +2593,15 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.TestRunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
+				"TARGETED_DEVICE_FAMILY[sdk=macosx*]" = 2;
 				TEST_TARGET_NAME = TestRunner;
 			};
 			name = Release;
@@ -2807,6 +2820,7 @@
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = YES;
 				SYMROOT = build;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -2830,6 +2844,7 @@
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = YES;
 				SYMROOT = build;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -2841,10 +2856,15 @@
 				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CLANG_CXX_LIBRARY = "compiler-default";
 				CLANG_ENABLE_MODULES = NO;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "TestRunner/TestRunner-Catalyst.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = CS838V553Y;
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = "";
+				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				EXCLUDED_ARCHS = "";
+				"EXCLUDED_ARCHS[sdk=macosx*]" = x86_64;
 				EXPORTED_SYMBOLS_FILE = "$(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -2883,10 +2903,11 @@
 				SDKROOT = iphoneos;
 				STRIPFLAGS = "-s $(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
-				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MACCATALYST = YES;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				TARGETED_DEVICE_FAMILY = "1,7";
+				"TARGETED_DEVICE_FAMILY[sdk=macosx*]" = 2;
 				USER_HEADER_SEARCH_PATHS = "";
 			};
 			name = Debug;
@@ -2897,10 +2918,15 @@
 				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CLANG_CXX_LIBRARY = "compiler-default";
 				CLANG_ENABLE_MODULES = NO;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "TestRunner/TestRunner-Catalyst.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 8V7T28DG39;
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = "";
+				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				EXCLUDED_ARCHS = "";
+				"EXCLUDED_ARCHS[sdk=macosx*]" = x86_64;
 				EXPORTED_SYMBOLS_FILE = "$(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -2939,10 +2965,11 @@
 				SDKROOT = iphoneos;
 				STRIPFLAGS = "-s $(PROJECT_DIR)/TestFixtures/exported-symbols.txt";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
-				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MACCATALYST = YES;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				TARGETED_DEVICE_FAMILY = "1,7";
+				"TARGETED_DEVICE_FAMILY[sdk=macosx*]" = 2;
 				USER_HEADER_SEARCH_PATHS = "";
 			};
 			name = Release;

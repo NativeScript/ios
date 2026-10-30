@@ -86,9 +86,11 @@ sdk_root = env("SDKROOT")
 src_root = env("SRCROOT")
 deployment_target_flag_name = env_or_empty("DEPLOYMENT_TARGET_CLANG_FLAG_NAME") or default_deployment_target_flag_name
 # Xcode does not export MACCATALYST_DEPLOYMENT_TARGET unless the project sets it,
-# so fall back to the iOS deployment target rather than dying with a KeyError.
+# and may not export IPHONEOS_DEPLOYMENT_TARGET to Catalyst script phases either;
+# LLVM_TARGET_TRIPLE_OS_VERSION (e.g. "ios13.1") always carries the iOS version.
 deployment_target = env_or_none(env_or_empty("DEPLOYMENT_TARGET_CLANG_ENV_NAME") or default_deployment_target_clang_env_name) \
-    or env("IPHONEOS_DEPLOYMENT_TARGET")
+    or env_or_none("IPHONEOS_DEPLOYMENT_TARGET") \
+    or env_or_empty("LLVM_TARGET_TRIPLE_OS_VERSION").lstrip("abcdefghijklmnopqrstuvwxyz")
 std = env("GCC_C_LANGUAGE_STANDARD")
 header_search_paths = env_or_empty("HEADER_SEARCH_PATHS")
 header_search_paths_parsed = map_and_list((lambda s: "-I" + s), shlex.split(header_search_paths))
