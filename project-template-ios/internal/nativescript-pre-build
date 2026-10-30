@@ -21,7 +21,7 @@ done
 # only they changed.
 FILTERS_STAMP="$CONFIGURATION_BUILD_DIR/metadata-filters.stamp"
 FILTERS_HASH=$(cd "$SRCROOT" && shasum whitelist.mdg blacklist.mdg 2>/dev/null || true)
-if [ "$FILTERS_HASH" != "$(cat "$FILTERS_STAMP" 2>/dev/null)" ]; then
+if [ ! -e "$FILTERS_STAMP" ] || [ "$FILTERS_HASH" != "$(cat "$FILTERS_STAMP")" ]; then
     for arch in $VALID_ARCHS
     do :
         touch "$CONFIGURATION_BUILD_DIR/metadata-$arch.bin"
