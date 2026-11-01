@@ -81,8 +81,7 @@ describe("Remote Module Security", function() {
             // We can't directly access the parsed config from JS in debug mode,
             // but we can verify the package.json file structure
             const fs = NSFileManager.defaultManager;
-            const bundlePath = NSBundle.mainBundle.bundlePath;
-            const packagePath = bundlePath + "/app/package.json";
+            const packagePath = NSBundle.mainBundle.resourcePath + "/app/package.json";
             
             const exists = fs.fileExistsAtPath(packagePath);
             expect(exists).toBe(true);

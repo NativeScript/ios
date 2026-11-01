@@ -92,7 +92,8 @@ global.__JUnitSaveResults = function (text) {
     attemptReport(1);
 };
 
-global.__approot = NSString.stringWithString(NSBundle.mainBundle.bundlePath).stringByResolvingSymlinksInPath;
+// resourcePath, not bundlePath: a Mac Catalyst bundle keeps app/ under Contents/Resources.
+global.__approot = NSString.stringWithString(NSBundle.mainBundle.resourcePath).stringByResolvingSymlinksInPath;
 
 require("../Infrastructure/Jasmine/jasmine-2.0.1/boot");
 
