@@ -2591,6 +2591,7 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
 				CLANG_ENABLE_MODULES = NO;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "TestRunnerTests/TestRunnerTests-Catalyst.entitlements";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = NO;
@@ -2623,6 +2624,7 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
 				CLANG_ENABLE_MODULES = NO;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "TestRunnerTests/TestRunnerTests-Catalyst.entitlements";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = NO;
