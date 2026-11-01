@@ -113,17 +113,17 @@ jobs:
           BUILD_SCRIPT: ${{ matrix.script }}
         run: npm run "$BUILD_SCRIPT" -- --spm-mode=remote
       - name: Upload npm package artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: npm-package-${{ matrix.target }}
           path: dist/nativescript-*-${{ env.NPM_VERSION }}.tgz
       - name: Upload SwiftPM artifacts (xcframework zips + checksums)
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: spm-artifacts-${{ matrix.target }}
           path: dist/artifacts/*
       - name: Upload dSYMs artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dSYMs-${{ matrix.target }}
           path: dist/dSYMs
@@ -200,7 +200,7 @@ jobs:
           test-folder: ${{env.TEST_FOLDER}}
       - name: Archive Test Result Data
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results
           path: |
