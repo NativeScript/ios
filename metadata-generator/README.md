@@ -46,3 +46,112 @@ Example command line arguments:
 ```
 
 For a better way of generating these arguments, just run the TestRunner scheme on the v8ios-runtime project and get the arguments from the log.
+
+## Swift (Symbol Graph) support
+
+The generator can import Swift modules from symbol graphs (`*.symbols.json`, as
+written by `swiftc -emit-symbol-graph` or `swift symbolgraph-extract`). Graphs
+are loaded structurally into a Swift-specific IR (`src/Swift/SwiftIR.h`): every
+public declaration with its precise USR, kind, access level, parameters and
+labels, effects (`async`/`throws`), settability, generics, availability,
+extension info, and resolved relationships (members, conformances, superclass,
+overrides, protocol requirements). Malformed or unexpected input is reported as
+diagnostics with stable codes (`invalid-json`, `unsupported-format-version`,
+`duplicate-symbol`, `parameter-label-mismatch`, ...); errors make the generator
+exit non-zero.
+
+`--swift-thunk-output <dir>` writes `<Module>+NativeScript.swift`: a Swift
+thunk for every declaration the runtime can call, plus the
+`ns_swift_register_<Module>` function the runtime looks up. `-output-typescript`
+writes `swift!<Module>.d.ts`, declaring exactly that surface as the
+`ns:swift/<Module>` module. Both come from the same registration model
+(`src/Swift/SwiftSurface.h`). See `docs/swift-interop.md` for the app-side
+workflow and the JavaScript semantics.
+
+### Capability classification and coverage
+
+Every declaration is classified into one tier, with machine-readable reasons
+for anything not generated (`src/Swift/CapabilityClassifier.h` lists the
+codes):
+
+| Tier | Meaning |
+|---|---|
+| `objc-direct` | Objective-C-visible (`c:` USR); served by the existing metadata runtime |
+| `swift-generated` | callable through a generated Swift thunk |
+| `swift-specialized` | needs an explicit generic specialization first |
+| `type-only` | representable in TypeScript, not callable (protocols, type aliases) |
+| `unsupported` | not bridgeable yet; `reasons` say why |
+| `not-applicable` | not an API surface (deinitializers, macros) |
+
+The generated surface currently bridges `Bool`, integer and floating-point
+types, `String`, optionals of those, module classes and actors (handles),
+module structs (boxed copies) and payload-less enums (case-name strings).
+
+`--swift-coverage-output <dir>` writes `<Module>.coverage.json`: counts per
+tier and kind, a histogram of reasons, and every symbol's classification.
+`effectiveCallable` counts what is callable through either the Objective-C
+runtime or a thunk.
+
+### Compiler verification
+
+Symbol graphs do not carry every fact a call needs (e.g. `~Copyable` is often
+invisible), so the generated surface can be checked by the Swift compiler.
+`--swift-probe-output <dir>` writes `<Module>.probe.swift`, which calls every
+generated declaration the way a thunk will, and a line map back to symbols.
+`--swift-verify` type-checks those probes, demotes every declaration the
+compiler rejects (`compiler-rejected:<message>`), and repeats until the probes
+type-check:
+
+```
+./objc-metadata-generator --skip-objc \
+	--swift-symbolgraph-dir <graphs> \
+	--swift-deployment-target 15.0 \
+	--swift-verify \
+	--swift-sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+	--swift-target arm64-apple-ios15.0-simulator \
+	--swift-search-path <dir containing the module's .swiftmodule> \
+	--swift-coverage-output <out_dir>
+```
+
+`--swift-deployment-target` sets the version availability decisions are made
+against; it defaults to the minimum version recorded in the graphs, which
+`swift-symbolgraph-extract` sets to the SDK version.
+
+```
+./objc-metadata-generator \
+	-output-typescript <out_dir> \
+	--swift-symbolgraph-dir <path_to>/symbolgraphs \
+	--swift-ir-output <ir_dir> \
+	--skip-objc
+```
+
+- `--swift-symbolgraph-dir` – directory searched recursively for symbol graphs
+- `--swift-ir-output` – optional; writes `<Module>.swift-ir.json`, a deterministic dump of the IR
+- `--skip-objc` – skip the Objective-C phase
+
+Environment variables (if using build-step script):
+- `NS_SWIFT_SYMBOLGRAPH_DIR` (or `TNS_SWIFT_SYMBOLGRAPH_DIR`) – path to symbol graph directory
+- `NS_SKIP_OBJC_METADATA` (or `TNS_SKIP_OBJC_METADATA`) – set to `1` to skip Objective-C phase
+
+### Tests
+
+`swift-symbolgraph-tests` is built alongside the generator and runs against the
+checked-in graphs in `TestFixtures/SwiftDemo/symbolgraphs`, so it needs no Swift
+toolchain:
+
+```
+cmake --build build --target swift-symbolgraph-tests
+./build/bin/swift-symbolgraph-tests            # or: (cd build && ctest)
+./build/bin/swift-symbolgraph-tests Snapshot   # run tests whose name contains "Snapshot"
+```
+
+The snapshot tests (`IRSnapshot`, `TypeScriptSnapshot`, `CoverageSnapshot`,
+`ProbeSnapshot`) compare against `tests/swift/snapshots/`;
+`ThunkSourceMatchesFixtureInterop` keeps
+`TestFixtures/SwiftDemo/Interop/SwiftDemo+NativeScript.swift`, which TestRunner
+compiles, identical to the generator's output. `TypeScriptUsageCompiles` runs
+`tsc` (from `PATH` or `NS_TSC`) over `tests/swift/typescript/usage.ts`. `ProbesTypeCheck`
+and the `Verifier*` tests build the fixture module and run the Swift compiler;
+they are skipped when `xcrun` is unavailable. After an intended output change, regenerate them with
+`NS_UPDATE_SNAPSHOTS=1 ./build/bin/swift-symbolgraph-tests` and review
+the diff.
