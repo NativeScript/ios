@@ -61,7 +61,7 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   void runMessageLoopOnPause(int contextGroupId) override;
   void quitMessageLoopOnPause() override;
 
-  void scheduleBreak();
+  void pauseBeforeApp();
   void registerModules();
 
   void consoleLog(v8::Isolate* isolate, ConsoleAPIType method,
@@ -106,7 +106,7 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   uint64_t sessionConnectionId_ = 0;
   uint64_t frontendGeneration_ = 0;  // guarded by senderMutex_
   bool isWaitingForDebugger_ = false;
-  bool hasScheduledDebugBreak_ = false;
+  bool debuggerAttachedWhileWaiting_ = false;
 
   std::unique_ptr<tns::inspector::TracingAgentImpl> tracing_agent_;
 
