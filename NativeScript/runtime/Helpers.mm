@@ -493,7 +493,7 @@ void tns::InitializeLogCategoriesFromEnvironment() {
   }
 }
 
-static bool IsDevNull(int fd) {
+bool tns::IsDevNull(int fd) {
   struct stat target;
   struct stat devNull;
   return fstat(fd, &target) == 0 && stat("/dev/null", &devNull) == 0 &&
