@@ -95,9 +95,9 @@ class NativeMessagePort
   // Creates a port and its JS wrapper. With `data` the port adopts an
   // in-flight port — the group travels with the data — and schedules a drain
   // of whatever queued up while it was in transit; with `group` it joins that
-  // named group; with neither it is one unentangled end of a new channel.
-  // Null with an exception pending when the wrapper or the JS tier could not
-  // be built.
+  // named group as a BroadcastChannel's port; with neither it is one
+  // unentangled end of a new channel. Null with an exception pending when the
+  // wrapper or the JS tier could not be built.
   static std::shared_ptr<NativeMessagePort> New(
       v8::Local<v8::Context> context, std::unique_ptr<PortData> data = nullptr,
       std::shared_ptr<SiblingGroup> group = nullptr);
@@ -110,6 +110,16 @@ class NativeMessagePort
   // schedules a drain for it.
   void Start();
   void Stop();
+
+  // Any thread, under this port's data mutex: whether a message queued now
+  // would be taken by a drain, so a producer can skip waking a port that
+  // would only find it has nothing it may deliver.
+  bool WantsDrainFor(const serialization::SerializedValue& message) const;
+
+  // A BroadcastChannel port's delivery target: the channel, held strongly,
+  // while it has a 'message' or 'messageerror' listener; empty otherwise, and
+  // a message drained with no target is discarded without being read.
+  void SetBroadcastTarget(v8::Local<v8::Object> target);
 
   // Detaches the data, sentinels the sibling, drops the JS wrapper and fires
   // the tier's close event on it. Safe to call on an already-closed port, and
@@ -153,7 +163,11 @@ class NativeMessagePort
             v8::Local<v8::Value> ports, const char* type);
 
   std::unique_ptr<PortData> data_;
-  bool receiving_ = false;
+  // Written on the home thread only; producers read it in WantsDrainFor.
+  std::atomic<bool> receiving_{false};
+  // Set once, at creation. A broadcast port always receives; whether a message
+  // is delivered or discarded is decided per message by broadcastTarget_.
+  bool broadcast_ = false;
   // Set while a drain is queued, so a burst of messages costs one post.
   // Atomic because producers flip it from their own threads.
   std::atomic<bool> scheduled_{false};
@@ -161,6 +175,7 @@ class NativeMessagePort
   // closed, which is the lifetime model HTML and Node specify — reachability
   // plays no part in it.
   v8::Global<v8::Object> wrapper_;
+  v8::Global<v8::Object> broadcastTarget_;
   IsolateWrapper isolateWrapper_;
   // Held by shared_ptr so a drain posted from a foreign thread can never race
   // the loop's own teardown.
