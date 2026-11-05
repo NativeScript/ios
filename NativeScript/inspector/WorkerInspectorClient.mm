@@ -57,8 +57,11 @@ WorkerInspectorClient::WorkerInspectorClient(int workerId, Isolate* isolate,
   contextInfo.origin = Make8BitStringView(url_);
   inspector_->contextCreated(contextInfo);
   context_.Reset(isolate_, context);
-  session_ =
-      inspector_->connect(contextGroupId, this, {}, v8_inspector::V8Inspector::kFullyTrusted);
+
+  sessions_ = std::make_unique<InspectorSessions>(
+      isolate_, contextGroupId, [this](uint64_t connectionId, const std::string& message) {
+        this->SendWrapped(connectionId, message);
+      });
 }
 
 WorkerInspectorClient::~WorkerInspectorClient() {
@@ -74,22 +77,27 @@ WorkerInspectorClient::~WorkerInspectorClient() {
   v8::Locker locker(isolate_);
   Isolate::Scope isolate_scope(isolate_);
   HandleScope handle_scope(isolate_);
-  if (session_ != nullptr) {
-    session_->resume();
-    session_.reset();
-  }
+  sessions_.reset();
   inspector_.reset();
   context_.Reset();
 }
 
-void WorkerInspectorClient::PushMessage(const std::string& message) {
+void WorkerInspectorClient::PushMessage(uint64_t connectionId, const std::string& message) {
+  this->PushIncoming({connectionId, false, message});
+}
+
+void WorkerInspectorClient::PushDisconnect(uint64_t connectionId) {
+  this->PushIncoming({connectionId, true, std::string()});
+}
+
+void WorkerInspectorClient::PushIncoming(Incoming incoming) {
   if (dying_) {
     return;
   }
 
   {
     std::lock_guard<std::mutex> lock(incomingMutex_);
-    incoming_.push(message);
+    incoming_.push(std::move(incoming));
   }
 
   if (source_ != nullptr && CFRunLoopSourceIsValid(source_)) {
@@ -99,87 +107,36 @@ void WorkerInspectorClient::PushMessage(const std::string& message) {
   dispatch_semaphore_signal(messageArrived_);
 }
 
-std::string WorkerInspectorClient::PopMessage() {
+bool WorkerInspectorClient::PopIncoming(Incoming& incoming) {
   std::lock_guard<std::mutex> lock(incomingMutex_);
   if (incoming_.empty()) {
-    return "";
+    return false;
   }
-  std::string message = incoming_.front();
+  incoming = std::move(incoming_.front());
   incoming_.pop();
-  return message;
+  return true;
 }
 
 void WorkerInspectorClient::DrainIncoming() {
-  std::string message;
-  while (!dying_ && !(message = this->PopMessage()).empty()) {
-    this->DispatchOne(message);
+  Incoming incoming;
+  while (!dying_ && this->PopIncoming(incoming)) {
+    this->HandleIncoming(incoming);
   }
-  this->MaybeResetSession();
 }
 
-void WorkerInspectorClient::DispatchOne(const std::string& message) {
-  if (message == kResetSessionMessage) {
-    this->HandleResetRequest();
+void WorkerInspectorClient::HandleIncoming(const Incoming& incoming) {
+  if (incoming.disconnect) {
+    sessions_->Disconnect(incoming.connectionId);
     return;
   }
 
-  if (session_ == nullptr) {
-    return;
-  }
+  sessions_->Connect(inspector_.get(), incoming.connectionId);
+  sessions_->Dispatch(incoming.connectionId, incoming.message);
 
   v8::Locker locker(isolate_);
   Isolate::Scope isolate_scope(isolate_);
   HandleScope handle_scope(isolate_);
-  session_->dispatchProtocolMessage(Make8BitStringView(message));
   isolate_->PerformMicrotaskCheckpoint();
-}
-
-void WorkerInspectorClient::HandleResetRequest() {
-  if (runningPauseLoop_) {
-    // We're inside session_->dispatchProtocolMessage somewhere up the stack —
-    // resume now (which exits the nested pause loop) and swap the session
-    // only once that stack has fully unwound, from DrainIncoming.
-    pendingReset_ = true;
-    {
-      v8::Locker locker(isolate_);
-      Isolate::Scope isolate_scope(isolate_);
-      HandleScope handle_scope(isolate_);
-      if (session_ != nullptr) {
-        session_->resume();
-      }
-    }
-    if (source_ != nullptr && CFRunLoopSourceIsValid(source_)) {
-      CFRunLoopSourceSignal(source_);
-      CFRunLoopWakeUp(workerLoop_);
-    }
-    return;
-  }
-
-  this->DoResetSession();
-}
-
-void WorkerInspectorClient::DoResetSession() {
-  v8::Locker locker(isolate_);
-  Isolate::Scope isolate_scope(isolate_);
-  HandleScope handle_scope(isolate_);
-  if (session_ != nullptr) {
-    session_->resume();
-    session_.reset();
-  }
-  session_ =
-      inspector_->connect(contextGroupId, this, {}, v8_inspector::V8Inspector::kFullyTrusted);
-
-  JsV8InspectorClient* root = JsV8InspectorClient::GetInstance();
-  if (root != nullptr) {
-    frontendGeneration_ = root->FrontendGeneration();
-  }
-}
-
-void WorkerInspectorClient::MaybeResetSession() {
-  if (pendingReset_ && !runningPauseLoop_ && !dying_) {
-    pendingReset_ = false;
-    this->DoResetSession();
-  }
 }
 
 void WorkerInspectorClient::runMessageLoopOnPause(int contextGroupId) {
@@ -188,12 +145,13 @@ void WorkerInspectorClient::runMessageLoopOnPause(int contextGroupId) {
   }
   runningPauseLoop_ = true;
   pauseTerminated_ = false;
+  sessions_->ClearPauseRequests();
 
   while (!pauseTerminated_ && !dying_) {
-    std::string message = this->PopMessage();
-    bool shouldWait = message.empty();
+    Incoming incoming;
+    bool shouldWait = !this->PopIncoming(incoming);
     if (!shouldWait) {
-      this->DispatchOne(message);
+      this->HandleIncoming(incoming);
     }
 
     // JS frames are on the stack, so only nestable v8 foreground tasks may
@@ -221,7 +179,8 @@ void WorkerInspectorClient::NotifyTerminating() {
   dispatch_semaphore_signal(messageArrived_);
 }
 
-void WorkerInspectorClient::RequestPauseInterrupt() {
+void WorkerInspectorClient::RequestPauseInterrupt(uint64_t connectionId) {
+  sessions_->RequestPause(connectionId);
   isolate_->RequestInterrupt(
       [](Isolate* isolate, void* data) {
         // Runs on the worker thread mid-JS. Teardown also happens on the
@@ -237,23 +196,9 @@ void WorkerInspectorClient::RequestPauseInterrupt() {
       reinterpret_cast<void*>(static_cast<intptr_t>(workerId_)));
 }
 
-void WorkerInspectorClient::SchedulePauseFromInterrupt() {
-  if (session_ != nullptr) {
-    session_->schedulePauseOnNextStatement({}, {});
-  }
-}
+void WorkerInspectorClient::SchedulePauseFromInterrupt() { sessions_->TakePauseRequests(); }
 
-void WorkerInspectorClient::sendResponse(int callId, std::unique_ptr<StringBuffer> message) {
-  this->SendWrapped(ToStdString(message->string()));
-}
-
-void WorkerInspectorClient::sendNotification(std::unique_ptr<StringBuffer> message) {
-  this->SendWrapped(ToStdString(message->string()));
-}
-
-void WorkerInspectorClient::flushProtocolNotifications() {}
-
-void WorkerInspectorClient::SendWrapped(const std::string& message) {
+void WorkerInspectorClient::SendWrapped(uint64_t connectionId, const std::string& message) {
   if (message.empty() || message[0] != '{') {
     return;
   }
@@ -272,7 +217,7 @@ void WorkerInspectorClient::SendWrapped(const std::string& message) {
 
   JsV8InspectorClient* root = JsV8InspectorClient::GetInstance();
   if (root != nullptr) {
-    root->SendWorkerOutput(frontendGeneration_, wrapped);
+    root->SendToConnection(connectionId, wrapped);
   }
 }
 
@@ -296,7 +241,7 @@ void WorkerInspectorClient::consoleLog(ConsoleAPIType method,
       context, contextId, contextGroupId, impl, currentTimeMS(), method, {args.data(), args.size()},
       String16{}, std::move(stackImpl));
 
-  // Going through the message storage both reports to the session when the
+  // Going through the message storage both reports to the sessions whose
   // frontend has enabled the Runtime agent AND keeps the message for replay
   // on Runtime.enable. Workers log most of their output (module top-level,
   // early onmessage work) before DevTools attaches and enables the session;

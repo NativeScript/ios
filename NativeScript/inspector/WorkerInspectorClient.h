@@ -6,11 +6,13 @@
 
 #include <atomic>
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <queue>
 #include <string>
 #include <vector>
 
+#include "InspectorSessions.h"
 #include "include/v8-inspector.h"
 #include "src/inspector/v8-console-message.h"
 
@@ -18,17 +20,17 @@ namespace v8_inspector {
 
 // V8 inspector for a single worker isolate, exposed to Chrome DevTools as a
 // child target ("Target.attachedToTarget") and addressed with flat-session
-// CDP messages (a top-level "sessionId" field). One instance per worker.
+// CDP messages (a top-level "sessionId" field). One instance per worker, with
+// one V8 session per frontend that talks to it.
 //
 // Threading: constructed, dispatched into, and destroyed on the worker's own
 // thread (V8's inspector is not thread-safe). Other threads interact only
-// through PushMessage/NotifyTerminating/RequestPauseInterrupt. Incoming
-// messages are queued and drained via a CFRunLoopSource on the worker's
-// runloop; while paused, a nested loop on the worker thread pumps the same
-// queue (the runloop is NOT re-entered, so postMessage deliveries stay queued
-// during a pause, matching Chrome's semantics).
-class WorkerInspectorClient final : public V8InspectorClient,
-                                    public V8Inspector::Channel {
+// through PushMessage/PushDisconnect/NotifyTerminating/RequestPauseInterrupt.
+// Incoming messages are queued and drained via a CFRunLoopSource on the
+// worker's runloop; while paused, a nested loop on the worker thread pumps the
+// same queue (the runloop is NOT re-entered, so postMessage deliveries stay
+// queued during a pause, matching Chrome's semantics).
+class WorkerInspectorClient final : public V8InspectorClient {
  public:
   // Worker thread, with the worker isolate locked and its context created.
   WorkerInspectorClient(int workerId, v8::Isolate* isolate,
@@ -40,14 +42,13 @@ class WorkerInspectorClient final : public V8InspectorClient,
   const std::string& TargetId() const { return targetId_; }
   const std::string& Url() const { return url_; }
 
-  // Worker thread. See JsV8InspectorClient::FrontendGeneration.
-  void SetFrontendGeneration(uint64_t generation) {
-    frontendGeneration_ = generation;
-  }
+  // Any thread. Queues a CDP message from a frontend and wakes the worker
+  // runloop / a nested pause loop. The frontend's first message creates its
+  // session, so callers must stop pushing once they pushed its disconnect.
+  void PushMessage(uint64_t connectionId, const std::string& message);
 
-  // Any thread. Queues a CDP message (already stripped of routing concerns)
-  // and wakes the worker runloop / a nested pause loop.
-  void PushMessage(const std::string& message);
+  // Any thread. Drops the frontend's session.
+  void PushDisconnect(uint64_t connectionId);
 
   // Any thread. Unblocks a paused worker and makes it drop all inspector
   // work; used by WorkerWrapper::Terminate together with TerminateExecution.
@@ -55,7 +56,7 @@ class WorkerInspectorClient final : public V8InspectorClient,
 
   // Any thread (with the worker isolate guaranteed alive). Schedules a pause
   // at the next statement even if the worker is busy executing JS.
-  void RequestPauseInterrupt();
+  void RequestPauseInterrupt(uint64_t connectionId);
 
   // Worker thread (from the interrupt requested above).
   void SchedulePauseFromInterrupt();
@@ -64,16 +65,6 @@ class WorkerInspectorClient final : public V8InspectorClient,
   void consoleLog(ConsoleAPIType method,
                   const std::vector<v8::Local<v8::Value>>& args);
 
-  // Internal control message pushed by the root client on frontend
-  // reconnect; resumes the worker if paused and recreates its session.
-  static constexpr const char* kResetSessionMessage =
-      "{\"__nsInternal\":\"resetSession\"}";
-
-  // Overrides of V8Inspector::Channel
-  void sendResponse(int callId, std::unique_ptr<StringBuffer> message) override;
-  void sendNotification(std::unique_ptr<StringBuffer> message) override;
-  void flushProtocolNotifications() override;
-
   // Overrides of V8InspectorClient
   void runMessageLoopOnPause(int contextGroupId) override;
   void quitMessageLoopOnPause() override;
@@ -81,13 +72,17 @@ class WorkerInspectorClient final : public V8InspectorClient,
  private:
   static constexpr int contextGroupId = 1;
 
+  struct Incoming {
+    uint64_t connectionId;
+    bool disconnect;
+    std::string message;
+  };
+
   void DrainIncoming();
-  std::string PopMessage();
-  void DispatchOne(const std::string& message);
-  void HandleResetRequest();
-  void DoResetSession();
-  void MaybeResetSession();
-  void SendWrapped(const std::string& message);
+  bool PopIncoming(Incoming& incoming);
+  void PushIncoming(Incoming incoming);
+  void HandleIncoming(const Incoming& incoming);
+  void SendWrapped(uint64_t connectionId, const std::string& message);
 
   v8::Local<v8::Context> ensureDefaultContextInGroup(
       int contextGroupId) override;
@@ -101,20 +96,16 @@ class WorkerInspectorClient final : public V8InspectorClient,
   CFRunLoopSourceRef source_ = nullptr;
 
   std::unique_ptr<V8Inspector> inspector_;
-  std::unique_ptr<V8InspectorSession> session_;
+  std::unique_ptr<InspectorSessions> sessions_;
   v8::Persistent<v8::Context> context_;
 
-  std::queue<std::string> incoming_;
+  std::queue<Incoming> incoming_;
   std::mutex incomingMutex_;
   dispatch_semaphore_t messageArrived_;
 
   std::atomic<bool> dying_{false};
   std::atomic<bool> pauseTerminated_{false};
   bool runningPauseLoop_ = false;  // worker thread only
-  bool pendingReset_ = false;      // worker thread only
-  // JsV8InspectorClient::FrontendGeneration() as of this session's latest
-  // (re)creation or registration; worker thread only.
-  uint64_t frontendGeneration_ = 0;
 };
 
 }  // namespace v8_inspector
