@@ -2985,7 +2985,6 @@
 					"-Wall",
 					"-Werror",
 					"-Wno-documentation",
-					"-fembed-bitcode",
 				);
 				OTHER_LDFLAGS = (
 					"-ld_classic",
@@ -3079,7 +3078,6 @@
 					"-Wall",
 					"-Werror",
 					"-Wno-documentation",
-					"-fembed-bitcode",
 				);
 				OTHER_LDFLAGS = (
 					"-ld_classic",
