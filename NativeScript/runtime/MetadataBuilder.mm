@@ -546,6 +546,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
   Local<External> ext = External::New(isolate, item, v8::kExternalPointerTypeTagDefault);
 
   ctorFuncTemplate = FunctionTemplate::New(isolate, ClassConstructorCallback, ext);
+  // MetaInstancePrototypes caches this prototype.
+  ctorFuncTemplate->ReadOnlyPrototype();
   ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
   ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, meta->name()));
 
