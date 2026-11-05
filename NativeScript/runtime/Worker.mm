@@ -744,6 +744,9 @@ void Worker::PostMessageCallback(const FunctionCallbackInfo<Value>& info) {
 
 void Worker::OnMessageCallback(Isolate* isolate, Local<Object> receiver,
                                std::shared_ptr<worker::Message> message) {
+  // Callers drain a whole batch under one scope; without this the handles of
+  // every message in the batch stay alive until the batch ends.
+  HandleScope handleScope(isolate);
   WorkerEventsState* state = Caches::StateFor<WorkerEventsState>(isolate);
   if (state == nullptr || state->emitMessage.IsEmpty()) {
     return;

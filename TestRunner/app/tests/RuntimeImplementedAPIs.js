@@ -83,9 +83,12 @@ describe("DOMException canary", () => {
   });
 
   it("serializes through structuredClone on this runtime", () => {
-    const clone = structuredClone(new DOMException("x", "AbortError"));
+    const original = new DOMException("x", "AbortError");
+    original.stack = "DOMException stack sentinel";
+    const clone = structuredClone(original);
     expect(clone instanceof DOMException).toBe(true);
     expect(clone.name).toBe("AbortError");
+    expect(clone.stack).toBe("DOMException stack sentinel");
   });
 
   // Once an isolate holds a DOMException the serializer claims host objects
