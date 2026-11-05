@@ -72,6 +72,13 @@ jobs:
     name: Build ${{ matrix.target }}
     runs-on: macos-15
     needs: setup
+    # A newer push to main supersedes an older "next" build. Only build and
+    # test are cancelable: cancelling the publishing jobs could leave a
+    # half-published release. Tags and manual releases get their own groups
+    # and never cancel.
+    concurrency:
+      group: ${{ github.workflow }}-build-${{ matrix.target }}-${{ github.event_name }}-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     strategy:
       fail-fast: false
       # Computed in `setup`: ios always; visionos only for real releases
@@ -132,6 +139,9 @@ jobs:
     name: Test
     runs-on: macos-15
     needs: build
+    concurrency:
+      group: ${{ github.workflow }}-test-${{ github.event_name }}-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
