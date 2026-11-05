@@ -66,5 +66,10 @@ print(max(matches)[1])
 " "$DEVICE")
 
 echo "Booting $DEVICE ($UDID) in the background; log: $LOG" >&2
-nohup xcrun simctl bootstatus "$UDID" -b >"$LOG" 2>&1 &
+nohup bash -c '
+  echo "boot started:  $(date -u +%FT%TZ)"
+  xcrun simctl bootstatus "$1" -b
+  rc=$?
+  echo "boot finished: $(date -u +%FT%TZ) (exit $rc)"
+' _ "$UDID" >"$LOG" 2>&1 &
 echo "$UDID"

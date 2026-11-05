@@ -154,11 +154,6 @@ jobs:
         with:
           submodules: true
           persist-credentials: false # disable to prevent leaking credentials to build scripts
-      - name: Boot simulator
-        # Placed before dependency setup so the boot overlaps it and the build.
-        run: |
-          UDID=$(./scripts/boot-ci-simulator.sh --device "iPhone 16 Pro")
-          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
       - name: LLVM cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -173,6 +168,12 @@ jobs:
         run: |
           mkdir -p dist-test
           echo TEST_FOLDER=$(pwd)/dist-test >> $GITHUB_ENV
+      - name: Boot simulator
+        # Started here, not earlier: booting during the cache restore and the
+        # dependency installs slows them down more than the overlap saves.
+        run: |
+          UDID=$(./scripts/boot-ci-simulator.sh --device "iPhone 16 Pro")
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
       - name: Xcode Tests
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         # try to run the tests with xcpretty. If it fails then try again without xcpretty twice for better log output
@@ -189,6 +190,9 @@ jobs:
           # "Existing file at -resultBundlePath".
           on_retry_command: rm -rf $TEST_FOLDER/test_results_attempt1.xcresult; mv $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test_results_attempt1.xcresult 2>/dev/null; for f in $TEST_FOLDER/test_results*; do [ "$f" = "$TEST_FOLDER/test_results_attempt1.xcresult" ] || rm -rf "$f"; done; xcrun simctl shutdown all
           new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination id\=$SIM_UDID test
+      - name: Simulator boot log
+        if: ${{ !cancelled() }}
+        run: cat "$RUNNER_TEMP/simulator-boot.log" || true
       - name: Extract test results
         # Runs even when the test step failed: the xcresult usually still
         # carries the JS suite's junit attachments for the report step below.
