@@ -144,6 +144,11 @@ jobs:
         with:
           submodules: true
           persist-credentials: false # disable to prevent leaking credentials to build scripts
+      - name: Boot simulator
+        # Placed before dependency setup so the boot overlaps it and the build.
+        run: |
+          UDID=$(./scripts/boot-ci-simulator.sh --device "iPhone 16 Pro")
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
       - name: LLVM cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -167,20 +172,20 @@ jobs:
           # TestRunnerTests.swift) need more than 20m headroom per attempt.
           timeout_minutes: 40
           max_attempts: 2
-          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test | xcpretty
+          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination id\=$SIM_UDID test | xcpretty
           # Keep the failed attempt's bundle — it holds the diagnostics of the
           # failure being retried. Everything else at the result path must go
           # (including extensionless staging leftovers), or the retry dies with
           # "Existing file at -resultBundlePath".
           on_retry_command: rm -rf $TEST_FOLDER/test_results_attempt1.xcresult; mv $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test_results_attempt1.xcresult 2>/dev/null; for f in $TEST_FOLDER/test_results*; do [ "$f" = "$TEST_FOLDER/test_results_attempt1.xcresult" ] || rm -rf "$f"; done; xcrun simctl shutdown all
-          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test
+          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination id\=$SIM_UDID test
       - name: Extract test results
         # Runs even when the test step failed: the xcresult usually still
         # carries the JS suite's junit attachments for the report step below.
         if: ${{ !cancelled() }}
         run: |
           if [ -d "$TEST_FOLDER/test_results.xcresult" ]; then
-            xcparse attachments $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test-out
+            ./scripts/export-test-attachments.sh --result "$TEST_FOLDER/test_results.xcresult" --output "$TEST_FOLDER/test-out"
           fi
       - name: Test report summary
         if: ${{ !cancelled() }}
