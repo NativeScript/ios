@@ -311,6 +311,22 @@ describe("Messaging runtime edges", function () {
                 done();
             };
         });
+
+        it("rejects a marked object reached after the getter that created the brand", function (done) {
+            var worker = new Worker("./messaging/uncloneableAfterGetterWorker.js");
+            worker.onmessage = function (event) {
+                expect(event.data).toEqual({ threw: true, name: "DataCloneError" });
+                worker.terminate();
+                done();
+            };
+            // fail() throws in this runner, which would skip done() when called
+            // from an event handler.
+            worker.onerror = function (error) {
+                expect("worker error: " + error.message).toBeNull();
+                worker.terminate();
+                done();
+            };
+        });
     });
 
     describe("worker error reporting", function () {
