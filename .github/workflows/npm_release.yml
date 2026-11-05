@@ -74,10 +74,11 @@ jobs:
     needs: setup
     # A newer push to main supersedes an older "next" build. Only build and
     # test are cancelable: cancelling the publishing jobs could leave a
-    # half-published release. Tags and manual releases get their own groups
-    # and never cancel.
+    # half-published release. Every other event gets a per-run group: a shared
+    # group would let a newer pending release replace an older pending one,
+    # even without cancel-in-progress.
     concurrency:
-      group: ${{ github.workflow }}-build-${{ matrix.target }}-${{ github.event_name }}-${{ github.ref }}
+      group: ${{ github.workflow }}-build-${{ matrix.target }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'main' || github.run_id }}
       cancel-in-progress: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     strategy:
       fail-fast: false
@@ -140,7 +141,7 @@ jobs:
     runs-on: macos-15
     needs: build
     concurrency:
-      group: ${{ github.workflow }}-test-${{ github.event_name }}-${{ github.ref }}
+      group: ${{ github.workflow }}-test-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'main' || github.run_id }}
       cancel-in-progress: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - name: Harden the runner (Audit all outbound calls)
