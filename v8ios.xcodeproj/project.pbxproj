@@ -2093,7 +2093,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cd ${PROJECT_DIR}/metadata-generator\nmkdir build\ncd ./build\ncmake -DCMAKE_BUILD_TYPE=Release ../\nmake\n";
+			shellScript = "cd ${PROJECT_DIR}/metadata-generator\nmkdir build\ncd ./build\ncmake -DCMAKE_BUILD_TYPE=Release ../\nmake -j$(sysctl -n hw.ncpu)\n";
 		};
 		C2F4CBBD22C61D480036B56F /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
