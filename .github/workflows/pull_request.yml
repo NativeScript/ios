@@ -4,6 +4,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 env:
   NPM_TAG: "pr"
   XCODE_VERSION: "^16.0"
