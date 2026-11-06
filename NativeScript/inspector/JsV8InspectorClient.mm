@@ -2,6 +2,8 @@
 #include <notify.h>
 #include <algorithm>
 #include <chrono>
+#include <cmath>
+#include <cstdint>
 
 #include "src/inspector/v8-console-message.h"
 #include "src/inspector/v8-inspector-impl.h"
@@ -195,6 +197,20 @@ size_t TruncateUTF8ToByteSize(const uint8_t* data, size_t length) {
     }
   }
   return 0;
+}
+
+// CDP integers are int32: Chromium's protocol bindings reject anything else,
+// though an integral double such as 5.0 still counts.
+bool GetInt32(const json& value, long long& out) {
+  if (!value.is_number()) {
+    return false;
+  }
+  double number = value.get<double>();
+  if (number != std::trunc(number) || number < INT32_MIN || number > INT32_MAX) {
+    return false;
+  }
+  out = static_cast<long long>(number);
+  return true;
 }
 }  // namespace
 
@@ -417,10 +433,9 @@ void JsV8InspectorClient::onFrontendMessageReceived(uint64_t connectionId,
       }
       for (auto [name, value] : {std::pair{"offset", &offset}, std::pair{"size", &size}}) {
         if (params.contains(name)) {
-          validParams &= params[name].is_number_integer();
-          if (params[name].is_number_integer()) {
-            *value = params[name].get<long long>();
-          }
+          long long parsedValue = 0;
+          validParams &= GetInt32(params[name], parsedValue);
+          *value = parsedValue;
         }
       }
     }
@@ -1102,8 +1117,9 @@ void JsV8InspectorClient::HandleIORead(int msgId, const std::string& handle,
 
   json response = {{"id", msgId}, {"result", result}};
   // A text chunk that starts inside a character, or a read of 6 bytes or
-  // fewer, is not valid UTF-8 on its own.
-  this->SendToFrontend(
+  // fewer, is not valid UTF-8 on its own. Raw: a reply is never a
+  // Debugger.scriptParsed whose sourceMapURL needs rewriting.
+  this->SendRawToFrontend(
       WithSessionId(response, sessionId).dump(-1, ' ', false, json::error_handler_t::replace));
 }
 
