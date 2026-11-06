@@ -1,3 +1,5 @@
+const { raisesGlobalErrors } = require("../Infrastructure/Jasmine/globalErrorSpy");
+
 describe("interop.escapeException and boundary hardening", function () {
     // Several tests drive an unhandled/reported error through the uncaught path,
     // which ends in the __onUncaughtError shim (unless a listener prevents it).
@@ -205,7 +207,7 @@ describe("interop.escapeException and boundary hardening", function () {
     });
 
     describe("adapter boundary hardening (no process abort on JS throw)", function () {
-        it("a throwing getter read through the DictionaryAdapter yields a default, reports, and does not crash", function (done) {
+        it("a throwing getter read through the DictionaryAdapter yields a default, reports, and does not crash", raisesGlobalErrors(function (done) {
             const jsObject = {
                 get boom() {
                     throw new Error("dict-adapter-boom");
@@ -220,9 +222,9 @@ describe("interop.escapeException and boundary hardening", function () {
                 expect(uncaughtSeen("dict-adapter-boom")).toBe(true);
                 done();
             });
-        });
+        }));
 
-        it("a throwing overridden property getter read from native does not crash and is reported", function (done) {
+        it("a throwing overridden property getter read from native does not crash and is reported", raisesGlobalErrors(function (done) {
             // baseProperty uses the default getter selector (KVC-accessible),
             // unlike TNSApi.property which has a custom getter.
             const Derived = TNSDerivedInterface.extend({
@@ -247,7 +249,7 @@ describe("interop.escapeException and boundary hardening", function () {
                 expect(uncaughtSeen("getter-adapter-boom")).toBe(true);
                 done();
             });
-        });
+        }));
     });
 
     // manual: uncaughtErrorPolicy "throw" is not exercised automatically because

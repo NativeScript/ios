@@ -1,3 +1,5 @@
+const { raisesGlobalErrors } = require("../Infrastructure/Jasmine/globalErrorSpy");
+
 // A timer source foreign to the runtime's event loop: a CFRunLoopTimer on the
 // same runloop, outside the ordered timer lane. The global setTimeout is the
 // runtime's own timers, so tests probing interleaving with non-runtime work
@@ -172,7 +174,7 @@ describe("event loop ordered macrotasks", function () {
 // a rejection created mid-chain must be reported while the chain is still
 // running, not after it ends.
 describe("event loop immediate timer yielding", function () {
-    it("yields to native work between immediate timer chain steps", function (done) {
+    it("yields to native work between immediate timer chain steps", raisesGlobalErrors(function (done) {
         let step = 0;
         let nstimerStep = -1;
         let mainQueueStep = -1;
@@ -208,7 +210,7 @@ describe("event loop immediate timer yielding", function () {
                 done();
             }, 100);
         })();
-    });
+    }));
 
 });
 
@@ -400,6 +402,9 @@ describe("event loop workers", function () {
                 .toBe("names the reason");
             worker.terminate();
             done();
+            // Left unhandled here, the error would be re-reported on the main
+            // global scope, where Jasmine charges it to the next spec.
+            return true;
         };
     });
 
