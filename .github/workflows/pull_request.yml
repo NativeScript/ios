@@ -35,8 +35,10 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/xcode-cas
-          key: xcode-cas-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}${{ matrix.artifact-suffix }}-${{ github.sha }}
-          restore-keys: xcode-cas-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}${{ matrix.artifact-suffix }}-
+          # npm_release.yml saves this key from main (never restoring it there), so
+          # a PR's first push starts warm.
+          key: xcode-cas-${{ runner.os }}-${{ runner.arch }}-build-${{ github.sha }}
+          restore-keys: xcode-cas-${{ runner.os }}-${{ runner.arch }}-build-
       - name: Enable Xcode compilation cache
         run: |
           echo "XCODE_XCCONFIG_FILE=$GITHUB_WORKSPACE/tools/ci-compilation-cache.xcconfig" >> "$GITHUB_ENV"
@@ -91,11 +93,13 @@ jobs:
           - name: Test
             xcodebuild-args: ""
             artifact-suffix: ""
+            cache-variant: default
           # Only code compiled here is instrumented: the runtime and the test
           # fixtures, not the prebuilt V8 archives.
           - name: Test (ASan)
             xcodebuild-args: "-enableAddressSanitizer YES"
             artifact-suffix: "-asan"
+            cache-variant: asan
     steps:
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
@@ -113,8 +117,10 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/xcode-cas
-          key: xcode-cas-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}${{ matrix.artifact-suffix }}-${{ github.sha }}
-          restore-keys: xcode-cas-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}${{ matrix.artifact-suffix }}-
+          # A distinct segment per variant: a bare prefix of one would also match
+          # the other's keys. npm_release.yml saves the "default" variant from main.
+          key: xcode-cas-${{ runner.os }}-${{ runner.arch }}-test-${{ matrix.cache-variant }}-${{ github.sha }}
+          restore-keys: xcode-cas-${{ runner.os }}-${{ runner.arch }}-test-${{ matrix.cache-variant }}-
       - name: Enable Xcode compilation cache
         run: |
           echo "XCODE_XCCONFIG_FILE=$GITHUB_WORKSPACE/tools/ci-compilation-cache.xcconfig" >> "$GITHUB_ENV"
