@@ -13,7 +13,7 @@ on:
 
 env:
   NPM_TAG: "next"
-  XCODE_VERSION: "^16.0"
+  XCODE_VERSION: "26.3"
 
 # Minimal default token permissions for every job. Jobs that need more declare it
 # locally (github-release: contents:write; publish: id-token:write). Cross-repo
@@ -110,6 +110,14 @@ jobs:
       - uses: ./.github/actions/setup-build-env
         with:
           registry-url: "https://registry.npmjs.org"
+      - name: Fill an empty Xcode compilation cache
+        # Pull requests restore this cache (pull_request.yml). This workflow only
+        # saves it: never restore a cache here, so shipped binaries are always
+        # compiled from source.
+        if: ${{ github.ref == 'refs/heads/main' && matrix.target == 'ios' }}
+        run: |
+          echo "XCODE_XCCONFIG_FILE=$GITHUB_WORKSPACE/tools/ci-compilation-cache.xcconfig" >> "$GITHUB_ENV"
+          echo "NS_COMPILATION_CACHE_DIR=$RUNNER_TEMP/xcode-cas" >> "$GITHUB_ENV"
       - name: Set package version
         run: npm version $NPM_VERSION --no-git-tag-version --allow-same-version
       - name: Build (${{ matrix.target }})
@@ -120,6 +128,12 @@ jobs:
           # env indirection keeps matrix values out of shell interpolation
           BUILD_SCRIPT: ${{ matrix.script }}
         run: npm run "$BUILD_SCRIPT" -- --spm-mode=remote
+      - name: Save Xcode compilation cache for pull requests
+        if: ${{ github.ref == 'refs/heads/main' && matrix.target == 'ios' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/xcode-cas
+          key: xcode-cas-${{ runner.os }}-${{ runner.arch }}-build-${{ github.sha }}
       - name: Upload npm package artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -165,6 +179,14 @@ jobs:
           install-test-tools: "true"
       - name: Prepare
         run: npm run setup-ci
+      - name: Fill an empty Xcode compilation cache
+        # Pull requests restore this cache (pull_request.yml). This workflow only
+        # saves it: never restore a cache here, so shipped binaries are always
+        # compiled from source.
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: |
+          echo "XCODE_XCCONFIG_FILE=$GITHUB_WORKSPACE/tools/ci-compilation-cache.xcconfig" >> "$GITHUB_ENV"
+          echo "NS_COMPILATION_CACHE_DIR=$RUNNER_TEMP/xcode-cas" >> "$GITHUB_ENV"
       - name: Prepare test folder
         run: |
           mkdir -p dist-test
@@ -185,6 +207,12 @@ jobs:
           # "Existing file at -resultBundlePath".
           on_retry_command: rm -rf $TEST_FOLDER/test_results_attempt1.xcresult; mv $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test_results_attempt1.xcresult 2>/dev/null; for f in $TEST_FOLDER/test_results*; do [ "$f" = "$TEST_FOLDER/test_results_attempt1.xcresult" ] || rm -rf "$f"; done; xcrun simctl shutdown all
           new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro test
+      - name: Save Xcode compilation cache for pull requests
+        if: ${{ github.ref == 'refs/heads/main' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/xcode-cas
+          key: xcode-cas-${{ runner.os }}-${{ runner.arch }}-test-default-${{ github.sha }}
       - name: Extract test results
         # Runs even when the test step failed: the xcresult usually still
         # carries the JS suite's junit attachments for the report step below.

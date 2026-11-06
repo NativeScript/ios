@@ -1,7 +1,8 @@
-// CI-only: Xcode 26 compilation caching for the pull request workflow.
-// Loaded through XCODE_XCCONFIG_FILE so it applies to every xcodebuild in a
-// job, including the ones the build scripts run. NS_COMPILATION_CACHE_DIR is
-// the CAS directory the workflow restores and saves. Never use it in the
-// release workflow: shipped binaries must not be built from restored caches.
+// CI-only: Xcode 26 compilation caching. Loaded through XCODE_XCCONFIG_FILE so
+// it applies to every xcodebuild in a job, including the ones the build
+// scripts run. NS_COMPILATION_CACHE_DIR is the CAS directory.
+// pull_request.yml restores and saves the CAS. npm_release.yml only fills an
+// empty CAS and saves it for pull requests; it must never restore one, so
+// shipped binaries are always compiled from source.
 COMPILATION_CACHE_ENABLE_CACHING = YES
 COMPILATION_CACHE_CAS_PATH = $(NS_COMPILATION_CACHE_DIR)
