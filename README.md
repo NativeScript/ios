@@ -143,11 +143,9 @@ Apple variants need macOS.
 
 # Building a Distribution Package
 
-1. (Optional) Bump the version in package.json
+1. (Optional) Bump the version in package.json. The runtime reads it from there at build time.
 
-2. Run: `npm run update-version` (*This will update the runtime headers with version info*)
-
-3. Build & pack: `npm run build-ios`
+2. Build & pack: `npm run build-ios`
 
 This will create `dist/nativescript-ios-{version}.tgz`.
 
