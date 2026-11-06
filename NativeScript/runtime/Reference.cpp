@@ -456,9 +456,7 @@ Reference::DataPair Reference::GetDataPair(Local<Object> obj) {
     const TypeEncoding* typeEncoding = refWrapper->Encoding();
 
     if (typeWrapper == nullptr) {
-      ffi_type* ffiType = FFICall::GetArgumentType(typeEncoding);
-      size = ffiType->size;
-      FFICall::DisposeFFIType(ffiType, typeEncoding);
+      size = FFICall::GetTypeSize(typeEncoding);
     }
 
     DataPair pair(typeWrapper, typeEncoding, refWrapper->Data(), size);

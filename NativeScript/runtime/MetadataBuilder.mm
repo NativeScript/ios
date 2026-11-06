@@ -1264,11 +1264,10 @@ v8::Intercepted MetadataBuilder::SwizzledInstanceMethodCallback(
       new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);
   IMP methodBody =
       Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
+  SEL nativeSelector = Interop::RegisterSwizzledSelector(methodMeta->selector());
   IMP nativeImp =
       class_replaceMethod(klass, methodMeta->selector(), methodBody, compilerEncoding.c_str());
   if (nativeImp) {
-    std::string selector = methodMeta->selectorAsString();
-    SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selector).c_str());
     class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding.c_str());
   }
   // Not intercepted: the native write is done, but V8 must still perform
@@ -1359,10 +1358,9 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
     PropertyCallbackContext* userData =
         new PropertyCallbackContext(isolate, poGetterFunc, nullptr, propertyMeta);
     IMP impGetter = Interop::CreateMethod(2, 0, typeEncoding, getterCallback, userData);
+    SEL nativeSelector = Interop::RegisterSwizzledSelector(propertyMeta->getter()->selector());
     IMP nativeImp =
         class_replaceMethod(klass, propertyMeta->getter()->selector(), impGetter, compilerEncoding);
-    std::string selector = propertyMeta->getter()->selectorAsString();
-    SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selector).c_str());
     class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding);
   }
 
@@ -1424,10 +1422,9 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
     IMP impSetter = Interop::CreateMethod(2, 1, typeEncoding, setterCallback, userData);
 
     const char* compilerEncoding = "v@:@";
+    SEL nativeSelector = Interop::RegisterSwizzledSelector(propertyMeta->setter()->selector());
     IMP nativeImp =
         class_replaceMethod(klass, propertyMeta->setter()->selector(), impSetter, compilerEncoding);
-    std::string selector = propertyMeta->setter()->selectorAsString();
-    SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selector).c_str());
     class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding);
   }
   // Not intercepted: the native write is done, but V8 must still perform

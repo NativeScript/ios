@@ -115,6 +115,9 @@ class Interop {
   static v8::Local<v8::Value> GetPrimitiveReturnType(
       v8::Local<v8::Context> context, BinaryTypeEncodingType type,
       BaseCall* call);
+  // Must run before the class_replaceMethod that swizzles `selector`; returns
+  // the selector the original implementation is re-added under.
+  static SEL RegisterSwizzledSelector(SEL selector);
 
  private:
   static void ExecuteWriteValueDebugValidationsIfInDebug(
@@ -177,6 +180,8 @@ class Interop {
                                               BinaryTypeEncodingType type);
   static std::vector<std::string> GetAdditionalProtocols(
       const TypeEncoding* typeEncoding);
+  // The `__NativeScript__`-prefixed twin of `selector`, or nullptr when no
+  // class has had `selector` swizzled.
   static SEL GetSwizzledMethodSelector(SEL selector);
 
   template <typename T>
