@@ -1103,7 +1103,12 @@ void JsV8InspectorClient::HandleIORead(int msgId, const std::string& handle,
       }
       stream.lastReadPos = position + count;
 
-      if (stream.binary) {
+      // A read that starts inside a character, or one of 6 bytes or fewer, can
+      // cut a character at an end. Chromium's JSON encoder would drop those
+      // bytes; sending that one chunk as base64 keeps them.
+      bool wholeCharacters =
+          (bytes[0] & 0xC0) != 0x80 && TruncateUTF8ToByteSize(bytes, count) == count;
+      if (stream.binary || !wholeCharacters) {
         NSData* chunk = [NSData dataWithBytes:bytes length:count];
         NSString* encoded = [chunk base64EncodedStringWithOptions:0];
         result = {{"data", [encoded UTF8String]}, {"eof", false}, {"base64Encoded", true}};
@@ -1116,11 +1121,9 @@ void JsV8InspectorClient::HandleIORead(int msgId, const std::string& handle,
   }
 
   json response = {{"id", msgId}, {"result", result}};
-  // A text chunk that starts inside a character, or a read of 6 bytes or
-  // fewer, is not valid UTF-8 on its own. Raw: a reply is never a
-  // Debugger.scriptParsed whose sourceMapURL needs rewriting.
-  this->SendRawToFrontend(
-      WithSessionId(response, sessionId).dump(-1, ' ', false, json::error_handler_t::replace));
+  // Raw: a reply is never a Debugger.scriptParsed whose sourceMapURL needs
+  // rewriting.
+  this->SendRawToFrontend(WithSessionId(response, sessionId).dump());
 }
 
 void JsV8InspectorClient::HandleIOClose(int msgId, const std::string& handle,
