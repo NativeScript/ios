@@ -27,6 +27,7 @@
 #include "TSHelpers.h"
 #include "WeakRef.h"
 #include "Worker.h"
+#include "generated/Version.h"
 
 #include "IsolateWrapper.h"
 
@@ -40,9 +41,6 @@
 #include "URLImpl.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
-
-#define STRINGIZE(x) #x
-#define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
 
 using namespace v8;
 using namespace std;
@@ -688,7 +686,7 @@ void Runtime::DefineNativeScriptVersion(Isolate* isolate, Local<ObjectTemplate> 
   const PropertyAttribute readOnlyFlags =
       static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
   globalTemplate->Set(ToV8String(isolate, "__runtimeVersion"),
-                      ToV8String(isolate, STRINGIZE_VALUE_OF(NATIVESCRIPT_VERSION)), readOnlyFlags);
+                      ToV8String(isolate, NATIVESCRIPT_VERSION), readOnlyFlags);
 }
 
 void Runtime::DefineTimeMethod(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> globalTemplate) {

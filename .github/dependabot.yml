@@ -4,9 +4,26 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    groups:
+      github-actions:
+        patterns: ["*"]
 
   - package-ecosystem: npm
-    directory: /AppWithModules/app
+    directories:
+      - /
+      - /AppWithModules/app
+      - /TestRunner/app
+      - /TestRunner/app/tests
+      - /TestRunner/app/tests/shared
+      - /TestRunner/app/tests/shared/Require/PackageJsonApp/io
+      - /TestRunner/app/tests/shared/Require/PackageJsonAppNoMain/io
+      - /TestRunner/app/tests/shared/Require/PackageJsonAppWithoutExtension/io
+      - /TestRunner/app/tests/shared/Require/PackageJsonMainPointsToDir
+      - /TestRunner/app/tests/shared/Require/PackageJsonSyntaxError/io
+      - /TestRunner/app/tests/shared/Require/ResolveCanonicalPath
+      - /TestRunner/app/tns_modules/dummy-package
+      - /TestRunner/app/tns_modules/tns-core-modules/shared/Require/PackageJsonTns/io
+      - /TestRunner/app/tns_modules/tns-core-modules/shared/Require/RequirePriority/dependency5
     schedule:
       interval: monthly
       time: "23:00"
@@ -14,133 +31,6 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /TestRunner/app
-    schedule:
-      interval: monthly
-      time: "23:00"
-    open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /TestRunner/app/tests
-    schedule:
-      interval: monthly
-      time: "23:00"
-    open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /TestRunner/app/tests/shared/Require/PackageJsonApp/io
-    schedule:
-      interval: monthly
-      time: "23:00"
-    open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /TestRunner/app/tests/shared/Require/PackageJsonAppNoMain/io
-    schedule:
-      interval: monthly
-      time: "23:00"
-    open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /TestRunner/app/tests/shared/Require/PackageJsonAppWithoutExtension/io
-    schedule:
-      interval: monthly
-      time: "23:00"
-    open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /TestRunner/app/tests/shared/Require/PackageJsonMainPointsToDir
-    schedule:
-      interval: monthly
-      time: "23:00"
-    open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /TestRunner/app/tests/shared/Require/PackageJsonSyntaxError/io
-    schedule:
-      interval: monthly
-      time: "23:00"
-    open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /TestRunner/app/tests/shared/Require/ResolveCanonicalPath
-    schedule:
-      interval: monthly
-      time: "23:00"
-    open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /TestRunner/app/tests/shared
-    schedule:
-      interval: monthly
-      time: "23:00"
-    open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /TestRunner/app/tns_modules/dummy-package
-    schedule:
-      interval: monthly
-      time: "23:00"
-    open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /TestRunner/app/tns_modules/tns-core-modules/shared/Require/PackageJsonTns/io
-    schedule:
-      interval: monthly
-      time: "23:00"
-    open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /TestRunner/app/tns_modules/tns-core-modules/shared/Require/RequirePriority/dependency5
-    schedule:
-      interval: monthly
-      time: "23:00"
-    open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: npm
-    directory: /
-    schedule:
-      interval: monthly
-      time: "23:00"
-    open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+    groups:
+      npm:
+        patterns: ["*"]

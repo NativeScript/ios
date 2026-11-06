@@ -13,7 +13,7 @@ on:
 
 env:
   NPM_TAG: "next"
-  XCODE_VERSION: "^16.0"
+  XCODE_VERSION: "26.3"
 
 # Minimal default token permissions for every job. Jobs that need more declare it
 # locally (github-release: contents:write; publish: id-token:write). Cross-repo
@@ -72,6 +72,14 @@ jobs:
     name: Build ${{ matrix.target }}
     runs-on: macos-15
     needs: setup
+    # A newer push to main supersedes an older "next" build. Only build and
+    # test are cancelable: cancelling the publishing jobs could leave a
+    # half-published release. Every other event gets a per-run group: a shared
+    # group would let a newer pending release replace an older pending one,
+    # even without cancel-in-progress.
+    concurrency:
+      group: ${{ github.workflow }}-build-${{ matrix.target }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'main' || github.run_id }}
+      cancel-in-progress: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     strategy:
       fail-fast: false
       # Computed in `setup`: ios always; visionos only for real releases
@@ -102,6 +110,14 @@ jobs:
       - uses: ./.github/actions/setup-build-env
         with:
           registry-url: "https://registry.npmjs.org"
+      - name: Fill an empty Xcode compilation cache
+        # Pull requests restore this cache (pull_request.yml). This workflow only
+        # saves it: never restore a cache here, so shipped binaries are always
+        # compiled from source.
+        if: ${{ github.ref == 'refs/heads/main' && matrix.target == 'ios' }}
+        run: |
+          echo "XCODE_XCCONFIG_FILE=$GITHUB_WORKSPACE/tools/ci-compilation-cache.xcconfig" >> "$GITHUB_ENV"
+          echo "NS_COMPILATION_CACHE_DIR=$RUNNER_TEMP/xcode-cas" >> "$GITHUB_ENV"
       - name: Set package version
         run: npm version $NPM_VERSION --no-git-tag-version --allow-same-version
       - name: Build (${{ matrix.target }})
@@ -112,6 +128,12 @@ jobs:
           # env indirection keeps matrix values out of shell interpolation
           BUILD_SCRIPT: ${{ matrix.script }}
         run: npm run "$BUILD_SCRIPT" -- --spm-mode=remote
+      - name: Save Xcode compilation cache for pull requests
+        if: ${{ github.ref == 'refs/heads/main' && matrix.target == 'ios' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/xcode-cas
+          key: xcode-cas-${{ runner.os }}-${{ runner.arch }}-build-${{ github.sha }}
       - name: Upload npm package artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -132,6 +154,9 @@ jobs:
     name: Test
     runs-on: macos-15
     needs: build
+    concurrency:
+      group: ${{ github.workflow }}-test-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'main' || github.run_id }}
+      cancel-in-progress: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
@@ -154,6 +179,14 @@ jobs:
           install-test-tools: "true"
       - name: Prepare
         run: npm run setup-ci
+      - name: Fill an empty Xcode compilation cache
+        # Pull requests restore this cache (pull_request.yml). This workflow only
+        # saves it: never restore a cache here, so shipped binaries are always
+        # compiled from source.
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: |
+          echo "XCODE_XCCONFIG_FILE=$GITHUB_WORKSPACE/tools/ci-compilation-cache.xcconfig" >> "$GITHUB_ENV"
+          echo "NS_COMPILATION_CACHE_DIR=$RUNNER_TEMP/xcode-cas" >> "$GITHUB_ENV"
       - name: Prepare test folder
         run: |
           mkdir -p dist-test
@@ -167,20 +200,26 @@ jobs:
           # TestRunnerTests.swift) need more than 20m headroom per attempt.
           timeout_minutes: 40
           max_attempts: 2
-          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test | xcpretty
+          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro test | xcpretty
           # Keep the failed attempt's bundle — it holds the diagnostics of the
           # failure being retried. Everything else at the result path must go
           # (including extensionless staging leftovers), or the retry dies with
           # "Existing file at -resultBundlePath".
           on_retry_command: rm -rf $TEST_FOLDER/test_results_attempt1.xcresult; mv $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test_results_attempt1.xcresult 2>/dev/null; for f in $TEST_FOLDER/test_results*; do [ "$f" = "$TEST_FOLDER/test_results_attempt1.xcresult" ] || rm -rf "$f"; done; xcrun simctl shutdown all
-          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro build test
+          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro test
+      - name: Save Xcode compilation cache for pull requests
+        if: ${{ github.ref == 'refs/heads/main' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/xcode-cas
+          key: xcode-cas-${{ runner.os }}-${{ runner.arch }}-test-default-${{ github.sha }}
       - name: Extract test results
         # Runs even when the test step failed: the xcresult usually still
         # carries the JS suite's junit attachments for the report step below.
         if: ${{ !cancelled() }}
         run: |
           if [ -d "$TEST_FOLDER/test_results.xcresult" ]; then
-            xcparse attachments $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test-out
+            ./scripts/export-test-attachments.sh --result "$TEST_FOLDER/test_results.xcresult" --output "$TEST_FOLDER/test-out"
           fi
       - name: Test report summary
         if: ${{ !cancelled() }}
