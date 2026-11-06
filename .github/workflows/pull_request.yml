@@ -145,3 +145,60 @@ jobs:
           path: |
             ${{env.TEST_FOLDER}}/test_results.xcresult
             ${{env.TEST_FOLDER}}/test_results_attempt1.xcresult
+  test-catalyst:
+    name: Test (Mac Catalyst)
+    runs-on: macos-15
+    needs: build
+    steps:
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: ${{env.XCODE_VERSION}}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          persist-credentials: false # disable to prevent leaking credentials to build scripts
+      - name: LLVM cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ./llvm
+          key: ${{ hashFiles('download_llvm.sh') }}
+      - uses: ./.github/actions/setup-build-env
+        with:
+          install-test-tools: "true"
+      - name: Prepare test folder
+        run: echo TEST_FOLDER=$(pwd)/build/tests/catalyst >> $GITHUB_ENV
+      - name: Xcode Tests
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 40
+          max_attempts: 2
+          command: ./run_tests.sh --catalyst
+          # run_tests.sh empties its results folder, so move the failed
+          # attempt's bundle out of it first.
+          on_retry_command: rm -rf $TEST_FOLDER-attempt1; mv $TEST_FOLDER $TEST_FOLDER-attempt1 2>/dev/null || true
+      - name: Test report summary
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@a9170d5795813c01ab4901ffb045b52bab4ab09d # v6.5.0
+        with:
+          report_paths: build/tests/catalyst/test-out/*junit*.xml
+          annotate_only: true
+          detailed_summary: true
+      - name: Validate Test Results
+        run: |
+          find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
+          find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
+      - name: Collect test diagnostics
+        if: failure()
+        uses: ./.github/actions/collect-test-diagnostics
+        with:
+          test-folder: ${{env.TEST_FOLDER}}
+          artifact-name: test-diagnostics-catalyst
+          host-process-log: "true"
+      - name: Archive Test Result Data
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: test-results-catalyst
+          path: |
+            ${{env.TEST_FOLDER}}/test_results.xcresult
+            ${{env.TEST_FOLDER}}-attempt1/test_results.xcresult
