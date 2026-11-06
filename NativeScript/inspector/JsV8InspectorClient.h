@@ -8,6 +8,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -113,10 +114,13 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   // Streams backing Network.loadNetworkResource responses, read by the
   // frontend through IO.read/IO.close (how Chrome DevTools fetches source
   // maps from the target). Served on the socket thread for any session;
-  // guarded by resourceStreamsMutex_.
+  // guarded by resourceStreamsMutex_. Like Chromium's DevToolsIOContext, a
+  // stream lives until IO.close or until its frontend goes away.
   struct ResourceStream {
     std::string data;
-    size_t offset = 0;
+    // Chromium sends valid UTF-8 as text and everything else as base64.
+    bool binary = false;
+    size_t lastReadPos = 0;
   };
   std::map<std::string, ResourceStream> resourceStreams_;
   int lastStreamId_ = 0;
@@ -193,7 +197,9 @@ class JsV8InspectorClient : V8InspectorClient, V8Inspector::Channel {
   // (sessionId is echoed in the reply when non-empty).
   void HandleLoadNetworkResource(int msgId, const std::string& url,
                                  const std::string& sessionId);
-  void HandleIORead(int msgId, const std::string& handle, int size,
+  void HandleIORead(int msgId, const std::string& handle,
+                    std::optional<long long> offset,
+                    std::optional<long long> size,
                     const std::string& sessionId);
   void HandleIOClose(int msgId, const std::string& handle,
                      const std::string& sessionId);

@@ -2,6 +2,8 @@
 #include <notify.h>
 #include <algorithm>
 #include <chrono>
+#include <cmath>
+#include <cstdint>
 
 #include "src/inspector/v8-console-message.h"
 #include "src/inspector/v8-inspector-impl.h"
@@ -118,6 +120,97 @@ std::string MaybeRewriteSourceMapURL(const std::string& message) {
 
   params["sourceMapURL"] = kSourceMapScheme + path;
   return parsed.dump();
+}
+
+// Echo the flat-protocol sessionId so the frontend routes the reply to the
+// right (worker) session; root-session messages carry none.
+json WithSessionId(json message, const std::string& sessionId) {
+  if (!sessionId.empty()) {
+    message["sessionId"] = sessionId;
+  }
+  return message;
+}
+
+// The IO stream helpers below follow Chromium (base::IsStringUTF8,
+// base::TruncateUTF8ToByteSize, DevToolsStreamFile) so IO.read behaves the
+// same as in Chrome for every client.
+
+// Length of the well-formed UTF-8 sequence starting at data[i] (no overlongs,
+// surrogates or code points past U+10FFFF), or 0 if it is ill-formed or cut
+// off at `length`.
+size_t DecodeUtf8(const uint8_t* data, size_t i, size_t length, uint32_t& codePoint) {
+  uint8_t lead = data[i];
+  if (lead < 0x80) {
+    codePoint = lead;
+    return 1;
+  }
+  if (lead < 0xC2 || lead > 0xF4) {
+    return 0;
+  }
+  static constexpr uint32_t kMinCodePoint[] = {0, 0, 0x80, 0x800, 0x10000};
+  size_t count = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : 2;
+  uint32_t min = kMinCodePoint[count];
+  codePoint = lead & (0x7F >> count);
+  if (length - i < count) {
+    return 0;
+  }
+  for (size_t k = 1; k < count; ++k) {
+    uint8_t trail = data[i + k];
+    if ((trail & 0xC0) != 0x80) {
+      return 0;
+    }
+    codePoint = (codePoint << 6) | (trail & 0x3F);
+  }
+  if (codePoint < min || codePoint > 0x10FFFF || (codePoint >= 0xD800 && codePoint <= 0xDFFF)) {
+    return 0;
+  }
+  return count;
+}
+
+// base::IsValidCharacter: excludes noncharacters as well as surrogates.
+bool IsValidCharacter(uint32_t c) {
+  return c < 0xD800 || (c >= 0xE000 && c < 0xFDD0) ||
+         (c > 0xFDEF && c <= 0x10FFFF && (c & 0xFFFE) != 0xFFFE);
+}
+
+bool IsStringUTF8(const std::string& value) {
+  const auto* data = reinterpret_cast<const uint8_t*>(value.data());
+  for (size_t i = 0; i < value.size();) {
+    uint32_t codePoint;
+    size_t count = DecodeUtf8(data, i, value.size(), codePoint);
+    if (count == 0 || !IsValidCharacter(codePoint)) {
+      return false;
+    }
+    i += count;
+  }
+  return true;
+}
+
+// base::TruncateUTF8ToByteSize: the length of the longest prefix of
+// data[0, length) that ends right after a valid character, or 0 if none does.
+size_t TruncateUTF8ToByteSize(const uint8_t* data, size_t length) {
+  for (size_t i = length; i-- > 0;) {
+    uint32_t codePoint;
+    size_t count = DecodeUtf8(data, i, length, codePoint);
+    if (count != 0 && IsValidCharacter(codePoint)) {
+      return i + count;
+    }
+  }
+  return 0;
+}
+
+// CDP integers are int32: Chromium's protocol bindings reject anything else,
+// though an integral double such as 5.0 still counts.
+bool GetInt32(const json& value, long long& out) {
+  if (!value.is_number()) {
+    return false;
+  }
+  double number = value.get<double>();
+  if (number != std::trunc(number) || number < INT32_MIN || number > INT32_MAX) {
+    return false;
+  }
+  out = static_cast<long long>(number);
+  return true;
 }
 }  // namespace
 
@@ -327,19 +420,32 @@ void JsV8InspectorClient::onFrontendMessageReceived(uint64_t connectionId,
 
   if (method == "IO.read" || method == "IO.close") {
     std::string handle;
-    int size = 0;
-    if (parsed.contains("params")) {
+    std::optional<long long> offset;
+    std::optional<long long> size;
+    bool validParams = true;
+    if (parsed.contains("params") && parsed["params"].is_object()) {
       const auto& params = parsed["params"];
       if (params.contains("handle")) {
-        handle = params["handle"].get<std::string>();
+        validParams &= params["handle"].is_string();
+        if (params["handle"].is_string()) {
+          handle = params["handle"].get<std::string>();
+        }
       }
-      if (params.contains("size")) {
-        size = params["size"].get<int>();
+      for (auto [name, value] : {std::pair{"offset", &offset}, std::pair{"size", &size}}) {
+        if (params.contains(name)) {
+          long long parsedValue = 0;
+          validParams &= GetInt32(params[name], parsedValue);
+          *value = parsedValue;
+        }
       }
     }
 
-    if (method == "IO.read") {
-      this->HandleIORead(static_cast<int>(msgId), handle, size, sessionId);
+    if (!validParams) {
+      json error = {{"id", msgId},
+                    {"error", {{"code", -32602}, {"message", "Invalid parameters"}}}};
+      this->SendToFrontend(WithSessionId(error, sessionId).dump());
+    } else if (method == "IO.read") {
+      this->HandleIORead(static_cast<int>(msgId), handle, offset, size, sessionId);
     } else {
       this->HandleIOClose(static_cast<int>(msgId), handle, sessionId);
     }
@@ -868,17 +974,6 @@ void JsV8InspectorClient::dispatchMessage(const std::string& message) {
   isolate->PerformMicrotaskCheckpoint();
 }
 
-namespace {
-// Echo the flat-protocol sessionId so the frontend routes the reply to the
-// right (worker) session; root-session messages carry none.
-json WithSessionId(json message, const std::string& sessionId) {
-  if (!sessionId.empty()) {
-    message["sessionId"] = sessionId;
-  }
-  return message;
-}
-}  // namespace
-
 void JsV8InspectorClient::HandleLoadNetworkResource(int msgId, const std::string& url,
                                                     const std::string& sessionId) {
   std::string path;
@@ -931,13 +1026,22 @@ void JsV8InspectorClient::HandleLoadNetworkResource(int msgId, const std::string
 
   json resource;
   if (loaded) {
+    // The headers an HTTP server would send for the file. With
+    // Content-Length, js-debug stops reading at the exact byte count and
+    // sends IO.close itself; without it, it never closes the stream.
+    json headers = {{"Content-Length", std::to_string(content.size())},
+                    {"Content-Type", "application/json"}};
+    bool binary = !IsStringUTF8(content);
     std::string handle;
     {
       std::lock_guard<std::mutex> lock(this->resourceStreamsMutex_);
       handle = "ns-network-resource-" + std::to_string(++lastStreamId_);
-      resourceStreams_[handle] = {std::move(content), 0};
+      resourceStreams_[handle] = {std::move(content), binary, 0};
     }
-    resource = {{"success", true}, {"httpStatusCode", 200}, {"stream", handle}};
+    resource = {{"success", true},
+                {"httpStatusCode", 200},
+                {"headers", std::move(headers)},
+                {"stream", handle}};
   } else {
     resource = {{"success", false},
                 {"netError", -6},
@@ -949,49 +1053,90 @@ void JsV8InspectorClient::HandleLoadNetworkResource(int msgId, const std::string
   this->SendToFrontend(WithSessionId(response, sessionId).dump());
 }
 
-void JsV8InspectorClient::HandleIORead(int msgId, const std::string& handle, int size,
+void JsV8InspectorClient::HandleIORead(int msgId, const std::string& handle,
+                                       std::optional<long long> offset,
+                                       std::optional<long long> size,
                                        const std::string& sessionId) {
+  auto sendError = [&](const char* message) {
+    json error = {{"id", msgId}, {"error", {{"code", -32602}, {"message", message}}}};
+    this->SendToFrontend(WithSessionId(error, sessionId).dump());
+  };
+
+  // Chromium defaults to 10 MB; smaller chunks keep socket frames (UTF-16 on
+  // the wire) and peak memory down on device.
+  constexpr long long kDefaultChunkSize = 1024 * 1024;
+  long long maxSize = size.value_or(kDefaultChunkSize);
+  if (maxSize <= 0) {
+    sendError("Invalid max read size");
+    return;
+  }
+
   json result;
   {
     std::lock_guard<std::mutex> lock(this->resourceStreamsMutex_);
     auto it = resourceStreams_.find(handle);
     if (it == resourceStreams_.end()) {
-      json error = {{"id", msgId},
-                    {"error", {{"code", -32602}, {"message", "Invalid stream handle"}}}};
-      this->SendToFrontend(WithSessionId(error, sessionId).dump());
+      sendError("Invalid stream handle");
       return;
     }
 
     ResourceStream& stream = it->second;
-    constexpr size_t kDefaultChunkSize = 1024 * 1024;
-    size_t chunkSize = size > 0 ? static_cast<size_t>(size) : kDefaultChunkSize;
-    size_t remaining = stream.data.size() - stream.offset;
-    chunkSize = std::min(chunkSize, remaining);
+    // A missing or negative offset continues from the previous read.
+    size_t position = offset.value_or(-1) >= 0 ? static_cast<size_t>(*offset) : stream.lastReadPos;
 
-    if (chunkSize == 0) {
-      // DevTools ignores any data sent alongside eof, so only signal it once
-      // the whole stream has been delivered.
-      result = {{"data", ""}, {"eof", true}, {"base64Encoded", false}};
+    if (position >= stream.data.size()) {
+      // DevTools ignores any data sent alongside eof, so it only comes on the
+      // read after the last bytes.
+      result = {{"data", ""}, {"eof", true}, {"base64Encoded", stream.binary}};
     } else {
-      // Base64 keeps arbitrary file bytes intact through the JSON transport.
-      NSData* chunk = [NSData dataWithBytes:stream.data.data() + stream.offset length:chunkSize];
-      NSString* encoded = [chunk base64EncodedStringWithOptions:0];
-      stream.offset += chunkSize;
-      result = {{"data", [encoded UTF8String]}, {"eof", false}, {"base64Encoded", true}};
+      const auto* bytes = reinterpret_cast<const uint8_t*>(stream.data.data()) + position;
+      size_t count = std::min(static_cast<size_t>(maxSize), stream.data.size() - position);
+      // Don't end a sufficiently large chunk inside a UTF-8 character: js-debug
+      // decodes every chunk on its own and advances its offset by the decoded
+      // length, so a split character is both garbled and skews that offset.
+      if (count > 6 && (bytes[count - 1] & 0x80) != 0) {
+        size_t truncated = TruncateUTF8ToByteSize(bytes, count);
+        // Nothing valid to cut at means binary data; leave it as is.
+        if (truncated != 0) {
+          count = truncated;
+        }
+      }
+      stream.lastReadPos = position + count;
+
+      // A read that starts inside a character, or one of 6 bytes or fewer, can
+      // cut a character at an end. Chromium's JSON encoder would drop those
+      // bytes; sending that one chunk as base64 keeps them.
+      bool wholeCharacters =
+          (bytes[0] & 0xC0) != 0x80 && TruncateUTF8ToByteSize(bytes, count) == count;
+      if (stream.binary || !wholeCharacters) {
+        NSData* chunk = [NSData dataWithBytes:bytes length:count];
+        NSString* encoded = [chunk base64EncodedStringWithOptions:0];
+        result = {{"data", [encoded UTF8String]}, {"eof", false}, {"base64Encoded", true}};
+      } else {
+        result = {{"data", std::string(reinterpret_cast<const char*>(bytes), count)},
+                  {"eof", false},
+                  {"base64Encoded", false}};
+      }
     }
   }
 
   json response = {{"id", msgId}, {"result", result}};
-  this->SendToFrontend(WithSessionId(response, sessionId).dump());
+  // Raw: a reply is never a Debugger.scriptParsed whose sourceMapURL needs
+  // rewriting.
+  this->SendRawToFrontend(WithSessionId(response, sessionId).dump());
 }
 
 void JsV8InspectorClient::HandleIOClose(int msgId, const std::string& handle,
                                         const std::string& sessionId) {
+  bool closed;
   {
     std::lock_guard<std::mutex> lock(this->resourceStreamsMutex_);
-    resourceStreams_.erase(handle);
+    closed = resourceStreams_.erase(handle) != 0;
   }
-  json response = {{"id", msgId}, {"result", json::object()}};
+  json response = closed
+                      ? json{{"id", msgId}, {"result", json::object()}}
+                      : json{{"id", msgId},
+                             {"error", {{"code", -32602}, {"message", "Invalid stream handle"}}}};
   this->SendToFrontend(WithSessionId(response, sessionId).dump());
 }
 
