@@ -10,12 +10,15 @@ $(SRCROOT)/NativeScript/runtime/js/events.js
 $(SRCROOT)/NativeScript/runtime/js/inline-functions.js
 $(SRCROOT)/NativeScript/runtime/js/primordials.js
 $(SRCROOT)/NativeScript/runtime/js/inspect.js
+$(SRCROOT)/NativeScript/runtime/js/interop-global.js
 $(SRCROOT)/NativeScript/runtime/js/message-channel.js
 $(SRCROOT)/NativeScript/runtime/js/message-event.js
 $(SRCROOT)/NativeScript/runtime/js/node-module.js
 $(SRCROOT)/NativeScript/runtime/js/node-url.js
 $(SRCROOT)/NativeScript/runtime/js/node-util.js
 $(SRCROOT)/NativeScript/runtime/js/node-worker-threads.js
+$(SRCROOT)/NativeScript/runtime/js/ns-interop.js
+$(SRCROOT)/NativeScript/runtime/js/ns-interop-ios.js
 $(SRCROOT)/NativeScript/runtime/js/ns-module.js
 $(SRCROOT)/NativeScript/runtime/js/ns-runtime.js
 $(SRCROOT)/NativeScript/runtime/js/ns-url.js

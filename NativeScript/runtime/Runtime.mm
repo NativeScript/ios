@@ -492,7 +492,6 @@ void Runtime::Init() {
   this->moduleInternal_ = std::make_unique<ModuleInternal>(context);
 
   ArgConverter::Init(context);
-  Interop::RegisterInteropTypes(context);
 
   ClassBuilder::RegisterBaseTypeScriptExtendsFunction(
       context);  // Register the __extends function to the global object
@@ -650,12 +649,6 @@ void Runtime::DefineGlobalObject(Local<Context> context, bool isWorker) {
                                            global, readOnlyFlags)
                        .FromMaybe(false)) {
     tns::Assert(false, isolate);
-  }
-
-  if (isWorker) {
-    // Register proper interop types for worker context
-    // Worker bundles need full interop functionality, not just simple stubs
-    tns::Interop::RegisterInteropTypes(context);
   }
 }
 
