@@ -6,6 +6,5 @@ if [ -n "$1" ]; then
     jq ".version = \"$PACKAGE_VERSION\"" package.json > package.json.tmp && rm package.json && mv package.json.tmp package.json
 fi
 
-# Read the version from package.json and replace it inside NativeScript/runtime/Version.h
-FULL_VERSION=$(jq -r .version package.json)
-sed -i.bak "s/#define[[:space:]]*NATIVESCRIPT_VERSION[[:space:]]*\"\(.*\)\"/#define NATIVESCRIPT_VERSION \"$FULL_VERSION\"/g" NativeScript/runtime/Version.h && rm NativeScript/runtime/Version.h.bak
+# NATIVESCRIPT_VERSION comes from package.json at build time
+# (tools/generate-version-header.sh, run by the NativeScript target).
