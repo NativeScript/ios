@@ -25,6 +25,7 @@
 #include "SpinLock.h"
 #include "StructuredClone.h"
 #include "TSHelpers.h"
+#include "Version.h"
 #include "WeakRef.h"
 #include "Worker.h"
 

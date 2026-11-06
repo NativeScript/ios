@@ -12,6 +12,7 @@
 #include "runtime/Runtime.h"
 #include "runtime/RuntimeConfig.h"
 #include "runtime/Tasks.h"
+#include "runtime/Version.h"
 
 using namespace v8;
 using namespace tns;
