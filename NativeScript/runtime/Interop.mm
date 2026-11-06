@@ -31,6 +31,36 @@ static constexpr int64_t kMinSafeInteger =
     static_cast<int64_t>(kUint64AllBitsSet << 53) + 1;        // -9007199254740991 (-(2^53-1))
 static constexpr int64_t kMaxSafeInteger = -kMinSafeInteger;  // 9007199254740991 (2^53-1)
 
+namespace {
+
+void DisposeJSBlockWrapper(MethodCallbackWrapper* wrapper, BlockWrapper* blockWrapper) {
+  if (wrapper->isolateWrapper_.HandOffTeardown(
+          [wrapper, blockWrapper]() { DisposeJSBlockWrapper(wrapper, blockWrapper); })) {
+    return;
+  }
+  {
+    IsolatePin pin = wrapper->isolateWrapper_.Pin();
+    if (pin) {
+      Isolate* isolate = wrapper->isolateWrapper_.Isolate();
+      v8::Locker locker(isolate);
+      if (!wrapper->isolateWrapper_.IsTornDown()) {
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+        Local<Value> callback = wrapper->callback_->Get(isolate);
+        if (!callback.IsEmpty() && callback->IsObject() &&
+            tns::GetValue(isolate, callback) == blockWrapper) {
+          tns::DeleteValue(isolate, callback);
+        }
+        wrapper->callback_->Reset();
+      }
+    }
+  }
+  delete blockWrapper;
+  delete wrapper;
+}
+
+}  // namespace
+
 Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
     .reserved = 0,
     .size = sizeof(JSBlock),
@@ -40,45 +70,12 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
           if (block->descriptor == &JSBlock::kJSBlockDescriptor) {
             MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
             BlockWrapper* blockWrapper = block->blockWrapper;
-            // Runs on whatever thread drops the last native reference. That is
-            // safe inline: callback_ is a strong, unregistered persistent, so
-            // resetting it never touches the finalizer drain's bookkeeping,
-            // and a foreign-thread Locker into the block's own isolate is
-            // legitimate now that extended class names are worker-scoped.
-            //
-            // Validity is not the test here: the slot stays reachable after
-            // the isolate is invalidated, by JS still running under the Locker
-            // and by the teardown's own walk of registered objects. Until the
-            // gate closes, the wrapper is only freed once the slot is cleared.
-            {
-              IsolatePin pin = wrapper->isolateWrapper_.Pin();
-              if (pin) {
-                Isolate* isolate = wrapper->isolateWrapper_.Isolate();
-                v8::Locker locker(isolate);
-                if (!wrapper->isolateWrapper_.IsTornDown()) {
-                  Isolate::Scope isolate_scope(isolate);
-                  HandleScope handle_scope(isolate);
-                  Local<Value> callback = wrapper->callback_->Get(isolate);
-                  if (!callback.IsEmpty() && callback->IsObject()) {
-                    // The slot may hold another wrapper by now; only our own is
-                    // cleared from it.
-                    if (tns::GetValue(isolate, callback) == blockWrapper) {
-                      tns::DeleteValue(isolate, callback);
-                    }
-                  }
-                  // Unconditional: an already-detached callback still owns its
-                  // node, and dropping the persistent without a reset would leave
-                  // that node rooted forever.
-                  wrapper->callback_->Reset();
-                }
-              }
-            }
-            // Outside the gate: once the teardown is done the cache slot is
-            // unreachable and nothing else can free the wrapper.
-            delete blockWrapper;
-            delete wrapper;
+            // libclosure frees the block as soon as this helper returns.
+            // Invalidate its cached address before deferring any V8 cleanup.
+            blockWrapper->ClearBlock();
             ffi_closure_free(block->ffiClosure);
             block->~JSBlock();
+            DisposeJSBlockWrapper(wrapper, blockWrapper);
           }
         }};
 
@@ -88,9 +85,9 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
 static constexpr int32_t kBlockDeallocating = 0x0001;
 static constexpr int32_t kBlockRefcountMask = 0xfffe;
 
-// libclosure's increment ignores the deallocating bit, so Block_copy would hand
-// out a block whose dispose is already waiting for the isolate's Locker and
-// which libclosure frees right after. This CASes the same word libclosure does.
+// libclosure's increment ignores the deallocating bit. The wrapper's mutex
+// keeps the allocation alive here; this CAS also rejects a last release that
+// won before dispose acquired that mutex.
 bool Interop::TryRetainJSBlock(JSBlock* block) {
   volatile int32_t* flags = &block->flags;
   int32_t old = __atomic_load_n(flags, __ATOMIC_RELAXED);
@@ -106,6 +103,17 @@ bool Interop::TryRetainJSBlock(JSBlock* block) {
       return true;
     }
   }
+}
+
+void* BlockWrapper::RetainBlock() {
+  if (ownsBlock_) {
+    return Block_copy(block_);
+  }
+  std::lock_guard<std::mutex> lock(blockMutex_);
+  if (block_ == nullptr || !Interop::TryRetainJSBlock(static_cast<Interop::JSBlock*>(block_))) {
+    return nullptr;
+  }
+  return block_;
 }
 
 std::pair<IMP, ffi_closure*> Interop::CreateMethodInternal(const uint8_t initialParamIndex,
@@ -618,15 +626,8 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       // so the reference that keeps it alive across the call must be balanced:
       // the JSBlock dispose helper owns the ffi closure and the callback wrapper
       // and only runs once the last reference goes away.
-      if (wrapper->OwnsBlock()) {
-        // A native block; the wrapper's own Block_copy keeps it alive.
-        blockPtr = CFAutorelease(Block_copy(wrapper->Block()));
-      } else if (TryRetainJSBlock(static_cast<JSBlock*>(wrapper->Block()))) {
-        // Reading the block is safe even when its last release raced ahead:
-        // until the isolate's teardown closes its gate, dispose clears this
-        // slot under the Locker this thread holds, before libclosure frees
-        // the block.
-        blockPtr = CFAutorelease(wrapper->Block());
+      if (void* block = wrapper->RetainBlock()) {
+        blockPtr = CFAutorelease(block);
       }
     }
     if (blockPtr == nullptr) {
@@ -742,7 +743,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     }
   } else if (argHelper.isObject()) {
     Local<Object> obj = arg.As<Object>();
-    BaseDataWrapper* wrapper = tns::GetValue(isolate, obj);
+    BaseDataWrapper* wrapper = tns::GetValueForMarshalling(isolate, obj);
 
     if (wrapper != nullptr) {
       if (wrapper->Type() == WrapperType::Enum) {
@@ -852,7 +853,7 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
     ArrayAdapter* adapter = [[ArrayAdapter alloc] initWithJSObject:array isolate:isolate];
     return adapter;
   } else if (arg->IsObject()) {
-    if (BaseDataWrapper* wrapper = tns::GetValue(isolate, arg)) {
+    if (BaseDataWrapper* wrapper = tns::GetValueForMarshalling(isolate, arg)) {
       switch (wrapper->Type()) {
         case WrapperType::ObjCObject: {
           ObjCDataWrapper* wr = static_cast<ObjCDataWrapper*>(wrapper);

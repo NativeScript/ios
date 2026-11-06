@@ -730,6 +730,10 @@ Local<Value> Interop::HandleOf(Local<Context> context, Local<Value> value) {
             ObjCDataWrapper* w = static_cast<ObjCDataWrapper*>(wrapper);
             @autoreleasepool {
               id target = w->Data();
+              // A claim whose adapter's last release has started is no handle.
+              if (target == nil) {
+                break;
+              }
               CFTypeRef ref = CFBridgingRetain(target);
               void* handle = const_cast<void*>(ref);
               CFRelease(ref);
@@ -779,8 +783,7 @@ Local<Value> Interop::HandleOf(Local<Context> context, Local<Value> value) {
             // A JS function does not keep its block alive: only native
             // references do. A live block is kept for the rest of the turn,
             // like one passed to a native call; a dying one is no handle.
-            JSBlock* block = static_cast<JSBlock*>(blockWrapper->Block());
-            if (TryRetainJSBlock(block)) {
+            if (void* block = blockWrapper->RetainBlock()) {
               CFAutorelease(block);
               return Pointer::NewInstance(context, block);
             }

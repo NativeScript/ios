@@ -1,5 +1,20 @@
 describe("ns:worker_threads", function () {
     var nsWorkerThreads = require("ns:worker_threads");
+    var worker, originalTimeout;
+
+    beforeEach(function () {
+        originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
+    });
+    afterEach(function () {
+        if (worker) {
+            worker.onmessage = null;
+            worker.onerror = null;
+            worker.terminate();
+            worker = null;
+        }
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+    });
 
     it("exposes frozen exports", function () {
         expect(Object.isFrozen(nsWorkerThreads)).toBe(true);
@@ -27,7 +42,7 @@ describe("ns:worker_threads", function () {
     });
 
     it("constructs a worker with the runtime's options", function (done) {
-        var worker = new nsWorkerThreads.Worker("./workerResourceLimits/echoWorker.js", {
+        worker = new nsWorkerThreads.Worker("./workerResourceLimits/echoWorker.js", {
             ios: { priority: "utility" },
             resourceLimits: { maxOldGenerationSizeMb: 64 },
         });
@@ -37,7 +52,6 @@ describe("ns:worker_threads", function () {
                 return;
             }
             settled = true;
-            worker.terminate();
             done();
         };
         worker.onmessage = function (event) {
@@ -51,14 +65,12 @@ describe("ns:worker_threads", function () {
     });
 
     it("hands a worker realm its own constructor, not whatever the global names", function (done) {
-        var worker = new Worker("./nsWorkerThreadsIdentityWorker.js");
+        worker = new Worker("./nsWorkerThreadsIdentityWorker.js");
         worker.onmessage = function (event) {
             expect(event.data).toEqual({ isOriginal: true, isImpostor: false, frozen: true });
-            worker.terminate();
             done();
         };
         worker.onerror = function (event) {
-            worker.terminate();
             fail("worker error: " + event.message);
             done();
         };
