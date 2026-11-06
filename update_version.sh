@@ -6,6 +6,6 @@ if [ -n "$1" ]; then
     jq ".version = \"$PACKAGE_VERSION\"" package.json > package.json.tmp && rm package.json && mv package.json.tmp package.json
 fi
 
-# Read the version from package.json and replace it inside the NativeScript-Prefix.pch precompiled header
+# Read the version from package.json and replace it inside NativeScript/runtime/Version.h
 FULL_VERSION=$(jq -r .version package.json)
-sed -i.bak "s/#define[[:space:]]*NATIVESCRIPT_VERSION[[:space:]]*\"\(.*\)\"/#define NATIVESCRIPT_VERSION \"$FULL_VERSION\"/g" NativeScript/NativeScript-Prefix.pch && rm NativeScript/NativeScript-Prefix.pch.bak
+sed -i.bak "s/#define[[:space:]]*NATIVESCRIPT_VERSION[[:space:]]*\"\(.*\)\"/#define NATIVESCRIPT_VERSION \"$FULL_VERSION\"/g" NativeScript/runtime/Version.h && rm NativeScript/runtime/Version.h.bak
