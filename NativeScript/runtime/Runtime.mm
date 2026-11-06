@@ -1,5 +1,6 @@
 #include "Runtime.h"
 #include <chrono>
+#include <climits>
 #include <string>
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
@@ -298,6 +299,11 @@ Runtime::~Runtime() {
     CFRelease(rejectionObserver_);
     rejectionObserver_ = nullptr;
   }
+  if (soleOwnerObserver_ != nullptr) {
+    CFRunLoopObserverInvalidate(soleOwnerObserver_);
+    CFRelease(soleOwnerObserver_);
+    soleOwnerObserver_ = nullptr;
+  }
 
   // Drop any pending uncaughtErrorPolicy "throw" deposit for this isolate so a
   // stale entry can't outlive the isolate it keys on.
@@ -405,6 +411,7 @@ void Runtime::Init() {
   initialized_ = true;
   // Before anything can build an IsolateWrapper for this isolate.
   IsolateGates::Open(cache->getGateId());
+  cache->SoleOwnerCandidates.BindToCurrentThread();
   cache->isWorker = isWorker;
   cache->ObjectCtorInitializer = MetadataBuilder::GetOrCreateConstructorFunctionTemplate;
   cache->StructInstanceFactory = MetadataBuilder::NewStructInstance;
@@ -465,6 +472,15 @@ void Runtime::Init() {
       CFRunLoopObserverCreate(kCFAllocatorDefault, kCFRunLoopBeforeWaiting, /*repeats*/ true,
                               /*order*/ 0, Runtime::DrainRejectionsObserver, &observerContext);
   CFRunLoopAddObserver(runtimeLoop_, rejectionObserver_, kCFRunLoopCommonModes);
+
+  // Ordered after every other observer, UIKit's autorelease pool pop among
+  // them (order 0x7fffffff): by then the main thread's pool for this turn has
+  // drained, so an object it held is released before the check reads its
+  // retain count.
+  soleOwnerObserver_ = CFRunLoopObserverCreate(
+      kCFAllocatorDefault, kCFRunLoopBeforeWaiting, /*repeats*/ true,
+      /*order*/ LONG_MAX, Runtime::ChargeSoleOwnersObserver, &observerContext);
+  CFRunLoopAddObserver(runtimeLoop_, soleOwnerObserver_, kCFRunLoopCommonModes);
 
   DefineGlobalObject(context, isWorker);
   DefineCollectFunction(context);
@@ -776,6 +792,35 @@ void Runtime::DrainRejectionsObserver(CFRunLoopObserverRef observer, CFRunLoopAc
   Local<Context> context = cache->GetContext();
   Context::Scope context_scope(context);
   cache->PromiseRejections->Drain(context);
+}
+
+void Runtime::ChargeSoleOwnersObserver(CFRunLoopObserverRef observer, CFRunLoopActivity activity,
+                                       void* info) {
+  Isolate* isolate = static_cast<Isolate*>(info);
+  if (!Runtime::IsAlive(isolate)) {
+    return;
+  }
+  auto cache = Caches::Get(isolate);
+  // NextDueMs is the one member readable without the Locker, so an idle turn
+  // never contends for it.
+  if (!cache->IsValid() || cache->SoleOwnerCandidates.NextDueMs() > EventLoop::NowMs()) {
+    return;
+  }
+
+  IsolatePin pin(cache->getGateId(), Isolate::TryGetCurrent() == isolate);
+  if (!pin) {
+    return;
+  }
+  v8::Locker locker(isolate);
+  // ~Runtime invalidates the cache before it takes the Locker, so this second
+  // look rules out charging once teardown has begun.
+  if (!cache->IsValid() || !cache->HasContext()) {
+    return;
+  }
+  Isolate::Scope isolate_scope(isolate);
+  HandleScope handle_scope(isolate);
+  Context::Scope context_scope(cache->GetContext());
+  ExternalMemory::ChargeSoleOwners(isolate, cache.get());
 }
 
 bool Runtime::IsAlive(const Isolate* isolate) {

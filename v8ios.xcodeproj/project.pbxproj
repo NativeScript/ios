@@ -133,6 +133,7 @@
 		C2937520229FC1600075CB16 /* TNSVersions.m in Sources */ = {isa = PBXBuildFile; fileRef = C29374FF229FC1600075CB16 /* TNSVersions.m */; };
 		C2937521229FC1600075CB16 /* TNSApi.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937501229FC1600075CB16 /* TNSApi.m */; };
 		C2937522229FC1600075CB16 /* TNSReturnsRetained.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937502229FC1600075CB16 /* TNSReturnsRetained.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
+		A1E5E0000000000000000003 /* TNSExternalMemory.m in Sources */ = {isa = PBXBuildFile; fileRef = A1E5E0000000000000000002 /* TNSExternalMemory.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		C2937523229FC1600075CB16 /* TNSReturnsUnmanaged.m in Sources */ = {isa = PBXBuildFile; fileRef = C2937504229FC1600075CB16 /* TNSReturnsUnmanaged.m */; };
 		C2937524229FC1600075CB16 /* TNSAllocLog.m in Sources */ = {isa = PBXBuildFile; fileRef = C293750B229FC1600075CB16 /* TNSAllocLog.m */; };
 		C2937525229FC1600075CB16 /* TNSFunctionPointers.m in Sources */ = {isa = PBXBuildFile; fileRef = C293750C229FC1600075CB16 /* TNSFunctionPointers.m */; };
@@ -599,12 +600,14 @@
 		C29374F9229FC1600075CB16 /* TestFixtures.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TestFixtures.h; sourceTree = "<group>"; };
 		C29374FB229FC1600075CB16 /* TNSDeclarationConflicts.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSDeclarationConflicts.m; sourceTree = "<group>"; };
 		C29374FC229FC1600075CB16 /* TNSReturnsRetained.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSReturnsRetained.h; sourceTree = "<group>"; };
+		A1E5E0000000000000000001 /* TNSExternalMemory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSExternalMemory.h; sourceTree = "<group>"; };
 		C29374FD229FC1600075CB16 /* TNSApi.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSApi.h; sourceTree = "<group>"; };
 		C29374FE229FC1600075CB16 /* TNSBridgedTypes.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSBridgedTypes.m; sourceTree = "<group>"; };
 		C29374FF229FC1600075CB16 /* TNSVersions.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSVersions.m; sourceTree = "<group>"; };
 		C2937500229FC1600075CB16 /* TNSReturnsUnmanaged.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSReturnsUnmanaged.h; sourceTree = "<group>"; };
 		C2937501229FC1600075CB16 /* TNSApi.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSApi.m; sourceTree = "<group>"; };
 		C2937502229FC1600075CB16 /* TNSReturnsRetained.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSReturnsRetained.m; sourceTree = "<group>"; };
+		A1E5E0000000000000000002 /* TNSExternalMemory.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSExternalMemory.m; sourceTree = "<group>"; };
 		C2937503229FC1600075CB16 /* TNSDeclarationConflicts.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSDeclarationConflicts.h; sourceTree = "<group>"; };
 		C2937504229FC1600075CB16 /* TNSReturnsUnmanaged.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TNSReturnsUnmanaged.m; sourceTree = "<group>"; };
 		C2937505229FC1600075CB16 /* TNSVersions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSVersions.h; sourceTree = "<group>"; };
@@ -1220,12 +1223,14 @@
 			children = (
 				C29374FB229FC1600075CB16 /* TNSDeclarationConflicts.m */,
 				C29374FC229FC1600075CB16 /* TNSReturnsRetained.h */,
+				A1E5E0000000000000000001 /* TNSExternalMemory.h */,
 				C29374FD229FC1600075CB16 /* TNSApi.h */,
 				C29374FE229FC1600075CB16 /* TNSBridgedTypes.m */,
 				C29374FF229FC1600075CB16 /* TNSVersions.m */,
 				C2937500229FC1600075CB16 /* TNSReturnsUnmanaged.h */,
 				C2937501229FC1600075CB16 /* TNSApi.m */,
 				C2937502229FC1600075CB16 /* TNSReturnsRetained.m */,
+				A1E5E0000000000000000002 /* TNSExternalMemory.m */,
 				C2937503229FC1600075CB16 /* TNSDeclarationConflicts.h */,
 				C2937504229FC1600075CB16 /* TNSReturnsUnmanaged.m */,
 				C2937505229FC1600075CB16 /* TNSVersions.h */,
@@ -2288,6 +2293,7 @@
 				C2937528229FC1600075CB16 /* TNSObjCTypes.m in Sources */,
 				C2937526229FC1600075CB16 /* TNSRecords.m in Sources */,
 				C2937522229FC1600075CB16 /* TNSReturnsRetained.m in Sources */,
+				A1E5E0000000000000000003 /* TNSExternalMemory.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
