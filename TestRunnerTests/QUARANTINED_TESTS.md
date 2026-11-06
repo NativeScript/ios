@@ -1,10 +1,9 @@
 # Quarantined runtime tests
 
 Specs in the runtime suite (`TestRunner`) can be skipped at the harness level
-via a `specFilter` in
-`TestRunner/app/Infrastructure/Jasmine/jasmine-2.0.1/boot.js`
+via a `specFilter` in `TestRunner/app/Infrastructure/Jasmine/boot.js`
 (`QUARANTINED_SPEC_SUBSTRINGS`), matched by substring against each spec's full
-name. Quarantining touches only the test app — it does **not** edit the shared
+name. Quarantined specs show up as skipped in the JUnit report. Quarantining touches only the test app — it does **not** edit the shared
 `common-runtime-tests-app` submodule. When adding an entry, record *why* and
 *how to re-enable* it here.
 

@@ -1,3 +1,5 @@
+const { raisesGlobalErrors } = require("../Infrastructure/Jasmine/globalErrorSpy");
+
 /**
  TODO: Revisit thread handling with promises regarding these tests
  */
@@ -193,7 +195,7 @@ describe("unhandled rejections", function () {
         }, 20);
     }
 
-    it("reports an unhandled Promise.reject", function (done) {
+    it("reports an unhandled Promise.reject", raisesGlobalErrors(function (done) {
         const reason = new Error("unhandled-promise-reject");
         Promise.reject(reason);
         afterDrain(function () {
@@ -201,7 +203,7 @@ describe("unhandled rejections", function () {
             expect(reported[0]).toBe(reason);
             done();
         });
-    });
+    }));
 
     it("does not report when .catch is attached synchronously in the same turn", function (done) {
         const p = Promise.reject(new Error("handled-same-turn"));
@@ -212,7 +214,7 @@ describe("unhandled rejections", function () {
         });
     });
 
-    it("reports an uncaught throw from an async function", function (done) {
+    it("reports an uncaught throw from an async function", raisesGlobalErrors(function (done) {
         const reason = new Error("async-function-throw");
         (async () => {
             throw reason;
@@ -222,9 +224,9 @@ describe("unhandled rejections", function () {
             expect(reported[0]).toBe(reason);
             done();
         });
-    });
+    }));
 
-    it("reports an unhandled rejection thrown from a .then callback", function (done) {
+    it("reports an unhandled rejection thrown from a .then callback", raisesGlobalErrors(function (done) {
         const reason = new Error("then-callback-throw");
         Promise.resolve().then(() => {
             throw reason;
@@ -234,9 +236,9 @@ describe("unhandled rejections", function () {
             expect(reported[0]).toBe(reason);
             done();
         });
-    });
+    }));
 
-    it("ignores a late .catch attached after the rejection was already reported", function (done) {
+    it("ignores a late .catch attached after the rejection was already reported", raisesGlobalErrors(function (done) {
         const reason = new Error("late-catch");
         const p = Promise.reject(reason);
         afterDrain(function () {
@@ -249,5 +251,5 @@ describe("unhandled rejections", function () {
                 done();
             });
         });
-    });
+    }));
 });
