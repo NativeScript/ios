@@ -142,8 +142,13 @@ SymbolResolver* SymbolLoader::resolveModule(const ModuleMeta* module) {
 }
 
 void* SymbolLoader::loadFunctionSymbol(const ModuleMeta* module, const char* symbolName) {
+  // An iOS app on a Mac opens /System/Library/Frameworks bundles that do not carry
+  // the iOS symbols (those live under /System/iOSSupport), so a miss falls through
+  // to the process-wide lookup. Applies to loadDataSymbol too.
   if (auto resolver = this->resolveModule(module)) {
-    return resolver->loadFunctionSymbol(symbolName);
+    if (void* symbol = resolver->loadFunctionSymbol(symbolName)) {
+      return symbol;
+    }
   }
 
   return dlsym(RTLD_DEFAULT, symbolName);
@@ -151,7 +156,9 @@ void* SymbolLoader::loadFunctionSymbol(const ModuleMeta* module, const char* sym
 
 void* SymbolLoader::loadDataSymbol(const ModuleMeta* module, const char* symbolName) {
   if (auto resolver = this->resolveModule(module)) {
-    return resolver->loadDataSymbol(symbolName);
+    if (void* symbol = resolver->loadDataSymbol(symbolName)) {
+      return symbol;
+    }
   }
 
   return dlsym(RTLD_DEFAULT, symbolName);
