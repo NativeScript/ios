@@ -928,19 +928,31 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
         tns::Assert(false, isolate);
       }
     } else {
-      Class knownClass = objc_getClass(meta->name());
-      KnownUnknownClassPair pair(knownClass, klass);
-      Local<FunctionTemplate> ctorFuncTemplate = cache->ObjectCtorInitializer(
-          context, static_cast<const BaseClassMeta*>(meta), pair, additionalProtocols);
-      Local<v8::Function> ctorFunc;
-      bool success = ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc);
-      tns::Assert(success, isolate);
+      auto cached = additionalProtocols.empty() ? cache->MetaInstancePrototypes.find(meta)
+                                                : cache->MetaInstancePrototypes.end();
+      Local<Object> prototype;
+      bool success;
+      if (cached != cache->MetaInstancePrototypes.end()) {
+        prototype = cached->second->Get(isolate);
+      } else {
+        Class knownClass = objc_getClass(meta->name());
+        KnownUnknownClassPair pair(knownClass, klass);
+        Local<FunctionTemplate> ctorFuncTemplate = cache->ObjectCtorInitializer(
+            context, static_cast<const BaseClassMeta*>(meta), pair, additionalProtocols);
+        Local<v8::Function> ctorFunc;
+        success = ctorFuncTemplate->GetFunction(context).ToLocal(&ctorFunc);
+        tns::Assert(success, isolate);
 
-      Local<Value> prototypeValue;
-      success =
-          ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
-      tns::Assert(success, isolate);
-      Local<Object> prototype = prototypeValue.As<Object>();
+        Local<Value> prototypeValue;
+        success =
+            ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
+        tns::Assert(success, isolate);
+        prototype = prototypeValue.As<Object>();
+        if (additionalProtocols.empty()) {
+          cache->MetaInstancePrototypes.emplace(
+              meta, std::make_unique<Persistent<Object>>(isolate, prototype));
+        }
+      }
 
       if (!receiver->SetPrototype(context, prototype).To(&success) || !success) {
         tns::Assert(false, isolate);
