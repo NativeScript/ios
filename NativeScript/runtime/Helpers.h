@@ -355,24 +355,38 @@ void LogBacktrace(int skip = 1);
 // "%{public}s" argument to os_log. When os_log is not available we
 // fall back to NSLog (Objective-C) or CF/NSLog bridge in pure C++ builds.
 
-// Whether split messages should carry markers for the CLI to stitch them with.
-bool ShouldMarkLogChunks();
+// The log format (see LogChunks.h) the CLI asked for, or 0 for plain split lines.
+int LogFormat();
+
+// Unique per split message in the process, for the headers of format 1.
+uint32_t NextLogMessageId();
 
 #if TNS_HAVE_OS_LOG
-// The prefix is repeated on every chunk, so that each stays a complete log line.
+// Logs the two parts as one entry.
+static inline void TNS_WriteOsLogEntry(os_log_type_t type, std::string_view first,
+                                       std::string_view second) {
+  os_log_with_type(OS_LOG_DEFAULT, type, "%{public}.*s%{public}.*s",
+                   static_cast<int>(first.size()), first.data(), static_cast<int>(second.size()),
+                   second.data());
+}
+
 static inline void TNS_WriteToOsLog(const char* message, os_log_type_t type = OS_LOG_TYPE_DEFAULT,
                                     std::string_view prefix = "") {
-  ForEachLogChunk(message, kMaxLogChunkBytes - prefix.size(),
-                  [&](std::string_view chunk, LogChunkBreak chunkBreak) {
-                    const char* marker = "";
-                    if (chunkBreak != LogChunkBreak::kNone && ShouldMarkLogChunks()) {
-                      marker = chunkBreak == LogChunkBreak::kLine ? kLogChunkLineMarker
-                                                                  : kLogChunkJoinMarker;
-                    }
-                    os_log_with_type(OS_LOG_DEFAULT, type, "%{public}.*s%{public}.*s%{public}s",
-                                     static_cast<int>(prefix.size()), prefix.data(),
-                                     static_cast<int>(chunk.size()), chunk.data(), marker);
-                  });
+  std::string_view text(message);
+  if (prefix.size() + text.size() <= kMaxLogChunkBytes) {
+    TNS_WriteOsLogEntry(type, prefix, text);
+  } else if (LogFormat() >= 1) {
+    ForEachFramedLogChunk(prefix, text, NextLogMessageId(),
+                          [&](std::string_view header, std::string_view piece) {
+                            TNS_WriteOsLogEntry(type, header, piece);
+                          });
+  } else {
+    // Repeated on every piece, so that each stays a complete log line.
+    ForEachLogChunk(text, kMaxLogChunkBytes - prefix.size(),
+                    [&](std::string_view chunk, LogChunkBreak) {
+                      TNS_WriteOsLogEntry(type, prefix, chunk);
+                    });
+  }
 }
 #endif
 

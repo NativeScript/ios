@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <algorithm>
 #include <atomic>
 #include <cerrno>
 #include <mutex>
@@ -500,19 +501,26 @@ static bool IsDevNull(int fd) {
          S_ISCHR(target.st_mode) && target.st_rdev == devNull.st_rdev;
 }
 
-// Syslog-style output shows the markers as visible text and an attached console
-// shows them as they are, so they need a CLI that asked for them and no console.
-bool tns::ShouldMarkLogChunks() {
+// A console attached to the app would show the headers, so they also need stdout
+// to go nowhere, as it does when the CLI launches the app.
+int tns::LogFormat() {
   if (RuntimeConfig.ApplicationPath.empty()) {
-    return false;
+    return 0;
   }
 
-  static const bool enabled = [] {
-    id value = Runtime::GetAppConfigValue("logChunkMarkers");
-    return [value isKindOfClass:[NSNumber class]] && [value boolValue] &&
-           IsDevNull(STDOUT_FILENO);
+  static const int format = [] {
+    id value = Runtime::GetAppConfigValue("logFormat");
+    if (![value isKindOfClass:[NSNumber class]] || !IsDevNull(STDOUT_FILENO)) {
+      return 0;
+    }
+    return std::clamp([value intValue], 0, kNewestLogFormat);
   }();
-  return enabled;
+  return format;
+}
+
+uint32_t tns::NextLogMessageId() {
+  static std::atomic<uint32_t> lastMessageId{0};
+  return lastMessageId.fetch_add(1, std::memory_order_relaxed) + 1;
 }
 
 void tns::EmitDebugLog(LogCategory category, const char* format, ...) {
