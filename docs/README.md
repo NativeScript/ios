@@ -1,7 +1,8 @@
 # Runtime documentation
 
 - [Builtin modules](ns-builtin-modules.md) — the `ns:`/`node:` builtin-module
-  reference: resolution rules, `ns:util`/`ns:runtime`/`ns:module` and the
+  reference: resolution rules, `ns:util`/`ns:runtime`/`ns:module`,
+  `ns:interop`/`ns:interop/ios` and the global `interop` over them, the
   `node:` compatibility shims, import maps and scopes, `createRequire` and the
   pumping variant, the module-response (MIME) contract, and app-entry
   bootstraps. The cross-runtime contract both iOS and Android implement.

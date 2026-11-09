@@ -76,7 +76,17 @@ struct ObjCMethodCall : public MethodCall {
 
 class Interop {
  public:
-  static void RegisterInteropTypes(v8::Local<v8::Context> context);
+  // The natives behind ns:interop and ns:interop/ios (runtime/js/ns-interop.js,
+  // ns-interop-ios.js), built when the module is first resolved.
+  static v8::MaybeLocal<v8::Object> NsInteropBinding(
+      v8::Local<v8::Context> context);
+  static v8::MaybeLocal<v8::Object> NsInteropIosBinding(
+      v8::Local<v8::Context> context);
+  // ns:runtime members; `target` is that module's binding.
+  static void RegisterExternalSizeFunctions(v8::Local<v8::Context> context,
+                                            v8::Local<v8::Object> target);
+  static void RegisterEscapeExceptionFunction(v8::Local<v8::Context> context,
+                                              v8::Local<v8::Object> target);
   static IMP CreateMethod(const uint8_t initialParamIndex,
                           const uint8_t argsCount,
                           const TypeEncoding* typeEncoding,
@@ -135,10 +145,13 @@ class Interop {
                                const std::vector<StructField>& fields,
                                v8::Local<v8::Value> inititalizer,
                                ptrdiff_t& position);
-  static void RegisterInteropType(v8::Local<v8::Context> context,
-                                  v8::Local<v8::Object> types, std::string name,
-                                  PrimitiveDataWrapper* wrapper,
-                                  bool autoDelete = true);
+  static bool GetPrimitiveTypes(v8::Local<v8::Context> context,
+                                v8::Local<v8::Object>* cTypes,
+                                v8::Local<v8::Object>* appleTypes);
+  static v8::Local<v8::Object> CreateInteropType(v8::Local<v8::Context> context,
+                                                 const std::string& name,
+                                                 PrimitiveDataWrapper* wrapper,
+                                                 bool autoDelete = true);
   static void RegisterBufferFromDataFunction(v8::Local<v8::Context> context,
                                              v8::Local<v8::Object> interop);
   static void RegisterStringFromCString(v8::Local<v8::Context> context,
@@ -151,12 +164,8 @@ class Interop {
                                    v8::Local<v8::Object> interop);
   static void RegisterAdoptFunction(v8::Local<v8::Context> context,
                                     v8::Local<v8::Object> interop);
-  static void RegisterExternalSizeFunctions(v8::Local<v8::Context> context,
-                                            v8::Local<v8::Object> interop);
   static void RegisterSizeOfFunction(v8::Local<v8::Context> context,
                                      v8::Local<v8::Object> interop);
-  static void RegisterEscapeExceptionFunction(v8::Local<v8::Context> context,
-                                              v8::Local<v8::Object> interop);
   static void SetFFIParams(v8::Local<v8::Context> context,
                            const TypeEncoding* typeEncoding, FFICall* call,
                            const int argsCount, const int initialParameterIndex,

@@ -22,6 +22,8 @@ struct LazyGlobalEntry {
   const char* name;
   const char* exportName;  // key of `name` in the builtin's module.exports
   ExportsAccessor exports;
+  // WebIDL globals are non-enumerable; `interop` is not one and is enumerable.
+  PropertyAttribute attributes = PropertyAttribute::DontEnum;
 };
 
 // Exports accessor for a builtin with no natives of its own; modules with a
@@ -45,6 +47,8 @@ constexpr LazyGlobalEntry kLazyGlobals[] = {
     {"MessageChannel", "MessageChannel", messaging::GetMessageChannelExports},
     {"BroadcastChannel", "BroadcastChannel",
      messaging::GetBroadcastChannelExports},
+    {"interop", "interop", BuiltinExports<BuiltinId::kInteropGlobal>,
+     PropertyAttribute::None},
 };
 
 void LazyGlobalGetter(Local<v8::Name> property,
@@ -80,7 +84,7 @@ void LazyGlobals::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
     // assignment landing before the first read replaces the global as well.
     globalTemplate->SetLazyDataProperty(tns::ToV8String(isolate, entry.name),
                                         LazyGlobalGetter, data,
-                                        PropertyAttribute::DontEnum);
+                                        entry.attributes);
   }
 }
 

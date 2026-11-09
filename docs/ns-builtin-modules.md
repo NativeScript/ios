@@ -93,13 +93,20 @@ programmatically.
 
 ### `ns:runtime`
 
-Runtime-level configuration. Keys, value domains, and scope are defined and
-validated natively; the module surface is a thin frozen wrapper.
+Runtime-level configuration and plumbing. Keys, value domains, and scope are
+defined and validated natively; the module surface is a thin frozen wrapper.
 
 | export | description |
 |---|---|
 | `setConfig(key, value)` | Sets a runtime config key. Throws `TypeError` on an unknown key, an invalid value, or (for process-wide keys) when called from a worker isolate. |
 | `getConfig(key)` | Returns the current value of a config key. Throws `TypeError` on an unknown key. Readable from any isolate. |
+| `escapeException(error)` | Returns an `Error` branded to cross the next JS-to-native boundary as a native exception rather than being reported in JS (see [error-handling.md](error-handling.md#forwarding-a-throw-to-native-interopescapeexception)). An already-branded value is returned unchanged; no argument throws `TypeError`. |
+| `setExternalSize(target, bytes)` | Reports `bytes` of native memory held by a native object, pointer, reference, block or function reference to the garbage collector, replacing any earlier size (`0` clears it). Throws `TypeError` for any other value, `RangeError` for a byte count outside 0–2^34. |
+| `getExternalSize(target)` | The size currently charged to `target`, `0` when there is none. |
+
+The last three are also members of the global `interop` (see
+[The global `interop`](#the-global-interop)); the module and the global hold
+the same function objects.
 
 Config keys:
 
@@ -480,6 +487,82 @@ declares the global `URL` and `URLSearchParams` the way `@types/node` declares
 its own globals: a program with a DOM lib keeps the lib's declarations, and a
 program without one gets the module's constructors as the globals.
 
+### `ns:interop`
+
+Native memory and C values — the part of interop that is not tied to one
+platform's object model.
+
+Every runtime provides `ns:interop`, exporting the members it supports. The
+table below is the iOS set. The Android runtime exports none of them today
+(its Java helpers are in `ns:interop/android`).
+
+| export | description |
+|---|---|
+| `Pointer` | The `void*` wrapper constructor. `new Pointer(address)` takes a number or a BigInt; pointers are interned per address. |
+| `Reference` | A typed slot in native memory: `new Reference(value)`, `new Reference(type, value)`, or `new Reference(type, pointer)` for a view of existing memory. |
+| `FunctionReference` | Wraps a JS function so it can be passed as a C function pointer. |
+| `sizeof(type)` | Size in bytes of a type, or of the native value behind an instance. |
+| `alloc(size)` | Zeroed memory, returned as a pointer that frees it when collected. |
+| `free(pointer)` | Frees memory a pointer does not own. |
+| `handleof(instance)` | A `Pointer` to the native counterpart of a wrapper, struct, reference, block, function or ArrayBuffer view. |
+| `stringFromCString(pointer[, length])` | Decodes UTF-8 from a C string. |
+| `types` | Frozen object of the C primitive types: `void`, `bool`, `int8`, `uint8`, `int16`, `uint16`, `int32`, `uint32`, `int64`, `uint64`, `ulong`, `slong`, `float`, `double`. |
+
+```js
+import { Reference, alloc, sizeof, types } from "ns:interop";
+
+const buffer = alloc(sizeof(types.int32));
+const slot = new Reference(types.int32, buffer);
+slot.value = 42;
+```
+
+`types/ns-interop.d.ts` also declares the type-only names `Type<T>`,
+`StructType<T>`, `Unmanaged<T>` and `AdoptedPointer`, so declarations can
+write `import type * as interop from "ns:interop"` and keep referring to
+`interop.Pointer` or `interop.Reference<T>`.
+
+### `ns:interop/ios`
+
+The Apple-only interop helpers and the Objective-C types. **iOS-only**: the
+module exists only on the Apple runtimes. `ns:interop/visionos` and
+`ns:interop/macos` are aliases resolving to the very same module — one exports
+object for `require()`, one module and namespace object for `import` — so code
+can name the platform it targets without the runtime keeping three copies.
+
+| export | description |
+|---|---|
+| `adopt(pointer)` | Makes `pointer` own its memory, freeing it when collected; returns `pointer`. |
+| `bufferFromData(data)` | An `ArrayBuffer` over an `NSData`'s bytes, without copying; the buffer keeps the data alive. |
+| `types` | Frozen object of the Objective-C types: `id`, `class`, `selector`, `protocol`, `unichar`, `noop`. |
+
+`types/ns-interop-ios.d.ts` types `bufferFromData`'s argument as the global
+`NSData` without requiring `@nativescript/types-ios`: it declares an empty
+global `interface NSData`, which merges into that package's class when it is
+in the program and accepts any object otherwise.
+
+### The global `interop`
+
+The global `interop` is a compatibility layer over the three modules above,
+kept so existing code keeps working:
+
+- Every member is the module's own object:
+  `interop.Pointer === require("ns:interop").Pointer`,
+  `interop.adopt === require("ns:interop/ios").adopt`,
+  `interop.escapeException === require("ns:runtime").escapeException`.
+- `interop.types` is one object merging both modules' types, so each of its
+  twenty members is the module's own type object
+  (`interop.types.int32 === require("ns:interop").types.int32`,
+  `interop.types.id === require("ns:interop/ios").types.id`).
+- Unlike the modules it is **not frozen**, and neither is `interop.types`;
+  it remains an ordinary, enumerable, writable property of the global.
+- It carries no member the modules lack.
+
+New code should import from the modules.
+
+*Platform note (iOS):* the global is materialized on its first read, which is
+also what first builds the three modules in a realm that has not required
+them.
+
 ### `node:` compatibility shims
 
 The same registry serves the `node:` scheme with **compatibility shims** so
@@ -794,6 +877,9 @@ shims are built on, so it is normative: both runtimes provide it.
 ## Adding a builtin module
 
 - The name is a short, lowercase identifier (`ns:util`, `ns:timers`, ...).
+  A platform-specific counterpart of a cross-platform module takes the
+  platform as a sub-path (`ns:interop/ios`), and aliases of one platform
+  family resolve to the same registry row.
 - One module, one source file, one registry entry — including shims.
 - New modules and new exports require this document to be updated first and
   an implementation on both runtimes before a stable release; a module may
@@ -807,9 +893,11 @@ resolvers read the same table differently:
 - The **`ns:`/`node:` resolver** — the app-facing one, behind `require()`,
   `import` and `import()` — serves only rows *not* marked internal-only. An
   internal-only specifier fails exactly as a name absent from the table does.
-  Nine rows are public today: `ns:module`, `ns:runtime`, `ns:url`, `ns:util`,
-  `ns:worker_threads`, `node:module`, `node:url`, `node:util`,
-  `node:worker_threads`.
+  Eleven rows are public today: `ns:interop`, `ns:interop/ios`, `ns:module`,
+  `ns:runtime`, `ns:url`, `ns:util`, `ns:worker_threads`, `node:module`,
+  `node:url`, `node:util`, `node:worker_threads`. `ns:interop/visionos` and
+  `ns:interop/macos` are aliases, canonicalized to `ns:interop/ios` before any
+  lookup, so they have no row of their own.
 - The **internal require** builtins receive (previous section) is the only
   thing that can name an internal-only row. Six rows are marked that way:
   `internal/broadcast-channel`, `internal/dom-exception`, `internal/events`,
@@ -819,8 +907,8 @@ resolvers read the same table differently:
   worker's rebuilt error travels under, base classes that must be the
   runtime's own rather than whatever a global currently names.
 - Builtins with **no row at all** (the intrinsics snapshot, the require
-  factory, the console formatter) are invoked straight from their native call
-  sites. There is no specifier that could reach them and nothing to mark.
+  factory, the console formatter, the global `interop` compat layer) are
+  invoked straight from their native call sites. There is no specifier that could reach them and nothing to mark.
 
 So a builtin is unreachable from app code unless a registry row says
 otherwise, and exposing one means editing that row's tier — which is also the

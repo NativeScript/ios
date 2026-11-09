@@ -7,6 +7,12 @@ const {
     ObjectKeys,
 } = primordials;
 
+// Read when a decorator runs rather than here: this file runs at init, and
+// requiring ns:interop at the top would build that module for every app.
+function voidType() {
+    return require("ns:interop").types.void;
+}
+
 ObjectAssign(global, {
     CGPointMake(x, y) {
         return new CGPoint({ x, y });
@@ -60,7 +66,7 @@ ObjectAssign(global, {
             if (!target.constructor.ObjCExposedMethods[propertyKey]) {
                 target.constructor.ObjCExposedMethods[propertyKey] = {};
             }
-            target.constructor.ObjCExposedMethods[propertyKey].returns = returnType || interop.types.void;
+            target.constructor.ObjCExposedMethods[propertyKey].returns = returnType || voidType();
 
             if (hasName && name !== propertyKey) {
                 target.constructor.ObjCExposedMethods[name] = target.constructor.ObjCExposedMethods[propertyKey];
@@ -98,7 +104,7 @@ ObjectAssign(global, {
             if (!exposedMethod.params) {
                 exposedMethod.params = [];
             }
-            exposedMethod.params[parameterIndex] = type || interop.types.void;
+            exposedMethod.params[parameterIndex] = type || voidType();
         };
     },
 

@@ -82,9 +82,13 @@ hands out the objects the globals hold, in either access order. Until then
 nothing of it exists — no compile, no run, no allocation. `text-encoding.js`
 (`TextEncoder`/`TextDecoder`), `base64.js` (`atob`/`btoa`),
 `dom-exception.js` (`DOMException`), `message-event.js` (`MessageEvent`),
-`message-channel.js` (`MessagePort`/`MessageChannel`) and
-`broadcast-channel.js` (`BroadcastChannel`) are the current ones; new globals
-join by adding a row to `kLazyGlobals`.
+`message-channel.js` (`MessagePort`/`MessageChannel`),
+`broadcast-channel.js` (`BroadcastChannel`) and `interop-global.js`
+(`interop`) are the current ones; new globals join by adding a row to
+`kLazyGlobals`. `interop-global.js` is the compat-layer shape of the tier: it
+owns no implementation, it assembles the global out of the `ns:interop`,
+`ns:interop/ios` and `ns:runtime` exports it requires, so the standard
+modules never know the global exists.
 
 Two neighbours of that set are deliberately not in it. `worker-events.js` is
 **eager**: it defines the handler attributes on `Worker.prototype` and the
