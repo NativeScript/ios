@@ -71,17 +71,6 @@ add_executable(objc-metadata-generator ${GENERATOR_HEADERS} ${GENERATOR_SOURCES}
 target_link_libraries(objc-metadata-generator
     ${LLVM_LINKER_FLAGS}
     ${LIBXML2_LIBRARIES}
-    clangFrontend
-    clangSerialization
-    clangDriver
-    clangParse
-    clangSema
-    clangAnalysis
-    clangAST
-    clangBasic
-    clangEdit
-    clangLex
-    clangTooling
 )
 
 set_target_properties(objc-metadata-generator PROPERTIES
@@ -91,10 +80,6 @@ set_target_properties(objc-metadata-generator PROPERTIES
 add_custom_command(TARGET objc-metadata-generator
                    POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory ${LLVM_LIBDIR}/clang ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/clang)
-
-add_custom_command(TARGET objc-metadata-generator
-                   POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/clang/*/lib)
 
 install(TARGETS objc-metadata-generator
         RUNTIME DESTINATION bin)
