@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
 project(MetadataGenerator)
-include(CheckCCompilerFlag)
-include(CheckCXXCompilerFlag)
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
@@ -14,15 +12,24 @@ if (NOT LIBXML2_FOUND)
     message(FATAL_ERROR "libXML2 not found")
 endif ()
 
-get_filename_component(LLVM_ROOT "../../llvm/17.0.6" REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
+get_filename_component(LLVM_ROOT "../../llvm/17.0.8" REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
 set(CMAKE_OSX_DEPLOYMENT_TARGET 13.0)
 
 set(LLVM_SYSTEM_LIBS "-lz -lcurses -lm -lxml2")
-set(LLVM_PREPROCESSOR_FLAGS "-I${LLVM_ROOT}/include -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS")
-# these are all available libs currently, we probably don't need all
-#set(LLVM_LIBS "-lLLVMCFGuard  -lLLVMMipsInfo  -lclangFrontend  -lclangToolingRefactoring  -lLLVMGlobalISel  -lLLVMFileCheck  -lLLVMAnalysis  -lLLVMAArch64AsmParser  -lLLVMBPFAsmParser  -lclangToolingASTDiff  -lLLVMAArch64Utils  -lLLVMMCA  -lclangHandleLLVM  -lLLVMMIRParser  -lLLVMHexagonAsmParser  -lLLVMLanaiDesc  -lLLVMSparcDisassembler  -llldELF  -lLLVMMipsAsmParser  -lLLVMDebugInfoDWARF  -lLLVMAVRDisassembler  -lLLVMWebAssemblyInfo  -lLLVMHexagonInfo  -lLLVMARMCodeGen  -lLLVMPowerPCCodeGen  -lLLVMXRay  -lLLVMMSP430CodeGen  -lLLVMVectorize  -lLLVMHexagonCodeGen  -lclangCrossTU  -lLLVMSupport  -lLLVMDWP  -lLLVMWindowsManifest  -lclangToolingInclusions  -lLLVMNVPTXDesc  -lc++  -lLLVMXCoreCodeGen  -lLLVMSystemZInfo  -lclangFormat  -lLLVMWebAssemblyUtils  -lLLVMCFIVerify  -lLLVMXCoreInfo  -lLLVMAVRDesc  -lLLVMARMDisassembler  -lclangAPINotes  -lLLVMSparcDesc  -llldCOFF  -lLLVMAggressiveInstCombine  -lLLVMAMDGPUDesc  -lLLVMMSP430AsmParser  -lclangIndexSerialization  -lLLVMExtensions  -lLLVMInstCombine  -lLLVMDWARFLinker  -lclangHandleCXX  -lLLVMRISCVDisassembler  -lclangDependencyScanning  -lLLVMRISCVAsmParser  -lLLVMFuzzMutate  -lLLVMExegesisMips  -lclangDynamicASTMatchers  -lclangTransformer  -lclangCodeGen  -lLLVMScalarOpts  -lLLVMTextAPI  -lclangSerialization  -lLLVMPasses  -lLLVMBPFInfo  -lLLVMLinker  -lLLVMObject  -lLLVMMCJIT  -lPollyISL  -lLLVMExegesisPowerPC  -lLLVMCore  -lLLVMLanaiCodeGen  -lLLVMipo  -lLLVMAArch64Info  -lLLVMMC  -lLLVMObjCARCOpts  -lclangRewrite  -lLLVMCodeGen  -lclangAST  -lLLVMTarget  -lLLVMX86AsmParser  -lLLVMFrontendOpenACC  -llldYAML  -lLLVMDebugInfoPDB  -lLLVMMCDisassembler  -lclangEdit  -lLLVMX86CodeGen  -lLLVMX86Info  -lLLVMBPFCodeGen  -lLLVMDebugInfoGSYM  -lLLVMBPFDisassembler  -lclangRewriteFrontend  -lclangLex  -lLLVMRISCVInfo  -lLLVMJITLink  -lLLVMBitReader  -lLLVMHexagonDisassembler  -lLLVMExecutionEngine  -lLLVMMSP430Desc  -lLLVMPowerPCDesc  -llldCommon  -lLLVMWebAssemblyAsmParser  -lclangBasic  -lLLVMSystemZAsmParser  -lLLVMLTO  -lLLVMSystemZCodeGen  -lLLVMRemarks  -lLLVMOption  -lLLVMARMDesc  -lLLVMAMDGPUUtils  -lclangAnalysis  -lLLVMPowerPCAsmParser  -lLLVMOrcTargetProcess  -lLLVMInterfaceStub  -lclangStaticAnalyzerCore  -lclangASTMatchers  -lLLVMIRReader  -llldWasm  -lLLVMFrontendOpenMP  -llldDriver  -lLLVMAArch64Desc  -lclangDirectoryWatcher  -lLLVMAVRCodeGen  -lLLVMWebAssemblyDisassembler  -lLLVMLanaiAsmParser  -lLLVMRISCVCodeGen  -lLLVMBPFDesc  -lLLVMMSP430Disassembler  -lclangDriver  -lLLVMTransformUtils  -lLLVMLibDriver  -lLLVMCoverage  -lLLVMARMInfo  -lLLVMExegesisAArch64  -lclangParse  -lLLVMInterpreter  -lLLVMPowerPCInfo  -lLLVMRuntimeDyld  -lLLVMMSP430Info  -lLLVMProfileData  -lLLVMSymbolize  -lLLVMSelectionDAG  -lLLVMRISCVDesc  -lLLVMExegesisX86  -lLLVMX86Desc  -lLLVMSparcCodeGen  -lLLVMBitWriter  -lclangStaticAnalyzerCheckers  -lLLVMObjectYAML  -lclangTooling  -lLLVMBinaryFormat  -lLLVMMCParser  -lLLVMWebAssemblyDesc  -lLLVMHexagonDesc  -lLLVMAMDGPUCodeGen  -lLLVMX86Disassembler  -lclangToolingCore  -lLLVMDemangle  -lLLVMARMAsmParser  -lLLVMLanaiDisassembler  -lLLVMLineEditor  -lLLVMMipsCodeGen  -lclangTesting  -lLLVMLanaiInfo  -lLLVMOrcJIT  -lclangInterpreter  -llldReaderWriter  -lLLVMAsmPrinter  -lLLVMExegesis  -lLLVMAArch64Disassembler  -lLLVMTableGenGlobalISel  -lclangToolingSyntax  -lLLVMMipsDesc  -lPolly  -lLLVMMCACustomBehaviourAMDGPU  -llldMinGW  -lLLVMXCoreDisassembler  -lLLVMTableGen  -lLLVMAArch64CodeGen  -llldMachO  -lLLVMCoroutines  -llldMachO2  -lLLVMAVRAsmParser  -lLLVMPowerPCDisassembler  -lLLVMDebugInfoCodeView  -lLLVMNVPTXCodeGen  -lclangFrontendTool  -lLLVMAMDGPUInfo  -llldCore  -lLLVMWebAssemblyCodeGen  -lLLVMSystemZDisassembler  -lLLVMSparcInfo  -lLLVMAMDGPUDisassembler  -lLLVMAVRInfo  -lclangARCMigrate  -lLLVMSparcAsmParser  -lLLVMXCoreDesc  -lLLVMAsmParser  -lLLVMDebugInfoMSF  -lLLVMOrcShared  -lLLVMSystemZDesc  -lLLVMNVPTXInfo  -lLLVMBitstreamReader  -lclangStaticAnalyzerFrontend  -lclangIndex  -lLLVMInstrumentation  -lclangSema  -lLLVMDlltoolDriver  -lLLVMARMUtils  -lLLVMMipsDisassembler  -lLLVMAMDGPUAsmParser")
-# these come from the older llvm plus some added ones at the end
-set(LLVM_LIBS "-lLLVMLTO -lLLVMPasses -lLLVMObjCARCOpts -lLLVMMIRParser -lLLVMSymbolize -lLLVMDebugInfoPDB -lLLVMDebugInfoDWARF -lLLVMCoverage -lLLVMMCA -lLLVMTableGen -lLLVMDlltoolDriver -lLLVMXRay -lLLVMOrcJIT -lLLVMXCoreDisassembler -lLLVMXCoreCodeGen -lLLVMXCoreDesc -lLLVMXCoreInfo -lLLVMWebAssemblyDisassembler -lLLVMWebAssemblyCodeGen -lLLVMWebAssemblyDesc -lLLVMWebAssemblyAsmParser -lLLVMWebAssemblyInfo -lLLVMSystemZDisassembler -lLLVMSystemZCodeGen -lLLVMSystemZAsmParser -lLLVMSystemZDesc -lLLVMSystemZInfo -lLLVMSparcDisassembler -lLLVMSparcCodeGen -lLLVMSparcAsmParser -lLLVMSparcDesc -lLLVMSparcInfo -lLLVMPowerPCDisassembler -lLLVMPowerPCCodeGen -lLLVMPowerPCAsmParser -lLLVMPowerPCDesc -lLLVMPowerPCInfo -lLLVMNVPTXCodeGen -lLLVMNVPTXDesc -lLLVMNVPTXInfo -lLLVMMSP430Disassembler -lLLVMMSP430CodeGen -lLLVMMSP430AsmParser -lLLVMMSP430Desc -lLLVMMSP430Info -lLLVMMipsDisassembler -lLLVMMipsCodeGen -lLLVMMipsAsmParser -lLLVMMipsDesc -lLLVMMipsInfo -lLLVMLanaiDisassembler -lLLVMLanaiCodeGen -lLLVMLanaiAsmParser -lLLVMLanaiDesc -lLLVMLanaiInfo -lLLVMHexagonDisassembler -lLLVMHexagonCodeGen -lLLVMHexagonAsmParser -lLLVMHexagonDesc -lLLVMHexagonInfo -lLLVMBPFDisassembler -lLLVMBPFCodeGen -lLLVMBPFAsmParser -lLLVMBPFDesc -lLLVMBPFInfo -lLLVMARMDisassembler -lLLVMARMCodeGen -lLLVMARMAsmParser -lLLVMARMDesc -lLLVMARMInfo -lLLVMARMUtils -lLLVMAMDGPUDisassembler -lLLVMAMDGPUCodeGen -lLLVMAMDGPUAsmParser -lLLVMAMDGPUDesc -lLLVMAMDGPUInfo -lLLVMAMDGPUUtils -lLLVMAArch64Disassembler -lLLVMAArch64CodeGen -lLLVMAArch64AsmParser -lLLVMAArch64Desc -lLLVMAArch64Info -lLLVMAArch64Utils -lLLVMObjectYAML -lLLVMLibDriver -lLLVMOption -lLLVMWindowsManifest -lLLVMTextAPI -lLLVMFuzzMutate -lLLVMX86Disassembler -lLLVMX86AsmParser -lLLVMX86CodeGen -lLLVMGlobalISel -lLLVMSelectionDAG -lLLVMAsmPrinter -lLLVMX86Desc -lLLVMMCDisassembler -lLLVMX86Info -lLLVMMCJIT -lLLVMLineEditor -lLLVMInterpreter -lLLVMExecutionEngine -lLLVMRuntimeDyld -lLLVMCodeGen -lLLVMTarget -lLLVMCoroutines -lLLVMipo -lLLVMInstrumentation -lLLVMVectorize -lLLVMScalarOpts -lLLVMLinker -lLLVMIRReader -lLLVMAsmParser -lLLVMInstCombine -lLLVMBitWriter -lLLVMAggressiveInstCombine -lLLVMTransformUtils -lLLVMAnalysis -lLLVMProfileData -lLLVMObject -lLLVMMCParser -lLLVMMC -lLLVMDebugInfoCodeView -lLLVMDebugInfoMSF -lLLVMBitReader -lLLVMCore -lLLVMBinaryFormat -lLLVMSupport -lLLVMDemangle -lLLVMRemarks -lLLVMFrontendOpenMP -lLLVMBitstreamReader -lclangASTMatchers -lLLVMRISCVAsmParser -lclangSupport -lLLVMWindowsDriver -lLLVMTargetParser -lLLVMCAS -lclangCAS -lclangAPINotes -lLLVMCodeGenTypes")
+set(LLVM_PREPROCESSOR_FLAGS "-isystem ${LLVM_ROOT}/include -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS")
+# The static archives the generator links. It needs no LLVM backend:
+# clang gets target information from clangBasic.
+set(LLVM_LIBS
+    clangTooling clangFrontend clangDriver clangSerialization clangParse clangSema
+    clangAnalysis clangASTMatchers clangEdit clangAST clangLex clangAPINotes clangCAS
+    clangSupport clangBasic
+    LLVMFrontendOpenMP LLVMOption LLVMObject LLVMTextAPI LLVMIRReader LLVMAsmParser
+    LLVMBitReader LLVMMCParser LLVMMC LLVMDebugInfoDWARF LLVMDebugInfoCodeView
+    LLVMProfileData LLVMCore LLVMRemarks LLVMBitstreamReader LLVMBinaryFormat LLVMCAS
+    LLVMTargetParser LLVMWindowsDriver LLVMSupport LLVMDemangle
+)
+list(TRANSFORM LLVM_LIBS PREPEND "-l")
+list(JOIN LLVM_LIBS " " LLVM_LIBS)
 
 set(LLVM_LIBDIR "${LLVM_ROOT}/lib_${METADATA_BINARY_ARCH}")
 set(LLVM_LINKER_FLAGS "-L${LLVM_LIBDIR} -Wl,-search_paths_first -Wl,-headerpad_max_install_names -Wl,-dead_strip")
@@ -30,29 +37,6 @@ set(LLVM_LINKER_FLAGS "-L${LLVM_LIBDIR} -Wl,-search_paths_first -Wl,-headerpad_m
 set(CMAKE_BUILD_TYPE Release)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -target ${METADATA_BINARY_ARCH}-apple-darwin -std=c++17 -fno-rtti ${LLVM_PREPROCESSOR_FLAGS}")
-
-# Disable unused-but-set-variable error because it's triggered by LLVM code
-check_c_compiler_flag(-Wno-unused-but-set-variable HAS_UNUSED_BUT_SET_VARIABLE)
-if (HAS_UNUSED_BUT_SET_VARIABLE)
-    add_compile_options(-Wno-unused-but-set-variable)
-endif()
-
-# Newer Apple toolchains (Xcode 26.x with Clang 17+) emit two diagnostics
-# inside LLVM 17.0.6's own headers (e.g. `-Wunnecessary-virtual-specifier`
-# on `virtual void anchor()` in classes declared `final` in
-# `clang/AST/Decl.h`, and `-Wpreferred-type-bitfield-enum-conversion` on
-# bitfield-to-enum stores). These are upstream-known issues that don't
-# affect generator behavior. Keep `-Werror` for *our* code, but downgrade
-# these two to warnings so the build succeeds without bumping LLVM.
-check_cxx_compiler_flag(-Wno-error=preferred-type-bitfield-enum-conversion HAS_NO_ERROR_PREFERRED_TYPE_BITFIELD_ENUM_CONVERSION)
-if (HAS_NO_ERROR_PREFERRED_TYPE_BITFIELD_ENUM_CONVERSION)
-    add_compile_options(-Wno-error=preferred-type-bitfield-enum-conversion)
-endif()
-
-check_cxx_compiler_flag(-Wno-error=unnecessary-virtual-specifier HAS_NO_ERROR_UNNECESSARY_VIRTUAL_SPECIFIER)
-if (HAS_NO_ERROR_UNNECESSARY_VIRTUAL_SPECIFIER)
-    add_compile_options(-Wno-error=unnecessary-virtual-specifier)
-endif()
 
 set(LLVM_LINKER_FLAGS "${LLVM_LINKER_FLAGS} ${LLVM_SYSTEM_LIBS} ${LLVM_LIBS}")
 

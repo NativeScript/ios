@@ -297,7 +297,7 @@ static llvm::ErrorOr<bool> isStaticFramework(clang::Module* framework)
             if (isDylib(machObjectFile)) {
                 return false;
             }
-        } else if (Archive* archive = dyn_cast<Archive>(&binary)) {
+        } else if (isa<Archive>(&binary)) {
             return true;
         }
     }
