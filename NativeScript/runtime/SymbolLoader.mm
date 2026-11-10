@@ -74,6 +74,23 @@ class DlSymbolResolver : public SymbolResolver {
   void* _libraryHandle;
 };
 
+#if !TARGET_IPHONE_SIMULATOR
+// Mac Catalyst, or an iOS app running on an Apple silicon Mac ("Designed for iPad").
+static bool isRunningOnMac() {
+  static const bool runningOnMac = [] {
+    NSProcessInfo* info = [NSProcessInfo processInfo];
+    if (info.isMacCatalystApp) {
+      return true;
+    }
+    if (@available(iOS 14.0, *)) {
+      return (bool)info.isiOSAppOnMac;
+    }
+    return false;
+  }();
+  return runningOnMac;
+}
+#endif
+
 SymbolLoader& SymbolLoader::instance() {
   static SymbolLoader loader;
   return loader;
@@ -99,6 +116,7 @@ SymbolResolver* SymbolLoader::resolveModule(const ModuleMeta* module) {
   std::unique_ptr<SymbolResolver> resolver;
   if (module->isFramework()) {
     NSString* frameworkPathStr = [NSString stringWithFormat:@"%s.framework", module->getName()];
+    CFBundleRef bundle = nullptr;
     NSURL* baseUrl = nil;
     if (module->isSystem()) {
 #if TARGET_IPHONE_SIMULATOR
@@ -108,14 +126,27 @@ SymbolResolver* SymbolLoader::resolveModule(const ModuleMeta* module) {
           substringToIndex:[foundationPath rangeOfString:@"Foundation.framework"].location];
       baseUrl = [NSURL fileURLWithPath:basePathStr isDirectory:YES];
 #else
+      // On a Mac the iOS frameworks live under /System/iOSSupport; a /System/Library copy
+      // is the macOS variant or lacks the iOS symbols. Frameworks shared with macOS
+      // (Foundation, CoreGraphics, ...) exist only under /System/Library.
+      if (isRunningOnMac()) {
+        NSURL* iOSSupportUrl =
+            [NSURL fileURLWithPath:@"/System/iOSSupport/System/Library/Frameworks"
+                       isDirectory:YES];
+        NSURL* bundleUrl = [NSURL URLWithString:frameworkPathStr relativeToURL:iOSSupportUrl];
+        bundle = CFBundleCreate(kCFAllocatorDefault, (CFURLRef)bundleUrl);
+      }
       baseUrl = [NSURL fileURLWithPath:@"/System/Library/Frameworks" isDirectory:YES];
 #endif
     } else {
       baseUrl = [[NSBundle mainBundle] privateFrameworksURL];
     }
 
-    NSURL* bundleUrl = [NSURL URLWithString:frameworkPathStr relativeToURL:baseUrl];
-    if (CFBundleRef bundle = CFBundleCreate(kCFAllocatorDefault, (CFURLRef)bundleUrl)) {
+    if (!bundle) {
+      NSURL* bundleUrl = [NSURL URLWithString:frameworkPathStr relativeToURL:baseUrl];
+      bundle = CFBundleCreate(kCFAllocatorDefault, (CFURLRef)bundleUrl);
+    }
+    if (bundle) {
       resolver = std::make_unique<CFBundleSymbolResolver>(bundle);
     }
   } else if (module->libraries->count == 1) {
