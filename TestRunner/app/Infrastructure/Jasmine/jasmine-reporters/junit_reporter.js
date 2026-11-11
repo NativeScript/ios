@@ -32,15 +32,23 @@
             pad(d.getMinutes()) + ':' +
             pad(d.getSeconds());
     }
+    // XML 1.0 has no way to represent these, escaped or not, and a single one
+    // makes the whole report unparseable; they are written out as \uXXXX text.
+    var XML_FORBIDDEN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+    function replaceXmlForbiddenChars(str) {
+        return str.replace(XML_FORBIDDEN, function (ch) {
+            return "\\u" + ("000" + ch.charCodeAt(0).toString(16).toUpperCase()).slice(-4);
+        });
+    }
     function escapeInvalidXmlChars(str) {
-        return str.replace(/\&/g, "&amp;")
+        return replaceXmlForbiddenChars(str).replace(/\&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/\>/g, "&gt;")
             .replace(/\"/g, "&quot;")
             .replace(/\'/g, "&apos;");
     }
     function cdata(str) {
-        return '<![CDATA[' + str.replace(/\]\]>/g, ']]]]><![CDATA[>') + ']]>';
+        return '<![CDATA[' + replaceXmlForbiddenChars(str).replace(/\]\]>/g, ']]]]><![CDATA[>') + ']]>';
     }
     function getQualifiedFilename(path, filename, separator) {
         if (path && path.substr(-1) !== separator && filename.substr(0) !== separator) {

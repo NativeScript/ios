@@ -219,7 +219,9 @@
                 fail_str = totalSpecsFailed + (totalSpecsFailed === 1 ? " failure, " : " failures, "),
                 skip_str = skipped + " skipped, ",
                 disabled_str = disabled + " disabled in ",
-                summary_str = spec_str + fail_str + skip_str + disabled_str + dur + "s.",
+                other_str = totalOtherFailures === 0 ? "" :
+                    totalOtherFailures + (totalOtherFailures === 1 ? " suite/run-level error, " : " suite/run-level errors, "),
+                summary_str = spec_str + fail_str + other_str + skip_str + disabled_str + dur + "s.",
                 result_str = (failedOverall ? "FAILURE: " : "SUCCESS: ") + summary_str,
                 result_color = failedOverall ? "red+bold" : "green+bold";
 

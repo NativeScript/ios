@@ -188,6 +188,13 @@ describe("unhandled rejections", function () {
         })();
     }
 
+    // The spec's own rejection must be the only global error raised while it
+    // ran; anything else the spy caught would otherwise pass unnoticed.
+    function expectOnlyGlobalError(globalErrorSpy, reason) {
+        expect(globalErrorSpy.calls.count()).toBe(1);
+        expect(globalErrorSpy.calls.argsFor(0)[0]).toBe(reason);
+    }
+
     // Wait a couple of runloop turns to confirm the hook did NOT fire.
     function afterQuietTurns(cb) {
         setTimeout(function () {
@@ -195,12 +202,13 @@ describe("unhandled rejections", function () {
         }, 20);
     }
 
-    it("reports an unhandled Promise.reject", raisesGlobalErrors(function (done) {
+    it("reports an unhandled Promise.reject", raisesGlobalErrors(function (done, globalErrorSpy) {
         const reason = new Error("unhandled-promise-reject");
         Promise.reject(reason);
         afterDrain(function () {
             expect(reported.length).toBeGreaterThan(0);
             expect(reported[0]).toBe(reason);
+            expectOnlyGlobalError(globalErrorSpy, reason);
             done();
         });
     }));
@@ -214,7 +222,7 @@ describe("unhandled rejections", function () {
         });
     });
 
-    it("reports an uncaught throw from an async function", raisesGlobalErrors(function (done) {
+    it("reports an uncaught throw from an async function", raisesGlobalErrors(function (done, globalErrorSpy) {
         const reason = new Error("async-function-throw");
         (async () => {
             throw reason;
@@ -222,11 +230,12 @@ describe("unhandled rejections", function () {
         afterDrain(function () {
             expect(reported.length).toBeGreaterThan(0);
             expect(reported[0]).toBe(reason);
+            expectOnlyGlobalError(globalErrorSpy, reason);
             done();
         });
     }));
 
-    it("reports an unhandled rejection thrown from a .then callback", raisesGlobalErrors(function (done) {
+    it("reports an unhandled rejection thrown from a .then callback", raisesGlobalErrors(function (done, globalErrorSpy) {
         const reason = new Error("then-callback-throw");
         Promise.resolve().then(() => {
             throw reason;
@@ -234,11 +243,12 @@ describe("unhandled rejections", function () {
         afterDrain(function () {
             expect(reported.length).toBeGreaterThan(0);
             expect(reported[0]).toBe(reason);
+            expectOnlyGlobalError(globalErrorSpy, reason);
             done();
         });
     }));
 
-    it("ignores a late .catch attached after the rejection was already reported", raisesGlobalErrors(function (done) {
+    it("ignores a late .catch attached after the rejection was already reported", raisesGlobalErrors(function (done, globalErrorSpy) {
         const reason = new Error("late-catch");
         const p = Promise.reject(reason);
         afterDrain(function () {
@@ -248,6 +258,7 @@ describe("unhandled rejections", function () {
             p.catch(function () {});
             afterQuietTurns(function () {
                 expect(reported.length).toBe(1);
+                expectOnlyGlobalError(globalErrorSpy, reason);
                 done();
             });
         });
