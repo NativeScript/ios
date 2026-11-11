@@ -573,6 +573,14 @@ describe(module.id, function () {
         expect(str.normalize()).toBe(str);
     });
 
+    describe("__runtimeVersion", function () {
+        it("is the bare package version, as on Android", function () {
+            expect(typeof __runtimeVersion).toBe("string");
+            expect(__runtimeVersion).not.toContain('"');
+            expect(__runtimeVersion).toMatch(/^\d+\.\d+\.\d+([-+][0-9A-Za-z.+-]*)?$/);
+        });
+    });
+
     describe("__releaseNativeCounterpart", function () {
         it("deallocates js derived instances created with alloc().init()", function () {
             var P = TNSAllocLog.extend({});

@@ -1868,6 +1868,7 @@
 			buildPhases = (
 				C2DDEB2D229EAB3B00345BFE /* Headers */,
 				4A5C201A2E2B000100000008 /* Generate RuntimeBuiltins */,
+				4A5C201A2E2B000100000009 /* Generate Version header */,
 				C2DDEB2E229EAB3B00345BFE /* Sources */,
 				C2DDEB2F229EAB3B00345BFE /* Frameworks */,
 				C2DDEB30229EAB3B00345BFE /* Resources */,
@@ -2042,6 +2043,27 @@
 			shellPath = /bin/sh;
 			shellScript = "set -e\ncd \"${SRCROOT}\"\n[ -f .xcode.env ] && . ./.xcode.env\n[ -f .xcode.env.local ] && . ./.xcode.env.local\nif [ -z \"${NODE_BINARY:-}\" ] || [ ! -x \"${NODE_BINARY:-}\" ]; then\n  echo \"error: no usable node for tools/js2c.mjs (NODE_BINARY='${NODE_BINARY:-}'). Run 'npm run setup-xcode-env' in the runtime repo to record your node in .xcode.env.local\" >&2\n  exit 1\nfi\n\"$NODE_BINARY\" tools/js2c.mjs --out-dir NativeScript/runtime/generated --filelist tools/js2c-inputs.xcfilelist NativeScript/runtime/js/*.js\n";
 		};
+		4A5C201A2E2B000100000009 /* Generate Version header */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/package.json",
+				"$(SRCROOT)/tools/generate-version-header.sh",
+			);
+			name = "Generate Version header";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/NativeScript/runtime/generated/Version.h",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "exec \"${SRCROOT}/tools/generate-version-header.sh\" --package \"${SRCROOT}/package.json\" --out \"${SRCROOT}/NativeScript/runtime/generated/Version.h\"\n";
+		};
 		65A6D684291F63A30074DF31 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -2093,7 +2115,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cd ${PROJECT_DIR}/metadata-generator\nmkdir build\ncd ./build\ncmake -DCMAKE_BUILD_TYPE=Release ../\nmake\n";
+			shellScript = "cd ${PROJECT_DIR}/metadata-generator\nmkdir build\ncd ./build\ncmake -DCMAKE_BUILD_TYPE=Release ../\nmake -j$(sysctl -n hw.ncpu)\n";
 		};
 		C2F4CBBD22C61D480036B56F /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -2985,7 +3007,6 @@
 					"-Wall",
 					"-Werror",
 					"-Wno-documentation",
-					"-fembed-bitcode",
 				);
 				OTHER_LDFLAGS = (
 					"-ld_classic",
@@ -3079,7 +3100,6 @@
 					"-Wall",
 					"-Werror",
 					"-Wno-documentation",
-					"-fembed-bitcode",
 				);
 				OTHER_LDFLAGS = (
 					"-ld_classic",

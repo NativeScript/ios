@@ -4,9 +4,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 env:
   NPM_TAG: "pr"
-  XCODE_VERSION: "^16.0"
+  # Xcode 26 for its compilation cache (tools/ci-compilation-cache.xcconfig).
+  XCODE_VERSION: "26.3"
 
 jobs:
   build:
@@ -26,7 +31,21 @@ jobs:
         with:
           path: ./llvm
           key: ${{ hashFiles('download_llvm.sh') }}
+      - name: Xcode compilation cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/xcode-cas
+          # npm_release.yml saves this key from main (never restoring it there), so
+          # a PR's first push starts warm.
+          key: xcode-cas-${{ runner.os }}-${{ runner.arch }}-build-${{ github.sha }}
+          restore-keys: xcode-cas-${{ runner.os }}-${{ runner.arch }}-build-
+      - name: Enable Xcode compilation cache
+        run: |
+          echo "XCODE_XCCONFIG_FILE=$GITHUB_WORKSPACE/tools/ci-compilation-cache.xcconfig" >> "$GITHUB_ENV"
+          echo "NS_COMPILATION_CACHE_DIR=$RUNNER_TEMP/xcode-cas" >> "$GITHUB_ENV"
       - uses: ./.github/actions/setup-build-env
+        with:
+          ccache: "true"
       - name: Get Current Version
         run: |
           echo NPM_VERSION=$(node -e "console.log(require('./package.json').version);") >> $GITHUB_ENV
@@ -40,6 +59,12 @@ jobs:
         # package, so the artifact below is self-contained — download it and
         # use it directly with `ns platform add ios --framework-path=<tgz>`.
         run: npm run build-ios
+      - name: Xcode compilation cache size
+        if: ${{ !cancelled() }}
+        run: du -sh "$NS_COMPILATION_CACHE_DIR" || true
+      - name: ccache stats
+        if: ${{ !cancelled() }}
+        run: ccache --show-stats || true
       - name: Upload npm package artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -68,11 +93,13 @@ jobs:
           - name: Test
             xcodebuild-args: ""
             artifact-suffix: ""
+            cache-variant: default
           # Only code compiled here is instrumented: the runtime and the test
           # fixtures, not the prebuilt V8 archives.
           - name: Test (ASan)
             xcodebuild-args: "-enableAddressSanitizer YES"
             artifact-suffix: "-asan"
+            cache-variant: asan
     steps:
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
@@ -86,6 +113,18 @@ jobs:
         with:
           path: ./llvm
           key: ${{ hashFiles('download_llvm.sh') }}
+      - name: Xcode compilation cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/xcode-cas
+          # A distinct segment per variant: a bare prefix of one would also match
+          # the other's keys. npm_release.yml saves the "default" variant from main.
+          key: xcode-cas-${{ runner.os }}-${{ runner.arch }}-test-${{ matrix.cache-variant }}-${{ github.sha }}
+          restore-keys: xcode-cas-${{ runner.os }}-${{ runner.arch }}-test-${{ matrix.cache-variant }}-
+      - name: Enable Xcode compilation cache
+        run: |
+          echo "XCODE_XCCONFIG_FILE=$GITHUB_WORKSPACE/tools/ci-compilation-cache.xcconfig" >> "$GITHUB_ENV"
+          echo "NS_COMPILATION_CACHE_DIR=$RUNNER_TEMP/xcode-cas" >> "$GITHUB_ENV"
       - uses: ./.github/actions/setup-build-env
         with:
           install-test-tools: "true"
@@ -103,20 +142,23 @@ jobs:
           # TestRunnerTests.swift) need more than 20m headroom per attempt.
           timeout_minutes: 40
           max_attempts: 2
-          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro ${{ matrix.xcodebuild-args }} build test | xcpretty
+          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro ${{ matrix.xcodebuild-args }} test | xcpretty
           # Keep the failed attempt's bundle — it holds the diagnostics of the
           # failure being retried. Everything else at the result path must go
           # (including extensionless staging leftovers), or the retry dies with
           # "Existing file at -resultBundlePath".
           on_retry_command: rm -rf $TEST_FOLDER/test_results_attempt1.xcresult; mv $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test_results_attempt1.xcresult 2>/dev/null; for f in $TEST_FOLDER/test_results*; do [ "$f" = "$TEST_FOLDER/test_results_attempt1.xcresult" ] || rm -rf "$f"; done; xcrun simctl shutdown all
-          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro ${{ matrix.xcodebuild-args }} build test
+          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro ${{ matrix.xcodebuild-args }} test
+      - name: Xcode compilation cache size
+        if: ${{ !cancelled() }}
+        run: du -sh "$NS_COMPILATION_CACHE_DIR" || true
       - name: Extract test results
         # Runs even when the test step failed: the xcresult usually still
         # carries the JS suite's junit attachments for the report step below.
         if: ${{ !cancelled() }}
         run: |
           if [ -d "$TEST_FOLDER/test_results.xcresult" ]; then
-            xcparse attachments $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test-out
+            ./scripts/export-test-attachments.sh --result "$TEST_FOLDER/test_results.xcresult" --output "$TEST_FOLDER/test-out"
           fi
       - name: Test report summary
         if: ${{ !cancelled() }}
