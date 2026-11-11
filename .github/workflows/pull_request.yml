@@ -133,6 +133,9 @@ jobs:
         run: |
           mkdir -p dist-test
           echo TEST_FOLDER=$(pwd)/dist-test >> $GITHUB_ENV
+      # Must match the simulator named in the Xcode Tests -destination.
+      - name: Wait for the test simulator
+        run: ./scripts/wait-for-simulator.sh --name "iPhone 16 Pro"
       - name: Xcode Tests
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         # try to run the tests with xcpretty. If it fails then try again without xcpretty twice for better log output
