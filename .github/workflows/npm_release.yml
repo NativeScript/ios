@@ -304,7 +304,7 @@ jobs:
         working-directory: dist/dSYMs
         run: find . -maxdepth 1 -name '*.dSYM' -print | xargs -I@ zip -r @.zip @ || true
       - name: Partial Changelog
-        run: npx conventional-changelog -p angular -r2 > body.md
+        run: node ./scripts/changelog.mjs --version "$NPM_VERSION" > body.md
       - name: Create / update release with SPM artifacts
         uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
         with:
