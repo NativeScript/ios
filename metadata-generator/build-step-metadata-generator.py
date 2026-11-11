@@ -3,6 +3,7 @@
 import os
 import shlex
 import subprocess
+import filecmp
 import sys
 
 print("Python version: " + sys.version)
@@ -126,7 +127,7 @@ def save_stream_to_file(filename, stream):
 def generate_metadata(arch):
     # metadata generator arguments
     generator_call = ["./objc-metadata-generator", "-verbose",
-                      "-output-bin", "{}/metadata-{}.bin".format(conf_build_dir, arch),
+                      "-output-bin", "{}/metadata-{}.bin.tmp".format(conf_build_dir, arch),
                       "-output-umbrella", "{}/umbrella-{}.h".format(conf_build_dir, arch),
                       "-docset-path", docset_path]
 
@@ -191,6 +192,14 @@ def generate_metadata(arch):
         print("Error: Unable to generate metadata for {}.".format(arch))
         print(error_stream_content)
         sys.exit(1)
+
+    # Generated during linking, but also an input of the link (-sectcreate):
+    # replacing unchanged metadata would make Xcode relink on every build.
+    output_bin = "{}/metadata-{}.bin".format(conf_build_dir, arch)
+    if os.path.exists(output_bin) and filecmp.cmp(output_bin + ".tmp", output_bin, shallow=False):
+        os.remove(output_bin + ".tmp")
+    else:
+        os.replace(output_bin + ".tmp", output_bin)
 
 
 for arch in env("ARCHS").split():
