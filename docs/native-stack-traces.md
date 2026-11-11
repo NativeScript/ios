@@ -115,5 +115,9 @@ locations above.
 
 `NSException.callStackSymbols` names frames the same way as this log, so it has
 the same limitation. `NSException.callStackReturnAddresses` gives the raw
-addresses for server-side symbolication. See
+addresses, but they cannot be resolved on their own: the framework loads at a
+different address on every launch, so each address needs its image's load
+address, architecture and UUID, the same data as this log's `Binary images:`
+list. Reporter SDKs that capture native crashes collect that list themselves.
+If you send raw addresses yourself, send the image list with them. See
 [Error handling](error-handling.md#crash-reporter-integration).
