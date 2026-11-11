@@ -29,6 +29,9 @@ git submodule update --init
 sudo gem install xcodeproj
 sudo gem install cocoapods
 
+# Install the npm dev dependencies (the TestRunner app bundles jasmine-core from node_modules)
+npm install
+
 # Record this shell's node in .xcode.env.local and open the runtime in Xcode
 # (Xcode build phases don't see your shell's PATH — see "Node.js in Xcode builds")
 npm run open-xcode
@@ -50,7 +53,7 @@ If all tests pass, everything is good! At this point you can make changes to the
 
 ## Node.js in Xcode builds
 
-Building the `NativeScript` target generates the runtime JS builtins with `tools/js2c.mjs`, which needs Node.js. Xcode runs build phases with a minimal `PATH` and never reads your shell profile, so a node managed by nvm/fnm/volta/asdf is invisible to it. The build phase instead sources two files from the repo root:
+Building the `NativeScript` target generates the runtime JS builtins with `tools/js2c.mjs`, and building the `TestRunner` target copies jasmine-core from `node_modules` into the test app with `tools/stage-test-runner-deps.mjs`; both need Node.js. Xcode runs build phases with a minimal `PATH` and never reads your shell profile, so a node managed by nvm/fnm/volta/asdf is invisible to it. The build phase instead sources two files from the repo root:
 
 - `.xcode.env` — committed defaults (`NODE_BINARY=$(command -v node)`, enough for Homebrew installs and `xcodebuild` runs from a terminal)
 - `.xcode.env.local` — gitignored per-machine overrides, sourced last so it wins
