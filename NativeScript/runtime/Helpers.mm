@@ -4,11 +4,15 @@
 #include <dispatch/dispatch.h>
 #include <dlfcn.h>
 #include <execinfo.h>
+#include <mach-o/loader.h>
+#include <mach/machine.h>
 #include <objc/runtime.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <uuid/uuid.h>
 #include <atomic>
 #include <cerrno>
 #include <mutex>
@@ -771,36 +775,102 @@ std::string tns::ReplaceAll(const std::string source, std::string find, std::str
   return result;
 }
 
+namespace {
+
+const char* ImageArch(const struct mach_header* header) {
+  switch (header->cputype) {
+    case CPU_TYPE_ARM64:
+      return (header->cpusubtype & ~CPU_SUBTYPE_MASK) == CPU_SUBTYPE_ARM64E ? "arm64e" : "arm64";
+    case CPU_TYPE_X86_64:
+      return "x86_64";
+    default:
+      return "?";
+  }
+}
+
+// Same spelling as `dwarfdump --uuid`, so a log line can be matched to its dSYM by eye.
+std::string ImageUUID(const struct mach_header* header) {
+  if (header->magic != MH_MAGIC_64) {
+    return "?";
+  }
+  const uint8_t* cursor = reinterpret_cast<const uint8_t*>(header) + sizeof(struct mach_header_64);
+  for (uint32_t i = 0; i < header->ncmds; i++) {
+    const struct load_command* command = reinterpret_cast<const struct load_command*>(cursor);
+    if (command->cmd == LC_UUID) {
+      uuid_string_t uuid;
+      uuid_unparse_upper(reinterpret_cast<const struct uuid_command*>(command)->uuid, uuid);
+      return uuid;
+    }
+    cursor += command->cmdsize;
+  }
+  return "?";
+}
+
+const char* ImageName(const char* path) {
+  const char* slash = strrchr(path, '/');
+  return slash != nullptr ? slash + 1 : path;
+}
+
+}  // namespace
+
+// Frames use the crash-report layout (`image address load_address + offset`) and end with
+// the images' load addresses and UUIDs, so `atos` can resolve them against the dSYM. The
+// symbol name is only dladdr's nearest exported symbol: the release framework has no local
+// symbols, so for internal functions it names the wrong function.
 void tns::LogBacktrace(int skip) {
   void* callstack[128];
   const int nMaxFrames = sizeof(callstack) / sizeof(callstack[0]);
+  const int addressWidth = int(2 + sizeof(void*) * 2);
   char buf[1024];
   int nFrames = backtrace(callstack, nMaxFrames);
   char** symbols = backtrace_symbols(callstack, nFrames);
+  std::vector<Dl_info> images;
 
   for (int i = skip; i < nFrames; i++) {
     Dl_info info;
-    if (dladdr(callstack[i], &info) && info.dli_sname) {
-      char* demangled = NULL;
+    if (!dladdr(callstack[i], &info) || info.dli_fbase == nullptr || info.dli_fname == nullptr) {
+      snprintf(buf, sizeof(buf), "%-3d %*p %s\n", i, addressWidth, callstack[i], symbols[i]);
+      Log(@"%s", buf);
+      continue;
+    }
+
+    bool seen = false;
+    for (const Dl_info& image : images) {
+      seen = seen || image.dli_fbase == info.dli_fbase;
+    }
+    if (!seen) {
+      images.push_back(info);
+    }
+
+    int written = snprintf(buf, sizeof(buf), "%-3d %-30s %*p %p + %zu", i,
+                           ImageName(info.dli_fname), addressWidth, callstack[i], info.dli_fbase,
+                           size_t((char*)callstack[i] - (char*)info.dli_fbase));
+    if (info.dli_sname != nullptr && written > 0 && size_t(written) < sizeof(buf)) {
+      char* demangled = nullptr;
       int status = -1;
       if (info.dli_sname[0] == '_') {
-        demangled = abi::__cxa_demangle(info.dli_sname, NULL, 0, &status);
+        demangled = abi::__cxa_demangle(info.dli_sname, nullptr, nullptr, &status);
       }
-      snprintf(buf, sizeof(buf), "%-3d %*p %s + %zd\n", i, int(2 + sizeof(void*) * 2), callstack[i],
-               status == 0           ? demangled
-               : info.dli_sname == 0 ? symbols[i]
-                                     : info.dli_sname,
+      snprintf(buf + written, sizeof(buf) - written, " %s + %zd",
+               status == 0 ? demangled : info.dli_sname,
                (char*)callstack[i] - (char*)info.dli_saddr);
       free(demangled);
-    } else {
-      snprintf(buf, sizeof(buf), "%-3d %*p %s\n", i, int(2 + sizeof(void*) * 2), callstack[i],
-               symbols[i]);
     }
-    Log(@"%s", buf);
+    Log(@"%s\n", buf);
   }
   free(symbols);
   if (nFrames == nMaxFrames) {
     Log(@"[truncated]");
+  }
+
+  if (!images.empty()) {
+    Log(@"Binary images:");
+    for (const Dl_info& image : images) {
+      const struct mach_header* header = static_cast<const struct mach_header*>(image.dli_fbase);
+      snprintf(buf, sizeof(buf), "%p %s %s <%s> %s\n", image.dli_fbase, ImageName(image.dli_fname),
+               ImageArch(header), ImageUUID(header).c_str(), image.dli_fname);
+      Log(@"%s", buf);
+    }
   }
 }
 
