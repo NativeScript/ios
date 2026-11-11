@@ -98,15 +98,9 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStru
             type->elements[size] = nullptr;
             return type;
         }
-        case BinaryTypeEncodingType::StructDeclarationReference: {
-            const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
-            const Meta* meta = ArgConverter::GetMeta(structName);
-            tns::Assert(meta->type() == MetaType::Struct);
-            const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-
-            const StructInfo& structInfo =
-                FFICall::GetStructInfo(structMeta, structName);
-            return structInfo.FFIType();
+        case BinaryTypeEncodingType::StructDeclarationReference:
+        case BinaryTypeEncodingType::AnonymousStructEncoding: {
+          return FFICall::GetStructInfo(typeEncoding).FFIType();
         }
         case BinaryTypeEncodingType::ConstantArrayEncoding: {
             if (isStructMember) {
@@ -123,14 +117,6 @@ ffi_type* FFICall::GetArgumentType(const TypeEncoding* typeEncoding, bool isStru
             }
 
             return &ffi_type_pointer;
-        }
-        case BinaryTypeEncodingType::AnonymousStructEncoding: {
-            size_t count = typeEncoding->details.anonymousRecord.fieldsCount;
-            const TypeEncoding* fieldEncoding = typeEncoding->details.anonymousRecord.getFieldsEncodings();
-            const String* fieldNames = typeEncoding->details.anonymousRecord.getFieldNames();
-            const StructInfo& structInfo =
-                FFICall::GetStructInfo(count, fieldEncoding, fieldNames);
-            return structInfo.FFIType();
         }
         default: {
             break;
@@ -172,6 +158,71 @@ void FFICall::DisposeFFIType(ffi_type* type, const TypeEncoding* typeEncoding) {
             break;
     }
     
+}
+
+size_t FFICall::GetTypeSize(const TypeEncoding* typeEncoding,
+                            bool isStructMember) {
+  switch (typeEncoding->type) {
+    case BinaryTypeEncodingType::StructDeclarationReference:
+    case BinaryTypeEncodingType::AnonymousStructEncoding: {
+      return FFICall::GetStructInfo(typeEncoding).FFIType()->size;
+    }
+    case BinaryTypeEncodingType::ConstantArrayEncoding: {
+      if (!isStructMember) {
+        return ffi_type_pointer.size;
+      }
+      const TypeEncoding* innerType =
+          typeEncoding->details.constantArray.getInnerType();
+      return typeEncoding->details.constantArray.size *
+             FFICall::GetTypeSize(innerType, true);
+    }
+    case BinaryTypeEncodingType::ExtVectorEncoding: {
+      const TypeEncoding* innerType =
+          typeEncoding->details.extVector.getInnerType();
+      size_t vecSize = typeEncoding->details.extVector.size *
+                       FFICall::GetTypeSize(innerType, isStructMember);
+      size_t p2 = 1;
+      while (p2 < vecSize) {
+        p2 <<= 1;
+      }
+      return p2;
+    }
+    default:
+      // Every remaining encoding maps to a static ffi_type.
+      return FFICall::GetArgumentType(typeEncoding, isStructMember)->size;
+  }
+}
+
+const StructInfo& FFICall::GetStructInfo(const TypeEncoding* typeEncoding) {
+  {
+    SpinLock lock(structInfosByEncodingMutex_);
+    auto it = structInfosByEncoding_.find(typeEncoding);
+    if (it != structInfosByEncoding_.end()) {
+      return *it->second;
+    }
+  }
+
+  const StructInfo* structInfo = nullptr;
+  if (typeEncoding->type ==
+      BinaryTypeEncodingType::StructDeclarationReference) {
+    const char* structName =
+        typeEncoding->details.declarationReference.name.valuePtr();
+    const Meta* meta = ArgConverter::GetMeta(structName);
+    tns::Assert(meta != nullptr && meta->type() == MetaType::Struct);
+    structInfo = &FFICall::GetStructInfo(static_cast<const StructMeta*>(meta),
+                                         structName);
+  } else {
+    tns::Assert(typeEncoding->type ==
+                BinaryTypeEncodingType::AnonymousStructEncoding);
+    structInfo = &FFICall::GetStructInfo(
+        typeEncoding->details.anonymousRecord.fieldsCount,
+        typeEncoding->details.anonymousRecord.getFieldsEncodings(),
+        typeEncoding->details.anonymousRecord.getFieldNames());
+  }
+
+  SpinLock lock(structInfosByEncodingMutex_);
+  structInfosByEncoding_.emplace(typeEncoding, structInfo);
+  return *structInfo;
 }
 
 const StructInfo& FFICall::GetStructInfo(const StructMeta* structMeta,
@@ -331,4 +382,7 @@ SpinMutex ParametrizedCall::callsCacheMutex_;
 robin_hood::unordered_map<std::string, std::unique_ptr<StructInfo>>
     FFICall::structInfosCache_;
 SpinMutex FFICall::structInfosCacheMutex_;
+robin_hood::unordered_map<const TypeEncoding*, const StructInfo*>
+    FFICall::structInfosByEncoding_;
+SpinMutex FFICall::structInfosByEncodingMutex_;
 }
