@@ -108,8 +108,12 @@ jobs:
           path: ./llvm
           key: ${{ hashFiles('download_llvm.sh') }}
       - uses: ./.github/actions/setup-build-env
+        id: setup-build-env
         with:
           registry-url: "https://registry.npmjs.org"
+          # "seed" compiles into an empty ccache for pull requests to restore;
+          # it never restores one.
+          ccache: ${{ (github.ref == 'refs/heads/main' && matrix.target == 'ios') && 'seed' || 'false' }}
       - name: Fill an empty Xcode compilation cache
         # Pull requests restore this cache (pull_request.yml). This workflow only
         # saves it: never restore a cache here, so shipped binaries are always
@@ -134,6 +138,12 @@ jobs:
         with:
           path: ${{ runner.temp }}/xcode-cas
           key: xcode-cas-${{ runner.os }}-${{ runner.arch }}-build-${{ github.sha }}
+      - name: Save metadata generator ccache for pull requests
+        if: ${{ github.ref == 'refs/heads/main' && matrix.target == 'ios' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ccache
+          key: ${{ steps.setup-build-env.outputs.ccache-key }}
       - name: Upload npm package artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
