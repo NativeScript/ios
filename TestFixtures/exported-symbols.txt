@@ -1,4 +1,5 @@
 _CFArrayCreateWithString
+_TNSHasExecutableV8Memory
 _functionExplicitCreateNSObject
 _functionImplicitCreate
 _functionReturningFunctionPtrAsVoidPtr
