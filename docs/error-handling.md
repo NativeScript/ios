@@ -200,6 +200,8 @@ globalThis.addEventListener("error", (e) => {
 });
 ```
 
+`callStackSymbols` names frames inside `NativeScript.framework` by the nearest exported symbol, which is often the wrong function in release builds. Upload the runtime's dSYM to the crash reporter, or send `callStackReturnAddresses` for server-side symbolication; see [Native stack traces](native-stack-traces.md).
+
 Native side — for the `NSUncaughtExceptionHandler`/signal layer, read `exception.tns_javascriptStackTrace` (or the `userInfo` keys) to attach the JS stack to crashes that never pass through the JS event layer (escaped exceptions, `uncaughtErrorPolicy: "throw"`).
 
 ## Legacy hooks (deprecated)
