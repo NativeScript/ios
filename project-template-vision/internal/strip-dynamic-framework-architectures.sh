@@ -54,6 +54,11 @@ for file in *.framework/* *.dylib; do
   if [[ "$file" == *.framework/* && "$(basename "$file")" != "$(basename "$(dirname "$file")" .framework)" ]]; then
     continue
   fi
+  # A versioned framework's binary (and a dylib's alias) is a symlink, which
+  # lipo -output would replace with a regular file; strip the real binary.
+  if [ -L "$file" ]; then
+    file="$(readlink -f "$file")"
+  fi
 
   archs="$(lipo -archs "$file" 2>/dev/null)" || continue
   stripped=""
