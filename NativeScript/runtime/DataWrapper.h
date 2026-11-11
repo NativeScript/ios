@@ -3,6 +3,7 @@
 
 #include <objc/runtime.h>
 
+#include <atomic>
 #include <functional>
 #include <mutex>
 #include <optional>
@@ -398,16 +399,28 @@ class ObjCDataWrapper : public BaseDataWrapper {
         typeEncoding_(typeEncoding),
         klass_(object_getClass(data)) {}
 
-  const WrapperType Type() { return WrapperType::ObjCObject; }
+  ~ObjCDataWrapper() override {
+    if (adapterClaim_) {
+      objc_storeWeak(&data_, nil);
+    }
+  }
 
-  id Data() { return this->data_; }
+  const WrapperType Type() override { return WrapperType::ObjCObject; }
 
-  // True for the claim a collection adapter attaches to the plain JS object it
-  // was built from. The adapter owns that claim exclusively -- it must stay
-  // deletable from the adapter's -dealloc even after isolate teardown -- so no
-  // other retirement path may free it.
-  bool IsAdapterClaim() { return this->adapterClaim_; }
-  void MarkAdapterClaim() { this->adapterClaim_ = true; }
+  // A claim borrows its adapter. Weak loading atomically retains a live
+  // adapter until the autorelease pool drains, or returns nil once its last
+  // release has started, including while -dealloc waits for another isolate.
+  id Data() { return adapterClaim_ ? objc_loadWeak(&data_) : data_; }
+
+  // The adapter owns its claim, including after isolate teardown. Retirement
+  // of the JS object must neither release the adapter nor free the claim.
+  bool IsAdapterClaim() { return adapterClaim_; }
+  void MarkAdapterClaim() {
+    id adapter = data_;
+    data_ = nil;
+    objc_storeWeak(&data_, adapter);
+    adapterClaim_ = true;
+  }
 
   const TypeEncoding* TypeEncoding() { return this->typeEncoding_; }
 
@@ -492,13 +505,21 @@ class BlockWrapper : public BaseDataWrapper {
 
   const WrapperType Type() { return WrapperType::Block; }
 
+  // Raw access is for wrappers that own a native block. A borrowed JS block
+  // must be retained while the mutex excludes its dispose helper.
   void* Block() { return this->block_; }
+  void* RetainBlock();
+  void ClearBlock() {
+    std::lock_guard<std::mutex> lock(blockMutex_);
+    block_ = nullptr;
+  }
 
   const TypeEncoding* Encodings() { return this->typeEncoding_; }
 
   bool OwnsBlock() { return this->ownsBlock_; }
 
  private:
+  std::mutex blockMutex_;
   void* block_;
   const TypeEncoding* typeEncoding_;
   bool ownsBlock_;

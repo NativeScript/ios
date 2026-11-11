@@ -5,10 +5,12 @@
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
 #include "Caches.h"
+#include "EventLoop.h"
 #include "FastEnumerationAdapter.h"
 #include "Helpers.h"
 #include "Interop.h"
 #include "NativeScriptException.h"
+#include "NativeScriptPlatform.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
 #include "TNSDerivedClass.h"
@@ -267,10 +269,15 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         cache->CtorFuncs.emplace(extendedClassName, poExtendedClassCtorFunc);
 
         IMP newInitialize = imp_implementationWithBlock(^(id self) {
-          if (!isolateWrapper.IsValid()) {
+          // +initialize runs on whichever thread first messages the class.
+          IsolatePin pin = isolateWrapper.Pin();
+          if (!pin || !isolateWrapper.IsValid()) {
             return;
           }
           v8::Locker locker(isolate);
+          if (!isolateWrapper.IsValid()) {
+            return;
+          }
           Isolate::Scope isolate_scope(isolate);
           HandleScope handle_scope(isolate);
           Local<Context> context = Caches::Get(isolate)->GetContext();
@@ -313,35 +320,39 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         /// counterpart as well.
         id (*retain)(id, SEL) =
             (id (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(retain));
+        // Read here, on the isolate's thread: the blocks below run on any
+        // thread and must not reach the Runtime, which a teardown can free.
+        CFRunLoopRef runtimeLoop = Runtime::GetRuntime(isolate)->RuntimeLoop();
         IMP newRetain = imp_implementationWithBlock(^id(id self) {
-          if (!isolateWrapper.IsValid()) {
-            return retain(self, @selector(retain));
-          }
           if ([self retainCount] == 1) {
-            auto runtime = Runtime::GetRuntime(isolate);
-            auto runtimeLoop = runtime->RuntimeLoop();
-            void* weakSelf = (__bridge void*)self;
-            auto gcProtect = [isolateWrapper, weakSelf, isolate]() {
-              auto innerCache = isolateWrapper.GetCache();
-              auto it = innerCache->Instances.find((id)weakSelf);
-              if (it != innerCache->Instances.end()) {
+            IsolatePin pin = isolateWrapper.Pin();
+            if (pin && isolateWrapper.IsValid()) {
+              void* weakSelf = (__bridge void*)self;
+              auto gcProtect = [isolateWrapper, weakSelf, isolate]() {
                 v8::Locker locker(isolate);
-                Isolate::Scope isolate_scope(isolate);
-                HandleScope handle_scope(isolate);
-                Local<Value> value = it->second->Get(isolate);
-                BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
-                if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-                  ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                  objcWrapper->GcProtect();
+                auto innerCache = isolateWrapper.GetCache();
+                auto it = innerCache->Instances.find((id)weakSelf);
+                if (it != innerCache->Instances.end()) {
+                  Isolate::Scope isolate_scope(isolate);
+                  HandleScope handle_scope(isolate);
+                  Local<Value> value = it->second->Get(isolate);
+                  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+                  if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+                    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+                    objcWrapper->GcProtect();
+                  }
                 }
+              };
+              if (CFRunLoopGetCurrent() != runtimeLoop) {
+                // bare entry: the closure does its own Locker ceremony
+                std::shared_ptr<EventLoop> loop =
+                    NativeScriptPlatform::Instance()->LookupEventLoop(isolate);
+                if (loop != nullptr) {
+                  loop->PostInternalBare(gcProtect);
+                }
+              } else {
+                gcProtect();
               }
-            };
-            if (CFRunLoopGetCurrent() != runtimeLoop) {
-              // bare entry: the closure does its own Locker ceremony, exactly
-              // like the performed block it replaces
-              runtime->GetEventLoop()->PostInternalBare(gcProtect);
-            } else {
-              gcProtect();
             }
           }
 
@@ -352,21 +363,17 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         void (*release)(id, SEL) =
             (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(release));
         IMP newRelease = imp_implementationWithBlock(^(id self) {
-          if (!isolateWrapper.IsValid()) {
-            release(self, @selector(release));
-            return;
-          }
-
           if ([self retainCount] == 2) {
-            void* weakSelf = (__bridge void*)self;
-            auto gcUnprotect = [isolateWrapper, weakSelf, isolate]() {
-              auto innerCache = isolateWrapper.GetCache();
-              auto it = innerCache->Instances.find((id)weakSelf);
-              if (it != innerCache->Instances.end()) {
+            IsolatePin pin = isolateWrapper.Pin();
+            if (pin && isolateWrapper.IsValid()) {
+              void* weakSelf = (__bridge void*)self;
+              auto gcUnprotect = [isolateWrapper, weakSelf, isolate]() {
                 v8::Locker locker(isolate);
-                Isolate::Scope isolate_scope(isolate);
-                HandleScope handle_scope(isolate);
-                if (it->second != nullptr) {
+                auto innerCache = isolateWrapper.GetCache();
+                auto it = innerCache->Instances.find((id)weakSelf);
+                if (it != innerCache->Instances.end() && it->second != nullptr) {
+                  Isolate::Scope isolate_scope(isolate);
+                  HandleScope handle_scope(isolate);
                   Local<Value> value = it->second->Get(isolate);
                   BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
                   if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
@@ -374,29 +381,16 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
                     objcWrapper->GcUnprotect();
                   }
                 }
-              }
-            };
-            auto runtime = Runtime::GetRuntime(isolate);
-            auto runtimeLoop = runtime->RuntimeLoop();
-            if (CFRunLoopGetCurrent() != runtimeLoop) {
-              // bare entry: the closure does its own Locker ceremony, exactly
-              // like the performed block it replaces
-              runtime->GetEventLoop()->PostInternalBare(gcUnprotect);
-            } else {
-              auto innerCache = isolateWrapper.GetCache();
-              auto it = innerCache->Instances.find(self);
-              if (it != innerCache->Instances.end()) {
-                v8::Locker locker(isolate);
-                Isolate::Scope isolate_scope(isolate);
-                HandleScope handle_scope(isolate);
-                if (it->second != nullptr) {
-                  Local<Value> value = it->second->Get(isolate);
-                  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
-                  if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-                    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                    objcWrapper->GcUnprotect();
-                  }
+              };
+              if (CFRunLoopGetCurrent() != runtimeLoop) {
+                // bare entry: the closure does its own Locker ceremony
+                std::shared_ptr<EventLoop> loop =
+                    NativeScriptPlatform::Instance()->LookupEventLoop(isolate);
+                if (loop != nullptr) {
+                  loop->PostInternalBare(gcUnprotect);
                 }
+              } else {
+                gcUnprotect();
               }
             }
           }
@@ -908,7 +902,16 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
         // after every V8 scope in the inner block has destructed.
         NSException* __strong pendingThrow = nil;
         {
+          IsolatePin pin = context->isolateWrapper_.Pin();
+          if (!pin || !context->isolateWrapper_.IsValid()) {
+            memset(retValue, 0, cif->rtype->size);
+            return;
+          }
           v8::Locker locker(isolate);
+          if (!context->isolateWrapper_.IsValid()) {
+            memset(retValue, 0, cif->rtype->size);
+            return;
+          }
           Isolate::Scope isolate_scope(isolate);
           HandleScope handle_scope(isolate);
           Local<v8::Function> getterFunc = context->callback_->Get(isolate);
@@ -956,7 +959,14 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
         Isolate* isolate = context->isolate_;
         NSException* __strong pendingThrow = nil;
         {
+          IsolatePin pin = context->isolateWrapper_.Pin();
+          if (!pin || !context->isolateWrapper_.IsValid()) {
+            return;
+          }
           v8::Locker locker(isolate);
+          if (!context->isolateWrapper_.IsValid()) {
+            return;
+          }
           Isolate::Scope isolate_scope(isolate);
           HandleScope handle_scope(isolate);
           Local<v8::Function> setterFunc = context->callback_->Get(isolate);
