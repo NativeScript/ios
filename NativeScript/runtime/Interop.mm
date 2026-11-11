@@ -365,16 +365,13 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       // Always copy: an external one-byte string's resource (e.g. one made by
       // node_api_create_external_string_latin1) holds Latin-1 with no NUL
       // terminator, so its data can't be handed to native code as a C string.
-      v8::String::Utf8Value utf8Value(isolate, arg);
-      const char* value = strdup(*utf8Value);
-      // The external string only ties the strdup'd buffer's lifetime to the
-      // GC; it is never read as a string. Its length counts the NUL so it is
-      // never zero: V8 disposes a zero-length resource immediately.
       OneByteStringResource* resource =
-          new OneByteStringResource(value, (size_t)utf8Value.length() + 1);
+          OneByteStringResource::NewUtf8Copy(isolate, arg.As<v8::String>());
+      // The external string only ties the copy's lifetime to the GC; it is
+      // never read as a string.
       bool success = v8::String::NewExternalOneByte(isolate, resource).ToLocal(&arg);
       tns::Assert(success, isolate);
-      Interop::SetValue(dest, value);
+      Interop::SetValue(dest, resource->data());
     } else {
       BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
       if (wrapper == nullptr) {
