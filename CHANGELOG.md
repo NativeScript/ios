@@ -1,3 +1,59 @@
+## [9.1.1](https://github.com/NativeScript/ios/compare/v9.1.0...v9.1.1) (2026-11-11)
+
+
+### Bug Fixes
+
+* **build:** stop forcing a relink on every incremental build ([#529](https://github.com/NativeScript/ios/issues/529)) ([7a4de28](https://github.com/NativeScript/ios/commit/7a4de28ce803a0ffbd8be9fe71e3b6953ae08b2e))
+* **inspector:** release the frontend's resources when DevTools disconnects ([#516](https://github.com/NativeScript/ios/issues/516)) ([600f903](https://github.com/NativeScript/ios/commit/600f903369c954e4401abd4f3ef9289bc782bb52))
+* **inspector:** serve source map streams the way Chromium does ([#548](https://github.com/NativeScript/ios/issues/548)) ([5a186cf](https://github.com/NativeScript/ios/commit/5a186cfaf9f0f4058e54de41f5a9d49137c854a8))
+* **ios:** preserve object return from generated retain override ([#480](https://github.com/NativeScript/ios/issues/480)) ([33fcf3d](https://github.com/NativeScript/ios/commit/33fcf3d9ed5e250c2842c84cff3d808f240d7eaa))
+* report __runtimeVersion without quotes, and cut CI time with the Xcode 26 compilation cache ([#546](https://github.com/NativeScript/ios/issues/546)) ([8b0b1d0](https://github.com/NativeScript/ios/commit/8b0b1d00011d7872388656cf402bf0772510cdd4))
+* **runtime:** deliver a posted undefined as undefined, not null ([#477](https://github.com/NativeScript/ios/issues/477)) ([6f06243](https://github.com/NativeScript/ios/commit/6f06243892b787e664c2e49304d00d68af4bac33))
+* **runtime:** don't cache an uncloneable brand handle made inside IsHostObject ([#544](https://github.com/NativeScript/ios/issues/544)) ([77d89a4](https://github.com/NativeScript/ios/commit/77d89a404675400c4268ee5b9cbc87609b1cb6a8))
+* **runtime:** expose a C function missing at runtime as undefined instead of asserting ([#498](https://github.com/NativeScript/ios/issues/498)) ([91630ca](https://github.com/NativeScript/ios/commit/91630ca77d2cf63349b67aff03817f050c7650f3))
+* **runtime:** free a JS block's wrapper only once its isolate's teardown is done ([#501](https://github.com/NativeScript/ios/issues/501)) ([71c40ed](https://github.com/NativeScript/ios/commit/71c40edea937890e335894af6657daae535db389))
+* **runtime:** keep clone-only message reads read-only, and see an uncloneable brand created mid-clone ([#490](https://github.com/NativeScript/ios/issues/490)) ([1c1ce8d](https://github.com/NativeScript/ios/commit/1c1ce8d031f9ddb16ba168a47bb5f42b617282da))
+* **runtime:** keep the V8 platform and main Runtime alive through exit() ([#469](https://github.com/NativeScript/ios/issues/469)) ([cee3713](https://github.com/NativeScript/ios/commit/cee371358f2bbff8a2c4d9c4aad9ef5bbfec8ac7))
+* **runtime:** load iOS system frameworks from /System/iOSSupport on a Mac ([#551](https://github.com/NativeScript/ios/issues/551)) ([c45a8ab](https://github.com/NativeScript/ios/commit/c45a8ab582b7814c9a069d78f48a1a304210cf9a)), closes [#549](https://github.com/NativeScript/ios/issues/549)
+* **runtime:** never revive a JS block whose dispose has started ([#500](https://github.com/NativeScript/ios/issues/500)) ([249ec1a](https://github.com/NativeScript/ios/commit/249ec1aa8183242c87c2bb1e131ae80f81694297))
+* **runtime:** null-initialize Runtime::isolate_ ([#460](https://github.com/NativeScript/ios/issues/460)) ([b81a4d9](https://github.com/NativeScript/ios/commit/b81a4d9f032e7f0138f7f35a5451404f157f07ab))
+* **runtime:** re-check isolate liveness under the Locker in ObjC-to-JS callbacks ([#475](https://github.com/NativeScript/ios/issues/475)) ([6221ca8](https://github.com/NativeScript/ios/commit/6221ca82e670eaa5a4bc8270090fccb55894b7df))
+* **runtime:** read script caches into per-call buffers, publish them atomically ([#468](https://github.com/NativeScript/ios/issues/468)) ([c9e2140](https://github.com/NativeScript/ios/commit/c9e214026be361706bb4e504261cc7f4bdc1f91e))
+* **runtime:** stop handing freed or foreign buffers to C string parameters ([#524](https://github.com/NativeScript/ios/issues/524)) ([b4d5df0](https://github.com/NativeScript/ios/commit/b4d5df072a0a5b96de3aca4ce13a1ad7acfcf167))
+* **runtime:** strong Worker wrapper lifetime while the thread runs ([#456](https://github.com/NativeScript/ios/issues/456)) ([ab72efc](https://github.com/NativeScript/ios/commit/ab72efc2272139f8d8b40278bb4d37fa19c4a40a))
+* **runtime:** unwrap Proxy receivers and arguments before native dispatch ([#485](https://github.com/NativeScript/ios/issues/485)) ([ec59fe1](https://github.com/NativeScript/ios/commit/ec59fe18b7d9359b2cc180dd58081f313651fae6))
+* **worker:** carry the deserialization failure in a worker's messageerror data ([#489](https://github.com/NativeScript/ios/issues/489)) ([4ae32eb](https://github.com/NativeScript/ios/commit/4ae32ebf63cb77cffc8d30ba966334a09ca4a1e8))
+* **worker:** decide who deletes a WorkerWrapper with one atomic state ([#479](https://github.com/NativeScript/ios/issues/479)) ([461954e](https://github.com/NativeScript/ios/commit/461954ecdb014d38d4c446c0e60364376448e275))
+* **worker:** isolate and wrapper lifetime fixes around startup and teardown ([#478](https://github.com/NativeScript/ios/issues/478)) ([e146d4e](https://github.com/NativeScript/ios/commit/e146d4ec222fcc907e1d662c76ebe8322238fac7))
+* **worker:** lifecycle fixes for workers that fail during startup ([#473](https://github.com/NativeScript/ios/issues/473)) ([19b880c](https://github.com/NativeScript/ios/commit/19b880cbb3b12d673dc5479bb7cf2f556e7d49b3))
+* **worker:** open a handle scope per delivered message, and fix two messaging specs ([#545](https://github.com/NativeScript/ios/issues/545)) ([29d01fb](https://github.com/NativeScript/ios/commit/29d01fb01fe53eb7832219f42be872d65fa1b107))
+* **worker:** route worker_threads errors like the web surface, and fire once listeners once ([#491](https://github.com/NativeScript/ios/issues/491)) ([87a1a4b](https://github.com/NativeScript/ios/commit/87a1a4b8ea1a161adae99904f91660637d059f21))
+* **worker:** terminate() reaches a worker still inside its entry script ([#493](https://github.com/NativeScript/ios/issues/493)) ([872aba9](https://github.com/NativeScript/ios/commit/872aba995b69fd36d89df24ed9ae3dec70d55e73)), closes [#445](https://github.com/NativeScript/ios/issues/445)
+
+
+### Features
+
+* **runtime:** add nullability annotations to NativeScript.h ([#461](https://github.com/NativeScript/ios/issues/461)) ([f7e3382](https://github.com/NativeScript/ios/commit/f7e338262ec9f6096667b6dd12c94bbffbefdf75))
+* **runtime:** MessagePort, MessageChannel, BroadcastChannel, and node:worker_threads ([#454](https://github.com/NativeScript/ios/issues/454)) ([94b04db](https://github.com/NativeScript/ios/commit/94b04db6ca86b6949fd5f24c8d457c4a5a3cf24a))
+* **runtime:** ns:interop builtin modules, global interop as compat ([#527](https://github.com/NativeScript/ios/issues/527)) ([8f2f3df](https://github.com/NativeScript/ios/commit/8f2f3dfbc9d22d90caeeed5e875137257a41f9e6))
+* **runtime:** ns:url builtin module mirroring node:url, with URL types ([#497](https://github.com/NativeScript/ios/issues/497)) ([80475b4](https://github.com/NativeScript/ios/commit/80475b494800f9c9c98cc48ecbc2207098d1e37b))
+* **runtime:** ns:worker_threads builtin module with typed iOS worker options ([#494](https://github.com/NativeScript/ios/issues/494)) ([0819de2](https://github.com/NativeScript/ios/commit/0819de28a3c2ca4bce3dee50d1c12e7fb263c00d))
+* **runtime:** report native memory held by wrappers to V8, forward memory pressure ([#507](https://github.com/NativeScript/ios/issues/507)) ([20935bd](https://github.com/NativeScript/ios/commit/20935bd5069c21b6c8af9b896d9db74cf4db647e))
+* **runtime:** serialize DOMException per Web IDL [Serializable] ([#453](https://github.com/NativeScript/ios/issues/453)) ([4d26e75](https://github.com/NativeScript/ios/commit/4d26e7540e07cc31bb3cbd6a769327fb1c7e41ac))
+* **worker:** accept platform options under ios, deprecate iosPriority ([#470](https://github.com/NativeScript/ios/issues/470)) ([3dade40](https://github.com/NativeScript/ios/commit/3dade40a6bba9a57fac9fc7fc8dbd0025191d956))
+* **worker:** resourceLimits for worker isolates ([#471](https://github.com/NativeScript/ios/issues/471)) ([8c35e95](https://github.com/NativeScript/ios/commit/8c35e952e0991c5d9efd9d5361a44dd2f8f04229))
+
+
+### Performance Improvements
+
+* **ios:** ship default metadata as a separate framework for embedding hosts only ([#488](https://github.com/NativeScript/ios/issues/488)) ([ee77abb](https://github.com/NativeScript/ios/commit/ee77abb7c9b9f02a7e159a8fbd5a8b5bef2af146))
+* **runtime:** build struct objects from per-type templates with GC-owned storage ([#499](https://github.com/NativeScript/ios/issues/499)) ([cb1d444](https://github.com/NativeScript/ios/commit/cb1d4445d104079f28bf927b1c939bdee24b790f))
+* **runtime:** cache StructInfo, struct prototypes and the Class on the native call path ([#496](https://github.com/NativeScript/ios/issues/496)) ([c036f33](https://github.com/NativeScript/ios/commit/c036f33d7bf49322eebebb459a1c90871a3ba9e4))
+* **runtime:** marshal C string arguments with a single allocation ([#525](https://github.com/NativeScript/ios/issues/525)) ([4ba2d64](https://github.com/NativeScript/ios/commit/4ba2d648b541e295c816bc825af0ef58f3542c2c))
+* **runtime:** skip unread BroadcastChannel deliveries and let idle channels be collected ([#543](https://github.com/NativeScript/ios/issues/543)) ([3a93557](https://github.com/NativeScript/ios/commit/3a93557a6d1fdc00a9756f22e3bd5d6bddd9dfdd))
+
+
+
 # [9.1.0](https://github.com/NativeScript/ios/compare/v9.0.3...v9.1.0) (2026-08-27)
 
 
