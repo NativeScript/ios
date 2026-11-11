@@ -82,8 +82,7 @@ class TestRunnerTests: XCTestCase {
                 // mid-flight under the flat 5s request timeout. The parent
                 // re-exports the child so a spec covers a transitive HTTP
                 // edge the graph walk discovers after the slow fetch lands.
-                if path == "/esm/slow/parent.mjs" || path == "/esm/slow/child.mjs" ||
-                    path == "/esm/slow/leaf.mjs" {
+                if path.hasPrefix("/esm/slow/") {
                     var delayMs = path == "/esm/slow/child.mjs" ? 0 : 7000
                     var key = "slow"
                     for pair in query.split(separator: "&") {
