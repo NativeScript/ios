@@ -148,6 +148,13 @@ describe(module.id, function () {
         expect(TNSGetOutput()).toBe("abc");
     });
 
+    it("marshals an empty string as an empty C string", function () {
+        TNSClearOutput();
+        var actual = functionWithCharPtr("");
+        expect(TNSGetOutput()).toBe("");
+        expect(actual[0]).toBe(0);
+    });
+
     it("functionWithInt8ArrayBuffer", function () {
         let array = Int8Array.from([ 97, 98, 99, 0 ]).buffer;
         let actual = functionWithCharPtr(array);

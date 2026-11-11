@@ -1,7 +1,7 @@
 // Addons see NAPI_VERSION 8 unless they ask for more; asking must come before
 // the headers. The env still reports module API version 8 either way — this
 // only decides which declarations exist.
-#define NAPI_VERSION 9
+#define NAPI_VERSION 10
 
 #include <math.h>
 #include <stdint.h>
@@ -143,6 +143,25 @@ static napi_value CreateStrings(napi_env env, napi_callback_info info) {
   NAPI_CALL(env, napi_set_named_property(env, result, "utf16", utf16));
   NAPI_CALL(env, napi_set_named_property(env, result, "latin1", latin1));
   NAPI_CALL(env, napi_set_named_property(env, result, "empty", empty));
+  return result;
+}
+
+// The shape addons hand to node_api_create_external_string_latin1: bytes that
+// are Latin-1 (0xE9 is 'é') and not NUL-terminated.
+static napi_value CreateExternalLatin1(napi_env env, napi_callback_info info) {
+  (void)info;
+
+  static char kBytes[] = {'c', 'a', 'f', (char)0xE9, '!'};
+
+  napi_value text = NULL;
+  bool copied = true;
+  NAPI_CALL(env,
+            node_api_create_external_string_latin1(env, kBytes, 4, NULL, NULL, &text, &copied));
+
+  napi_value result = NULL;
+  NAPI_CALL(env, napi_create_object(env, &result));
+  NAPI_CALL(env, napi_set_named_property(env, result, "text", text));
+  NAPI_CALL(env, napi_set_named_property(env, result, "copied", NapiBool(env, copied)));
   return result;
 }
 
@@ -1344,6 +1363,7 @@ static napi_value InitNapiCoverageModule(napi_env env, napi_value exports) {
       NAPI_METHOD("stringLengths", StringLengths),
       NAPI_METHOD("copyString", CopyString),
       NAPI_METHOD("createStrings", CreateStrings),
+      NAPI_METHOD("createExternalLatin1", CreateExternalLatin1),
       NAPI_METHOD("stringStatus", StringStatus),
       NAPI_METHOD("numberParts", NumberParts),
       NAPI_METHOD("createNumbers", CreateNumbers),
