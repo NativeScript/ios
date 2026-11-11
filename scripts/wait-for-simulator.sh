@@ -10,12 +10,12 @@ usage() {
   echo "Usage: ./scripts/wait-for-simulator.sh --name <device name> [--timeout <seconds>]"
   echo ""
   echo "  --name <name>        simulator device name, e.g. \"iPhone 16 Pro\""
-  echo "  --timeout <seconds>  give up after this long (default: 180)"
+  echo "  --timeout <seconds>  give up after this long (default: 300)"
   echo "  -h, --help           show this help"
 }
 
 NAME=""
-TIMEOUT=180
+TIMEOUT=300
 while [ $# -gt 0 ]; do
   case "$1" in
     --name)
