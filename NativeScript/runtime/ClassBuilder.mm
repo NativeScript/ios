@@ -1,4 +1,5 @@
 #include "ClassBuilder.h"
+#include "WrapperLifetime.h"
 #include <Foundation/Foundation.h>
 #include <numeric>
 #include <sstream>
@@ -13,7 +14,7 @@
 #include "ObjectManager.h"
 #include "Runtime.h"
 #include "TNSDerivedClass.h"
-#include "WrapperLifetime.h"
+#include "WrapperLifetimeCanary.h"
 
 using namespace v8;
 
@@ -109,6 +110,8 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     Local<FunctionTemplate> extendedClassCtorFuncTemplate =
         FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, ext);
     extendedClassCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+    WrapperLifetimeCanary::ConfigureInstanceTemplate(
+        extendedClassCtorFuncTemplate->InstanceTemplate());
 
     Local<v8::Function> extendClassCtorFunc;
     if (!extendedClassCtorFuncTemplate->GetFunction(context).ToLocal(&extendClassCtorFunc)) {
@@ -319,11 +322,11 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
           /// When we instantiate a native class via a JavaScript call we add it to the object
           /// instances map thus incrementing the retainCount by 1. Then, when the native object is
           /// referenced somewhere else its count will become more than 1. Since we want to keep the
-          /// corresponding JavaScript object alive even if it is not used anywhere, we call
-          /// GcProtect on it. Whenever the native object is released so that its retainCount is 1
-          /// (the object instances map), we unprotect the corresponding JavaScript object in order
-          /// to make both of them destroyable/GC-able. When the JavaScript object is GC-ed we
-          /// release the native counterpart as well.
+          /// corresponding JavaScript object alive even if it is not used anywhere, we call GcProtect
+          /// on it. Whenever the native object is released so that its retainCount is 1 (the object
+          /// instances map), we unprotect the corresponding JavaScript object in order to make both
+          /// of them destroyable/GC-able. When the JavaScript object is GC-ed we release the native
+          /// counterpart as well.
           id (*retain)(id, SEL) =
               (id (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(retain));
           IMP newRetain = imp_implementationWithBlock(^id(id self) {
