@@ -1,0 +1,23 @@
+# SwiftPM build artifacts
+.build/
+.swiftpm/
+
+# Generated symbol graphs, except the checked-in corpus the loader tests read
+.symbolgraph/
+*.symbolgraph
+*.symbols.json
+!symbolgraphs/*.symbols.json
+
+# Swift package resolution (optional to commit; ignore for test fixture)
+Package.resolved
+
+# macOS noise
+.DS_Store
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Deprecated Xcode project generation artifacts
+*.xcodeproj/
+*.xcworkspace/
