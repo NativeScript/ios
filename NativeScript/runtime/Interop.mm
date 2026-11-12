@@ -776,6 +776,16 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       return;
     }
 
+    // A wrapper whose native object was released must never reach native code
+    // as a DictionaryAdapter standing in for it.
+    tns::ReleasedReason releasedReason = tns::GetReleasedReason(obj);
+    if (releasedReason != tns::ReleasedReason::kNone) {
+      tns::ReportReleasedObject(isolate, obj, releasedReason, "native argument", true);
+      id none = nil;
+      Interop::SetValue(dest, none);
+      return;
+    }
+
     bool isNSArray = false;
     if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
       std::string name = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
@@ -866,6 +876,13 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
           break;
       }
     } else {
+      // nil is not a legal collection element, and this runs inside adapter
+      // callbacks where nothing can be thrown.
+      tns::ReleasedReason releasedReason = tns::GetReleasedReason(arg);
+      if (releasedReason != tns::ReleasedReason::kNone) {
+        tns::ReportReleasedObject(isolate, arg, releasedReason, "collection element", false);
+        return [NSNull null];
+      }
       DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:source.As<Object>()
                                                                        isolate:isolate];
       // CFAutorelease(adapter);

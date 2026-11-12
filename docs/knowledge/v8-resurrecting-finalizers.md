@@ -157,9 +157,12 @@ both JS-unreachable and one references the other, **both** are queued:
 - `n1`'s callback finds `IsGcProtected()` and re-arms.
 
 `n1` comes back holding a JS object whose native half is gone. `DisposeValue` does neuter the
-husk (`delete wrapper` then `tns::DeleteValue`, which sets internal field 0 to `Undefined`), so
-it is not a dangling `BaseDataWrapper*` — but consumers that read the field without checking,
-`Pointer.cpp` among them, will read `Undefined` as an `External` and dereference it.
+husk (`delete wrapper`, then internal field 0 is overwritten), so it is not a dangling
+`BaseDataWrapper*` — but consumers that read the field without checking, `Pointer.cpp` among
+them, would read it as an `External` and dereference it. ObjC object husks get a
+`tns::ReleasedReason` Smi in the field (`tns::MarkReleased`: collected, released explicitly
+through `__releaseNativeCounterpart`, or teardown); other wrapper types get `Undefined`.
+`tns::GetValue` only reads `External`s, so both read as "no wrapper".
 
 **This is not fixable by deferring the release or by re-checking liveness after the drain.**
 Every queued node is rooted by `IterateFinalizerHandlesAsRoots()` and treated as a strong
@@ -194,6 +197,17 @@ both struct field accessors, the two `InteropTypes.mm` argument readers, and the
 `Reference.cpp` accessors (`SetValueCallback`, `GetWrappedPointer`, `GetDataPair` → indexed
 get/set, toString). Regression spec: *"throws instead of crashing when touching a released
 object through a resurrected parent"* in `GCFinalizerTests.js`.
+
+An ObjC object husk reaching native code where an object is expected used to fall through to a
+`DictionaryAdapter` standing in for it (a released `UIColor` reached UIKit as one and raised
+`unrecognized selector`). The `ReleasedReason` marker now catches it on those paths, through
+`tns::ReportReleasedObject()` with the same policy: an argument (`Interop::WriteValue`) becomes
+`nil` or throws; a collection element (`Interop::ToObject`) becomes `NSNull`; a JS-implemented
+method's return value (`ArgConverter::SetValue`) becomes `nil` (both report only, since native
+code is on the stack); a method or property call on the husk (`ArgConverter::Invoke`, Proxy
+receivers included) always throws. `ns:runtime`'s `getWrapperLifetimeStats()` counts
+resurrections, collections, explicit releases and released-object accesses. Specs:
+`WrapperLifetimeTests.js`.
 
 Two facts worth knowing when reasoning about which objects can husk:
 

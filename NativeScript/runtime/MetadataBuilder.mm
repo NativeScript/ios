@@ -54,6 +54,12 @@ bool ResolveProxyReceiver(Isolate* isolate, Local<Object>& receiver, const char*
                       (wrapper->Type() == WrapperType::ObjCObject ||
                        wrapper->Type() == WrapperType::ObjCAllocObject);
     if (!isClass && !isInstance) {
+      if (tns::GetReleasedReason(target) != tns::ReleasedReason::kNone) {
+        // A released wrapper: the call reports it the same way as on the
+        // target directly.
+        receiver = target.As<Object>();
+        return true;
+      }
       reason = "on a Proxy whose target is not a native object";
     }
   }

@@ -103,6 +103,7 @@ defined and validated natively; the module surface is a thin frozen wrapper.
 | `escapeException(error)` | Returns an `Error` branded to cross the next JS-to-native boundary as a native exception rather than being reported in JS (see [error-handling.md](error-handling.md#forwarding-a-throw-to-native-interopescapeexception)). An already-branded value is returned unchanged; no argument throws `TypeError`. |
 | `setExternalSize(target, bytes)` | Reports `bytes` of native memory held by a native object, pointer, reference, block or function reference to the garbage collector, replacing any earlier size (`0` clears it). Throws `TypeError` for any other value, `RangeError` for a byte count outside 0–2^34. |
 | `getExternalSize(target)` | The size currently charged to `target`, `0` when there is none. |
+| `getWrapperLifetimeStats()` | Wrapper lifetime counters for the calling isolate (see [Wrapper lifetime counters](#wrapper-lifetime-counters)). |
 
 The last three are also members of the global `interop` (see
 [The global `interop`](#the-global-interop)); the module and the global hold
@@ -114,6 +115,7 @@ Config keys:
 |---|---|---|---|
 | `releasedObjectPolicy` | `"report"` \| `"throw"` | process-wide (main-isolate writes only; read live by every isolate) | `"report"` |
 | `debug` | comma-separated category list, e.g. `"esm,fetch"` | process-wide (main-isolate writes only; read live by every isolate) | the `NS_DEBUG` environment variable, or `""` |
+| `wrapperLifetimeWarnings` | `true` \| `false` | process-wide (main-isolate writes only; read live by every isolate) | the app config `"wrapperLifetime": { "warnings": … }`, or on in debug builds |
 
 ```js
 const { setConfig, getConfig } = require("ns:runtime");
@@ -141,6 +143,27 @@ The `TypeError` messages are part of the contract:
 | process-wide key written from a worker | `'<key>' is process-wide and can only be set from the main isolate` |
 | invalid `releasedObjectPolicy` value | `'releasedObjectPolicy' must be 'report' or 'throw'` |
 | non-string `debug` value | `'debug' must be a comma-separated category string (<categories>), or '' to disable tracing` |
+| non-boolean `wrapperLifetimeWarnings` value | `'wrapperLifetimeWarnings' must be a boolean` |
+
+### Wrapper lifetime counters
+
+`getWrapperLifetimeStats()` returns counters for the calling isolate, kept in
+every build (they only cost an increment on finalizer and error paths):
+
+| counter | counts |
+|---|---|
+| `resurrections` | finalizers that kept a wrapper alive because native code still retained its object (JS-extended classes) |
+| `collected` | finalizers that released their native object |
+| `releasedExplicitly` | native objects released through `__releaseNativeCounterpart` |
+| `releasedAccesses` | times JS passed a released wrapper to native code, used it as a method receiver, or touched a released pointer, reference or struct |
+| `stateLostCandidates` | collected wrappers carrying JS properties whose object was still retained by something else (only while `wrapperLifetimeWarnings` is on) |
+| `stateLostConfirmed` | candidates whose object was still alive a runloop turn later; each class is also reported once in the log |
+
+A wrapper whose native object was released keeps its JS identity. Passing it
+to native code follows `releasedObjectPolicy`: under `"report"` the argument
+or return value becomes `nil` (`NSNull` inside a collection) and a
+`releasednativeaccess` event fires; under `"throw"` an argument throws a
+`ReferenceError`. Calling a method on it always throws a `ReferenceError`.
 
 Remote-module security (`security.allowRemoteModules`,
 `security.remoteModuleAllowlist`) is **not** part of this surface. Those
