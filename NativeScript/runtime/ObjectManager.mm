@@ -53,10 +53,12 @@ struct WrapperLifetimeState {
 };
 
 bool IsTaggedPointer(id obj) {
+  // Through void*: clang rejects bit tests on ObjC object pointers.
+  uintptr_t bits = reinterpret_cast<uintptr_t>(static_cast<const void*>(obj));
 #if defined(__arm64__)
-  return reinterpret_cast<intptr_t>(obj) < 0;
+  return (bits >> 63) != 0;
 #else
-  return (reinterpret_cast<uintptr_t>(obj) & 1) != 0;
+  return (bits & 1) != 0;
 #endif
 }
 
