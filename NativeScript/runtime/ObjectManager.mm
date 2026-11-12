@@ -8,6 +8,7 @@
 #include "FFICall.h"
 #include "Helpers.h"
 #include "Runtime.h"
+#include "WrapperLifetime.h"
 #include <objc/message.h>
 #include <objc/runtime.h>
 #include <string>
@@ -158,6 +159,7 @@ void NoteStateLostCandidate(Isolate* isolate, Local<Object> obj, id target) {
 void ObjectManager::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
   globalTemplate->Set(tns::ToV8String(isolate, "__releaseNativeCounterpart"),
                       FunctionTemplate::New(isolate, ReleaseNativeCounterpartCallback));
+  WrapperLifetime::Init(isolate);
 }
 
 namespace {
@@ -174,6 +176,14 @@ void LinkRegistered(v8::Isolate* isolate, ObjectWeakCallbackState* state) {
   }
   *state->head_ = state;
 }
+
+void UnlinkRegistered(ObjectWeakCallbackState* state);
+
+}  // namespace
+
+void ObjectManager::Unlink(ObjectWeakCallbackState* state) { UnlinkRegistered(state); }
+
+namespace {
 
 void UnlinkRegistered(ObjectWeakCallbackState* state) {
   if (state->head_ == nullptr) {
@@ -248,6 +258,10 @@ void ObjectManager::DisposeAllRegistered(Isolate* isolate) {
   // claim every state up front: disposing one entry can re-enter JS from
   // -dealloc and reach __releaseNativeCounterpart for any other entry this
   // walk still owns.
+  // Wrappers that died before teardown are already off the list, waiting in
+  // the release queue.
+  WrapperLifetime::DrainForTeardown(isolate);
+
   ObjectWeakCallbackState* state = cache->ObjectManagedValues;
   cache->ObjectManagedValues = nullptr;
   for (ObjectWeakCallbackState* claimed = state; claimed != nullptr; claimed = claimed->next_) {
@@ -258,13 +272,16 @@ void ObjectManager::DisposeAllRegistered(Isolate* isolate) {
     ObjectWeakCallbackState* next = state->next_;
 
     std::shared_ptr<Persistent<Value>> handle = state->target_;
+    bool released = false;
     if (handle != nullptr && !handle->IsEmpty()) {
       ObjectManager::DisposeValue(isolate, handle->Get(isolate), true);
+      released = true;
       if (handle->IsWeak()) {
         handle->ClearWeak<ObjectWeakCallbackState>();
       }
       handle->Reset();
     }
+    WrapperLifetime::Retire(isolate, state, released);
     delete state;
 
     state = next;
@@ -521,14 +538,32 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
   if (data != nil) {
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     auto it = cache->Instances.find(data);
-    if (it != cache->Instances.end()) {
+    // An adopted wrapper (WrapperLifetime) owns its registration whether or not
+    // the Instances entry still names it, and its handle may be strong.
+    ObjectWeakCallbackState* adopted = objcWrapper->LifetimeState();
+    if (adopted != nullptr) {
+      if (adopted->disposing_) {
+        // The teardown walk owns this state and already released the object.
+        return;
+      }
+      if (it != cache->Instances.end() && it->second == adopted->target_) {
+        cache->Instances.erase(it);
+      }
+      adopted->target_->Reset();
+      WrapperLifetime::Forget(isolate, adopted);
+      objcWrapper->SetLifetimeState(nullptr);
+      UnlinkRegistered(adopted);
+      delete adopted;
+    } else if (it != cache->Instances.end()) {
       std::shared_ptr<Persistent<Value>> handle = it->second;
+      bool wasWeak = handle->IsWeak();
       ObjectWeakCallbackState* state =
-          handle->IsWeak() ? handle->ClearWeak<ObjectWeakCallbackState>() : nullptr;
+          wasWeak ? handle->ClearWeak<ObjectWeakCallbackState>() : nullptr;
       if (state != nullptr && state->disposing_) {
-        // Reached from a -dealloc running inside this handle's own finalizer:
-        // that frame already released the native counterpart and owns the
-        // state, so restore the weakness and let it finish.
+        // Reached from a -dealloc running inside this handle's own finalizer
+        // or the teardown walk: that frame already released the native
+        // counterpart and owns the state, so restore the weakness and let it
+        // finish.
         handle->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
         return;
       }

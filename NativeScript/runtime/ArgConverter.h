@@ -64,6 +64,10 @@ class ArgConverter {
   // recycled the address and give it a foreign prototype.
   static std::shared_ptr<v8::Persistent<v8::Value>> FindCachedInstance(
       v8::Isolate* isolate, const std::shared_ptr<Caches>& cache, id target);
+  // The JS `this` for a native call into a JS-implemented member: the object's
+  // wrapper, `fallback` when it has none (an empty fallback builds one).
+  static v8::Local<v8::Object> WrapCallbackSelf(v8::Local<v8::Context> context, id self,
+                                                v8::Local<v8::Object> fallback);
   static const Meta* GetMeta(const std::string& name);
   static const ProtocolMeta* FindProtocolMeta(Protocol* protocol);
   static void MethodCallback(ffi_cif* cif, void* retValue, void** argValues,

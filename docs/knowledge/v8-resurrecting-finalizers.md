@@ -209,6 +209,20 @@ receivers included) always throws. `ns:runtime`'s `getWrapperLifetimeStats()` co
 resurrections, collections, explicit releases and released-object accesses. Specs:
 `WrapperLifetimeTests.js`.
 
+The app config `"wrapperLifetime": { "mode": "rooted" }` (`WrapperLifetime.{h,mm}`) avoids the
+hazard instead of reporting it. An adopted wrapper never gets a `kFinalizer` callback: it is a
+strong root while something other than the runtime retains its object and a phantom
+(`kParameter`) weak handle otherwise. Strength is decided by a `-retainCount` scan in a
+major-GC prologue, where flipping weakness is legal, and a wrapper is born strong and made
+strong again whenever it crosses the JS/native boundary. A JS-unreachable holder therefore
+stays rooted with its whole closure for as long as native code owns it, so nothing it reaches
+is queued. Phantom callbacks only queue; the native objects are released later on the
+runtime's thread, where JS may run. The extended classes' retain/release swizzle is not
+installed in this mode. `"scope": "extended"` (default) roots only JS-extended instances;
+`"all"` roots every ObjC wrapper except blocks and tagged pointers, at the cost of keeping
+JS-referencing native cycles alive (ARC rules: break them with a `WeakRef`). Specs:
+`WrapperLifetimeModesTests.js`, run under each mode.
+
 Two facts worth knowing when reasoning about which objects can husk:
 
 - `Pointer`/`interop.alloc` objects never husk at runtime — `Caches::PointerInstances`

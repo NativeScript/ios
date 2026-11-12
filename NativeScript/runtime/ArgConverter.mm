@@ -9,6 +9,7 @@
 #include "NSExceptionSupport.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
+#include "WrapperLifetime.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
 
@@ -31,8 +32,10 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
   Class allocKlass = nil;
   bool instanceMethod = !receiver.IsEmpty();
   bool callSuper = false;
+  WrapperLifetime::DrainAtCallEntry(isolate);
   if (instanceMethod) {
     BaseDataWrapper* wrapper = tns::GetValue(isolate, receiver);
+    WrapperLifetime::Escape(wrapper);
 
     if (wrapper == nullptr) {
       tns::ReleasedReason releasedReason = tns::GetReleasedReason(receiver);
@@ -368,8 +371,14 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     if (data->initialParamIndex_ > 1) {
       id self_ = *static_cast<const id*>(argValues[0]);
       auto it = cache->Instances.find(self_);
+      if (it != cache->Instances.end() && it->second->IsEmpty()) {
+        // A dead wrapper whose release is queued: rebuild below.
+        cache->Instances.erase(it);
+        it = cache->Instances.end();
+      }
       if (it != cache->Instances.end()) {
         thiz = it->second->Get(data->isolateWrapper_.Isolate()).As<Object>();
+        WrapperLifetime::Escape(tns::GetValue(isolate, thiz));
       } else {
         ObjCDataWrapper* wrapper = new ObjCDataWrapper(self_);
         thiz = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true).As<Object>();
@@ -662,6 +671,7 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
     if (!resultIsOwned) {
       [result retain];
     }
+    WrapperLifetime::Adopt(isolate, wrapper, poThiz, result);
     ExternalMemory::ChargeEstimatedSize(isolate, thiz);
   }
 }
@@ -922,14 +932,24 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
   auto cache = Caches::Get(isolate);
   if (receiver.IsEmpty()) {
     auto it = cache->Instances.find(target);
+    if (it != cache->Instances.end() && it->second->IsEmpty()) {
+      // The wrapper died and its release is still queued (WrapperLifetime);
+      // the queue entry keeps its own retain, so a new wrapper starts over.
+      cache->Instances.erase(it);
+      it = cache->Instances.end();
+    }
     if (it != cache->Instances.end()) {
       receiver = it->second->Get(isolate).As<Object>();
+      WrapperLifetime::Escape(tns::GetValue(isolate, receiver));
     } else {
       std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context, skipGCRegistration);
       receiver = poValue->Get(isolate).As<Object>();
       tns::SetValue(isolate, receiver, wrapper);
       cache->Instances.emplace(target, poValue);
       [target retain];
+      if (wrapper->Type() == WrapperType::ObjCObject) {
+        WrapperLifetime::Adopt(isolate, static_cast<ObjCDataWrapper*>(wrapper), poValue, target);
+      }
     }
   } else {
     tns::SetValue(isolate, receiver, wrapper);
@@ -986,8 +1006,14 @@ std::shared_ptr<Persistent<Value>> ArgConverter::FindCachedInstance(
   if (it == cache->Instances.end()) {
     return nullptr;
   }
+  if (it->second->IsEmpty()) {
+    // A dead wrapper whose release is queued (WrapperLifetime).
+    cache->Instances.erase(it);
+    return nullptr;
+  }
 
   BaseDataWrapper* wrapper = tns::GetValue(isolate, it->second->Get(isolate));
+  WrapperLifetime::Escape(wrapper);
   if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
     Class expected = static_cast<ObjCDataWrapper*>(wrapper)->Klass();
     // A KVO-style isa swizzle replaces the class in place but keeps -class
@@ -1002,6 +1028,30 @@ std::shared_ptr<Persistent<Value>> ArgConverter::FindCachedInstance(
   }
 
   return it->second;
+}
+
+Local<Object> ArgConverter::WrapCallbackSelf(Local<Context> context, id self,
+                                             Local<Object> fallback) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  auto cache = Caches::Get(isolate);
+  auto it = cache->Instances.find(self);
+  if (it != cache->Instances.end() && it->second->IsEmpty()) {
+    // A dead wrapper whose release is queued (WrapperLifetime).
+    cache->Instances.erase(it);
+    it = cache->Instances.end();
+  }
+  if (it != cache->Instances.end()) {
+    Local<Object> existing = it->second->Get(isolate).As<Object>();
+    WrapperLifetime::Escape(tns::GetValue(isolate, existing));
+    return existing;
+  }
+  if (!fallback.IsEmpty()) {
+    return fallback;
+  }
+  ObjCDataWrapper* wrapper = new ObjCDataWrapper(self);
+  Local<Object> result = CreateJsWrapper(context, wrapper, Local<Object>()).As<Object>();
+  tns::DeleteWrapperIfUnused(isolate, result, wrapper);
+  return result;
 }
 
 const Meta* ArgConverter::FindMeta(Class klass, const TypeEncoding* typeEncoding) {
@@ -1165,8 +1215,10 @@ Intercepted ArgConverter::IndexedPropertyGetterCallback(uint32_t index,
 
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
   auto it = cache->Instances.find(obj);
-  if (it != cache->Instances.end()) {
-    args.GetReturnValue().Set(it->second->Get(isolate));
+  if (it != cache->Instances.end() && !it->second->IsEmpty()) {
+    Local<Value> existing = it->second->Get(isolate);
+    WrapperLifetime::Escape(tns::GetValue(isolate, existing));
+    args.GetReturnValue().Set(existing);
     return v8::Intercepted::kYes;
   }
 

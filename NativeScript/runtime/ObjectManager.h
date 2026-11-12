@@ -1,11 +1,13 @@
 #ifndef ObjectManager_h
 #define ObjectManager_h
 
+#include <atomic>
 #include "Common.h"
 
 namespace tns {
 
 class ObjectManager;
+class ObjCDataWrapper;
 
 // Parameter of the kFinalizer weak callback armed on target_.
 //
@@ -38,6 +40,17 @@ struct ObjectWeakCallbackState {
   // there would free the state under the frame that owns it. Retirement
   // observes the flag and leaves the handle to that frame.
   bool disposing_ = false;
+
+  // Set when WrapperLifetime adopted this registration (an ObjC object wrapper
+  // under a phantom-callback mode). The JS object is unreadable after its
+  // phantom callback, so the wrapper and object are cached here.
+  ObjCDataWrapper* lifetimeWrapper_ = nullptr;
+  id lifetimeTarget_ = nullptr;
+  std::atomic<int>* runtimeRetains_ = nullptr;
+  // May be rooted; scanned when a major collection starts.
+  bool lifetimeTracked_ = false;
+  // The handle is currently strong.
+  bool lifetimeStrong_ = false;
 };
 
 class ObjectManager {
@@ -60,6 +73,12 @@ class ObjectManager {
     // still alive a runloop turn later (see WrapperLifetimeWarningsEnabled).
     uint64_t stateLostCandidates = 0;
     uint64_t stateLostConfirmed = 0;
+    // Rooted mode (WrapperLifetime): wrappers made strong because native code
+    // owns their object, made weak because it no longer does, and dead
+    // wrappers whose object was queued for release.
+    uint64_t promotions = 0;
+    uint64_t demotions = 0;
+    uint64_t queuedReleases = 0;
   };
   static LifetimeStats* GetLifetimeStats(v8::Isolate* isolate);
 
@@ -74,6 +93,8 @@ class ObjectManager {
   // Disposes every handle from Register() that is still alive. Replaces the
   // old Isolate::VisitHandlesWithClassIds walk, which V8 removed.
   static void DisposeAllRegistered(v8::Isolate* isolate);
+  // Removes a registration from the teardown list.
+  static void Unlink(ObjectWeakCallbackState* state);
 
  private:
   static void ReleaseNativeCounterpartCallback(

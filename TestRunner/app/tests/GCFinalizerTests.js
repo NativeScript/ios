@@ -1,4 +1,15 @@
 describe("GC finalizer callbacks", function () {
+    // Under the rooted wrapper lifetime mode, a dead wrapper's object is
+    // released from a queue drained on entry to native calls, and a natively
+    // retained object only becomes collectable once its holder's release ran.
+    // Under the resurrecting mode the extra rounds change nothing.
+    function collectAndDrain() {
+        for (var round = 0; round < 3; round++) {
+            __collect();
+            NSObject.new();
+        }
+    }
+
     // A finalizer callback runs from V8's GC epilogue. Since 14.9,
     // Heap::CollectGarbage holds a DisallowJavascriptExecution across the whole
     // collection, so entering JS from one is a GRACEFUL_FATAL that aborts the
@@ -29,7 +40,7 @@ describe("GC finalizer callbacks", function () {
         for (var i = 0; i < 200000; i++) {
             sink += i % 7;
         }
-        __collect();
+        collectAndDrain();
 
         expect(sink).toBeGreaterThan(0);
         expect(calls).toBe(1);
@@ -243,8 +254,7 @@ describe("GC finalizer callbacks", function () {
         })();
 
         scrubStack();
-        __collect();
-        __collect();
+        collectAndDrain();
 
         expect(retired).toBeGreaterThan(0);
         expect(keepAlive.count).toBe(8);

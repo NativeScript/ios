@@ -25,6 +25,9 @@ struct PropertyCallbackContext {
 
 class ClassBuilder {
  public:
+  // The implementation of `method` on the first class above any JS-extended
+  // (TNSDerivedClass) ones in klass's hierarchy.
+  static IMP FindNotOverridenMethod(Class klass, SEL method);
   static v8::Local<v8::FunctionTemplate> GetExtendFunction(
       v8::Isolate* isolate, const InterfaceMeta* interfaceMeta);
   static Class GetExtendedClass(const std::string& baseClassName,
@@ -72,7 +75,6 @@ class ClassBuilder {
   static std::string GetTypeEncoding(const TypeEncoding* typeEncoding);
   static BinaryTypeEncodingType GetTypeEncodingType(v8::Isolate* isolate,
                                                     v8::Local<v8::Value> value);
-  static IMP FindNotOverridenMethod(Class klass, SEL method);
 
   struct CacheItem {
    public:

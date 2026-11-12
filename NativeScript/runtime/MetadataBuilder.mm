@@ -1325,20 +1325,8 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
         Local<Value> res;
 
         id thiz = *static_cast<const id*>(argValues[0]);
-        auto cache = Caches::Get(isolate);
-        auto it = cache->Instances.find(thiz);
-
         Local<Context> v8Context = Caches::Get(isolate)->GetContext();
-        ObjCDataWrapper* wrapper = nullptr;
-        Local<Object> self_ =
-            it != cache->Instances.end()
-                ? it->second->Get(isolate).As<Object>()
-                : ArgConverter::CreateJsWrapper(v8Context, wrapper = new ObjCDataWrapper(thiz),
-                                                Local<Object>())
-                      .As<Object>();
-        if (wrapper != nullptr) {
-          tns::DeleteWrapperIfUnused(isolate, self_, wrapper);
-        }
+        Local<Object> self_ = ArgConverter::WrapCallbackSelf(v8Context, thiz, Local<Object>());
         TryCatch tc(isolate);
         if (!getterFunc->Call(v8Context, self_, 0, nullptr).ToLocal(&res)) {
           NSException* ex = ArgConverter::HandleBoundaryException(v8Context, tc);
@@ -1388,18 +1376,7 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
         Local<Context> v8Context = Caches::Get(isolate)->GetContext();
 
         id thiz = *static_cast<const id*>(argValues[0]);
-        auto cache = Caches::Get(isolate);
-        auto it = cache->Instances.find(thiz);
-        ObjCDataWrapper* wrapper = nullptr;
-        Local<Object> self_ =
-            it != cache->Instances.end()
-                ? it->second->Get(isolate).As<Object>()
-                : ArgConverter::CreateJsWrapper(v8Context, wrapper = new ObjCDataWrapper(thiz),
-                                                Local<Object>())
-                      .As<Object>();
-        if (wrapper != nullptr) {
-          tns::DeleteWrapperIfUnused(isolate, self_, wrapper);
-        }
+        Local<Object> self_ = ArgConverter::WrapCallbackSelf(v8Context, thiz, Local<Object>());
 
         uint8_t* argBuffer = (uint8_t*)argValues[2];
         const TypeEncoding* typeEncoding = context->meta_->setter()->encodings()->first()->next();

@@ -397,6 +397,7 @@ class ObjCDataWrapper : public BaseDataWrapper {
       : data_(data),
         typeEncoding_(typeEncoding),
         klass_(object_getClass(data)) {}
+  ~ObjCDataWrapper();
 
   const WrapperType Type() { return WrapperType::ObjCObject; }
 
@@ -416,8 +417,13 @@ class ObjCDataWrapper : public BaseDataWrapper {
   // anything keyed on the raw pointer needs this to detect a recycled slot.
   Class Klass() { return this->klass_; }
 
+  // Registration state of a wrapper adopted by WrapperLifetime; null otherwise.
+  ObjectWeakCallbackState* LifetimeState() { return this->lifetimeState_; }
+  void SetLifetimeState(ObjectWeakCallbackState* state) { this->lifetimeState_ = state; }
+
  private:
   bool adapterClaim_ = false;
+  ObjectWeakCallbackState* lifetimeState_ = nullptr;
   id data_;
   const tns::TypeEncoding* typeEncoding_;
   Class klass_;
