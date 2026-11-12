@@ -43,7 +43,8 @@ describe("Wrapper lifetime modes", function () {
         TNSClearOutput();
     });
 
-    it("reports the configured mode and scope", function () {
+    // The name carries the mode so a run's log shows which one it exercised.
+    it("reports the configured mode and scope (" + mode + "/" + scope + ")", function () {
         expect(["resurrecting", "rooted"].indexOf(mode)).not.toBe(-1);
         expect(["extended", "all"].indexOf(scope)).not.toBe(-1);
         expect(function () {
