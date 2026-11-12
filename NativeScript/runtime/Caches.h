@@ -145,6 +145,9 @@ class Caches {
                             std::unique_ptr<v8::Persistent<v8::Object>>,
                             TransparentStringHash, TransparentStringEqual>
       ClassPrototypes;
+  robin_hood::unordered_map<const Meta*,
+                            std::unique_ptr<v8::Persistent<v8::Object>>>
+      MetaInstancePrototypes;
   robin_hood::unordered_map<
       const BaseClassMeta*,
       std::unique_ptr<v8::Persistent<v8::FunctionTemplate>>>

@@ -150,6 +150,21 @@ describe(module.id, function () {
         expect(array instanceof NSObject).toBe(true);
     });
 
+    it("keeps a native class prototype read-only", function () {
+        var original = NSMutableArray.prototype;
+        var descriptor = Object.getOwnPropertyDescriptor(NSMutableArray, "prototype");
+        expect(descriptor.writable).toBe(false);
+        try {
+            expect(function () { "use strict"; NSMutableArray.prototype = {}; }).toThrow();
+        } finally {
+            // Keep later array tests working if the prototype became writable again.
+            NSMutableArray.prototype = original;
+        }
+        var array = NSMutableArray.arrayWithCapacity(1);
+        expect(Object.getPrototypeOf(array)).toBe(original);
+        expect(array instanceof NSMutableArray).toBe(true);
+    });
+
     it("instanceOfDerivedClass", function () {
         var JSObject = TNSDerivedInterface.extend({});
         var object = JSObject.alloc().init();

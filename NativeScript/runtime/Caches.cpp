@@ -22,6 +22,7 @@ Caches::~Caches() {
 
   this->Prototypes.clear();
   this->ClassPrototypes.clear();
+  this->MetaInstancePrototypes.clear();
   this->CtorFuncTemplates.clear();
   this->CtorFuncs.clear();
   this->ProtocolCtorFuncs.clear();
