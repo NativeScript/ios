@@ -129,6 +129,19 @@ global handles via `IterateStrongRoots` (`SkipRoot::kWeak`), so pending nodes ar
 during a nested GC; root *updating* uses `IterateAllRoots`, a single pass over `NORMAL||WEAK`,
 so a pending node's slot is updated exactly once after evacuation.
 
+## Which thread releases the native object
+
+Finalizers run on whichever thread triggered the collection, and that can be any thread holding
+the isolate's Locker — a JS function dispatched to a background queue included. Off the
+runtime's thread, `ObjectManager` hands the native release (`[object release]`,
+`Block_release`) to the runtime's run loop instead of making it inline; the JS side is disposed
+immediately either way. The same applies to `__releaseNativeCounterpart` called from such a
+thread: the wrapper is retired at once, the object a run loop turn later. A new wrapper built
+for an object whose release is still waiting takes that release over (keeping the retain counts
+the extended classes' swizzle reads exact). Collection adapters are exempt, since their
+`-dealloc` retires the wrapper, and teardown drains the queue inline. For a worker, the
+runtime's thread is the worker's own thread, not the main thread.
+
 ## Deliberate deviations from upstream's original
 
 - **No `PENDING` state, no `NEAR_DEATH` for finalizers.** 14.9's `NodeState` is 2 bits with all

@@ -638,8 +638,16 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
     tns::SetValue(isolate, thiz, wrapper);
     std::shared_ptr<Persistent<Value>> poThiz = ObjectManager::Register(context, thiz);
     cache->Instances.emplace(result, poThiz);
-    if (!resultIsOwned) {
+    // An initializer can answer with an existing object whose release is still
+    // waiting (see CreateJsWrapper).
+    bool tookOver = ObjectManager::TakeDeferredRelease(isolate, result);
+    if (tookOver && resultIsOwned) {
+      [result release];
+    } else if (!tookOver && !resultIsOwned) {
       [result retain];
+    }
+    if (tookOver) {
+      ObjectManager::ProtectIfNativelyRetained(result, wrapper);
     }
     ExternalMemory::ChargeEstimatedSize(isolate, thiz);
   }
@@ -908,7 +916,13 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
       receiver = poValue->Get(isolate).As<Object>();
       tns::SetValue(isolate, receiver, wrapper);
       cache->Instances.emplace(target, poValue);
-      [target retain];
+      // An extended class reads its retain count to decide whether native
+      // code owns the object, so a pending release is taken over, not stacked.
+      if (!ObjectManager::TakeDeferredRelease(isolate, target)) {
+        [target retain];
+      } else if (wrapper->Type() == WrapperType::ObjCObject) {
+        ObjectManager::ProtectIfNativelyRetained(target, static_cast<ObjCDataWrapper*>(wrapper));
+      }
     }
   } else {
     tns::SetValue(isolate, receiver, wrapper);

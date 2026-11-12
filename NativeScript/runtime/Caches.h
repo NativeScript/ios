@@ -110,6 +110,22 @@ class Caches {
     return cache->GetOrCreateState<T>();
   }
 
+  // Teardown only: the existing state, even after InvalidateIsolate, for a
+  // subsystem that must finish work its state still holds. Never creates.
+  template <typename T>
+  static T* ExistingStateFor(v8::Isolate* isolate) {
+    auto raw = isolate->GetData(0);
+    if (raw == nullptr) {
+      return nullptr;
+    }
+    Caches* cache = reinterpret_cast<std::shared_ptr<Caches>*>(raw)->get();
+    size_t index = StateSlotIndexFor<T>();
+    if (index >= cache->stateSlots_.size()) {
+      return nullptr;
+    }
+    return static_cast<T*>(cache->stateSlots_[index].get());
+  }
+
   inline int getIsolateId() { return isolateId_; }
 
   // The id assigned at Init; unlike getIsolateId() it survives

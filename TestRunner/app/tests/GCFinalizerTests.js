@@ -35,6 +35,40 @@ describe("GC finalizer callbacks", function () {
         expect(calls).toBe(1);
     });
 
+    // A JS callback dispatched to a background queue holds the isolate's
+    // Locker there, so a collection and its finalizers can run off the main
+    // thread. The native releases they make must still happen on it.
+    it("releases natively on the runtime's thread after a background collection", function (done) {
+        var threads = [];
+        var DeallocThread = TNSApi.extend({
+            methodCalledInDealloc: function () {
+                threads.push(NSThread.isMainThread);
+            }
+        }, { name: "TNSApiDeallocThread" });
+
+        // Owned only through its wrapper, so its finalizer releases it.
+        (function () {
+            DeallocThread.alloc().init();
+        })();
+
+        var queue = dispatch_get_global_queue(qos_class_t.QOS_CLASS_DEFAULT, 0);
+        dispatch_async(queue, function () {
+            scrubStack();
+            __collect();
+            __collect();
+        });
+
+        var attempts = 200;
+        (function poll() {
+            if (threads.length > 0 || --attempts === 0) {
+                expect(threads).toEqual([true]);
+                done();
+                return;
+            }
+            setTimeout(poll, 10);
+        })();
+    });
+
     // A GcProtected (natively retained) instance is resurrected by its
     // finalizer, but anything reachable only through it is queued in the same
     // GC and disposed — the resurrected parent then holds "husks" whose
