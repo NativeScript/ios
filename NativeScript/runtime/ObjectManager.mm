@@ -7,6 +7,17 @@
 #include "DataWrapper.h"
 #include "FFICall.h"
 #include "Helpers.h"
+#include "Runtime.h"
+#include <objc/message.h>
+#include <objc/runtime.h>
+#include <string>
+#include <unordered_set>
+#include <vector>
+
+// Exported by libobjc; not declared in a public header for MRC code.
+extern "C" id objc_initWeak(id* location, id value);
+extern "C" id objc_loadWeakRetained(id* location);
+extern "C" void objc_destroyWeak(id* location);
 
 using namespace v8;
 using namespace std;
@@ -14,6 +25,135 @@ using namespace std;
 namespace tns {
 
 static Class NSTimerClass = objc_getClass("NSTimer");
+
+namespace {
+
+// A finalized wrapper that carried JS properties while something other than
+// the wrapper still retained its object. Confirmed a runloop turn later, so a
+// co-queued owner or a pending autorelease does not produce a warning.
+struct StateLostCandidate {
+  id* weakSlot;
+  std::string description;
+  std::string className;
+  std::string properties;
+};
+
+struct WrapperLifetimeState {
+  ObjectManager::LifetimeStats stats;
+  std::vector<StateLostCandidate> candidates;
+  bool confirmPosted = false;
+  std::unordered_set<std::string> warnedClasses;
+
+  ~WrapperLifetimeState() {
+    for (StateLostCandidate& candidate : candidates) {
+      objc_destroyWeak(candidate.weakSlot);
+      delete candidate.weakSlot;
+    }
+  }
+};
+
+bool IsTaggedPointer(id obj) {
+  // Through void*: clang rejects bit tests on ObjC object pointers.
+  uintptr_t bits = reinterpret_cast<uintptr_t>(static_cast<const void*>(obj));
+#if defined(__arm64__)
+  return (bits >> 63) != 0;
+#else
+  return (bits & 1) != 0;
+#endif
+}
+
+void ConfirmStateLost(Isolate* isolate) {
+  auto* state = Caches::StateFor<WrapperLifetimeState>(isolate);
+  if (state == nullptr) {
+    return;
+  }
+  state->confirmPosted = false;
+  std::vector<StateLostCandidate> candidates;
+  candidates.swap(state->candidates);
+  for (StateLostCandidate& candidate : candidates) {
+    id obj = objc_loadWeakRetained(candidate.weakSlot);
+    if (obj != nil) {
+      state->stats.stateLostConfirmed++;
+      if (state->warnedClasses.insert(candidate.className).second) {
+        Log("NativeScript: JS properties (%s) set on %s were lost when its JavaScript wrapper was "
+            "garbage collected, but the native object is still alive. If native code hands it "
+            "back, it gets a new wrapper without them. Keep a JS reference to the object while "
+            "its JS state is needed. Reported once per class; disable with \"wrapperLifetime\": "
+            "{ \"warnings\": false }.",
+            candidate.properties.c_str(), candidate.description.c_str());
+      }
+      [obj release];
+    }
+    objc_destroyWeak(candidate.weakSlot);
+    delete candidate.weakSlot;
+  }
+}
+
+// Called from the finalizer drain just before the wrapper releases `target`.
+void NoteStateLostCandidate(Isolate* isolate, Local<Object> obj, id target) {
+  if (IsTaggedPointer(target)) {
+    return;
+  }
+  NSUInteger count = [target retainCount];
+  if (count <= 1 || count >= (NSUIntegerMax >> 1)) {
+    return;
+  }
+  SEL allowsWeak = sel_registerName("allowsWeakReference");
+  if ([target respondsToSelector:allowsWeak] &&
+      !reinterpret_cast<BOOL (*)(id, SEL)>(objc_msgSend)(target, allowsWeak)) {
+    return;
+  }
+
+  HandleScope handleScope(isolate);
+  TryCatch tryCatch(isolate);
+  Local<Context> context = tns::GetCreationContextOrCurrent(isolate, obj);
+  Local<v8::Array> names;
+  if (context.IsEmpty() ||
+      !obj->GetOwnPropertyNames(context, PropertyFilter::SKIP_SYMBOLS).ToLocal(&names) ||
+      names->Length() == 0) {
+    return;
+  }
+
+  auto* state = Caches::StateFor<WrapperLifetimeState>(isolate);
+  if (state == nullptr) {
+    return;
+  }
+  state->stats.stateLostCandidates++;
+
+  std::string properties;
+  uint32_t shown = std::min<uint32_t>(names->Length(), 5);
+  for (uint32_t i = 0; i < shown; i++) {
+    Local<Value> name;
+    if (!names->Get(context, i).ToLocal(&name)) {
+      continue;
+    }
+    if (!properties.empty()) {
+      properties += ", ";
+    }
+    properties += tns::ToString(isolate, name);
+  }
+  if (names->Length() > shown) {
+    properties += ", ...";
+  }
+
+  const char* className = object_getClassName(target);
+  char description[256];
+  snprintf(description, sizeof(description), "<%s: %p>", className, (void*)target);
+
+  id* slot = new id(nil);
+  objc_initWeak(slot, target);
+  state->candidates.push_back({slot, description, className, properties});
+
+  if (!state->confirmPosted) {
+    Runtime* runtime = Runtime::GetRuntime(isolate);
+    std::shared_ptr<EventLoop> loop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
+    if (loop != nullptr && loop->PostInternal([isolate]() { ConfirmStateLost(isolate); })) {
+      state->confirmPosted = true;
+    }
+  }
+}
+
+}  // namespace
 
 void ObjectManager::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
   globalTemplate->Set(tns::ToV8String(isolate, "__releaseNativeCounterpart"),
@@ -192,16 +332,24 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
   BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
   // NSLog(@"dispose %p", wrapper);
   if (wrapper == nullptr) {
-    tns::SetValue(isolate, obj, nullptr);
+    if (tns::GetReleasedReason(obj) == tns::ReleasedReason::kNone) {
+      tns::SetValue(isolate, obj, nullptr);
+    }
     return true;
   }
 
+  const WrapperType type = wrapper->Type();
   if (wrapper->IsGcProtected() && !isFinalDisposal) {
+    if (type == WrapperType::ObjCObject) {
+      if (LifetimeStats* stats = GetLifetimeStats(isolate)) {
+        stats->resurrections++;
+      }
+    }
     return false;
   }
 
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
-  switch (wrapper->Type()) {
+  switch (type) {
     case WrapperType::Struct:
       // Lives in the struct object's ArrayBuffer storage, which the GC frees.
       return true;
@@ -217,6 +365,19 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
           Local<Value> cached = it->second->Get(isolate);
           if (cached.IsEmpty() || cached == value) {
             cache->Instances.erase(it);
+          }
+        }
+        if (!isFinalDisposal) {
+          if (LifetimeStats* stats = GetLifetimeStats(isolate)) {
+            stats->collected++;
+          }
+          if (tns::WrapperLifetimeWarningsEnabled()) {
+            NoteStateLostCandidate(isolate, obj, target);
+            // It allocates, so a nested collection may have run finalizers
+            // whose JS released this object explicitly.
+            if (tns::GetValue(isolate, obj) != wrapper) {
+              return true;
+            }
           }
         }
         [target release];
@@ -313,7 +474,13 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
   // so only a wrapper still sitting in it is ours to free.
   if (tns::GetValue(isolate, obj) == wrapper) {
     delete wrapper;
-    tns::DeleteValue(isolate, obj);
+    if (type == WrapperType::ObjCObject) {
+      tns::MarkReleased(isolate, obj,
+                        isFinalDisposal ? tns::ReleasedReason::kTeardown
+                                        : tns::ReleasedReason::kCollected);
+    } else {
+      tns::DeleteValue(isolate, obj);
+    }
   }
   return true;
 }
@@ -396,12 +563,20 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
     // again.
     if (!adapterClaim && tns::GetValue(isolate, value) == wrapper) {
       delete wrapper;
-      tns::SetValue(isolate, value.As<Object>(), nullptr);
+      tns::MarkReleased(isolate, value.As<Object>(), tns::ReleasedReason::kExplicit);
+    }
+    if (LifetimeStats* stats = GetLifetimeStats(isolate)) {
+      stats->releasedExplicitly++;
     }
   }
 }
 
 bool ObjectManager::IsInstanceOf(id obj, Class clazz) { return [obj isKindOfClass:clazz]; }
+
+ObjectManager::LifetimeStats* ObjectManager::GetLifetimeStats(Isolate* isolate) {
+  auto* state = Caches::StateFor<WrapperLifetimeState>(isolate);
+  return state != nullptr ? &state->stats : nullptr;
+}
 
 long ObjectManager::GetRetainCount(id obj) {
   if (!obj) {

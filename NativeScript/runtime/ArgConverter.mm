@@ -35,6 +35,19 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
     BaseDataWrapper* wrapper = tns::GetValue(isolate, receiver);
 
     if (wrapper == nullptr) {
+      tns::ReleasedReason releasedReason = tns::GetReleasedReason(receiver);
+      if (releasedReason != tns::ReleasedReason::kNone) {
+        const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
+        std::string operation = std::string("method '") + jsNameStr + "' receiver";
+        if (tns::ObjectManager::LifetimeStats* stats =
+                tns::ObjectManager::GetLifetimeStats(isolate)) {
+          stats->releasedAccesses++;
+        }
+        std::string message =
+            std::string(tns::ReleasedReasonMessage(releasedReason)) + " (" + operation + ")";
+        throw NativeScriptException(
+            isolate, Exception::ReferenceError(tns::ToV8String(isolate, message)), message);
+      }
       // During fast view churn like HMR in development, JS objects can outlive their
       // native wrappers briefly. In Debug, throw a catchable JS error instead of crashing.
       // In Release, assert so crash reporting can capture unexpected cases.
@@ -542,6 +555,14 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
         *static_cast<id __strong*>(retValue) = data;
         return;
       } else {
+        // Native code receives this value outside any JS frame, so a released
+        // wrapper is reported (never thrown) and returned as nil.
+        tns::ReleasedReason releasedReason = tns::GetReleasedReason(value);
+        if (releasedReason != tns::ReleasedReason::kNone) {
+          tns::ReportReleasedObject(isolate, value, releasedReason, "method return value", false);
+          memset(retValue, 0, sizeof(id));
+          return;
+        }
         id adapter = [[DictionaryAdapter alloc]
             initWithJSObject:tns::ProxyReadSource(original, value).As<Object>()
                      isolate:isolate];

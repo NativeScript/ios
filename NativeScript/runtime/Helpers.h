@@ -316,6 +316,40 @@ void SetReleasedObjectPolicy(ReleasedObjectPolicy policy);
 // field unchecked must go through this.
 BaseDataWrapper* GetValueOrReport(v8::Isolate* isolate, const v8::Local<v8::Value>& val,
                                   const char* operation);
+
+// Why an ObjC object's wrapper no longer has its native object. Stored as a
+// small integer in internal field 0, where an External would otherwise sit:
+// GetValue only reads Externals, so every existing caller sees "no wrapper",
+// and writing it allocates nothing inside the finalizer drain.
+enum class ReleasedReason : int32_t {
+  // Zero is never a reason: other templates' embedder fields can hold Smi 0.
+  kNone = 0,
+  // The wrapper's finalizer released it while JS could still reach the
+  // wrapper (only possible through a graph a resurrected wrapper keeps alive).
+  kCollected = 1,
+  // __releaseNativeCounterpart.
+  kExplicit = 2,
+  // Runtime teardown.
+  kTeardown = 3,
+};
+void MarkReleased(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, ReleasedReason reason);
+ReleasedReason GetReleasedReason(const v8::Local<v8::Value>& val);
+const char* ReleasedReasonMessage(ReleasedReason reason);
+
+// Applies ReleasedObjectPolicy to a released ObjC wrapper reaching native code
+// in place of its object. Throws a ReferenceError under kThrow when `canThrow`;
+// otherwise schedules the `releasednativeaccess` event (deduplicated per
+// object). The caller then passes nil (or NSNull where nil is not allowed).
+// Returns false when it threw.
+bool ReportReleasedObject(v8::Isolate* isolate, const v8::Local<v8::Value>& val,
+                          ReleasedReason reason, const char* operation, bool canThrow);
+
+// Whether the runtime warns when JS state on a wrapper is lost while its native
+// object lives on. Process-wide; defaults to the app's debug flag, overridden by
+// the "wrapperLifetime": { "warnings": bool } app config or ns:runtime's
+// `wrapperLifetimeWarnings` key.
+bool WrapperLifetimeWarningsEnabled();
+void SetWrapperLifetimeWarnings(bool enabled);
 void DeleteValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
 bool DeleteWrapperIfUnused(v8::Isolate* isolate, const v8::Local<v8::Value>& obj,
                            BaseDataWrapper* value);

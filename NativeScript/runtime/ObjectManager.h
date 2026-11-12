@@ -42,6 +42,27 @@ struct ObjectWeakCallbackState {
 
 class ObjectManager {
  public:
+  // Per-isolate wrapper lifetime counters. Kept in every build: plain integers
+  // bumped only on cold paths (finalizers, released-object reports), exposed
+  // through ns:runtime's getWrapperLifetimeStats().
+  struct LifetimeStats {
+    // An ObjC wrapper's finalizer refused disposal because native code still
+    // retains its object (IsGcProtected), keeping the wrapper alive.
+    uint64_t resurrections = 0;
+    // An ObjC wrapper's finalizer released its native object.
+    uint64_t collected = 0;
+    // __releaseNativeCounterpart released a native object.
+    uint64_t releasedExplicitly = 0;
+    // JS handed a released wrapper to native code or used it as a receiver.
+    uint64_t releasedAccesses = 0;
+    // A finalized ObjC wrapper carried JS properties while something other
+    // than the wrapper still retained its object, and whether that object was
+    // still alive a runloop turn later (see WrapperLifetimeWarningsEnabled).
+    uint64_t stateLostCandidates = 0;
+    uint64_t stateLostConfirmed = 0;
+  };
+  static LifetimeStats* GetLifetimeStats(v8::Isolate* isolate);
+
   static void Init(v8::Isolate* isolate,
                    v8::Local<v8::ObjectTemplate> globalTemplate);
   static std::shared_ptr<v8::Persistent<v8::Value>> Register(

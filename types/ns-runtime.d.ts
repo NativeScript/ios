@@ -31,6 +31,35 @@ declare module "ns:runtime" {
      * Available in release builds too. Process-wide; main-isolate writes only.
      */
     debug: string;
+    /**
+     * Whether the runtime logs a warning (once per class) when JS properties
+     * on a native object's wrapper are lost because the wrapper was garbage
+     * collected while native code still owned the object.
+     *
+     * Defaults to on in debug builds and off otherwise; the app config key
+     * `"wrapperLifetime": { "warnings": boolean }` overrides the default.
+     * Process-wide; main-isolate writes only.
+     */
+    wrapperLifetimeWarnings: boolean;
+  }
+
+  /**
+   * Wrapper lifetime counters for the calling isolate, maintained in every
+   * build.
+   */
+  export interface WrapperLifetimeStats {
+    /** Finalizers that kept a wrapper alive because native code still retained its object. */
+    resurrections: number;
+    /** Finalizers that released their native object. */
+    collected: number;
+    /** Native objects released through `__releaseNativeCounterpart`. */
+    releasedExplicitly: number;
+    /** Times JS passed a released wrapper to native code or called a method on it. */
+    releasedAccesses: number;
+    /** Collected wrappers with JS properties whose object was still retained elsewhere. */
+    stateLostCandidates: number;
+    /** Candidates whose object was still alive a runloop turn later (warnings enabled only). */
+    stateLostConfirmed: number;
   }
 
   /**
@@ -81,4 +110,10 @@ declare module "ns:runtime" {
    * runtime itself, `0` when there is none.
    */
   export function getExternalSize(target: unknown): number;
+
+  /**
+   * Wrapper lifetime counters for the calling isolate. The state-lost
+   * counters only advance while `wrapperLifetimeWarnings` is on.
+   */
+  export function getWrapperLifetimeStats(): WrapperLifetimeStats;
 }

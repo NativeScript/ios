@@ -12,11 +12,13 @@
 #include <atomic>
 #include <cerrno>
 #include <mutex>
+#include <optional>
 #include <sstream>
 #include <vector>
 #include "Caches.h"
 #include "ErrorEvents.h"
 #include "NativeScriptException.h"
+#include "ObjectManager.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
 
@@ -519,23 +521,49 @@ void tns::EmitDebugLog(LogCategory category, const char* format, ...) {
   va_end(ap);
 }
 
-tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>& val,
-                                            const char* operation) {
-  BaseDataWrapper* wrapper = tns::GetValue(isolate, val);
-  if (wrapper != nullptr) {
-    return wrapper;
+const char* tns::ReleasedReasonMessage(ReleasedReason reason) {
+  switch (reason) {
+    case tns::ReleasedReason::kCollected:
+      return "The native object was released when its wrapper was garbage collected";
+    case tns::ReleasedReason::kExplicit:
+      return "The native object was released by __releaseNativeCounterpart";
+    case tns::ReleasedReason::kTeardown:
+      return "The native object was released at runtime teardown";
+    case tns::ReleasedReason::kNone:
+      break;
   }
+  return "The native object has been released or is not a valid native object";
+}
 
-  std::string message =
-      std::string("The native object has been released or is not a valid native object (") +
-      operation + ")";
+namespace {
 
-  if (GetReleasedObjectPolicy() == ReleasedObjectPolicy::kThrow) {
+// Shared by GetValueOrReport and ReportReleasedObject: one message format, one
+// event, one deduplication marker.
+bool ApplyReleasedObjectPolicy(Isolate* isolate, const Local<Value>& val, const char* text,
+                               const char* operation, bool canThrow) {
+  if (tns::ObjectManager::LifetimeStats* stats = tns::ObjectManager::GetLifetimeStats(isolate)) {
+    stats->releasedAccesses++;
+  }
+  std::string message = std::string(text) + " (" + operation + ")";
+
+  if (canThrow && tns::GetReleasedObjectPolicy() == tns::ReleasedObjectPolicy::kThrow) {
     isolate->ThrowException(v8::Exception::ReferenceError(tns::ToV8String(isolate, message)));
-    return nullptr;
+    return false;
   }
 
   Local<Context> context = isolate->GetCurrentContext();
+  std::optional<Context::Scope> contextScope;
+  if (context.IsEmpty() && val->IsObject()) {
+    // Collection adapters convert elements from native callbacks that may not
+    // have entered a context.
+    context = tns::GetCreationContextOrCurrent(isolate, val.As<Object>());
+    if (!context.IsEmpty()) {
+      contextScope.emplace(context);
+    }
+  }
+  if (context.IsEmpty()) {
+    return true;
+  }
   if (val->IsObject()) {
     // One report per husk object: a released buffer touched in a tight loop
     // must not flood the event queue.
@@ -543,7 +571,7 @@ tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>
         Private::ForApi(isolate, tns::ToV8String(isolate, "ns:releasedAccessReported"));
     Local<Object> obj = val.As<Object>();
     if (obj->HasPrivate(context, reported).FromMaybe(false)) {
-      return nullptr;
+      return true;
     }
     obj->SetPrivate(context, reported, v8::True(isolate)).FromMaybe(false);
   }
@@ -553,7 +581,78 @@ tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>
   auto* report =
       new ReleasedAccessReport{isolate, v8::Global<v8::Value>(isolate, error), operation};
   isolate->EnqueueMicrotask(DispatchReleasedAccessMicrotask, report);
+  return true;
+}
+
+std::atomic<int> wrapperLifetimeWarnings_{-1};
+
+}  // namespace
+
+tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>& val,
+                                            const char* operation) {
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, val);
+  if (wrapper != nullptr) {
+    return wrapper;
+  }
+  ApplyReleasedObjectPolicy(isolate, val, ReleasedReasonMessage(GetReleasedReason(val)), operation,
+                            true);
   return nullptr;
+}
+
+void tns::MarkReleased(Isolate* isolate, const Local<Object>& obj, ReleasedReason reason) {
+  Local<Value> target = tns::UnwrapProxy(obj);
+  if (!target.IsEmpty() && target->IsObject() && target.As<Object>()->InternalFieldCount() > 0) {
+    target.As<Object>()->SetInternalField(0,
+                                          v8::Integer::New(isolate, static_cast<int32_t>(reason)));
+    return;
+  }
+  // Wrappers kept in the `metadata` private have no field for the marker; they
+  // are only cleared, and read as plain objects afterwards.
+  tns::DeleteValue(isolate, obj);
+}
+
+tns::ReleasedReason tns::GetReleasedReason(const Local<Value>& val) {
+  Local<Value> target = tns::UnwrapProxy(val);
+  if (target.IsEmpty() || !target->IsObject()) {
+    return ReleasedReason::kNone;
+  }
+  Local<Object> obj = target.As<Object>();
+  if (obj->InternalFieldCount() < 1) {
+    return ReleasedReason::kNone;
+  }
+  Local<Value> field = obj->GetInternalField(0).As<v8::Value>();
+  if (field.IsEmpty() || !field->IsInt32()) {
+    return ReleasedReason::kNone;
+  }
+  return static_cast<ReleasedReason>(field.As<v8::Int32>()->Value());
+}
+
+bool tns::ReportReleasedObject(Isolate* isolate, const Local<Value>& val, ReleasedReason reason,
+                               const char* operation, bool canThrow) {
+  return ApplyReleasedObjectPolicy(isolate, val, ReleasedReasonMessage(reason), operation, canThrow);
+}
+
+bool tns::WrapperLifetimeWarningsEnabled() {
+  int value = wrapperLifetimeWarnings_.load(std::memory_order_relaxed);
+  if (value >= 0) {
+    return value != 0;
+  }
+  bool enabled = RuntimeConfig.IsDebug;
+  id config = Runtime::GetAppConfigValue("wrapperLifetime");
+  if ([config isKindOfClass:[NSDictionary class]]) {
+    id warnings = ((NSDictionary*)config)[@"warnings"];
+    if ([warnings isKindOfClass:[NSNumber class]]) {
+      enabled = [warnings boolValue];
+    }
+  }
+  int expected = -1;
+  wrapperLifetimeWarnings_.compare_exchange_strong(expected, enabled ? 1 : 0,
+                                                   std::memory_order_relaxed);
+  return wrapperLifetimeWarnings_.load(std::memory_order_relaxed) != 0;
+}
+
+void tns::SetWrapperLifetimeWarnings(bool enabled) {
+  wrapperLifetimeWarnings_.store(enabled ? 1 : 0, std::memory_order_relaxed);
 }
 
 void tns::DeleteValue(Isolate* isolate, const Local<Value>& val) {
