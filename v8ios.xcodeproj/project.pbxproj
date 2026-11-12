@@ -311,6 +311,8 @@
 		C2DDEBAD229EAC8300345BFE /* Caches.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB84229EAC8300345BFE /* Caches.h */; };
 		C2DDEBAE229EAC8300345BFE /* DictionaryAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB85229EAC8300345BFE /* DictionaryAdapter.h */; };
 		C2DDEBAF229EAC8300345BFE /* ObjectManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB86229EAC8300345BFE /* ObjectManager.mm */; };
+		DD6B0F1ACE8AE363C72245E9 /* WrapperLifetime.h in Headers */ = {isa = PBXBuildFile; fileRef = 9E6F52B357F2776D77D71D8A /* WrapperLifetime.h */; };
+		1DE238EF3BDD0EF221E13C44 /* WrapperLifetime.mm in Sources */ = {isa = PBXBuildFile; fileRef = 13A9D13202DBEA9487A90B03 /* WrapperLifetime.mm */; };
 		C2DDEBB0229EAC8300345BFE /* StringHasher.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB87229EAC8300345BFE /* StringHasher.h */; };
 		C2DDEBB1229EAC8300345BFE /* Caches.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB88229EAC8300345BFE /* Caches.cpp */; };
 		C2DDEBB2229EAC8300345BFE /* ModuleInternal.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB89229EAC8300345BFE /* ModuleInternal.h */; };
@@ -841,6 +843,8 @@
 		C2DDEB84229EAC8300345BFE /* Caches.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Caches.h; sourceTree = "<group>"; };
 		C2DDEB85229EAC8300345BFE /* DictionaryAdapter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DictionaryAdapter.h; sourceTree = "<group>"; };
 		C2DDEB86229EAC8300345BFE /* ObjectManager.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ObjectManager.mm; sourceTree = "<group>"; };
+		9E6F52B357F2776D77D71D8A /* WrapperLifetime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WrapperLifetime.h; sourceTree = "<group>"; };
+		13A9D13202DBEA9487A90B03 /* WrapperLifetime.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = WrapperLifetime.mm; sourceTree = "<group>"; };
 		C2DDEB87229EAC8300345BFE /* StringHasher.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringHasher.h; sourceTree = "<group>"; };
 		C2DDEB88229EAC8300345BFE /* Caches.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Caches.cpp; sourceTree = "<group>"; };
 		C2DDEB89229EAC8300345BFE /* ModuleInternal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ModuleInternal.h; sourceTree = "<group>"; };
@@ -1524,6 +1528,8 @@
 				E9A2699467FF325411FC11C4 /* NSExceptionSupport.mm */,
 				C2DDEB83229EAC8300345BFE /* ObjectManager.h */,
 				C2DDEB86229EAC8300345BFE /* ObjectManager.mm */,
+				9E6F52B357F2776D77D71D8A /* WrapperLifetime.h */,
+				13A9D13202DBEA9487A90B03 /* WrapperLifetime.mm */,
 				C20AB5E526E1015200E2B41D /* OneByteStringResource.h */,
 				C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */,
 				4A5C201A2E2B000300000002 /* Performance.h */,
@@ -1681,6 +1687,7 @@
 				6573B9D0291FE29F00B0ED7C /* JSIV8ValueConverter.h in Headers */,
 				C20AB5E726E1015300E2B41D /* OneByteStringResource.h in Headers */,
 				C2DDEBAC229EAC8300345BFE /* ObjectManager.h in Headers */,
+				DD6B0F1ACE8AE363C72245E9 /* WrapperLifetime.h in Headers */,
 				6573B9E7291FE2A700B0ED7C /* jsi.h in Headers */,
 				6573B9E2291FE2A700B0ED7C /* jsi-inl.h in Headers */,
 				C2D21601248AAAD900EDC646 /* Constants.h in Headers */,
@@ -2365,6 +2372,7 @@
 				C2A5F86A2359AEB600074AFA /* ExtVector.cpp in Sources */,
 				AA8C47B22E27114300649BF5 /* ModuleInternalCallbacks.mm in Sources */,
 				C2DDEBAF229EAC8300345BFE /* ObjectManager.mm in Sources */,
+				1DE238EF3BDD0EF221E13C44 /* WrapperLifetime.mm in Sources */,
 				F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */,
 				A1B2C3D40000000000000004 /* WorkerInspectorClient.mm in Sources */,
 				C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */,

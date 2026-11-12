@@ -140,6 +140,7 @@ require("./NativeCallbackSelfTests");
 require("./JSAccessorEncodingTests");
 require("./JSAccessorReceiverTests");
 require("./WrapperLifetimeTests");
+require("./WrapperLifetimeModesTests");
 require("./BlockCacheRaceTests");
 require("./WorkerConcurrentStartupTests");
 require("./WorkerOptionsTests");

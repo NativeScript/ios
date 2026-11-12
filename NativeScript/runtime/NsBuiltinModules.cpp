@@ -9,6 +9,7 @@
 #include "Interop.h"
 #include "Messaging.h"
 #include "ObjectManager.h"
+#include "WrapperLifetime.h"
 #include "ModuleInternalCallbacks.h"
 #include "Runtime.h"
 #include "StructuredSerialization.h"
@@ -103,6 +104,9 @@ std::string Canonicalize(const std::string& specifier) {
 constexpr const char* kReleasedObjectPolicyKey = "releasedObjectPolicy";
 constexpr const char* kDebugKey = "debug";
 constexpr const char* kWrapperLifetimeWarningsKey = "wrapperLifetimeWarnings";
+// Read-only: the lifetime mode is fixed at startup from the app config.
+constexpr const char* kWrapperLifetimeModeKey = "wrapperLifetimeMode";
+constexpr const char* kWrapperLifetimeScopeKey = "wrapperLifetimeScope";
 
 void ThrowTypeError(Isolate* isolate, const std::string& message) {
   isolate->ThrowException(
@@ -139,6 +143,11 @@ void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
     } else {
       ThrowTypeError(isolate, "'" + key + "' must be 'report' or 'throw'");
     }
+    return;
+  }
+  if (key == kWrapperLifetimeModeKey || key == kWrapperLifetimeScopeKey) {
+    ThrowTypeError(isolate, "'" + key +
+                                "' is read-only; set \"wrapperLifetime\" in the app config");
     return;
   }
   if (key == kWrapperLifetimeWarningsKey) {
@@ -204,6 +213,16 @@ void GetConfigCallback(const FunctionCallbackInfo<Value>& info) {
     info.GetReturnValue().Set(tns::WrapperLifetimeWarningsEnabled());
     return;
   }
+  if (key == kWrapperLifetimeModeKey) {
+    info.GetReturnValue().Set(
+        tns::ToV8String(isolate, tns::WrapperLifetimeModeName(tns::GetWrapperLifetimeMode())));
+    return;
+  }
+  if (key == kWrapperLifetimeScopeKey) {
+    info.GetReturnValue().Set(
+        tns::ToV8String(isolate, tns::WrapperLifetimeScopeName(tns::GetWrapperLifetimeScope())));
+    return;
+  }
   ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
 }
 
@@ -224,6 +243,9 @@ void GetWrapperLifetimeStatsCallback(const FunctionCallbackInfo<Value>& info) {
       {"releasedAccesses", stats->releasedAccesses},
       {"stateLostCandidates", stats->stateLostCandidates},
       {"stateLostConfirmed", stats->stateLostConfirmed},
+      {"promotions", stats->promotions},
+      {"demotions", stats->demotions},
+      {"queuedReleases", stats->queuedReleases},
   };
   for (const auto& [name, value] : fields) {
     result
