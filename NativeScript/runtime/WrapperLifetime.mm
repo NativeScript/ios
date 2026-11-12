@@ -13,6 +13,7 @@
 #include "Helpers.h"
 #include "Runtime.h"
 #import "TNSDerivedClass.h"
+#include "WrapperLifetimeCanary.h"
 
 using namespace v8;
 
@@ -35,6 +36,8 @@ void ReadConfig() {
   } else if (mode != nil) {
     if ([mode isEqualToString:@"rooted"]) {
       detail::wrapperLifetimeMode = WrapperLifetimeMode::kRooted;
+    } else if ([mode isEqualToString:@"canary"]) {
+      detail::wrapperLifetimeMode = WrapperLifetimeMode::kCanary;
     } else if (![mode isEqualToString:@"resurrecting"]) {
       Log("NativeScript: unknown wrapperLifetime mode \"%s\"; using \"resurrecting\".",
           [mode UTF8String]);
@@ -123,7 +126,8 @@ bool IsBlock(id obj) {
   return blockClass != nil && [obj isKindOfClass:blockClass];
 }
 
-bool IsRootable(id obj) {
+// Rooted (rooted mode) or a canary (canary mode).
+bool IsInScope(id obj) {
   if (IsTaggedPointer(obj) || IsBlock(obj)) {
     return false;
   }
@@ -305,7 +309,15 @@ void ReleaseAll(Isolate* isolate, RootedState* rooted) {
 }  // namespace
 
 const char* WrapperLifetimeModeName(WrapperLifetimeMode mode) {
-  return mode == WrapperLifetimeMode::kRooted ? "rooted" : "resurrecting";
+  switch (mode) {
+    case WrapperLifetimeMode::kRooted:
+      return "rooted";
+    case WrapperLifetimeMode::kCanary:
+      return "canary";
+    case WrapperLifetimeMode::kResurrecting:
+      break;
+  }
+  return "resurrecting";
 }
 
 const char* WrapperLifetimeScopeName(WrapperLifetimeScope scope) {
@@ -314,6 +326,7 @@ const char* WrapperLifetimeScopeName(WrapperLifetimeScope scope) {
 
 void WrapperLifetime::Init(Isolate* isolate) {
   std::call_once(configOnce_, ReadConfig);
+  WrapperLifetimeCanary::Init(isolate);
   if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kRooted) {
     return;
   }
@@ -325,7 +338,7 @@ void WrapperLifetime::Init(Isolate* isolate) {
 
 void WrapperLifetime::Adopt(Isolate* isolate, ObjCDataWrapper* wrapper,
                             const std::shared_ptr<Persistent<Value>>& handle, id target) {
-  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kRooted || target == nil) {
+  if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kResurrecting || target == nil) {
     return;
   }
   RootedState* rooted = Caches::StateFor<RootedState>(isolate);
@@ -339,9 +352,17 @@ void WrapperLifetime::Adopt(Isolate* isolate, ObjCDataWrapper* wrapper,
   }
   state->lifetimeWrapper_ = wrapper;
   state->lifetimeTarget_ = target;
-  state->runtimeRetains_ = AcquireRuntimeRetain(target);
+  if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kRooted) {
+    state->runtimeRetains_ = AcquireRuntimeRetain(target);
+  }
   wrapper->SetLifetimeState(state);
-  if (IsRootable(target)) {
+  if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary) {
+    state->lifetimeCanary_ = IsInScope(target);
+    if (state->lifetimeCanary_) {
+      state->canaryRecord_ = WrapperLifetimeCanary::Find(isolate, target);
+    }
+    MakeWeak(state);
+  } else if (IsInScope(target)) {
     // Born strong: a wrapper just handed to JS or native is in use; the next
     // major collection decides whether native code keeps it.
     state->lifetimeTracked_ = true;
@@ -381,6 +402,7 @@ void WrapperLifetime::DrainReleases(Isolate* isolate) {
 }
 
 void WrapperLifetime::DrainForTeardown(Isolate* isolate) {
+  WrapperLifetimeCanary::CloseForTeardown(isolate);
   RootedState* rooted = Caches::ExistingStateFor<RootedState>(isolate);
   if (rooted == nullptr) {
     return;

@@ -51,10 +51,15 @@ declare module "ns:runtime" {
      *   while something other than the runtime retains its object, and is
      *   weak otherwise; native objects of collected wrappers are released on
      *   the runtime's thread.
+     * - `"canary"`: no resurrection. A wrapper in scope dies with its JS
+     *   references; JS properties set on it live on a state object kept until
+     *   the native object is deallocated, and a wrapper built for the object
+     *   later has them again (as a new object: `===` with the old one fails).
+     *   State that references its own object keeps that object alive.
      */
-    wrapperLifetimeMode: "resurrecting" | "rooted";
+    wrapperLifetimeMode: "resurrecting" | "rooted" | "canary";
     /**
-     * Which wrappers `"rooted"` roots, from the app config
+     * Which wrappers `"rooted"` roots, or `"canary"` makes canaries, from the app config
      * `"wrapperLifetime": { "scope": ... }`. Read-only: `setConfig` throws.
      *
      * - `"extended"` (default): instances of JS-extended classes.
@@ -84,8 +89,12 @@ declare module "ns:runtime" {
     promotions: number;
     /** `"rooted"` only: strong wrappers made weak because native code let go of their object. */
     demotions: number;
-    /** `"rooted"` only: collected wrappers whose native object was queued for release. */
+    /** `"rooted"` and `"canary"`: collected wrappers whose native object was queued for release. */
     queuedReleases: number;
+    /** `"canary"` only: state objects created for native objects' JS properties. */
+    canaryStates: number;
+    /** `"canary"` only: state objects let go of because their native object was deallocated. */
+    canaryNativeDeaths: number;
   }
 
   /**
