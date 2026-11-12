@@ -818,6 +818,7 @@
 		C2DDEB6A229EAC8200345BFE /* ArgConverter.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ArgConverter.mm; sourceTree = "<group>"; };
 		C2DDEB6B229EAC8200345BFE /* Console.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Console.cpp; sourceTree = "<group>"; };
 		C2DDEB6D229EAC8200345BFE /* Helpers.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Helpers.h; sourceTree = "<group>"; };
+		A1C0DE5100000000000000A1 /* LogChunks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LogChunks.h; sourceTree = "<group>"; };
 		C2DDEB6E229EAC8200345BFE /* Metadata.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Metadata.h; sourceTree = "<group>"; };
 		C2DDEB6F229EAC8200345BFE /* ArrayAdapter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ArrayAdapter.h; sourceTree = "<group>"; };
 		C2DDEB70229EAC8200345BFE /* Metadata.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = Metadata.mm; sourceTree = "<group>"; };
@@ -1497,6 +1498,7 @@
 				C266569D22B282BA00EE15CC /* FunctionReference.h */,
 				C266569C22B282BA00EE15CC /* FunctionReference.cpp */,
 				C2DDEB6D229EAC8200345BFE /* Helpers.h */,
+				A1C0DE5100000000000000A1 /* LogChunks.h */,
 				C2DDEB7D229EAC8200345BFE /* Helpers.mm */,
 				AA5DBFD12EC191F8008D12F9 /* HttpLoader.h */,
 				AA5DBFD22EC191F8008D12F9 /* HttpLoader.mm */,

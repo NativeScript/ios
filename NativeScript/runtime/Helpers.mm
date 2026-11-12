@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <algorithm>
 #include <atomic>
 #include <cerrno>
 #include <mutex>
@@ -491,6 +492,35 @@ void tns::InitializeLogCategoriesFromEnvironment() {
     Log("NS_DEBUG: ignoring unknown categories in '%s'; valid categories are %s", value,
         AllLogCategoryNames().c_str());
   }
+}
+
+static bool IsDevNull(int fd) {
+  struct stat target;
+  struct stat devNull;
+  return fstat(fd, &target) == 0 && stat("/dev/null", &devNull) == 0 &&
+         S_ISCHR(target.st_mode) && target.st_rdev == devNull.st_rdev;
+}
+
+// A console attached to the app would show the headers, so they also need stdout
+// to go nowhere, as it does when the CLI launches the app.
+int tns::LogFormat() {
+  if (RuntimeConfig.ApplicationPath.empty()) {
+    return 0;
+  }
+
+  static const int format = [] {
+    id value = Runtime::GetAppConfigValue("logFormat");
+    if (![value isKindOfClass:[NSNumber class]] || !IsDevNull(STDOUT_FILENO)) {
+      return 0;
+    }
+    return std::clamp([value intValue], 0, kNewestLogFormat);
+  }();
+  return format;
+}
+
+uint32_t tns::NextLogMessageId() {
+  static std::atomic<uint32_t> lastMessageId{0};
+  return lastMessageId.fetch_add(1, std::memory_order_relaxed) + 1;
 }
 
 void tns::EmitDebugLog(LogCategory category, const char* format, ...) {

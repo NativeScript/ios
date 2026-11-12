@@ -31,6 +31,8 @@ extern "C" void NSLog(CFStringRef format, ...);
 #define TNS_HAVE_OS_LOG 0
 #endif
 
+#include "LogChunks.h"
+
 namespace tns {
 
 inline v8::Local<v8::String> ToV8String(v8::Isolate* isolate, const std::string& value) {
@@ -353,6 +355,41 @@ void LogBacktrace(int skip = 1);
 // "%{public}s" argument to os_log. When os_log is not available we
 // fall back to NSLog (Objective-C) or CF/NSLog bridge in pure C++ builds.
 
+// The log format (see LogChunks.h) the CLI asked for, or 0 for plain split lines.
+int LogFormat();
+
+// Unique per split message in the process, for the headers of format 1.
+uint32_t NextLogMessageId();
+
+#if TNS_HAVE_OS_LOG
+// Logs the two parts as one entry.
+static inline void TNS_WriteOsLogEntry(os_log_type_t type, std::string_view first,
+                                       std::string_view second) {
+  os_log_with_type(OS_LOG_DEFAULT, type, "%{public}.*s%{public}.*s",
+                   static_cast<int>(first.size()), first.data(), static_cast<int>(second.size()),
+                   second.data());
+}
+
+static inline void TNS_WriteToOsLog(const char* message, os_log_type_t type = OS_LOG_TYPE_DEFAULT,
+                                    std::string_view prefix = "") {
+  std::string_view text(message);
+  if (prefix.size() + text.size() <= kMaxLogChunkBytes) {
+    TNS_WriteOsLogEntry(type, prefix, text);
+  } else if (LogFormat() >= 1) {
+    ForEachFramedLogChunk(prefix, text, NextLogMessageId(),
+                          [&](std::string_view header, std::string_view piece) {
+                            TNS_WriteOsLogEntry(type, header, piece);
+                          });
+  } else {
+    // Repeated on every piece, so that each stays a complete log line.
+    ForEachLogChunk(text, kMaxLogChunkBytes - prefix.size(),
+                    [&](std::string_view chunk, LogChunkBreak) {
+                      TNS_WriteOsLogEntry(type, prefix, chunk);
+                    });
+  }
+}
+#endif
+
 #ifdef __OBJC__
 // Overload for Objective-C string literals (NSString*)
 static inline void TNS_FormatAndLog(NSString* fmt, ...) {
@@ -373,7 +410,7 @@ static inline void TNS_FormatAndLog(NSString* fmt, ...) {
   const char* cStr = [formattedString UTF8String];
   if (cStr) {
 #if TNS_HAVE_OS_LOG
-    os_log(OS_LOG_DEFAULT, "%{public}s", cStr);
+    TNS_WriteToOsLog(cStr);
 #else
     NSLog(@"%s", cStr);
 #endif
@@ -406,7 +443,7 @@ static inline void TNS_FormatAndLog(const char* fmt, ...) {
   if (needed < STACK_BUF_SIZE) {
     // Message fit into stack buffer — single formatting pass.
 #if TNS_HAVE_OS_LOG
-    os_log(OS_LOG_DEFAULT, "%{public}s", stack_buf);
+    TNS_WriteToOsLog(stack_buf);
 #else
     // Fall back to NSLog. Use Objective-C API when compiling as ObjC++.
 #ifdef __OBJC__
@@ -421,7 +458,7 @@ static inline void TNS_FormatAndLog(const char* fmt, ...) {
     vsnprintf(buffer.data(), buffer.size(), fmt, ap);
 
 #if TNS_HAVE_OS_LOG
-    os_log(OS_LOG_DEFAULT, "%{public}s", buffer.data());
+    TNS_WriteToOsLog(buffer.data());
 #else
     // Fall back to NSLog. Use Objective-C API when compiling as ObjC++.
 #ifdef __OBJC__
