@@ -8,6 +8,7 @@
 #include "Helpers.h"
 #include "Interop.h"
 #include "Messaging.h"
+#include "ObjectManager.h"
 #include "ModuleInternalCallbacks.h"
 #include "Runtime.h"
 #include "StructuredSerialization.h"
@@ -101,6 +102,7 @@ std::string Canonicalize(const std::string& specifier) {
 // deliberately not registered — it is boot-time nativescript.config only.
 constexpr const char* kReleasedObjectPolicyKey = "releasedObjectPolicy";
 constexpr const char* kDebugKey = "debug";
+constexpr const char* kWrapperLifetimeWarningsKey = "wrapperLifetimeWarnings";
 
 void ThrowTypeError(Isolate* isolate, const std::string& message) {
   isolate->ThrowException(
@@ -137,6 +139,17 @@ void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
     } else {
       ThrowTypeError(isolate, "'" + key + "' must be 'report' or 'throw'");
     }
+    return;
+  }
+  if (key == kWrapperLifetimeWarningsKey) {
+    if (!EnsureMainIsolateWrite(isolate, key)) {
+      return;
+    }
+    if (!info[1]->IsBoolean()) {
+      ThrowTypeError(isolate, "'" + key + "' must be a boolean");
+      return;
+    }
+    tns::SetWrapperLifetimeWarnings(info[1]->IsTrue());
     return;
   }
   if (key == kDebugKey) {
@@ -187,7 +200,38 @@ void GetConfigCallback(const FunctionCallbackInfo<Value>& info) {
         tns::ToV8String(isolate, tns::EnabledLogCategoryNames()));
     return;
   }
+  if (key == kWrapperLifetimeWarningsKey) {
+    info.GetReturnValue().Set(tns::WrapperLifetimeWarningsEnabled());
+    return;
+  }
   ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
+}
+
+// Counters for the calling isolate; see ObjectManager::LifetimeStats.
+void GetWrapperLifetimeStatsCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> result = Object::New(isolate);
+  tns::ObjectManager::LifetimeStats* stats = tns::ObjectManager::GetLifetimeStats(isolate);
+  if (stats == nullptr) {
+    info.GetReturnValue().Set(result);
+    return;
+  }
+  const std::pair<const char*, uint64_t> fields[] = {
+      {"resurrections", stats->resurrections},
+      {"collected", stats->collected},
+      {"releasedExplicitly", stats->releasedExplicitly},
+      {"releasedAccesses", stats->releasedAccesses},
+      {"stateLostCandidates", stats->stateLostCandidates},
+      {"stateLostConfirmed", stats->stateLostConfirmed},
+  };
+  for (const auto& [name, value] : fields) {
+    result
+        ->Set(context, tns::ToV8String(isolate, name),
+              v8::Number::New(isolate, static_cast<double>(value)))
+        .FromMaybe(false);
+  }
+  info.GetReturnValue().Set(result);
 }
 
 const Registration* Find(const std::string& specifier) {
@@ -218,12 +262,17 @@ MaybeLocal<Object> NsModuleBinding(Local<Context> context) {
 MaybeLocal<Object> NsRuntimeBinding(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   Local<Object> binding = Object::New(isolate);
-  Local<v8::Function> setConfig, getConfig;
+  Local<v8::Function> setConfig, getConfig, getWrapperLifetimeStats;
   if (!v8::Function::New(context, SetConfigCallback).ToLocal(&setConfig) ||
       !v8::Function::New(context, GetConfigCallback).ToLocal(&getConfig) ||
+      !v8::Function::New(context, GetWrapperLifetimeStatsCallback)
+           .ToLocal(&getWrapperLifetimeStats) ||
       !binding->Set(context, tns::ToV8String(isolate, "setConfig"), setConfig)
            .FromMaybe(false) ||
       !binding->Set(context, tns::ToV8String(isolate, "getConfig"), getConfig)
+           .FromMaybe(false) ||
+      !binding->Set(context, tns::ToV8String(isolate, "getWrapperLifetimeStats"),
+                    getWrapperLifetimeStats)
            .FromMaybe(false)) {
     return MaybeLocal<Object>();
   }

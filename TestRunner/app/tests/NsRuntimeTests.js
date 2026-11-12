@@ -14,6 +14,7 @@ describe("ns:runtime", function () {
             "escapeException",
             "getConfig",
             "getExternalSize",
+            "getWrapperLifetimeStats",
             "setConfig",
             "setExternalSize",
         ]);
