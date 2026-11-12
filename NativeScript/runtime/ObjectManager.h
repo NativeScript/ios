@@ -6,6 +6,8 @@
 
 namespace tns {
 
+struct CanaryRecord;
+
 class ObjectManager;
 class ObjCDataWrapper;
 
@@ -51,6 +53,11 @@ struct ObjectWeakCallbackState {
   bool lifetimeTracked_ = false;
   // The handle is currently strong.
   bool lifetimeStrong_ = false;
+  // Canary mode: the wrapper forwards JS properties to a state object that
+  // outlives it (WrapperLifetimeCanary), found through this record once the
+  // object has state.
+  bool lifetimeCanary_ = false;
+  std::shared_ptr<CanaryRecord> canaryRecord_;
 };
 
 class ObjectManager {
@@ -79,6 +86,10 @@ class ObjectManager {
     uint64_t promotions = 0;
     uint64_t demotions = 0;
     uint64_t queuedReleases = 0;
+    // Canary mode: state objects created for native objects, and state
+    // objects let go of because their native object was deallocated.
+    uint64_t canaryStates = 0;
+    uint64_t canaryNativeDeaths = 0;
   };
   static LifetimeStats* GetLifetimeStats(v8::Isolate* isolate);
 

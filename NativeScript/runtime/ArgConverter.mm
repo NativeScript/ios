@@ -12,6 +12,7 @@
 #include "WrapperLifetime.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
+#include "WrapperLifetimeCanary.h"
 
 using namespace v8;
 using namespace std;
@@ -1183,6 +1184,7 @@ Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Local<Context> con
 
   instanceTemplate->SetHandler(IndexedPropertyHandlerConfiguration(IndexedPropertyGetterCallback,
                                                                    IndexedPropertySetterCallback));
+  WrapperLifetimeCanary::ConfigureInstanceTemplate(instanceTemplate);
 
   Local<v8::Function> emptyInstanceCtorFunc;
   if (!emptyInstanceCtorFuncTemplate->GetFunction(context).ToLocal(&emptyInstanceCtorFunc)) {

@@ -116,7 +116,7 @@ Config keys:
 | `releasedObjectPolicy` | `"report"` \| `"throw"` | process-wide (main-isolate writes only; read live by every isolate) | `"report"` |
 | `debug` | comma-separated category list, e.g. `"esm,fetch"` | process-wide (main-isolate writes only; read live by every isolate) | the `NS_DEBUG` environment variable, or `""` |
 | `wrapperLifetimeWarnings` | `true` \| `false` | process-wide (main-isolate writes only; read live by every isolate) | the app config `"wrapperLifetime": { "warnings": … }`, or on in debug builds |
-| `wrapperLifetimeMode` | `"resurrecting"` \| `"rooted"` | process-wide, read-only | the app config `"wrapperLifetime": { "mode": … }`, or `"resurrecting"` |
+| `wrapperLifetimeMode` | `"resurrecting"` \| `"rooted"` \| `"canary"` | process-wide, read-only | the app config `"wrapperLifetime": { "mode": … }`, or `"resurrecting"` |
 | `wrapperLifetimeScope` | `"extended"` \| `"all"` | process-wide, read-only | the app config `"wrapperLifetime": { "scope": … }`, or `"extended"` |
 
 ```js
@@ -163,7 +163,9 @@ every build (they only cost an increment on finalizer and error paths):
 | `stateLostConfirmed` | candidates whose object was still alive a runloop turn later; each class is also reported once in the log |
 | `promotions` | `"rooted"` only: weak wrappers made strong because native code retained their object |
 | `demotions` | `"rooted"` only: strong wrappers made weak at a major collection because native code no longer retained their object |
-| `queuedReleases` | `"rooted"` only: collected wrappers whose native object was queued for release on the runtime's thread |
+| `queuedReleases` | `"rooted"` and `"canary"`: collected wrappers whose native object was queued for release on the runtime's thread |
+| `canaryStates` | `"canary"` only: state objects created to hold native objects' JS properties |
+| `canaryNativeDeaths` | `"canary"` only: state objects let go of because their native object was deallocated |
 
 A wrapper whose native object was released keeps its JS identity. Passing it
 to native code follows `releasedObjectPolicy`: under `"report"` the argument
