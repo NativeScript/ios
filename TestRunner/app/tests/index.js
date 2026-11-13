@@ -143,6 +143,7 @@ require("./JSAccessorReceiverTests");
 require("./WrapperLifetimeTests");
 require("./WrapperLifetimeModesTests");
 require("./WrapperLifetimeWeakCollectionsTests");
+require("./WrapperLifetimeLeaksTests");
 require("./BlockCacheRaceTests");
 require("./WorkerConcurrentStartupTests");
 require("./WorkerOptionsTests");

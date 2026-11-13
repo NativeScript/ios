@@ -86,6 +86,23 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
           }
         }};
 
+bool Interop::IsJSBlock(const void* block) {
+  return static_cast<const JSBlock*>(block)->descriptor == &JSBlock::kJSBlockDescriptor;
+}
+
+Local<Value> Interop::JSBlockCallback(Isolate* isolate, const void* block) {
+  const JSBlock* jsBlock = static_cast<const JSBlock*>(block);
+  if (!IsJSBlock(block)) {
+    return Local<Value>();
+  }
+  MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(jsBlock->userData);
+  if (wrapper == nullptr || wrapper->isolateWrapper_.Isolate() != isolate ||
+      wrapper->callback_ == nullptr || wrapper->callback_->IsEmpty()) {
+    return Local<Value>();
+  }
+  return wrapper->callback_->Get(isolate);
+}
+
 // libclosure's flags layout (Block_private.h): bit 0 is set once the last
 // release has started disposing the block, bits 1-15 hold the refcount, and a
 // saturated refcount latches the block alive.

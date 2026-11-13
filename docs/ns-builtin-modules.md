@@ -104,6 +104,8 @@ defined and validated natively; the module surface is a thin frozen wrapper.
 | `setExternalSize(target, bytes)` | Reports `bytes` of native memory held by a native object, pointer, reference, block or function reference to the garbage collector, replacing any earlier size (`0` clears it). Throws `TypeError` for any other value, `RangeError` for a byte count outside 0–2^34. |
 | `getExternalSize(target)` | The size currently charged to `target`, `0` when there is none. |
 | `getWrapperLifetimeStats()` | Wrapper lifetime counters for the calling isolate (see [Wrapper lifetime counters](#wrapper-lifetime-counters)). |
+| `getWrapperClassCounts()` | Live wrappers per native class for the calling isolate (see [Leak diagnostics](#leak-diagnostics)). |
+| `findLeakCycles({ strict, inspect })` | JS ↔ native reference cycles keeping native objects alive (see [Leak diagnostics](#leak-diagnostics)). |
 
 `escapeException`, `setExternalSize` and `getExternalSize` are also members of the global `interop` (see
 [The global `interop`](#the-global-interop)); the module and the global hold
@@ -177,6 +179,50 @@ or return value becomes `nil` (`NSNull` inside a collection) and a
 `"throw"`. An `NSNull` element still breaks native code that expects a typed
 value there (an attributes dictionary holding a released `UIColor`, say); the
 event names the element so the cause can be found.
+
+### Leak diagnostics
+
+The `"rooted"` and `"canary"` wrapper lifetime modes trade resurrection's early
+releases for leaks: a JS ↔ native cycle that `"resurrecting"` broke by
+releasing a native object under live JS stays alive. Two tools find them.
+
+`getWrapperClassCounts()` returns, per native class name, the live
+`wrappers`, the rooted-`strong` ones and the canary `states`. It is cheap;
+compare it before and after repeating a journey to find classes that grow.
+
+`findLeakCycles(options)` takes a heap snapshot and reports the cycles. The
+snapshot carries the native objects the runtime wraps or keeps state for, the
+native objects they own (strong ivars, collection and block storage), and the
+runtime's cross-heap edges: `ns:retain` (wrapper → object), `ns:owned`
+(rooted-strong object → wrapper), `ns:state` (canary object → state),
+`ns:block-callback` (JS block → function) and `ns:adapter` (collection adapter
+→ JS object). A native object counts as owned from outside when its retain
+count exceeds the retains found in that graph; everything else is marked from
+the V8 roots, and cycles among what stays unmarked are reported. Every heap
+snapshot, DevTools' included, carries the runtime's edges; only
+`findLeakCycles` walks native memory.
+
+| option | effect |
+|---|---|
+| `strict: true` | Objects with *fewer* retains than references found (some found reference does not own: an MRC `assign` ivar, weak storage) are not treated as owned from outside, so cycles through them are reported too, with `uncertain: true` and the reasons. |
+| `inspect: ["Prefix", …]` | Adds `inspected`: the retain accounting, root decision and the path that reached each native object whose class name starts with a prefix. |
+
+Each cycle has a `signature` (addresses and V8 ids removed, rotated
+canonically) to compare runs and modes, the `path` as found, and its
+`members`. What it cannot see: references held without an ivar or storage
+pointer (manual retain/release bookkeeping, C++ members, associated objects)
+read as outside owners, so their cycles are missed rather than misreported.
+
+In debug builds, or with `"wrapperLifetime": { "leakProbe": true }` in the app
+config, the main isolate also:
+
+- logs the classes whose live wrappers and states grew since the previous
+  memory warning, on each memory warning;
+- answers Darwin notifications (`xcrun simctl spawn <device> notifyutil -p <name>`)
+  by writing a JSON report to the app's temporary directory and logging its
+  path: `org.nativescript.wrapperLifetime.counts` (class counts after full
+  collections), `org.nativescript.wrapperLifetime.findLeakCycles` and
+  `org.nativescript.wrapperLifetime.findLeakCycles.strict`.
 
 Remote-module security (`security.allowRemoteModules`,
 `security.remoteModuleAllowlist`) is **not** part of this surface. Those

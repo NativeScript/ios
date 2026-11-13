@@ -107,6 +107,68 @@ declare module "ns:runtime" {
     canaryInterceptedWrites: number;
   }
 
+  /** Live native object wrappers of one class in the calling isolate. */
+  export interface WrapperClassCounts {
+    /** JS wrappers the runtime holds a retain for. */
+    wrappers: number;
+    /** `"rooted"` only: wrappers currently strong because native code owns their object. */
+    strong: number;
+    /** `"canary"` only: native objects whose JS properties live on a state object. */
+    states: number;
+  }
+
+  export interface LeakCycleOptions {
+    /**
+     * Also report cycles through objects whose retain count is lower than the
+     * references found to them (some found reference does not own), marked
+     * `uncertain`. Off by default: such objects are treated as externally owned.
+     */
+    strict?: boolean;
+    /** Class-name prefixes whose native objects the report details in `inspected`. */
+    inspect?: string[];
+  }
+
+  export interface LeakCycle {
+    /** The cycle with addresses and V8 ids removed, rotated canonically: stable across runs. */
+    signature: string;
+    /** The cycle as found, starting at a native object. */
+    path: string;
+    /** Native objects on the cycle, and the objects of wrappers on it. */
+    members: { className: string; address: string }[];
+    /** Only in strict mode: the cycle passes an object whose retains the graph over-explains. */
+    uncertain: boolean;
+    reasons: string[];
+  }
+
+  export interface LeakCycleReport {
+    mode: "resurrecting" | "rooted" | "canary";
+    scope: "extended" | "all";
+    strict: boolean;
+    cycles: LeakCycle[];
+    /** Native objects in the graph: wrapped ones, ones with state, and what they own. */
+    nativeObjects: number;
+    /** Native objects whose retain count is lower than the references found to them. */
+    uncertainNativeObjects: number;
+    /** The native graph hit its size limit; cycles past it are not seen. */
+    truncated: boolean;
+    snapshotNodes: number;
+    snapshotMs: number;
+    analysisMs: number;
+    inspected?: {
+      className: string;
+      address: string;
+      seed: boolean;
+      retainCount: number;
+      runtimeRetains: number;
+      incoming: number;
+      out: string;
+      root: boolean;
+      jsBlock: boolean;
+      reached: boolean;
+      reachedFrom: string;
+    }[];
+  }
+
   /**
    * Sets a runtime config key.
    *
@@ -161,4 +223,16 @@ declare module "ns:runtime" {
    * counters only advance while `wrapperLifetimeWarnings` is on.
    */
   export function getWrapperLifetimeStats(): WrapperLifetimeStats;
+
+  /** Live wrappers per native class name in the calling isolate. */
+  export function getWrapperClassCounts(): Record<string, WrapperClassCounts>;
+
+  /**
+   * Takes a heap snapshot of the calling isolate and reports JS <-> native
+   * reference cycles that keep native objects alive: what the `"rooted"` and
+   * `"canary"` wrapper lifetime modes leak, and JS blocks whose callback
+   * reaches their owner in every mode. Slow (a full snapshot plus a native
+   * object graph walk); meant for diagnostics, not production paths.
+   */
+  export function findLeakCycles(options?: LeakCycleOptions): LeakCycleReport;
 }

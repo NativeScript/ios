@@ -956,4 +956,24 @@ void WrapperLifetimeCanary::CloseForTeardown(Isolate* isolate) {
   }
 }
 
+void WrapperLifetimeCanary::ForEachState(
+    Isolate* isolate, const std::function<void(id object, Local<Object> state)>& visit) {
+  CanaryState* state = Caches::StateFor<CanaryState>(isolate);
+  if (state == nullptr || state->registry->count.load(std::memory_order_relaxed) == 0) {
+    return;
+  }
+  std::lock_guard<std::mutex> lock(state->registry->mutex);
+  if (state->registry->closed) {
+    return;
+  }
+  for (auto& entry : state->registry->records) {
+    const std::shared_ptr<CanaryRecord>& record = entry.second;
+    if (record->state.IsEmpty() || record->died.load(std::memory_order_acquire) ||
+        !record->ObjectAlive()) {
+      continue;
+    }
+    visit((__bridge id)entry.first, record->state.Get(isolate));
+  }
+}
+
 }  // namespace tns
