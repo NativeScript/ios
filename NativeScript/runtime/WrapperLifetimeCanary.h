@@ -18,7 +18,9 @@ struct CanaryRecord;
 // for the same object forwards to the same state.
 //
 // The state object is rooted from its first write until the native object is
-// deallocated (an associated token's -dealloc reports it). It cannot be rooted
+// deallocated, reported by an associated token's -dealloc or found by a sweep
+// of weak references after major collections (NS_CANARY_DEATH_SIGNAL in the
+// .mm chooses). It cannot be rooted
 // only once the canary dies instead: a state reachable only through the canary
 // is garbage in the same collection, before any phantom callback runs. The
 // cost is that state referencing its own canary (a closure over `this`, a

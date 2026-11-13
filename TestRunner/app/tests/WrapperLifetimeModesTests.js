@@ -355,8 +355,9 @@ describe("Wrapper lifetime modes", function () {
         });
     });
 
-    // Third-party code can strip a live object's associations, which releases
-    // the token that reports native death; the state goes with it.
+    // Third-party code can strip a live object's associations. Where an
+    // associated token reports native death, the state goes with it; where a
+    // weak-reference sweep does, nothing changes.
     it("survives a live object's associations being removed", function () {
         if (typeof objc_removeAssociatedObjects !== "function") {
             return;
@@ -364,9 +365,7 @@ describe("Wrapper lifetime modes", function () {
         var obj = Extended.new();
         obj.tag = "first";
         objc_removeAssociatedObjects(obj);
-        if (canary) {
-            expect(obj.tag).toBeUndefined();
-        }
+        expect([undefined, "first"]).toContain(obj.tag);
         obj.tag = "second";
         expect(obj.tag).toBe("second");
     });

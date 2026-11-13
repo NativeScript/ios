@@ -14,18 +14,51 @@
 #include "Runtime.h"
 #include "WrapperLifetime.h"
 
+// How canary mode learns that a native object with state was deallocated, so
+// its state can be let go of:
+// - ASSOCIATION: a token associated with the object reports it from its
+//   -dealloc, immediately and on any thread. The ObjC runtime aborts the
+//   process for a class that forbids associated objects (no public query).
+// - WEAK_SWEEP: each record holds a weak reference to the object, checked by a
+//   sweep after every major collection, so state lingers until then. Classes
+//   that refuse weak references keep their JS properties on the canary.
+#define NS_CANARY_DEATH_ASSOCIATION 1
+#define NS_CANARY_DEATH_WEAK_SWEEP 2
+#ifndef NS_CANARY_DEATH_SIGNAL
+#define NS_CANARY_DEATH_SIGNAL NS_CANARY_DEATH_ASSOCIATION
+#endif
+
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
+extern "C" id objc_initWeakOrNil(id* location, id value);
+extern "C" void objc_destroyWeak(id* location);
+#endif
+
 using namespace v8;
 
 namespace tns {
 
 // A native object's state in one isolate, shared by the registry and the
-// object's live canary. Its token's -dealloc marks it died: normally when the
-// object is deallocated, but objc_removeAssociatedObjects can release the token
-// of a live object, whose canary then sees no state and starts a new record on
-// its next write. Teardown empties the handle.
+// object's live canary. Marked died once the object is known to be gone (with
+// ASSOCIATION, also when objc_removeAssociatedObjects releases the token of a
+// live object): its canary then sees no state and starts a new record on its
+// next write. Teardown empties the handle.
 struct CanaryRecord {
   Global<Object> state;
   std::atomic<bool> died{false};
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
+  // Zeroed by the ObjC runtime when the object is deallocated, on any thread.
+  id object = nil;
+
+  ~CanaryRecord() { objc_destroyWeak(&object); }
+
+  // A racy read is enough: the slot only goes from the object to nil, and is
+  // never dereferenced here.
+  bool ObjectAlive() const {
+    return __atomic_load_n(reinterpret_cast<void* const*>(&object), __ATOMIC_ACQUIRE) != nullptr;
+  }
+#else
+  bool ObjectAlive() const { return true; }
+#endif
 };
 
 namespace {
@@ -40,19 +73,23 @@ struct CanaryRegistry {
   std::vector<std::shared_ptr<CanaryRecord>> dead;
   bool closed = false;
   bool drainPosted = false;
+  bool sweepPosted = false;
   // Lets wrapper creation skip the lookup while no object has state.
   std::atomic<size_t> count{0};
   Isolate* isolate = nullptr;
   std::weak_ptr<EventLoop> loop;
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
   // The association key: one per isolate, and never reused while a token
   // keeps this registry alive.
   char associationKey = 0;
+#endif
 };
 
 struct CanaryState {
   std::shared_ptr<CanaryRegistry> registry = std::make_shared<CanaryRegistry>();
 };
 
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
 void DrainDead(const std::shared_ptr<CanaryRegistry>& registry) {
   std::vector<std::shared_ptr<CanaryRecord>> dead;
   {
@@ -102,6 +139,41 @@ void NativeDied(const std::shared_ptr<CanaryRegistry>& registry, void* object) {
     registry->drainPosted = false;
   }
 }
+#endif
+
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
+// Lets go of the state of every object that was deallocated. Runs as an event
+// loop task (under the Locker, on the runtime's thread), never inside the GC.
+void Sweep(const std::shared_ptr<CanaryRegistry>& registry) {
+  std::vector<std::shared_ptr<CanaryRecord>> dead;
+  {
+    std::lock_guard<std::mutex> lock(registry->mutex);
+    registry->sweepPosted = false;
+    if (registry->closed) {
+      return;
+    }
+    // Records a re-wrap or a write already found dead.
+    dead.swap(registry->dead);
+    for (auto it = registry->records.begin(); it != registry->records.end();) {
+      if (it->second->ObjectAlive()) {
+        ++it;
+        continue;
+      }
+      it->second->died.store(true, std::memory_order_release);
+      dead.push_back(std::move(it->second));
+      it = registry->records.erase(it);
+      registry->count.fetch_sub(1, std::memory_order_relaxed);
+    }
+  }
+  ObjectManager::LifetimeStats* stats = ObjectManager::GetLifetimeStats(registry->isolate);
+  for (std::shared_ptr<CanaryRecord>& record : dead) {
+    record->state.Reset();
+    if (stats != nullptr) {
+      stats->canaryNativeDeaths++;
+    }
+  }
+}
+#endif
 
 std::shared_ptr<CanaryRegistry> RegistryFor(Isolate* isolate) {
   CanaryState* state = Caches::StateFor<CanaryState>(isolate);
@@ -112,6 +184,7 @@ std::shared_ptr<CanaryRegistry> RegistryFor(Isolate* isolate) {
 
 }  // namespace tns
 
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
 // Associated with a native object once it has state in an isolate; its
 // -dealloc runs when the object is deallocated.
 @interface TNSCanaryLifecycleToken : NSObject {
@@ -129,6 +202,7 @@ std::shared_ptr<CanaryRegistry> RegistryFor(Isolate* isolate) {
   [super dealloc];
 }
 @end
+#endif
 
 namespace tns {
 
@@ -149,11 +223,25 @@ ObjectWeakCallbackState* CanaryOf(Isolate* isolate, Local<Object> holder) {
   return state != nullptr && state->lifetimeCanary_ ? state : nullptr;
 }
 
-// The record's state is usable: its token is alive and teardown has not
-// emptied it. Handles are only reset under the Locker these callers hold.
+// The record's state is usable: its object is not known to be gone and
+// teardown has not emptied it. Handles are only reset under the Locker these
+// callers hold.
 bool Usable(const std::shared_ptr<CanaryRecord>& record) {
   return record != nullptr && !record->died.load(std::memory_order_acquire) &&
          !record->state.IsEmpty();
+}
+
+// Under the registry mutex: a record whose object is gone but which no sweep
+// has reached yet is moved out, so an object now at that address starts over.
+void RetireIfDead(CanaryRegistry* registry,
+                  std::unordered_map<void*, std::shared_ptr<CanaryRecord>>::iterator it) {
+  if (it->second->ObjectAlive()) {
+    return;
+  }
+  it->second->died.store(true, std::memory_order_release);
+  registry->dead.push_back(std::move(it->second));
+  registry->records.erase(it);
+  registry->count.fetch_sub(1, std::memory_order_relaxed);
 }
 
 // The state object of the holder, if it has one.
@@ -189,22 +277,36 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
       if (registry->closed) {
         return false;
       }
+      auto existing = registry->records.find((__bridge void*)object);
+      if (existing != registry->records.end()) {
+        RetireIfDead(registry.get(), existing);
+      }
       std::shared_ptr<CanaryRecord>& slot = registry->records[(__bridge void*)object];
       if (slot == nullptr) {
-        slot = std::make_shared<CanaryRecord>();
-        slot->state.Reset(isolate, Object::New(isolate, Null(isolate), nullptr, nullptr, 0));
+        auto record = std::make_shared<CanaryRecord>();
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
+        if (objc_initWeakOrNil(&record->object, object) == nil) {
+          // The class refuses weak references.
+          registry->records.erase((__bridge void*)object);
+          return false;
+        }
+#endif
+        record->state.Reset(isolate, Object::New(isolate, Null(isolate), nullptr, nullptr, 0));
+        slot = std::move(record);
         registry->count.fetch_add(1, std::memory_order_relaxed);
         created = true;
       }
       canary->canaryRecord_ = slot;
     }
     if (created) {
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
       TNSCanaryLifecycleToken* token = [[TNSCanaryLifecycleToken alloc] init];
       token->registry_ = registry;
       token->object_ = (__bridge void*)object;
       objc_setAssociatedObject(object, &registry->associationKey, token,
                                OBJC_ASSOCIATION_RETAIN_NONATOMIC);
       [token release];
+#endif
       if (ObjectManager::LifetimeStats* stats = ObjectManager::GetLifetimeStats(isolate)) {
         stats->canaryStates++;
       }
@@ -340,6 +442,30 @@ Intercepted Descriptor(Local<v8::Name> property, const PropertyCallbackInfo<Valu
   return Intercepted::kYes;
 }
 
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
+// Posts a sweep after each major collection: dead objects' weak references are
+// zeroed by then. Only posts; the GC is no place to reset handles.
+void PostSweepAfterGC(Isolate* isolate, GCType, GCCallbackFlags) {
+  CanaryState* state = Caches::StateFor<CanaryState>(isolate);
+  if (state == nullptr || state->registry->count.load(std::memory_order_relaxed) == 0) {
+    return;
+  }
+  std::shared_ptr<CanaryRegistry> registry = state->registry;
+  std::shared_ptr<EventLoop> loop = registry->loop.lock();
+  {
+    std::lock_guard<std::mutex> lock(registry->mutex);
+    if (registry->sweepPosted || loop == nullptr) {
+      return;
+    }
+    registry->sweepPosted = true;
+  }
+  if (!loop->PostInternal([registry]() { Sweep(registry); })) {
+    std::lock_guard<std::mutex> lock(registry->mutex);
+    registry->sweepPosted = false;
+  }
+}
+#endif
+
 }  // namespace
 
 void WrapperLifetimeCanary::Init(Isolate* isolate) {
@@ -354,6 +480,10 @@ void WrapperLifetimeCanary::Init(Isolate* isolate) {
   if (Runtime* runtime = Runtime::GetRuntime(isolate)) {
     state->registry->loop = runtime->GetEventLoop();
   }
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
+  isolate->AddGCPrologueCallback(
+      PostSweepAfterGC, static_cast<GCType>(kGCTypeMarkSweepCompact | kGCTypeIncrementalMarking));
+#endif
 }
 
 void WrapperLifetimeCanary::ConfigureInstanceTemplate(Local<ObjectTemplate> instanceTemplate) {
@@ -372,7 +502,12 @@ std::shared_ptr<CanaryRecord> WrapperLifetimeCanary::Find(Isolate* isolate, id o
   }
   std::lock_guard<std::mutex> lock(state->registry->mutex);
   auto it = state->registry->records.find((__bridge void*)object);
-  return it != state->registry->records.end() ? it->second : nullptr;
+  if (it == state->registry->records.end()) {
+    return nullptr;
+  }
+  std::shared_ptr<CanaryRecord> record = it->second;
+  RetireIfDead(state->registry.get(), it);
+  return record->ObjectAlive() ? record : nullptr;
 }
 
 void WrapperLifetimeCanary::CloseForTeardown(Isolate* isolate) {
