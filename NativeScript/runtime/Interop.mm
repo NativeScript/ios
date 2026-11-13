@@ -1363,6 +1363,12 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     auto cache = Caches::Get(isolate);
     auto poInstance = ArgConverter::FindCachedInstance(isolate, cache, result);
     if (poInstance != nullptr) {
+      // The Instances entry holds its own reference. An initializer is left
+      // alone: the reference it returns is the one it consumed from its
+      // receiver, which an Instances entry may own.
+      if (ownsReturnedObject) {
+        [result release];
+      }
       return poInstance->Get(isolate);
     }
 
@@ -1867,8 +1873,8 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     }
 
     ObjCDataWrapper* wrapper = new ObjCDataWrapper((id)e);
-    Local<Value> nativeWrapper =
-        ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true);
+    Local<Value> nativeWrapper = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>());
+    tns::DeleteWrapperIfUnused(isolate, nativeWrapper, wrapper);
     jsErrObj->Set(context, tns::ToV8String(isolate, "nativeException"), nativeWrapper)
         .FromMaybe(false);
 
@@ -1911,8 +1917,8 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
 
       // Wrap the native NSError instance into a JS object and attach as nativeException
       ObjCDataWrapper* wrapper = new ObjCDataWrapper(error);
-      Local<Value> nativeWrapper =
-          ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true);
+      Local<Value> nativeWrapper = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>());
+      tns::DeleteWrapperIfUnused(isolate, nativeWrapper, wrapper);
       jsErrObj->Set(context, tns::ToV8String(isolate, "nativeException"), nativeWrapper)
           .FromMaybe(false);
 

@@ -12,10 +12,39 @@
 #include "Runtime.h"
 #include "RuntimeConfig.h"
 
+// Exported by libobjc; not declared in a public header for MRC code.
+extern "C" id objc_initWeakOrNil(id* location, id value);
+extern "C" void objc_destroyWeak(id* location);
+
 using namespace v8;
 using namespace std;
 
 namespace tns {
+
+namespace {
+
+// Also true for instances of the rare classes that refuse weak references.
+bool IsDeallocating(id obj) {
+  id slot = nil;
+  objc_initWeakOrNil(&slot, obj);
+  bool deallocating = slot == nil;
+  objc_destroyWeak(&slot);
+  return deallocating;
+}
+
+struct TransientSelf {
+  Global<Object> handle;
+  ObjCDataWrapper* wrapper;
+};
+
+void DisposeTransientSelf(const WeakCallbackInfo<TransientSelf>& info) {
+  TransientSelf* transient = info.GetParameter();
+  transient->handle.Reset();
+  delete transient->wrapper;
+  delete transient;
+}
+
+}  // namespace
 
 void ArgConverter::Init(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
@@ -358,9 +387,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
       if (it != cache->Instances.end()) {
         thiz = it->second->Get(data->isolateWrapper_.Isolate()).As<Object>();
       } else {
-        ObjCDataWrapper* wrapper = new ObjCDataWrapper(self_);
-        thiz = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true).As<Object>();
-        tns::DeleteWrapperIfUnused(isolate, thiz, wrapper);
+        thiz = ArgConverter::WrapNativeCallbackSelf(context, self_);
       }
     }
 
@@ -1067,6 +1094,36 @@ const ProtocolMeta* ArgConverter::FindProtocolMeta(Protocol* protocol) {
   tns::Assert(meta->type() == MetaType::ProtocolType);
   const ProtocolMeta* protocolMeta = static_cast<const ProtocolMeta*>(meta);
   return protocolMeta;
+}
+
+Local<Object> ArgConverter::WrapNativeCallbackSelf(Local<Context> context, id self) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  auto cache = Caches::Get(isolate);
+  ObjCDataWrapper* wrapper = new ObjCDataWrapper(self);
+
+  if (IsDeallocating(self)) {
+    // Called from -dealloc: a retain cannot keep the object alive, so the
+    // wrapper is neither cached nor owning.
+    Local<Object> receiver = NewEmptyInstance(context, cache->EmptyObjCtorFunc.get());
+    CreateJsWrapper(context, wrapper, receiver);
+    auto* transient = new TransientSelf{Global<Object>(isolate, receiver), wrapper};
+    transient->handle.SetWeak(transient, DisposeTransientSelf, WeakCallbackType::kParameter);
+    return receiver;
+  }
+
+  Local<Object> result = CreateJsWrapper(context, wrapper, Local<Object>()).As<Object>();
+  if (tns::DeleteWrapperIfUnused(isolate, result, wrapper)) {
+    return result;
+  }
+  // Native code usually still holds the object (it is mid-initialization or
+  // owned by whoever called in), and its JS state must outlive this call: the
+  // handle stays strong until the Instances entry is the object's only owner.
+  auto it = cache->Instances.find(self);
+  if (it != cache->Instances.end() && it->second->IsWeak()) {
+    ObjectManager::ManageOwnership(isolate, wrapper,
+                                   it->second->ClearWeak<ObjectWeakCallbackState>());
+  }
+  return result;
 }
 
 std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyObject(Local<Context> context,

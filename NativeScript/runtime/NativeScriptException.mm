@@ -124,7 +124,13 @@ NativeScriptException::NativeScriptException(Isolate* isolate, Local<Value> jsEr
   this->name_ = "NativeScriptException";
 }
 
-NativeScriptException::~NativeScriptException() { delete this->javascriptException_; }
+NativeScriptException::~NativeScriptException() {
+  // Deleting a Persistent does not release its V8 handle.
+  if (this->javascriptException_ != nullptr) {
+    this->javascriptException_->Reset();
+    delete this->javascriptException_;
+  }
+}
 
 void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Value> error) {
   @try {

@@ -54,6 +54,9 @@ class ArgConverter {
           std::vector<std::string>());
   static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyObject(
       v8::Local<v8::Context> context, bool skipGCRegistration = false);
+  // The JS `this` for native code calling a JS-implemented method on an
+  // object JS has no wrapper for yet.
+  static v8::Local<v8::Object> WrapNativeCallbackSelf(v8::Local<v8::Context> context, id self);
   static const Meta* FindMeta(Class klass,
                               const TypeEncoding* typeEncoding = nullptr);
   // Looks up the JS wrapper cached for `target` in Caches::Instances, dropping

@@ -332,7 +332,11 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
                 BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
                 if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
                   ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                  objcWrapper->GcProtect();
+                  if (objcWrapper->OwnershipState() != nullptr) {
+                    ObjectManager::ReconcileOwnership(isolate, objcWrapper);
+                  } else {
+                    objcWrapper->GcProtect();
+                  }
                 }
               }
             };
@@ -341,7 +345,10 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
               // like the performed block it replaces
               runtime->GetEventLoop()->PostInternalBare(gcProtect);
             } else {
+              // After the retain: reconciling reads the new retain count.
+              id result = retain(self, @selector(retain));
               gcProtect();
+              return result;
             }
           }
 
@@ -371,7 +378,11 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
                   BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
                   if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
                     ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                    objcWrapper->GcUnprotect();
+                    if (objcWrapper->OwnershipState() != nullptr) {
+                      ObjectManager::ReconcileOwnership(isolate, objcWrapper);
+                    } else {
+                      objcWrapper->GcUnprotect();
+                    }
                   }
                 }
               }
@@ -383,21 +394,11 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
               // like the performed block it replaces
               runtime->GetEventLoop()->PostInternalBare(gcUnprotect);
             } else {
-              auto innerCache = isolateWrapper.GetCache();
-              auto it = innerCache->Instances.find(self);
-              if (it != innerCache->Instances.end()) {
-                v8::Locker locker(isolate);
-                Isolate::Scope isolate_scope(isolate);
-                HandleScope handle_scope(isolate);
-                if (it->second != nullptr) {
-                  Local<Value> value = it->second->Get(isolate);
-                  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
-                  if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-                    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                    objcWrapper->GcUnprotect();
-                  }
-                }
-              }
+              // After the release: reconciling reads the new retain count, and
+              // the Instances entry still holds the object.
+              release(self, @selector(release));
+              gcUnprotect();
+              return;
             }
           }
 
