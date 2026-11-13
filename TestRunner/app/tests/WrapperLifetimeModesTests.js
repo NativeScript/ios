@@ -1,11 +1,14 @@
 // Wrapper lifetime under the configured mode ("wrapperLifetime" in the app
-// config). The suite runs under the default mode; the rooted expectations run
-// when the TestRunner app is configured with "mode": "rooted".
+// config). The suite runs under the default mode; the other expectations run
+// when the TestRunner app is configured with "mode": "rooted" or "canary".
 describe("Wrapper lifetime modes", function () {
     var runtime = require("ns:runtime");
     var mode = runtime.getConfig("wrapperLifetimeMode");
     var scope = runtime.getConfig("wrapperLifetimeScope");
     var rooted = mode === "rooted";
+    var canary = mode === "canary";
+    // JS state on a natively owned object survives its wrapper's death.
+    var keepsState = rooted || canary;
 
     var Extended = (function (_super) {
         __extends(Extended, _super);
@@ -17,6 +20,18 @@ describe("Wrapper lifetime modes", function () {
 
     function scrub(n) {
         return n > 0 ? scrub(n - 1) + n : 0;
+    }
+
+    // Watches specific objects without retaining them; unlike the dealloc log,
+    // it ignores objects earlier specs left to the collector.
+    function watch(obj) {
+        var table = NSHashTable.weakObjectsHashTable();
+        table.addObject(obj);
+        return table;
+    }
+
+    function alive(table) {
+        return table.allObjects.count;
     }
 
     function deallocs() {
@@ -45,7 +60,7 @@ describe("Wrapper lifetime modes", function () {
 
     // The name carries the mode so a run's log shows which one it exercised.
     it("reports the configured mode and scope (" + mode + "/" + scope + ")", function () {
-        expect(["resurrecting", "rooted"].indexOf(mode)).not.toBe(-1);
+        expect(["resurrecting", "rooted", "canary"].indexOf(mode)).not.toBe(-1);
         expect(["extended", "all"].indexOf(scope)).not.toBe(-1);
         expect(function () {
             runtime.setConfig("wrapperLifetimeMode", "rooted");
@@ -61,7 +76,7 @@ describe("Wrapper lifetime modes", function () {
         })();
         settle(2, function () {
             var holder = owner.objectAtIndex(0);
-            if (rooted) {
+            if (keepsState) {
                 expect(holder.state).toBeDefined();
                 expect(function () {
                     holder.state.item.isEqual(null);
@@ -71,7 +86,7 @@ describe("Wrapper lifetime modes", function () {
         });
     });
 
-    it("keeps the JS state of a natively owned plain object when every wrapper is rooted", function (done) {
+    it("keeps the JS state of a natively owned plain object when every wrapper is in scope", function (done) {
         var owner = NSMutableArray.new();
         (function () {
             var obj = TNSAllocLog.new();
@@ -80,7 +95,7 @@ describe("Wrapper lifetime modes", function () {
         })();
         settle(2, function () {
             var obj = owner.objectAtIndex(0);
-            if (rooted && scope === "all") {
+            if (keepsState && scope === "all") {
                 expect(obj.state && obj.state.value).toBe(42);
             }
             done();
@@ -167,7 +182,7 @@ describe("Wrapper lifetime modes", function () {
         })();
         settle(2, function () {
             var view = cell.owner.deref();
-            if (rooted && view !== undefined) {
+            if (keepsState && view !== undefined) {
                 expect(function () {
                     view.color.isEqual(null);
                     view.nativeView.isEqual(null);
@@ -198,7 +213,7 @@ describe("Wrapper lifetime modes", function () {
         })();
         settle(2, function () {
             expect(owner.count).toBe(4);
-            if (rooted) {
+            if (keepsState) {
                 expect(owner.objectAtIndex(0).state).toBe(0);
             }
             done();
@@ -220,7 +235,7 @@ describe("Wrapper lifetime modes", function () {
         });
     });
 
-    it("counts rooted-mode activity", function (done) {
+    it("counts phantom-mode activity", function (done) {
         var before = runtime.getWrapperLifetimeStats();
         (function () {
             for (var i = 0; i < 8; i++) {
@@ -229,7 +244,7 @@ describe("Wrapper lifetime modes", function () {
         })();
         settle(2, function () {
             var after = runtime.getWrapperLifetimeStats();
-            if (rooted) {
+            if (mode !== "resurrecting") {
                 expect(after.queuedReleases).toBeGreaterThan(before.queuedReleases);
                 expect(after.resurrections).toBe(before.resurrections);
             } else {
@@ -237,5 +252,157 @@ describe("Wrapper lifetime modes", function () {
             }
             done();
         });
+    });
+
+    // Own-property semantics hold whatever the mode: in canary mode the names
+    // live on the state object and the canary's interceptors present them.
+    it("keeps own-property semantics for JS properties on a native object", function () {
+        var obj = Extended.new();
+        obj.a = 1;
+        Object.defineProperty(obj, "hidden", { value: 2, enumerable: false, configurable: true });
+        Object.defineProperty(obj, "self", {
+            get: function () {
+                return this;
+            },
+            configurable: true
+        });
+
+        expect(Object.keys(obj)).toEqual(["a"]);
+        expect(Object.getOwnPropertyNames(obj).sort()).toEqual(["a", "hidden", "self"]);
+        expect("a" in obj).toBe(true);
+        expect(Object.prototype.hasOwnProperty.call(obj, "hidden")).toBe(true);
+        expect(obj.hidden).toBe(2);
+        expect(obj.self).toBe(obj);
+        expect(Object.getOwnPropertyDescriptor(obj, "a").value).toBe(1);
+
+        expect(delete obj.a).toBe(true);
+        expect("a" in obj).toBe(false);
+        expect(obj.a).toBeUndefined();
+        // Prototype members are not own properties.
+        expect(Object.prototype.hasOwnProperty.call(obj, "isEqual")).toBe(false);
+    });
+
+    it("hands back a native object's JS properties on a new wrapper after the old one died", function (done) {
+        var owner = NSMutableArray.new();
+        (function () {
+            var obj = Extended.new();
+            obj.tag = "kept";
+            owner.addObject(obj);
+        })();
+        settle(2, function () {
+            var obj = owner.objectAtIndex(0);
+            if (keepsState) {
+                expect(obj.tag).toBe("kept");
+            }
+            done();
+        });
+    });
+
+    it("leaves plain objects outside the extended scope without forwarding", function (done) {
+        var owner = NSMutableArray.new();
+        (function () {
+            var obj = TNSAllocLog.new();
+            obj.tag = "lost";
+            owner.addObject(obj);
+        })();
+        settle(2, function () {
+            if (canary && scope === "extended") {
+                expect(owner.objectAtIndex(0).tag).toBeUndefined();
+            }
+            done();
+        });
+    });
+
+    it("lets a native object's JS state go when the object is deallocated", function (done) {
+        var owner = NSMutableArray.new();
+        var before = runtime.getWrapperLifetimeStats();
+        var watched;
+        (function () {
+            var obj = Extended.new();
+            obj.tag = "state";
+            owner.addObject(obj);
+            watched = watch(obj);
+        })();
+        settle(2, function () {
+            owner.removeAllObjects();
+            settle(3, function () {
+                var after = runtime.getWrapperLifetimeStats();
+                expect(alive(watched)).toBe(0);
+                if (canary) {
+                    expect(after.canaryStates).toBeGreaterThan(before.canaryStates);
+                    expect(after.canaryNativeDeaths).toBeGreaterThan(before.canaryNativeDeaths);
+                }
+                done();
+            });
+        });
+    });
+
+    // Plain objects have no class -dealloc of ours: an associated token or a
+    // weak-reference sweep reports them.
+    it("lets a plain native object's JS state go when the object is deallocated", function (done) {
+        var owner = NSMutableArray.new();
+        var before = runtime.getWrapperLifetimeStats();
+        var watched;
+        (function () {
+            var obj = TNSAllocLog.new();
+            obj.tag = "state";
+            owner.addObject(obj);
+            watched = watch(obj);
+        })();
+        settle(2, function () {
+            owner.removeAllObjects();
+            settle(3, function () {
+                var after = runtime.getWrapperLifetimeStats();
+                expect(alive(watched)).toBe(0);
+                if (canary && scope === "all") {
+                    expect(after.canaryNativeDeaths).toBeGreaterThan(before.canaryNativeDeaths);
+                }
+                done();
+            });
+        });
+    });
+
+    // The documented cost of the canary contract: state that references its own
+    // object keeps the state, the object's wrapper and the native object alive
+    // until native code would have released it anyway, which nothing does here.
+    it("keeps a native object whose JS state references it", function (done) {
+        var watched;
+        (function () {
+            var obj = Extended.new();
+            obj.callback = function () {
+                return obj;
+            };
+            watched = watch(obj);
+        })();
+        settle(3, function () {
+            expect(alive(watched)).toBe(canary ? 1 : 0);
+            done();
+        });
+    });
+
+    // Third-party code can strip a live object's associations. Where an
+    // associated token reports native death, the state goes with it; where a
+    // weak-reference sweep does, nothing changes.
+    it("survives a live object's associations being removed", function () {
+        if (typeof objc_removeAssociatedObjects !== "function") {
+            return;
+        }
+        var obj = Extended.new();
+        obj.tag = "first";
+        objc_removeAssociatedObjects(obj);
+        expect([undefined, "first"]).toContain(obj.tag);
+        obj.tag = "second";
+        expect(obj.tag).toBe("second");
+    });
+
+    // V8 refuses to freeze, seal or prevent extensions on an object with
+    // interceptors, which every canary has.
+    it("refuses to freeze a canary", function () {
+        if (!canary) {
+            return;
+        }
+        expect(function () {
+            Object.freeze(Extended.new());
+        }).toThrowError(TypeError);
     });
 });

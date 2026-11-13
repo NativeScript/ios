@@ -13,6 +13,7 @@
 #include "ObjectManager.h"
 #include "Runtime.h"
 #include "TNSDerivedClass.h"
+#include "WrapperLifetimeCanary.h"
 
 using namespace v8;
 
@@ -82,6 +83,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     tns::Assert(extendedClass != nil, isolate);
     class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
     class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
+    WrapperLifetimeCanary::InstallDeallocHook(extendedClass);
 
     if (!nativeSignature.IsEmpty()) {
       ClassBuilder::ExposeDynamicMembers(context, extendedClass, implementationObject,
@@ -100,6 +102,8 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     Local<FunctionTemplate> extendedClassCtorFuncTemplate =
         FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, ext);
     extendedClassCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+    WrapperLifetimeCanary::ConfigureInstanceTemplate(
+        extendedClassCtorFuncTemplate->InstanceTemplate());
 
     Local<v8::Function> extendClassCtorFunc;
     if (!extendedClassCtorFuncTemplate->GetFunction(context).ToLocal(&extendClassCtorFunc)) {
@@ -226,6 +230,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         tns::Assert(extendedClass != nil, isolate);
         class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
         class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
+        WrapperLifetimeCanary::InstallDeallocHook(extendedClass);
 
         extendedClassName = class_getName(extendedClass);
 

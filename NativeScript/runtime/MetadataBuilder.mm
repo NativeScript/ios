@@ -14,6 +14,7 @@
 #include "SymbolLoader.h"
 #include "Tasks.h"
 #include "Worker.h"
+#include "WrapperLifetimeCanary.h"
 
 using namespace v8;
 
@@ -553,6 +554,7 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
 
   ctorFuncTemplate = FunctionTemplate::New(isolate, ClassConstructorCallback, ext);
   ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+  WrapperLifetimeCanary::ConfigureInstanceTemplate(ctorFuncTemplate->InstanceTemplate());
   ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, meta->name()));
 
   Local<v8::Function> baseCtorFunc;

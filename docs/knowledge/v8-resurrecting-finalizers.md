@@ -223,6 +223,35 @@ installed in this mode. `"scope": "extended"` (default) roots only JS-extended i
 JS-referencing native cycles alive (ARC rules: break them with a `WeakRef`). Specs:
 `WrapperLifetimeModesTests.js`, run under each mode.
 
+`"mode": "canary"` (`WrapperLifetimeCanary.{h,mm}`) is the portable variant, the shape Android and
+the Node-API runtimes can implement. A wrapper in scope is a canary: a phantom-weak JS object
+that dies with its JS references, releasing the runtime's retain through the same queue.
+`kNonMasking` named interceptors on the instance templates forward JS properties to a
+null-prototype state object, so prototype members never reach them. The state is rooted from
+its first write until the native object is deallocated; a canary built later for the same
+object forwards to the same state. Instances of JS-extended classes report their own
+deallocation: the runtime gives each extended class a `-dealloc` that tells every isolate's
+registry, then calls the superclass's. For other objects it is a compile-time choice
+(`NS_CANARY_DEATH_SIGNAL` in `WrapperLifetimeCanary.mm`): by default a token associated with the
+object reports it from its `-dealloc`, immediately and on any thread, but the ObjC runtime aborts
+the process for a class that forbids associated objects, and there is no public query for that;
+the alternative keeps an ObjC weak reference in each record (`objc_initWeakOrNil`, which declines
+instead of aborting for classes that refuse weak references) and sweeps the records after every
+major collection, so state lingers until then. With the default, `"scope": "all"` is
+experimental for that reason; `"extended"` attaches no tokens at all. It cannot be
+rooted at canary death instead, because a state reachable only through the canary is garbage in
+the same collection. The cost: state that references its own object (a closure over `this`)
+keeps it alive. A canary built after a death is a new object, but `===` cannot tell: only one
+canary lives at a time, and anything still referencing the old one would have kept it alive.
+What does notice is whatever keys on the canary without keeping it: `WeakMap` keys and `WeakRef`s
+of the old canary, and native `#private` fields, which are branded on it. Other
+limits: `Object.freeze`, `seal` and `preventExtensions` throw on a canary (V8 refuses them on
+objects with interceptors); index-keyed properties are not forwarded and die with the canary;
+a write through an object whose prototype is a canary lands in the canary's state, since
+interceptors see the holder but not the receiver. Relies on
+V8's own-property lookup through `kNonMasking` interceptors when the prototype has a named
+interceptor (`v8_nonmasking_own_lookup.patch` in v8-buildscripts, crbug 585053531).
+
 Two facts worth knowing when reasoning about which objects can husk:
 
 - `Pointer`/`interop.alloc` objects never husk at runtime — `Caches::PointerInstances`

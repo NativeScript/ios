@@ -19,11 +19,16 @@ enum class WrapperLifetimeMode {
   // Phantom callbacks, no resurrection: a wrapper is a strong root while
   // something other than the runtime retains its object, weak otherwise.
   kRooted,
+  // Phantom callbacks, no resurrection: the wrapper is a canary that dies with
+  // its JS references. JS properties set on it live on a separate state object
+  // that stays alive until the native object is deallocated, and a canary
+  // built for the same object later shares it (WrapperLifetimeCanary).
+  kCanary,
 };
 
 enum class WrapperLifetimeScope {
-  // Only JS-extended instances (TNSDerivedClass) are rooted; other wrappers are
-  // weak and die with their JS references.
+  // Only JS-extended instances (TNSDerivedClass) are rooted, or canaries;
+  // other wrappers are weak and die with their JS references.
   kExtended,
   kAll,
 };

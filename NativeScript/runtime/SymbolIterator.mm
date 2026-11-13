@@ -10,17 +10,18 @@ namespace tns {
 void SymbolIterator::Set(Local<Context> context, Local<Value> object) {
   Isolate* isolate = v8::Isolate::GetCurrent();
 
+  // Iterates its receiver rather than capturing `object`: in the canary
+  // wrapper lifetime mode this property lives on the object's state, which a
+  // reference back to the object would keep alive until native death.
   Local<v8::Function> iterator;
-  bool success = v8::Function::New(
-                     context,
-                     [](const FunctionCallbackInfo<Value>& args) {
-                       Isolate* isolate = args.GetIsolate();
-                       Local<Context> context = isolate->GetCurrentContext();
-                       Local<Value> object = args.Data();
-                       Local<Object> result = CreateIteratorObject(context, object);
-                       args.GetReturnValue().Set(result);
-                     },
-                     object)
+  bool success = v8::Function::New(context,
+                                   [](const FunctionCallbackInfo<Value>& args) {
+                                     Isolate* isolate = args.GetIsolate();
+                                     Local<Context> context = isolate->GetCurrentContext();
+                                     Local<Object> result =
+                                         CreateIteratorObject(context, args.This());
+                                     args.GetReturnValue().Set(result);
+                                   })
                      .ToLocal(&iterator);
   tns::Assert(success, isolate);
 
