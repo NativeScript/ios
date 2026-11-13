@@ -20,14 +20,10 @@ class WorkerInspectorClient;
 
 namespace tns {
 
-// The isolate whose runtime runs on this thread (its event loop's thread),
-// while the runtime is bound here. JS can also run on other threads, any that
-// take the isolate's Locker.
-inline thread_local v8::Isolate* runtimeThreadIsolate = nullptr;
-
-inline bool OnRuntimeThreadOf(v8::Isolate* isolate) {
-  return isolate != nullptr && runtimeThreadIsolate == isolate;
-}
+// Whether the calling thread is the one `isolate`'s runtime runs on (its event
+// loop's thread). JS can also run on other threads, any that take the
+// isolate's Locker. Several runtimes may share a thread. Defined in Runtime.mm.
+bool OnRuntimeThreadOf(v8::Isolate* isolate);
 
 class PrimitiveDataWrapper;
 struct ObjectWeakCallbackState;

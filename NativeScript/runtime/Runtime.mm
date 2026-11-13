@@ -266,6 +266,7 @@ Runtime::Runtime(const RuntimeOptions& options) : workerId_(options.workerId) {
 #endif
   Isolate* isolate = Isolate::New(create_params);
   runtimeLoop_ = CFRunLoopGetCurrent();
+  runtimeThread_ = pthread_self();
   // v8 already asked for this isolate's task runner during Isolate::New, so
   // the registry may hold an unbound loop - or a stopped one, when a worker
   // isolate reuses a disposed isolate's address. Refresh, then attach to this
@@ -278,16 +279,12 @@ Runtime::Runtime(const RuntimeOptions& options) : workerId_(options.workerId) {
   eventLoop_->BindToCurrentThread();
   isolate->SetData(Constants::RUNTIME_SLOT, this);
   isolate_ = isolate;
-  tns::runtimeThreadIsolate = isolate;
 }
 
 Runtime::~Runtime() {
   if (!initialized_) {
     // Never published: no other thread can know this isolate, and it holds no
     // caches, gate or wrappers.
-    if (tns::runtimeThreadIsolate == isolate_) {
-      tns::runtimeThreadIsolate = nullptr;
-    }
     isolate_->Dispose();
     NativeScriptPlatform::Instance()->IsolateDisposed(isolate_, eventLoop_);
     currentRuntime_ = nullptr;
@@ -373,9 +370,6 @@ Runtime::~Runtime() {
     Caches::Remove(this->isolate_);
 
     this->isolate_->SetData(Constants::RUNTIME_SLOT, nullptr);
-    if (tns::runtimeThreadIsolate == this->isolate_) {
-      tns::runtimeThreadIsolate = nullptr;
-    }
 
     // Last, and under the Locker: from here on nothing reads a wrapper through
     // a JS object, so threads that never pinned may free theirs without the
@@ -393,6 +387,14 @@ Runtime::~Runtime() {
   }
 
   currentRuntime_ = nullptr;
+}
+
+bool OnRuntimeThreadOf(v8::Isolate* isolate) {
+  if (isolate == nullptr) {
+    return false;
+  }
+  Runtime* runtime = Runtime::GetRuntime(isolate);
+  return runtime != nullptr && runtime->IsOnRuntimeThread();
 }
 
 Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {
