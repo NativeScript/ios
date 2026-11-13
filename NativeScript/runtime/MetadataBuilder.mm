@@ -1,5 +1,7 @@
 #include "MetadataBuilder.h"
 #include <Foundation/Foundation.h>
+#include <algorithm>
+#include <map>
 #include "ArgConverter.h"
 #include "Caches.h"
 #include "Constants.h"
@@ -532,12 +534,15 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
   Local<FunctionTemplate> ctorFuncTemplate;
   auto cache = Caches::Get(isolate);
 
-  if (additionalProtocols.empty()) {
-    auto it = cache->CtorFuncTemplates.find(meta);
-    if (it != cache->CtorFuncTemplates.end()) {
-      ctorFuncTemplate = it->second->Get(isolate);
-      return ctorFuncTemplate;
-    }
+  if (!additionalProtocols.empty()) {
+    return MetadataBuilder::GetOrCreateProtocolBindingTemplate(context, meta, pair,
+                                                               additionalProtocols);
+  }
+
+  auto cached = cache->CtorFuncTemplates.find(meta);
+  if (cached != cache->CtorFuncTemplates.end()) {
+    ctorFuncTemplate = cached->second->Get(isolate);
+    return ctorFuncTemplate;
   }
 
   std::string className;
@@ -660,6 +665,105 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
   cache->Prototypes.emplace(meta, poPrototype);
 
   return ctorFuncTemplate;
+}
+
+namespace {
+
+struct ProtocolBindings {
+  std::map<std::pair<const BaseClassMeta*, std::vector<std::string>>, Global<FunctionTemplate>>
+      templates;
+};
+
+// The instance member names the class's own binding registers, so a
+// protocol member the class already has keeps the class's definition.
+void CollectInstanceMemberNames(const BaseClassMeta* meta, KnownUnknownClassPair pair,
+                                bool ownMembers,
+                                robin_hood::unordered_map<std::string, uint8_t>& names) {
+  if (ownMembers) {
+    for (auto it = meta->instanceMethods->begin(); it != meta->instanceMethods->end(); it++) {
+      const MethodMeta* methodMeta = (*it).valuePtr();
+      if (methodMeta->isAvailableInClasses(pair, false)) {
+        names.emplace(methodMeta->name(), 0);
+      }
+    }
+    for (auto it = meta->instanceProps->begin(); it != meta->instanceProps->end(); it++) {
+      const PropertyMeta* propMeta = (*it).valuePtr();
+      if (propMeta->isAvailableInClasses(pair, false)) {
+        names.emplace(propMeta->name(), 0);
+      }
+    }
+    for (auto it = meta->protocols->begin(); it != meta->protocols->end(); it++) {
+      const Meta* protocolMeta = ArgConverter::GetMeta((*it).valuePtr());
+      if (protocolMeta != nullptr && protocolMeta->type() == MetaType::ProtocolType) {
+        CollectInstanceMemberNames(static_cast<const BaseClassMeta*>(protocolMeta), pair, true,
+                                   names);
+      }
+    }
+  }
+  if (meta->type() != MetaType::Interface) {
+    return;
+  }
+  const char* baseName = static_cast<const InterfaceMeta*>(meta)->baseName();
+  if (baseName == nullptr) {
+    return;
+  }
+  const Meta* baseMeta = ArgConverter::GetMeta(baseName);
+  if (baseMeta != nullptr && baseMeta->type() == MetaType::Interface) {
+    CollectInstanceMemberNames(static_cast<const BaseClassMeta*>(baseMeta), pair,
+                               baseMeta->isAvailable(), names);
+  }
+}
+
+}  // namespace
+
+Local<FunctionTemplate> MetadataBuilder::GetOrCreateProtocolBindingTemplate(
+    Local<Context> context, const BaseClassMeta* meta, KnownUnknownClassPair pair,
+    const std::vector<std::string>& additionalProtocols) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  std::vector<std::string> protocols = additionalProtocols;
+  std::sort(protocols.begin(), protocols.end());
+  protocols.erase(std::unique(protocols.begin(), protocols.end()), protocols.end());
+
+  ProtocolBindings* bindings = Caches::StateFor<ProtocolBindings>(isolate);
+  std::pair<const BaseClassMeta*, std::vector<std::string>> key(meta, protocols);
+  if (bindings != nullptr) {
+    auto it = bindings->templates.find(key);
+    if (it != bindings->templates.end()) {
+      return it->second.Get(isolate);
+    }
+  }
+
+  Local<FunctionTemplate> classTemplate =
+      MetadataBuilder::GetOrCreateConstructorFunctionTemplate(context, meta, pair);
+  robin_hood::unordered_map<std::string, uint8_t> names;
+  CollectInstanceMemberNames(meta, pair, true, names);
+
+  Local<FunctionTemplate> bindingTemplate = FunctionTemplate::New(isolate);
+  bindingTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+  bindingTemplate->SetClassName(tns::ToV8String(isolate, meta->name()));
+  bindingTemplate->Inherit(classTemplate);
+  MetadataBuilder::RegisterAdditionalProtocols(context, bindingTemplate, pair, protocols, names);
+
+  Local<v8::Function> bindingFunc;
+  Local<v8::Function> classFunc;
+  Local<Value> prototype;
+  bool success = bindingTemplate->GetFunction(context).ToLocal(&bindingFunc) &&
+                 classTemplate->GetFunction(context).ToLocal(&classFunc) &&
+                 bindingFunc->Get(context, tns::ToV8String(isolate, "prototype"))
+                     .ToLocal(&prototype) &&
+                 prototype->IsObject();
+  tns::Assert(success, isolate);
+  // Instances report the class's constructor, which is the one published
+  // globally and the one subclasses extend.
+  prototype.As<Object>()
+      ->DefineOwnProperty(context, tns::ToV8String(isolate, "constructor"), classFunc,
+                          PropertyAttribute::DontEnum)
+      .FromMaybe(false);
+
+  if (bindings != nullptr) {
+    bindings->templates.emplace(std::move(key), Global<FunctionTemplate>(isolate, bindingTemplate));
+  }
+  return bindingTemplate;
 }
 
 void MetadataBuilder::ToStringFunctionCallback(const FunctionCallbackInfo<Value>& info) {
