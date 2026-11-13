@@ -362,25 +362,16 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     Interop::SetValue(dest, sel_registerName(str.c_str()));
   } else if (typeEncoding->type == BinaryTypeEncodingType::CStringEncoding) {
     if (arg->IsString()) {
-      const char* value = nullptr;
-      Local<v8::String> strArg = arg.As<v8::String>();
-      if (strArg->IsExternalOneByte()) {
-        const v8::String::ExternalOneByteStringResource* resource =
-            strArg->GetExternalOneByteStringResource();
-        value = resource->data();
-      } else {
-        v8::String::Utf8Value utf8Value(isolate, arg);
-        value = strdup(*utf8Value);
-        // The external string only ties the strdup'd buffer's lifetime to the
-        // GC; it is never read as a string, and its one-byte (Latin-1) content
-        // matches the UTF-8 buffer only for ASCII. Length is the buffer's byte
-        // count, excluding the NUL.
-        OneByteStringResource* resource =
-            new OneByteStringResource(value, (size_t)utf8Value.length());
-        bool success = v8::String::NewExternalOneByte(isolate, resource).ToLocal(&arg);
-        tns::Assert(success, isolate);
-      }
-      Interop::SetValue(dest, value);
+      // Always copy: an external one-byte string's resource (e.g. one made by
+      // node_api_create_external_string_latin1) holds Latin-1 with no NUL
+      // terminator, so its data can't be handed to native code as a C string.
+      OneByteStringResource* resource =
+          OneByteStringResource::NewUtf8Copy(isolate, arg.As<v8::String>());
+      // The external string only ties the copy's lifetime to the GC; it is
+      // never read as a string.
+      bool success = v8::String::NewExternalOneByte(isolate, resource).ToLocal(&arg);
+      tns::Assert(success, isolate);
+      Interop::SetValue(dest, resource->data());
     } else {
       BaseDataWrapper* wrapper = tns::GetValue(isolate, arg);
       if (wrapper == nullptr) {

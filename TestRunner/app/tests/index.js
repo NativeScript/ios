@@ -94,7 +94,7 @@ global.__JUnitSaveResults = function (text) {
 
 global.__approot = NSString.stringWithString(NSBundle.mainBundle.bundlePath).stringByResolvingSymlinksInPath;
 
-require("../Infrastructure/Jasmine/jasmine-2.0.1/boot");
+var jasmineBoot = require("../Infrastructure/Jasmine/boot");
 
 require("./Marshalling/Primitives/Function");
 require("./Marshalling/Primitives/Static");
@@ -217,6 +217,6 @@ require("../shared/index").runAllTests();
 // These can be turned on manually to verify if needed anytime
 //require("./sdks/MusicKit");
 
-execute();
+jasmineBoot.execute();
 
 UIApplicationMain(0, null, null, null);

@@ -4,18 +4,23 @@
 set -e
 
 usage() {
-  echo "Usage: ./scripts/install-ci-deps.sh [--test-tools]"
+  echo "Usage: ./scripts/install-ci-deps.sh [--test-tools] [--ccache]"
   echo ""
-  echo "  --test-tools  also install xcparse and the JUnit report tools used by the"
-  echo "                test jobs"
+  echo "  --test-tools  also install the JUnit report tools used by the test jobs"
+  echo "  --ccache      also install ccache"
   echo "  -h, --help    show this help"
 }
 
 TEST_TOOLS=0
+CCACHE=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --test-tools)
       TEST_TOOLS=1
+      shift
+      ;;
+    --ccache)
+      CCACHE=1
       shift
       ;;
     -h|--help)
@@ -44,6 +49,9 @@ if [ ! -x /usr/local/bin/cmake ]; then
 fi
 
 if [ "$TEST_TOOLS" = "1" ]; then
-  brew install chargepoint/xcparse/xcparse
   npm install -g junit-cli-report-viewer@2.8.1 verify-junit-xml
+fi
+
+if [ "$CCACHE" = "1" ]; then
+  HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install ccache
 fi

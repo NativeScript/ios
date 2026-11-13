@@ -8,11 +8,48 @@ inputs:
     description: npm registry URL to configure for publishing (optional)
     default: ""
   install-test-tools:
-    description: Also install xcparse and the JUnit report tools ("true"/"false")
+    description: Also install the JUnit report tools ("true"/"false")
     default: "false"
+  ccache:
+    description: >
+      Compile the metadata generator's CMake builds through ccache.
+      "true" restores and saves a cache (pull requests). "seed" compiles into
+      an empty cache that the caller saves under the ccache-key output (main,
+      so pull requests can restore it). "false" disables it. npm_release.yml
+      may only seed: release jobs build shipped binaries and must never restore
+      a cache.
+    default: "false"
+outputs:
+  ccache-key:
+    description: Cache key of the ccache directory, set when ccache is "true" or "seed"
+    value: ${{ steps.ccache-key.outputs.key }}
 runs:
   using: composite
   steps:
+    # Computed before anything is built: hashFiles over metadata-generator/**
+    # would otherwise include the build output.
+    - name: Metadata generator ccache key
+      id: ccache-key
+      if: ${{ inputs.ccache == 'true' || inputs.ccache == 'seed' }}
+      shell: bash
+      run: echo "key=mdgen-ccache-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('metadata-generator/**', 'download_llvm.sh') }}" >> "$GITHUB_OUTPUT"
+    - name: Metadata generator ccache
+      if: ${{ inputs.ccache == 'true' }}
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/ccache
+        key: ${{ steps.ccache-key.outputs.key }}
+        restore-keys: mdgen-ccache-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
+    - name: Route CMake compiles through ccache
+      if: ${{ inputs.ccache == 'true' || inputs.ccache == 'seed' }}
+      shell: bash
+      run: |
+        {
+          echo "CCACHE_DIR=$RUNNER_TEMP/ccache"
+          echo "CCACHE_MAXSIZE=300M"
+          echo "CMAKE_C_COMPILER_LAUNCHER=ccache"
+          echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache"
+        } >> "$GITHUB_ENV"
     - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
       with:
         node-version: ${{ inputs.node-version }}
@@ -26,7 +63,7 @@ runs:
         python-version: "3"
     - name: Install dependencies
       shell: bash
-      run: ./scripts/install-ci-deps.sh ${{ inputs.install-test-tools == 'true' && '--test-tools' || '' }}
+      run: ./scripts/install-ci-deps.sh ${{ inputs.install-test-tools == 'true' && '--test-tools' || '' }} ${{ (inputs.ccache == 'true' || inputs.ccache == 'seed') && '--ccache' || '' }}
     # The V8 libraries and headers are not committed. build_nativescript.sh also
     # calls this, but the test job drives xcodebuild directly, so it belongs in
     # the shared setup rather than in one job. It is a no-op once installed.

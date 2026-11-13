@@ -1032,11 +1032,18 @@ describe("HTTP ESM Loader", function() {
             });
         });
         
-        it("should handle malformed URLs gracefully", function() {
+        it("should handle malformed URLs gracefully", function(done) {
             // The loader should ignore malformed http specifiers
+            var loading;
             expect(function() {
-                import("http://");
+                loading = import("http://");
             }).not.toThrow();
+            loading.then(function() {
+                done();
+            }, function(error) {
+                expect(error.message).toBeDefined();
+                done();
+            });
         });
     });
     

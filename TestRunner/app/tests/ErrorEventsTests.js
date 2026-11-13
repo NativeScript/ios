@@ -1,3 +1,5 @@
+const { raisesGlobalErrors } = require("../Infrastructure/Jasmine/globalErrorSpy");
+
 describe("WHATWG error events", function () {
     // Many tests exercise the global error/rejection path, which ends in the
     // __onUncaughtError shim when a listener does not preventDefault(). Install a
@@ -51,7 +53,7 @@ describe("WHATWG error events", function () {
         }, 25);
     }
 
-    it("reportError fires an 'error' listener with an ErrorEvent carrying error and message", function (done) {
+    it("reportError fires an 'error' listener with an ErrorEvent carrying error and message", raisesGlobalErrors(function (done) {
         const err = new Error("x");
         let received = null;
         onGlobal("error", function (e) {
@@ -74,9 +76,9 @@ describe("WHATWG error events", function () {
             expect(uncaught.indexOf(err)).toBe(-1);
             done();
         });
-    });
+    }));
 
-    it("reportError without preventDefault still invokes __onUncaughtError (back-compat)", function (done) {
+    it("reportError without preventDefault still invokes __onUncaughtError (back-compat)", raisesGlobalErrors(function (done) {
         const err = new Error("back-compat");
         let received = null;
         onGlobal("error", function (e) {
@@ -94,7 +96,7 @@ describe("WHATWG error events", function () {
         expect(typeof err.stackTrace).toBe("string");
         expect(err.stackTrace.length).toBeGreaterThan(0);
         done();
-    });
+    }));
 
     it("reportError throws TypeError when called with no arguments", function () {
         expect(function () {
@@ -102,7 +104,7 @@ describe("WHATWG error events", function () {
         }).toThrowError(TypeError);
     });
 
-    it("an error reported through a native boundary has a combined stackTrace set BEFORE the error event fires", function (done) {
+    it("an error reported through a native boundary has a combined stackTrace set BEFORE the error event fires", raisesGlobalErrors(function (done) {
         // Reading an overridden getter from native routes the JS throw through
         // the C++ boundary reporter (ReportToJsHandlersAndLog), which now sets
         // `error.stackTrace` before dispatching the cancelable `error` event —
@@ -133,9 +135,9 @@ describe("WHATWG error events", function () {
             expect(stackTraceInListener.length).toBeGreaterThan(0);
             done();
         });
-    });
+    }));
 
-    it("unhandledrejection listener receives reason and promise; preventDefault suppresses the shim", function (done) {
+    it("unhandledrejection listener receives reason and promise; preventDefault suppresses the shim", raisesGlobalErrors(function (done) {
         const reason = new Error("rejected");
         let received = null;
         onGlobal("unhandledrejection", function (e) {
@@ -161,9 +163,9 @@ describe("WHATWG error events", function () {
                 done();
             });
         });
-    });
+    }));
 
-    it("an unhandled rejection with no listener still reaches __onUncaughtError", function (done) {
+    it("an unhandled rejection with no listener still reaches __onUncaughtError", raisesGlobalErrors(function (done) {
         const reason = new Error("no-listener-rejection");
         Promise.reject(reason);
 
@@ -172,9 +174,9 @@ describe("WHATWG error events", function () {
             expect(uncaught[0]).toBe(reason);
             done();
         });
-    });
+    }));
 
-    it("fires rejectionhandled when a handler is attached after the rejection was reported", function (done) {
+    it("fires rejectionhandled when a handler is attached after the rejection was reported", raisesGlobalErrors(function (done) {
         const reason = new Error("late-handler");
         let rejectionHandled = null;
         onGlobal("rejectionhandled", function (e) {
@@ -208,7 +210,7 @@ describe("WHATWG error events", function () {
                 });
             }, 20);
         });
-    });
+    }));
 
     describe("constructors and EventTarget semantics", function () {
         it("Event is spec-sane and cancelable via preventDefault", function () {
@@ -307,7 +309,7 @@ describe("WHATWG error events", function () {
         });
     });
 
-    it("reportError still fires listeners after globalThis.dispatchEvent is overwritten", function (done) {
+    it("reportError still fires listeners after globalThis.dispatchEvent is overwritten", raisesGlobalErrors(function (done) {
         const err = new Error("resilient");
         let received = null;
         onGlobal("error", function (e) {
@@ -329,5 +331,5 @@ describe("WHATWG error events", function () {
             expect(uncaught.indexOf(err)).toBe(-1);
             done();
         });
-    });
+    }));
 });
