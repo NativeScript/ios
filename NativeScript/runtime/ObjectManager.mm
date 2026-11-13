@@ -164,10 +164,6 @@ void ObjectManager::DisposeAllRegistered(Isolate* isolate) {
   // claim every state up front: disposing one entry can re-enter JS from
   // -dealloc and reach __releaseNativeCounterpart for any other entry this
   // walk still owns.
-  if (OwnershipTracking* tracking = Caches::StateFor<OwnershipTracking>(isolate)) {
-    tracking->managed.clear();
-  }
-
   ObjectWeakCallbackState* state = cache->ObjectManagedValues;
   cache->ObjectManagedValues = nullptr;
   for (ObjectWeakCallbackState* claimed = state; claimed != nullptr; claimed = claimed->next_) {
@@ -219,7 +215,7 @@ void ObjectManager::ReconcileOwnership(Isolate* isolate, ObjCDataWrapper* wrappe
   // The handle's strength carries the ownership; a GcProtect from the retain
   // swizzle would keep a weak handle from ever being disposed.
   wrapper->GcUnprotect();
-  ApplyOwnership(state, ObjectManager::GetRetainCount(wrapper->Data()) > 1);
+  ApplyOwnership(state, NativelyOwnedWithoutJS(wrapper->Data()));
 }
 
 void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackState>& data) {
@@ -257,6 +253,16 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
 
   state->target_->ClearWeak<void>();
   state->target_->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
+
+  // Refused because native code took the object back: keep the handle strong
+  // rather than resurrecting it at every collection.
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+  if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+    if (objcWrapper->OwnershipState() == state) {
+      ApplyOwnership(state, NativelyOwnedWithoutJS(objcWrapper->Data()));
+    }
+  }
 }
 
 bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFinalDisposal) {
@@ -289,8 +295,7 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
   // to making it strong again.
   if (!isFinalDisposal && wrapper->Type() == WrapperType::ObjCObject) {
     ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-    if (objcWrapper->OwnershipState() != nullptr &&
-        ObjectManager::GetRetainCount(objcWrapper->Data()) > 1) {
+    if (objcWrapper->OwnershipState() != nullptr && NativelyOwnedWithoutJS(objcWrapper->Data())) {
       return false;
     }
   }
@@ -445,15 +450,36 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
   }
 
   ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+  if (objcWrapper->IsBorrowed()) {
+    if (tns::GetValue(isolate, value) == wrapper) {
+      tns::SetValue(isolate, value.As<Object>(), nullptr);
+      delete wrapper;
+    }
+    return;
+  }
+
   id data = objcWrapper->Data();
   if (data != nil) {
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     auto it = cache->Instances.find(data);
-    if (it != cache->Instances.end()) {
+    if (ObjectWeakCallbackState* managed = objcWrapper->OwnershipState()) {
+      // The handle ReconcileOwnership manages is this wrapper's own, whatever
+      // Instances maps the object to now.
+      if (managed->disposing_) {
+        return;
+      }
+      if (it != cache->Instances.end() && it->second == managed->target_) {
+        cache->Instances.erase(it);
+      }
+      managed->target_->Reset();
+      UnlinkRegistered(managed);
+      ForgetOwnership(isolate, managed);
+      delete managed;
+      objcWrapper->SetOwnershipState(nullptr);
+    } else if (it != cache->Instances.end()) {
       std::shared_ptr<Persistent<Value>> handle = it->second;
-      ObjectWeakCallbackState* state = handle->IsWeak()
-                                           ? handle->ClearWeak<ObjectWeakCallbackState>()
-                                           : objcWrapper->OwnershipState();
+      ObjectWeakCallbackState* state =
+          handle->IsWeak() ? handle->ClearWeak<ObjectWeakCallbackState>() : nullptr;
       if (state != nullptr && state->disposing_) {
         // Reached from a -dealloc running inside this handle's own finalizer:
         // that frame already released the native counterpart and owns the

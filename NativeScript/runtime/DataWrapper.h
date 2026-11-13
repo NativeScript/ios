@@ -423,8 +423,14 @@ class ObjCDataWrapper : public BaseDataWrapper {
   ObjectWeakCallbackState* OwnershipState() { return this->ownershipState_; }
   void SetOwnershipState(ObjectWeakCallbackState* state) { this->ownershipState_ = state; }
 
+  // A wrapper that holds no reference to its object (one made for an object
+  // already deallocating), so nothing may release on its behalf.
+  bool IsBorrowed() { return this->borrowed_; }
+  void MarkBorrowed() { this->borrowed_ = true; }
+
  private:
   bool adapterClaim_ = false;
+  bool borrowed_ = false;
   ObjectWeakCallbackState* ownershipState_ = nullptr;
   id data_;
   const tns::TypeEncoding* typeEncoding_;

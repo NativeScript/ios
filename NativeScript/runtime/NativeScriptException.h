@@ -91,6 +91,7 @@ class NativeScriptException {
 
  private:
   v8::Persistent<v8::Value>* javascriptException_;
+  v8::Isolate* isolate_ = nullptr;
   std::string name_;
   std::string message_;
   std::string stackTrace_;

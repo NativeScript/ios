@@ -12,10 +12,6 @@
 #include "Runtime.h"
 #include "RuntimeConfig.h"
 
-// Exported by libobjc; not declared in a public header for MRC code.
-extern "C" id objc_initWeakOrNil(id* location, id value);
-extern "C" void objc_destroyWeak(id* location);
-
 using namespace v8;
 using namespace std;
 
@@ -23,26 +19,31 @@ namespace tns {
 
 namespace {
 
-// Also true for instances of the rare classes that refuse weak references.
+// -allowsWeakReference answers NO once deallocation has begun, and for the
+// rare classes that refuse weak references altogether.
 bool IsDeallocating(id obj) {
-  id slot = nil;
-  objc_initWeakOrNil(&slot, obj);
-  bool deallocating = slot == nil;
-  objc_destroyWeak(&slot);
-  return deallocating;
+  static SEL allowsWeakReference = sel_registerName("allowsWeakReference");
+  if (![obj respondsToSelector:allowsWeakReference]) {
+    return false;
+  }
+  return !((BOOL (*)(id, SEL))objc_msgSend)(obj, allowsWeakReference);
 }
 
-struct TransientSelf {
-  Global<Object> handle;
-  ObjCDataWrapper* wrapper;
+// The borrowed wrapper WrapNativeCallbackSelf made for an object in -dealloc
+// is detached once the native call returns: the object is gone afterwards,
+// so a receiver JS kept must read as released.
+struct BorrowedSelfScope {
+  explicit BorrowedSelfScope(Isolate* isolate) : isolate(isolate) {}
+  ~BorrowedSelfScope() {
+    if (wrapper != nullptr && tns::GetValue(isolate, receiver) == wrapper) {
+      tns::SetValue(isolate, receiver, nullptr);
+      delete wrapper;
+    }
+  }
+  Isolate* isolate;
+  Local<Object> receiver;
+  ObjCDataWrapper* wrapper = nullptr;
 };
-
-void DisposeTransientSelf(const WeakCallbackInfo<TransientSelf>& info) {
-  TransientSelf* transient = info.GetParameter();
-  transient->handle.Reset();
-  delete transient->wrapper;
-  delete transient;
-}
 
 }  // namespace
 
@@ -381,13 +382,15 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     }
 
     Local<Object> thiz = context->Global();
+    BorrowedSelfScope borrowedSelf(isolate);
     if (data->initialParamIndex_ > 1) {
       id self_ = *static_cast<const id*>(argValues[0]);
       auto it = cache->Instances.find(self_);
       if (it != cache->Instances.end()) {
         thiz = it->second->Get(data->isolateWrapper_.Isolate()).As<Object>();
       } else {
-        thiz = ArgConverter::WrapNativeCallbackSelf(context, self_);
+        thiz = ArgConverter::WrapNativeCallbackSelf(context, self_, &borrowedSelf.wrapper);
+        borrowedSelf.receiver = thiz;
       }
     }
 
@@ -1096,18 +1099,19 @@ const ProtocolMeta* ArgConverter::FindProtocolMeta(Protocol* protocol) {
   return protocolMeta;
 }
 
-Local<Object> ArgConverter::WrapNativeCallbackSelf(Local<Context> context, id self) {
+Local<Object> ArgConverter::WrapNativeCallbackSelf(Local<Context> context, id self,
+                                                   ObjCDataWrapper** borrowed) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   auto cache = Caches::Get(isolate);
   ObjCDataWrapper* wrapper = new ObjCDataWrapper(self);
 
   if (IsDeallocating(self)) {
     // Called from -dealloc: a retain cannot keep the object alive, so the
-    // wrapper is neither cached nor owning.
+    // wrapper is neither cached nor owning, and the caller detaches it.
+    wrapper->MarkBorrowed();
     Local<Object> receiver = NewEmptyInstance(context, cache->EmptyObjCtorFunc.get());
     CreateJsWrapper(context, wrapper, receiver);
-    auto* transient = new TransientSelf{Global<Object>(isolate, receiver), wrapper};
-    transient->handle.SetWeak(transient, DisposeTransientSelf, WeakCallbackType::kParameter);
+    *borrowed = wrapper;
     return receiver;
   }
 

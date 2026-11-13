@@ -340,16 +340,16 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
                 }
               }
             };
+            // After the retain: reconciling reads the new retain count.
+            id result = retain(self, @selector(retain));
             if (CFRunLoopGetCurrent() != runtimeLoop) {
               // bare entry: the closure does its own Locker ceremony, exactly
               // like the performed block it replaces
               runtime->GetEventLoop()->PostInternalBare(gcProtect);
             } else {
-              // After the retain: reconciling reads the new retain count.
-              id result = retain(self, @selector(retain));
               gcProtect();
-              return result;
             }
+            return result;
           }
 
           return retain(self, @selector(retain));
@@ -389,17 +389,17 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
             };
             auto runtime = Runtime::GetRuntime(isolate);
             auto runtimeLoop = runtime->RuntimeLoop();
+            // After the release: reconciling reads the new retain count, and
+            // the Instances entry still holds the object.
+            release(self, @selector(release));
             if (CFRunLoopGetCurrent() != runtimeLoop) {
               // bare entry: the closure does its own Locker ceremony, exactly
               // like the performed block it replaces
               runtime->GetEventLoop()->PostInternalBare(gcUnprotect);
             } else {
-              // After the release: reconciling reads the new retain count, and
-              // the Instances entry still holds the object.
-              release(self, @selector(release));
               gcUnprotect();
-              return;
             }
+            return;
           }
 
           release(self, @selector(release));

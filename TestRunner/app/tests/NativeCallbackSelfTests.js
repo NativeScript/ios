@@ -41,9 +41,14 @@ describe("Native callback self wrappers", function () {
         return JSInit;
     })(TNSAllocLog);
 
-    beforeEach(function () {
-        TNSClearOutput();
-        initCalls = 0;
+    // Objects earlier specs dropped are collected first, so the dealloc log
+    // only counts this spec's objects.
+    beforeEach(function (done) {
+        settle(2, function () {
+            TNSClearOutput();
+            initCalls = 0;
+            done();
+        });
     });
 
     // +new runs the JS-implemented init from native code, before JS has a
@@ -131,20 +136,80 @@ describe("Native callback self wrappers", function () {
         });
     });
 
-    it("balances owned returns that hand back an object JS already wraps", function (done) {
-        var array = NSArray.arrayWithArray([1, 2, 3]);
+    it("frees a managed wrapper's object once when __releaseNativeCounterpart runs on it", function (done) {
+        var owner = NSMutableArray.new();
+        var natively = JSInit.new();
+        owner.addObject(natively);
+        var jsOnly = JSInit.new();
         settle(2, function () {
-            var before = array.retainCount();
-            for (var i = 0; i < 50; i++) {
-                var copy = array.copy();
-                expect(copy).toBe(array);
-            }
-            copy = null;
-            settle(2, function () {
-                expect(array.retainCount()).toBe(before);
-                expect(array.count).toBe(3);
-                done();
+            __releaseNativeCounterpart(natively);
+            __releaseNativeCounterpart(jsOnly);
+            natively = null;
+            jsOnly = null;
+            settle(3, function () {
+                expect(deallocs()).toBe(1);
+                owner.removeAllObjects();
+                settle(3, function () {
+                    expect(deallocs()).toBe(2);
+                    done();
+                });
             });
+        });
+    });
+
+    it("does not release an instance method's owned return that is its receiver", function (done) {
+        var obj = TNSAllocLog.alloc().init();
+        var same = obj.awakeAfterUsingCoder(null);
+        expect(same).toBe(obj);
+        settle(3, function () {
+            expect(deallocs()).toBe(0);
+            expect(obj.hash > 0).toBe(true);
+            done();
+        });
+    });
+
+    it("does not release what a JS copyWithZone hands to a native -copy", function (done) {
+        var target = TNSAllocLog.alloc().init();
+        var Copyable = TNSAllocLog.extend({
+            copyWithZone: function (zone) {
+                return target;
+            }
+        }, { name: "NativeCallbackSelfCopyable", protocols: [NSCopying] });
+        var original = Copyable.alloc().init();
+        var copy = original.copy();
+        expect(copy).toBe(target);
+        copy = null;
+        settle(3, function () {
+            expect(deallocs()).toBe(0);
+            expect(target.hash > 0).toBe(true);
+            expect(original.hash > 0).toBe(true);
+            done();
+        });
+    });
+
+    it("reports a receiver kept from a JS method run by -dealloc as released", function (done) {
+        var saved = null;
+        var Keeper = TNSApi.extend({
+            methodCalledInDealloc: function () {
+                saved = this;
+            }
+        }, { name: "NativeCallbackSelfDeallocKeeper" });
+        (function () {
+            var holder = NSMutableArray.alloc().init();
+            holder.addObject(Keeper.alloc().init());
+        })();
+        settle(4, function () {
+            expect(saved).not.toBeNull();
+            var value;
+            var threw = false;
+            try {
+                value = saved.hash;
+            } catch (e) {
+                threw = e instanceof ReferenceError;
+            }
+            expect(threw || value === undefined).toBe(true);
+            saved = null;
+            done();
         });
     });
 
