@@ -7,26 +7,13 @@ using namespace v8;
 
 namespace tns {
 
-void SymbolIterator::Set(Local<Context> context, Local<Value> object) {
-  Isolate* isolate = v8::Isolate::GetCurrent();
-
-  // Iterates its receiver rather than capturing `object`: in the canary
-  // wrapper lifetime mode this property lives on the object's state, which a
-  // reference back to the object would keep alive until native death.
-  Local<v8::Function> iterator;
-  bool success = v8::Function::New(context,
-                                   [](const FunctionCallbackInfo<Value>& args) {
-                                     Isolate* isolate = args.GetIsolate();
-                                     Local<Context> context = isolate->GetCurrentContext();
-                                     Local<Object> result =
-                                         CreateIteratorObject(context, args.This());
-                                     args.GetReturnValue().Set(result);
-                                   })
-                     .ToLocal(&iterator);
-  tns::Assert(success, isolate);
-
-  Local<Value> symbolIteratorKey = Symbol::GetIterator(isolate);
-  success = object.As<Object>()->Set(context, symbolIteratorKey, iterator).FromMaybe(false);
+void SymbolIterator::Install(Isolate* isolate, Local<ObjectTemplate> prototypeTemplate) {
+  prototypeTemplate->Set(
+      Symbol::GetIterator(isolate),
+      FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& args) {
+        Local<Context> context = args.GetIsolate()->GetCurrentContext();
+        args.GetReturnValue().Set(CreateIteratorObject(context, args.This()));
+      }));
 }
 
 Local<Object> SymbolIterator::CreateIteratorObject(Local<Context> context, Local<Value> object) {

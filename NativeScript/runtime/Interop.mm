@@ -18,7 +18,6 @@
 #include "Reference.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
-#include "SymbolIterator.h"
 #include "SymbolLoader.h"
 #include "UnmanagedType.h"
 #include "robin_hood.h"
@@ -1397,11 +1396,6 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
     if (ownsReturnedObject || isInitializer) {
       [result release];
-    }
-
-    if ([result isKindOfClass:[NSArray class]]) {
-      // attach Symbol.iterator to the instance
-      SymbolIterator::Set(context, jsResult);
     }
 
     tns::DeleteWrapperIfUnused(isolate, jsResult, wrapper);
