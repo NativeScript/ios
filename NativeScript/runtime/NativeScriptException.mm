@@ -96,6 +96,7 @@ NativeScriptException::NativeScriptException(Isolate* isolate, TryCatch& tc,
   }
   Local<Value> error = tc.Exception();
   this->javascriptException_ = new Persistent<Value>(isolate, tc.Exception());
+  this->isolate_ = isolate;
   this->message_ = GetErrorMessage(isolate, error, message);
   this->stackTrace_ = tns::GetSmartStackTrace(isolate, &tc, error);
   this->fullMessage_ = GetFullMessage(isolate, tc, this->message_);
@@ -112,6 +113,7 @@ NativeScriptException::NativeScriptException(Isolate* isolate, const std::string
       ->Set(context, ToV8String(isolate, "name"), ToV8String(isolate, this->name_))
       .FromMaybe(false);
   this->javascriptException_ = new Persistent<Value>(isolate, error);
+  this->isolate_ = isolate;
   this->message_ = GetErrorMessage(isolate, error, message);
   this->stackTrace_ = GetErrorStackTrace(isolate, Exception::GetStackTrace(error));
   this->fullMessage_ =
@@ -120,11 +122,28 @@ NativeScriptException::NativeScriptException(Isolate* isolate, const std::string
 NativeScriptException::NativeScriptException(Isolate* isolate, Local<Value> jsError,
                                              const std::string& message) {
   this->javascriptException_ = new Persistent<Value>(isolate, jsError);
+  this->isolate_ = isolate;
   this->message_ = message;
   this->name_ = "NativeScriptException";
 }
 
-NativeScriptException::~NativeScriptException() { delete this->javascriptException_; }
+NativeScriptException::~NativeScriptException() {
+  if (this->javascriptException_ == nullptr) {
+    return;
+  }
+  // Deleting a Persistent does not release its V8 handle. The exception can
+  // be caught after the Locker that ran the throwing code is gone (event
+  // loop tasks), so the handle is released under one.
+  if (Runtime::IsAlive(this->isolate_)) {
+    if (v8::Locker::IsLocked(this->isolate_)) {
+      this->javascriptException_->Reset();
+    } else {
+      v8::Locker locker(this->isolate_);
+      this->javascriptException_->Reset();
+    }
+  }
+  delete this->javascriptException_;
+}
 
 void NativeScriptException::OnUncaughtError(Local<v8::Message> message, Local<Value> error) {
   @try {

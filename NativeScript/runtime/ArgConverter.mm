@@ -17,6 +17,36 @@ using namespace std;
 
 namespace tns {
 
+namespace {
+
+// -allowsWeakReference answers NO once deallocation has begun, and for the
+// rare classes that refuse weak references altogether.
+bool IsDeallocating(id obj) {
+  static SEL allowsWeakReference = sel_registerName("allowsWeakReference");
+  if (![obj respondsToSelector:allowsWeakReference]) {
+    return false;
+  }
+  return !((BOOL (*)(id, SEL))objc_msgSend)(obj, allowsWeakReference);
+}
+
+// The borrowed wrapper WrapNativeCallbackSelf made for an object in -dealloc
+// is detached once the native call returns: the object is gone afterwards,
+// so a receiver JS kept must read as released.
+struct BorrowedSelfScope {
+  explicit BorrowedSelfScope(Isolate* isolate) : isolate(isolate) {}
+  ~BorrowedSelfScope() {
+    if (wrapper != nullptr && tns::GetValue(isolate, receiver) == wrapper) {
+      tns::SetValue(isolate, receiver, nullptr);
+      delete wrapper;
+    }
+  }
+  Isolate* isolate;
+  Local<Object> receiver;
+  ObjCDataWrapper* wrapper = nullptr;
+};
+
+}  // namespace
+
 void ArgConverter::Init(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   auto cache = Caches::Get(isolate);
@@ -352,15 +382,15 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     }
 
     Local<Object> thiz = context->Global();
+    BorrowedSelfScope borrowedSelf(isolate);
     if (data->initialParamIndex_ > 1) {
       id self_ = *static_cast<const id*>(argValues[0]);
       auto it = cache->Instances.find(self_);
       if (it != cache->Instances.end()) {
         thiz = it->second->Get(data->isolateWrapper_.Isolate()).As<Object>();
       } else {
-        ObjCDataWrapper* wrapper = new ObjCDataWrapper(self_);
-        thiz = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true).As<Object>();
-        tns::DeleteWrapperIfUnused(isolate, thiz, wrapper);
+        thiz = ArgConverter::WrapNativeCallbackSelf(context, self_, &borrowedSelf.wrapper);
+        borrowedSelf.receiver = thiz;
       }
     }
 
@@ -1067,6 +1097,37 @@ const ProtocolMeta* ArgConverter::FindProtocolMeta(Protocol* protocol) {
   tns::Assert(meta->type() == MetaType::ProtocolType);
   const ProtocolMeta* protocolMeta = static_cast<const ProtocolMeta*>(meta);
   return protocolMeta;
+}
+
+Local<Object> ArgConverter::WrapNativeCallbackSelf(Local<Context> context, id self,
+                                                   ObjCDataWrapper** borrowed) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  auto cache = Caches::Get(isolate);
+  ObjCDataWrapper* wrapper = new ObjCDataWrapper(self);
+
+  if (IsDeallocating(self)) {
+    // Called from -dealloc: a retain cannot keep the object alive, so the
+    // wrapper is neither cached nor owning, and the caller detaches it.
+    wrapper->MarkBorrowed();
+    Local<Object> receiver = NewEmptyInstance(context, cache->EmptyObjCtorFunc.get());
+    CreateJsWrapper(context, wrapper, receiver);
+    *borrowed = wrapper;
+    return receiver;
+  }
+
+  Local<Object> result = CreateJsWrapper(context, wrapper, Local<Object>()).As<Object>();
+  if (tns::DeleteWrapperIfUnused(isolate, result, wrapper)) {
+    return result;
+  }
+  // Native code usually still holds the object (it is mid-initialization or
+  // owned by whoever called in), and its JS state must outlive this call: the
+  // handle stays strong until the Instances entry is the object's only owner.
+  auto it = cache->Instances.find(self);
+  if (it != cache->Instances.end() && it->second->IsWeak()) {
+    ObjectManager::ManageOwnership(isolate, wrapper,
+                                   it->second->ClearWeak<ObjectWeakCallbackState>());
+  }
+  return result;
 }
 
 std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyObject(Local<Context> context,

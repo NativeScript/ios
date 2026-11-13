@@ -2,7 +2,9 @@
 #include <Block.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <sstream>
+#include <unordered_map>
 #include "Caches.h"
+#include "ClassBuilder.h"
 #include "Constants.h"
 #include "DataWrapper.h"
 #include "FFICall.h"
@@ -15,9 +17,63 @@ namespace tns {
 
 static Class NSTimerClass = objc_getClass("NSTimer");
 
+namespace {
+
+// Wrappers whose handle ObjectManager::ManageOwnership took over, keyed by the
+// finalizer state their handle carries.
+struct OwnershipTracking {
+  std::unordered_map<ObjectWeakCallbackState*, ObjCDataWrapper*> managed;
+};
+
+void ForgetOwnership(Isolate* isolate, ObjectWeakCallbackState* state) {
+  if (OwnershipTracking* tracking = Caches::StateFor<OwnershipTracking>(isolate)) {
+    tracking->managed.erase(state);
+  }
+}
+
+void ApplyOwnership(ObjectWeakCallbackState* state, bool nativelyOwned) {
+  bool weak = state->target_->IsWeak();
+  if (nativelyOwned && weak) {
+    state->target_->ClearWeak<ObjectWeakCallbackState>();
+  } else if (!nativelyOwned && !weak) {
+    state->target_->SetWeak(state, ObjectManager::FinalizerCallback,
+                            WeakCallbackType::kFinalizer);
+  }
+}
+
+// The GC prologue may not enter JS, so a JS-implemented -retainCount is
+// skipped. Matches ObjectManager::GetRetainCount, which counts timers as unowned.
+bool NativelyOwnedWithoutJS(id obj) {
+  for (Class c = object_getClass(obj); c != nil; c = class_getSuperclass(c)) {
+    if (c == NSTimerClass) {
+      return false;
+    }
+  }
+  IMP imp = ClassBuilder::FindNotOverridenMethod(object_getClass(obj), @selector(retainCount));
+  return ((NSUInteger(*)(id, SEL))imp)(obj, @selector(retainCount)) > 1;
+}
+
+void ReconcileOwnershipBeforeGC(Isolate* isolate, GCType, GCCallbackFlags) {
+  OwnershipTracking* tracking = Caches::StateFor<OwnershipTracking>(isolate);
+  if (tracking == nullptr) {
+    return;
+  }
+  for (auto& [state, wrapper] : tracking->managed) {
+    if (state->disposing_ || state->target_ == nullptr || state->target_->IsEmpty()) {
+      continue;
+    }
+    ApplyOwnership(state, NativelyOwnedWithoutJS(wrapper->Data()));
+  }
+}
+
+}  // namespace
+
 void ObjectManager::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
   globalTemplate->Set(tns::ToV8String(isolate, "__releaseNativeCounterpart"),
                       FunctionTemplate::New(isolate, ReleaseNativeCounterpartCallback));
+  isolate->AddGCPrologueCallback(
+      ReconcileOwnershipBeforeGC,
+      static_cast<GCType>(kGCTypeMarkSweepCompact | kGCTypeIncrementalMarking));
 }
 
 namespace {
@@ -139,6 +195,29 @@ void ObjectManager::DisposeAllRegistered(Isolate* isolate) {
   DisposeHandle(isolate, cache->FunctionReferenceCtorFunc);
 }
 
+void ObjectManager::ManageOwnership(Isolate* isolate, ObjCDataWrapper* wrapper,
+                                    ObjectWeakCallbackState* state) {
+  OwnershipTracking* tracking = Caches::StateFor<OwnershipTracking>(isolate);
+  if (tracking == nullptr || state == nullptr) {
+    return;
+  }
+  wrapper->SetOwnershipState(state);
+  tracking->managed[state] = wrapper;
+  ObjectManager::ReconcileOwnership(isolate, wrapper);
+}
+
+void ObjectManager::ReconcileOwnership(Isolate* isolate, ObjCDataWrapper* wrapper) {
+  ObjectWeakCallbackState* state = wrapper->OwnershipState();
+  if (state == nullptr || state->disposing_ || state->target_ == nullptr ||
+      state->target_->IsEmpty()) {
+    return;
+  }
+  // The handle's strength carries the ownership; a GcProtect from the retain
+  // swizzle would keep a weak handle from ever being disposed.
+  wrapper->GcUnprotect();
+  ApplyOwnership(state, NativelyOwnedWithoutJS(wrapper->Data()));
+}
+
 void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackState>& data) {
   ObjectWeakCallbackState* state = data.GetParameter();
   Isolate* isolate = data.GetIsolate();
@@ -167,12 +246,23 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
   if (disposed || state->target_->IsEmpty()) {
     state->target_->Reset();
     UnlinkRegistered(state);
+    ForgetOwnership(isolate, state);
     delete state;
     return;
   }
 
   state->target_->ClearWeak<void>();
   state->target_->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
+
+  // Refused because native code took the object back: keep the handle strong
+  // rather than resurrecting it at every collection.
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+  if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+    if (objcWrapper->OwnershipState() == state) {
+      ApplyOwnership(state, NativelyOwnedWithoutJS(objcWrapper->Data()));
+    }
+  }
 }
 
 bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFinalDisposal) {
@@ -198,6 +288,16 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
 
   if (wrapper->IsGcProtected() && !isFinalDisposal) {
     return false;
+  }
+
+  // A handle ReconcileOwnership keeps is weak while the Instances entry looked
+  // like the only owner; a retain from another thread can still be on its way
+  // to making it strong again.
+  if (!isFinalDisposal && wrapper->Type() == WrapperType::ObjCObject) {
+    ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+    if (objcWrapper->OwnershipState() != nullptr && NativelyOwnedWithoutJS(objcWrapper->Data())) {
+      return false;
+    }
   }
 
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
@@ -350,11 +450,33 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
   }
 
   ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+  if (objcWrapper->IsBorrowed()) {
+    if (tns::GetValue(isolate, value) == wrapper) {
+      tns::SetValue(isolate, value.As<Object>(), nullptr);
+      delete wrapper;
+    }
+    return;
+  }
+
   id data = objcWrapper->Data();
   if (data != nil) {
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     auto it = cache->Instances.find(data);
-    if (it != cache->Instances.end()) {
+    if (ObjectWeakCallbackState* managed = objcWrapper->OwnershipState()) {
+      // The handle ReconcileOwnership manages is this wrapper's own, whatever
+      // Instances maps the object to now.
+      if (managed->disposing_) {
+        return;
+      }
+      if (it != cache->Instances.end() && it->second == managed->target_) {
+        cache->Instances.erase(it);
+      }
+      managed->target_->Reset();
+      UnlinkRegistered(managed);
+      ForgetOwnership(isolate, managed);
+      delete managed;
+      objcWrapper->SetOwnershipState(nullptr);
+    } else if (it != cache->Instances.end()) {
       std::shared_ptr<Persistent<Value>> handle = it->second;
       ObjectWeakCallbackState* state =
           handle->IsWeak() ? handle->ClearWeak<ObjectWeakCallbackState>() : nullptr;
@@ -372,6 +494,7 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
         // parameter.
         handle->Reset();
         UnlinkRegistered(state);
+        ForgetOwnership(isolate, state);
         delete state;
       }
     }

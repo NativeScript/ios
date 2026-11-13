@@ -6,6 +6,7 @@
 namespace tns {
 
 class ObjectManager;
+class ObjCDataWrapper;
 
 // Parameter of the kFinalizer weak callback armed on target_.
 //
@@ -53,6 +54,14 @@ class ObjectManager {
   // Disposes every handle from Register() that is still alive. Replaces the
   // old Isolate::VisitHandlesWithClassIds walk, which V8 removed.
   static void DisposeAllRegistered(v8::Isolate* isolate);
+  // Takes over the handle `state` belongs to (the wrapper's Instances entry):
+  // from now on it is strong while something besides that entry retains the
+  // object and weak otherwise, re-checked whenever ReconcileOwnership runs and
+  // when a major collection starts.
+  static void ManageOwnership(v8::Isolate* isolate, ObjCDataWrapper* wrapper,
+                              ObjectWeakCallbackState* state);
+  // Runs on the isolate's thread with the isolate entered.
+  static void ReconcileOwnership(v8::Isolate* isolate, ObjCDataWrapper* wrapper);
 
  private:
   static void ReleaseNativeCounterpartCallback(
