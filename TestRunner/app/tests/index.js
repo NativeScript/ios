@@ -142,6 +142,7 @@ require("./JSAccessorEncodingTests");
 require("./JSAccessorReceiverTests");
 require("./WrapperLifetimeTests");
 require("./WrapperLifetimeModesTests");
+require("./WrapperLifetimeWeakCollectionsTests");
 require("./BlockCacheRaceTests");
 require("./WorkerConcurrentStartupTests");
 require("./WorkerOptionsTests");
