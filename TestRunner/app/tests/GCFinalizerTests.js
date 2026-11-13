@@ -69,6 +69,37 @@ describe("GC finalizer callbacks", function () {
         })();
     });
 
+    // An object that first reached JS on a background thread has no tie to the
+    // runtime's thread, so its release stays with the collection that ran there.
+    it("releases a background-born object where the background collection runs", function (done) {
+        var threads = [];
+        var DeallocThread = TNSApi.extend({
+            methodCalledInDealloc: function () {
+                threads.push(NSThread.isMainThread);
+            }
+        }, { name: "TNSApiDeallocBackgroundThread" });
+
+        var queue = dispatch_get_global_queue(qos_class_t.QOS_CLASS_DEFAULT, 0);
+        dispatch_async(queue, function () {
+            (function () {
+                DeallocThread.alloc().init();
+            })();
+            scrubStack();
+            __collect();
+            __collect();
+        });
+
+        var attempts = 200;
+        (function poll() {
+            if (threads.length > 0 || --attempts === 0) {
+                expect(threads).toEqual([false]);
+                done();
+                return;
+            }
+            setTimeout(poll, 10);
+        })();
+    });
+
     // A GcProtected (natively retained) instance is resurrected by its
     // finalizer, but anything reachable only through it is queued in the same
     // GC and disposed — the resurrected parent then holds "husks" whose

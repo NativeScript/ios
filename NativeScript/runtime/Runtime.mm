@@ -1,4 +1,5 @@
 #include "Runtime.h"
+#include "DataWrapper.h"
 #include <chrono>
 #include <string>
 #include "ArgConverter.h"
@@ -277,12 +278,16 @@ Runtime::Runtime(const RuntimeOptions& options) : workerId_(options.workerId) {
   eventLoop_->BindToCurrentThread();
   isolate->SetData(Constants::RUNTIME_SLOT, this);
   isolate_ = isolate;
+  tns::runtimeThreadIsolate = isolate;
 }
 
 Runtime::~Runtime() {
   if (!initialized_) {
     // Never published: no other thread can know this isolate, and it holds no
     // caches, gate or wrappers.
+    if (tns::runtimeThreadIsolate == isolate_) {
+      tns::runtimeThreadIsolate = nullptr;
+    }
     isolate_->Dispose();
     NativeScriptPlatform::Instance()->IsolateDisposed(isolate_, eventLoop_);
     currentRuntime_ = nullptr;
@@ -368,6 +373,9 @@ Runtime::~Runtime() {
     Caches::Remove(this->isolate_);
 
     this->isolate_->SetData(Constants::RUNTIME_SLOT, nullptr);
+    if (tns::runtimeThreadIsolate == this->isolate_) {
+      tns::runtimeThreadIsolate = nullptr;
+    }
 
     // Last, and under the Locker: from here on nothing reads a wrapper through
     // a JS object, so threads that never pinned may free theirs without the

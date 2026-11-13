@@ -132,15 +132,20 @@ so a pending node's slot is updated exactly once after evacuation.
 ## Which thread releases the native object
 
 Finalizers run on whichever thread triggered the collection, and that can be any thread holding
-the isolate's Locker — a JS function dispatched to a background queue included. Off the
-runtime's thread, `ObjectManager` hands the native release (`[object release]`,
-`Block_release`) to the runtime's run loop instead of making it inline; the JS side is disposed
-immediately either way. The same applies to `__releaseNativeCounterpart` called from such a
-thread: the wrapper is retired at once, the object a run loop turn later. A new wrapper built
-for an object whose release is still waiting takes that release over (keeping the retain counts
-the extended classes' swizzle reads exact). Collection adapters are exempt, since their
-`-dealloc` retires the wrapper, and teardown drains the queue inline. For a worker, the
-runtime's thread is the worker's own thread, not the main thread.
+the isolate's Locker — a JS function dispatched to a background queue included. An object that
+first reached JS on the runtime's thread (`ObjCDataWrapper`/`BlockWrapper::BornOnRuntimeThread`,
+recorded when the wrapper is built) is released on that thread: off it, `ObjectManager` queues
+the native release (`[object release]`, `Block_release`) and posts one event loop task to drain
+the queue; the JS side is disposed immediately either way. The same applies to
+`__releaseNativeCounterpart` called from such a thread: the wrapper is retired at once, the
+object a loop turn later. Objects that first reached JS on another thread are released where the
+collection runs, as are collection adapters, whose `-dealloc` retires the wrapper.
+
+The queue needs no synchronization of its own: finalizers, `__releaseNativeCounterpart`, the
+drain task, wrapper creation and teardown all hold the Locker. A new wrapper built for an object
+whose release is still queued takes that release over (keeping the retain counts the extended
+classes' swizzle reads exact). Teardown drains the queue inline, since the event loop has stopped
+by then. For a worker, the runtime's thread is the worker's own thread, not the main thread.
 
 ## Deliberate deviations from upstream's original
 

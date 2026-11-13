@@ -1,8 +1,6 @@
 #include "ObjectManager.h"
 #include <Block.h>
 #include <CoreFoundation/CoreFoundation.h>
-#include <atomic>
-#include <mutex>
 #include <sstream>
 #include <unordered_map>
 #include <vector>
@@ -10,6 +8,7 @@
 #include "Constants.h"
 #include "DataWrapper.h"
 #include "FFICall.h"
+#include "EventLoop.h"
 #include "Helpers.h"
 #include "Runtime.h"
 #include "TNSDerivedClass.h"
@@ -53,44 +52,31 @@ void UnlinkRegistered(ObjectWeakCallbackState* state) {
   state->next_ = nullptr;
 }
 
-// Native releases belong on the runtime's thread. JS, and with it a collection
-// and its finalizers, can run on any thread that holds the isolate's Locker (a
-// JS callback dispatched to a background queue), and a -dealloc that tears down
-// a view, a CA transaction or a block capturing one crashes off that thread.
+// The native release of an object that first reached JS on its runtime's
+// thread belongs on that thread. JS, and with it a collection and its
+// finalizers, can run on any thread that holds the isolate's Locker (a JS
+// callback dispatched to a background queue), and a -dealloc that tears down a
+// view, a CA transaction or a block capturing one crashes off the main thread.
+// Objects first wrapped on another thread are still released where the
+// collection runs.
 //
-// Shared with the run loop block that drains it, which may run after the
-// isolate's Caches is gone; the releases themselves need no Locker.
+// Every access holds the isolate's Locker: finalizers and
+// __releaseNativeCounterpart on any thread, and on the runtime's thread the
+// drain task, wrapper creation and teardown. So no other synchronization.
 struct DeferredReleases {
-  std::mutex mutex;
   // Object -> releases it is owed. An object stays alive while it is owed one,
   // so its address cannot be reused by another object meanwhile.
   std::unordered_map<void*, unsigned> objects;
   std::vector<const void*> blocks;
-  bool scheduled = false;
+  bool drainPosted = false;
 };
 
-struct DeferredReleasesState {
-  std::shared_ptr<DeferredReleases> pending = std::make_shared<DeferredReleases>();
-};
-
-// Object releases waiting in any isolate: lets wrapper creation skip the lookup.
-// Process-wide, so while one isolate has some, the others pay a lookup too.
-std::atomic<int> deferredObjectReleases_{0};
-
-void DrainDeferredReleases(const std::shared_ptr<DeferredReleases>& pending) {
+void DrainDeferredReleases(DeferredReleases* pending) {
   std::unordered_map<void*, unsigned> objects;
   std::vector<const void*> blocks;
-  {
-    std::lock_guard<std::mutex> lock(pending->mutex);
-    objects.swap(pending->objects);
-    blocks.swap(pending->blocks);
-    pending->scheduled = false;
-    int count = 0;
-    for (const auto& entry : objects) {
-      count += entry.second;
-    }
-    deferredObjectReleases_.fetch_sub(count, std::memory_order_relaxed);
-  }
+  objects.swap(pending->objects);
+  blocks.swap(pending->blocks);
+  pending->drainPosted = false;
   for (const auto& entry : objects) {
     id obj = (__bridge id)entry.first;
     for (unsigned i = 0; i < entry.second; i++) {
@@ -102,63 +88,50 @@ void DrainDeferredReleases(const std::shared_ptr<DeferredReleases>& pending) {
   }
 }
 
-// Null when the caller is on the runtime's thread (or there is no runtime to
-// hand over to) and should release inline.
-std::shared_ptr<DeferredReleases> DeferralTarget(Isolate* isolate, CFRunLoopRef* loop) {
-  Runtime* runtime = Runtime::GetRuntime(isolate);
-  if (runtime == nullptr || runtime->RuntimeLoop() == nullptr ||
-      CFRunLoopGetCurrent() == runtime->RuntimeLoop()) {
+// The queue to hand a release to, or null when the caller releases inline.
+// Created by Init, so a collection on another thread never creates it; read
+// without the validity check because a collection can still run on another
+// thread between InvalidateIsolate and teardown, which drains it.
+DeferredReleases* DeferralQueue(Isolate* isolate, bool bornOnRuntimeThread) {
+  if (!bornOnRuntimeThread || OnRuntimeThreadOf(isolate)) {
     return nullptr;
   }
-  DeferredReleasesState* state = Caches::StateFor<DeferredReleasesState>(isolate);
-  if (state == nullptr) {
-    return nullptr;
-  }
-  *loop = runtime->RuntimeLoop();
-  return state->pending;
+  return Caches::ExistingStateFor<DeferredReleases>(isolate);
 }
 
-// Called with pending->mutex held.
-void ScheduleDrain(const std::shared_ptr<DeferredReleases>& pending, CFRunLoopRef loop) {
-  if (pending->scheduled) {
+// One event loop task per batch. If the loop no longer takes work, teardown is
+// under way and drains the queue itself.
+void PostDrain(Isolate* isolate, DeferredReleases* pending) {
+  if (pending->drainPosted) {
     return;
   }
-  pending->scheduled = true;
-  std::shared_ptr<DeferredReleases> shared = pending;
-  // A plain run loop block rather than an event loop task: it must run even
-  // once the event loop stops taking work, and needs no isolate. The loop is
-  // retained because a worker's thread can exit, freeing it, meanwhile.
-  CFRetain(loop);
-  CFRunLoopPerformBlock(loop, kCFRunLoopCommonModes, ^{
-    DrainDeferredReleases(shared);
+  Runtime* runtime = Runtime::GetRuntime(isolate);
+  std::shared_ptr<EventLoop> loop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
+  pending->drainPosted = loop != nullptr && loop->PostInternal([isolate]() {
+    if (DeferredReleases* queued = Caches::ExistingStateFor<DeferredReleases>(isolate)) {
+      DrainDeferredReleases(queued);
+    }
   });
-  CFRunLoopWakeUp(loop);
-  CFRelease(loop);
 }
 
-void ReleaseOnRuntimeThread(Isolate* isolate, id obj) {
-  CFRunLoopRef loop = nullptr;
-  std::shared_ptr<DeferredReleases> pending = DeferralTarget(isolate, &loop);
+void ReleaseOnRuntimeThread(Isolate* isolate, id obj, bool bornOnRuntimeThread) {
+  DeferredReleases* pending = DeferralQueue(isolate, bornOnRuntimeThread);
   if (pending == nullptr) {
     [obj release];
     return;
   }
-  std::lock_guard<std::mutex> lock(pending->mutex);
   pending->objects[(__bridge void*)obj]++;
-  deferredObjectReleases_.fetch_add(1, std::memory_order_relaxed);
-  ScheduleDrain(pending, loop);
+  PostDrain(isolate, pending);
 }
 
-void BlockReleaseOnRuntimeThread(Isolate* isolate, const void* block) {
-  CFRunLoopRef loop = nullptr;
-  std::shared_ptr<DeferredReleases> pending = DeferralTarget(isolate, &loop);
+void BlockReleaseOnRuntimeThread(Isolate* isolate, const void* block, bool bornOnRuntimeThread) {
+  DeferredReleases* pending = DeferralQueue(isolate, bornOnRuntimeThread);
   if (pending == nullptr) {
     Block_release(block);
     return;
   }
-  std::lock_guard<std::mutex> lock(pending->mutex);
   pending->blocks.push_back(block);
-  ScheduleDrain(pending, loop);
+  PostDrain(isolate, pending);
 }
 
 }  // namespace
@@ -166,9 +139,7 @@ void BlockReleaseOnRuntimeThread(Isolate* isolate, const void* block) {
 void ObjectManager::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
   globalTemplate->Set(tns::ToV8String(isolate, "__releaseNativeCounterpart"),
                       FunctionTemplate::New(isolate, ReleaseNativeCounterpartCallback));
-  // Created here, on the runtime's thread: a collection on another thread must
-  // only find it.
-  Caches::StateFor<DeferredReleasesState>(isolate);
+  Caches::StateFor<DeferredReleases>(isolate);
 }
 
 std::shared_ptr<Persistent<Value>> ObjectManager::Register(Local<Context> context,
@@ -221,9 +192,10 @@ void ObjectManager::DisposeAllRegistered(Isolate* isolate) {
   Isolate::Scope isolateScope(isolate);
   HandleScope scope(isolate);
 
-  // A worker's run loop stops with its runtime, so nothing else would drain.
-  if (DeferredReleasesState* deferred = Caches::ExistingStateFor<DeferredReleasesState>(isolate)) {
-    DrainDeferredReleases(deferred->pending);
+  // The event loop has stopped taking work, so nothing else would drain.
+  DeferredReleases* deferred = Caches::ExistingStateFor<DeferredReleases>(isolate);
+  if (deferred != nullptr) {
+    DrainDeferredReleases(deferred);
   }
 
   // Detach the whole list first so disposal can't walk into freed entries, and
@@ -250,6 +222,12 @@ void ObjectManager::DisposeAllRegistered(Isolate* isolate) {
     delete state;
 
     state = next;
+  }
+
+  // The walk's own releases are inline on the runtime's thread; this catches
+  // any made from another.
+  if (deferred != nullptr) {
+    DrainDeferredReleases(deferred);
   }
 
   DisposeHandleMap(isolate, cache->CtorFuncs);
@@ -298,15 +276,10 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
 }
 
 bool ObjectManager::TakeDeferredRelease(Isolate* isolate, id obj) {
-  if (deferredObjectReleases_.load(std::memory_order_relaxed) == 0) {
+  DeferredReleases* pending = Caches::ExistingStateFor<DeferredReleases>(isolate);
+  if (pending == nullptr || pending->objects.empty()) {
     return false;
   }
-  DeferredReleasesState* state = Caches::StateFor<DeferredReleasesState>(isolate);
-  if (state == nullptr) {
-    return false;
-  }
-  DeferredReleases* pending = state->pending.get();
-  std::lock_guard<std::mutex> lock(pending->mutex);
   auto it = pending->objects.find((__bridge void*)obj);
   if (it == pending->objects.end()) {
     return false;
@@ -314,7 +287,6 @@ bool ObjectManager::TakeDeferredRelease(Isolate* isolate, id obj) {
   if (--it->second == 0) {
     pending->objects.erase(it);
   }
-  deferredObjectReleases_.fetch_sub(1, std::memory_order_relaxed);
   return true;
 }
 
@@ -373,7 +345,7 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
           // The adapter's -dealloc retires this wrapper; it must run first.
           [target release];
         } else {
-          ReleaseOnRuntimeThread(isolate, target);
+          ReleaseOnRuntimeThread(isolate, target, objCObjectWrapper->BornOnRuntimeThread());
         }
       }
       break;
@@ -392,7 +364,8 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
       // Block_copy and runs the block's dispose helper once we drop the last
       // reference. (Using CFRelease here over-released stack blocks that were
       // never promoted to the heap, crashing in objc_release during GC.)
-      BlockReleaseOnRuntimeThread(isolate, blockWrapper->Block());
+      BlockReleaseOnRuntimeThread(isolate, blockWrapper->Block(),
+                                  blockWrapper->BornOnRuntimeThread());
       break;
     }
     case WrapperType::Reference: {
@@ -544,7 +517,7 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
     if (adapterClaim) {
       [data release];
     } else {
-      ReleaseOnRuntimeThread(isolate, data);
+      ReleaseOnRuntimeThread(isolate, data, objcWrapper->BornOnRuntimeThread());
     }
 
     // The release above can run a -dealloc that detaches this wrapper; the

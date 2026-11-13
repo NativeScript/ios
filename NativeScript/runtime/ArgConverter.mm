@@ -647,6 +647,9 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
       [result retain];
     }
     if (tookOver) {
+      // Only releases of objects that first reached JS on the runtime's
+      // thread are ever queued.
+      wrapper->SetBornOnRuntimeThread();
       ObjectManager::ProtectIfNativelyRetained(result, wrapper);
     }
     ExternalMemory::ChargeEstimatedSize(isolate, thiz);
@@ -921,7 +924,9 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
       if (!ObjectManager::TakeDeferredRelease(isolate, target)) {
         [target retain];
       } else if (wrapper->Type() == WrapperType::ObjCObject) {
-        ObjectManager::ProtectIfNativelyRetained(target, static_cast<ObjCDataWrapper*>(wrapper));
+        ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+        objcWrapper->SetBornOnRuntimeThread();
+        ObjectManager::ProtectIfNativelyRetained(target, objcWrapper);
       }
     }
   } else {
