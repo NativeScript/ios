@@ -46,6 +46,22 @@ describe("Protocol-qualified object bindings", function () {
         expect(NSObject.alloc().init().methodFromProto1).toBeUndefined();
     });
 
+    it("binds an optional protocol member only for classes that implement it", function () {
+        var without = TNSPseudoDataType.getWithoutOptionalMember();
+        var withMember = TNSPseudoDataType.getWithOptionalMember();
+        var withoutAgain = TNSPseudoDataType.getWithoutOptionalMember();
+        expect(without.optionalMember).toBeUndefined();
+        expect(withMember.optionalMember()).toBe("optional member");
+        expect(withoutAgain.optionalMember).toBeUndefined();
+        expect(TNSPseudoDataType.getWithOptionalMember().optionalMember()).toBe("optional member");
+    });
+
+    it("keeps the class's own property when a protocol redeclares it readonly", function () {
+        var object = TNSPseudoDataType.getReadwriteValue();
+        object.value = 5;
+        expect(object.value).toBe(5);
+    });
+
     it("shares one binding across NSNotificationCenter observer tokens", function () {
         var center = NSNotificationCenter.defaultCenter;
         var nsObject = NSObject;

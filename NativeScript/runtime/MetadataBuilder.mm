@@ -1,7 +1,6 @@
 #include "MetadataBuilder.h"
 #include <Foundation/Foundation.h>
 #include <algorithm>
-#include <map>
 #include "ArgConverter.h"
 #include "Caches.h"
 #include "Constants.h"
@@ -594,9 +593,6 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
   MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, meta, pair, instanceMembers);
   MetadataBuilder::RegisterInstanceProtocols(context, ctorFuncTemplate, meta, meta->name(), pair,
                                              instanceMembers);
-  MetadataBuilder::RegisterAdditionalProtocols(context, ctorFuncTemplate, pair, additionalProtocols,
-                                               instanceMembers);
-
   ctorFuncTemplate->PrototypeTemplate()->Set(
       tns::ToV8String(isolate, "toString"),
       FunctionTemplate::New(isolate, MetadataBuilder::ToStringFunctionCallback));
@@ -669,13 +665,20 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
 
 namespace {
 
+// Keyed by the object's runtime class: optional protocol members are bound
+// only when that class implements them.
 struct ProtocolBindings {
-  std::map<std::pair<const BaseClassMeta*, std::vector<std::string>>, Global<FunctionTemplate>>
-      templates;
+  struct Binding {
+    const BaseClassMeta* meta;
+    std::vector<std::string> protocols;
+    Global<FunctionTemplate> bindingTemplate;
+  };
+  robin_hood::unordered_map<Class, std::vector<Binding>> byClass;
 };
 
-// The instance member names the class's own binding registers, so a
-// protocol member the class already has keeps the class's definition.
+// The instance members the class's own binding registers, with the property
+// accessor counts RegisterInstanceProperties compares against, so a protocol
+// member only replaces the class's definition where the old leaf rebuild did.
 void CollectInstanceMemberNames(const BaseClassMeta* meta, KnownUnknownClassPair pair,
                                 bool ownMembers,
                                 robin_hood::unordered_map<std::string, uint8_t>& names) {
@@ -688,9 +691,15 @@ void CollectInstanceMemberNames(const BaseClassMeta* meta, KnownUnknownClassPair
     }
     for (auto it = meta->instanceProps->begin(); it != meta->instanceProps->end(); it++) {
       const PropertyMeta* propMeta = (*it).valuePtr();
-      if (propMeta->isAvailableInClasses(pair, false)) {
-        names.emplace(propMeta->name(), 0);
+      if (!propMeta->isAvailableInClasses(pair, false)) {
+        continue;
       }
+      uint8_t accessors = (propMeta->hasGetter() ? 1 : 0) + (propMeta->hasSetter() ? 1 : 0);
+      if (accessors == 0) {
+        continue;
+      }
+      uint8_t& seen = names[propMeta->name()];
+      seen = std::max(seen, accessors);
     }
     for (auto it = meta->protocols->begin(); it != meta->protocols->end(); it++) {
       const Meta* protocolMeta = ArgConverter::GetMeta((*it).valuePtr());
@@ -720,29 +729,41 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateProtocolBindingTemplate(
     Local<Context> context, const BaseClassMeta* meta, KnownUnknownClassPair pair,
     const std::vector<std::string>& additionalProtocols) {
   Isolate* isolate = v8::Isolate::GetCurrent();
-  std::vector<std::string> protocols = additionalProtocols;
-  std::sort(protocols.begin(), protocols.end());
-  protocols.erase(std::unique(protocols.begin(), protocols.end()), protocols.end());
+  Class runtimeClass = pair.realClass();
 
   ProtocolBindings* bindings = Caches::StateFor<ProtocolBindings>(isolate);
-  std::pair<const BaseClassMeta*, std::vector<std::string>> key(meta, protocols);
-  if (bindings != nullptr) {
-    auto it = bindings->templates.find(key);
-    if (it != bindings->templates.end()) {
-      return it->second.Get(isolate);
+  auto findBinding = [&]() -> Local<FunctionTemplate> {
+    if (bindings != nullptr) {
+      auto it = bindings->byClass.find(runtimeClass);
+      if (it != bindings->byClass.end()) {
+        for (const ProtocolBindings::Binding& binding : it->second) {
+          if (binding.meta == meta && binding.protocols == additionalProtocols) {
+            return binding.bindingTemplate.Get(isolate);
+          }
+        }
+      }
     }
+    return Local<FunctionTemplate>();
+  };
+  Local<FunctionTemplate> cached = findBinding();
+  if (!cached.IsEmpty()) {
+    return cached;
   }
 
   Local<FunctionTemplate> classTemplate =
       MetadataBuilder::GetOrCreateConstructorFunctionTemplate(context, meta, pair);
+  // Seeded from the metadata's class alone: a member only the runtime class
+  // implements may be missing from the class's binding, so it is left to the
+  // protocols to bind.
   robin_hood::unordered_map<std::string, uint8_t> names;
-  CollectInstanceMemberNames(meta, pair, true, names);
+  CollectInstanceMemberNames(meta, KnownUnknownClassPair(pair.known), true, names);
 
   Local<FunctionTemplate> bindingTemplate = FunctionTemplate::New(isolate);
   bindingTemplate->InstanceTemplate()->SetInternalFieldCount(1);
   bindingTemplate->SetClassName(tns::ToV8String(isolate, meta->name()));
   bindingTemplate->Inherit(classTemplate);
-  MetadataBuilder::RegisterAdditionalProtocols(context, bindingTemplate, pair, protocols, names);
+  MetadataBuilder::RegisterAdditionalProtocols(context, bindingTemplate, pair, additionalProtocols,
+                                               names);
 
   Local<v8::Function> bindingFunc;
   Local<v8::Function> classFunc;
@@ -760,8 +781,14 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateProtocolBindingTemplate(
                           PropertyAttribute::DontEnum)
       .FromMaybe(false);
 
+  // Building the class's binding can wrap objects of this class first.
+  cached = findBinding();
+  if (!cached.IsEmpty()) {
+    return cached;
+  }
   if (bindings != nullptr) {
-    bindings->templates.emplace(std::move(key), Global<FunctionTemplate>(isolate, bindingTemplate));
+    bindings->byClass[runtimeClass].push_back(ProtocolBindings::Binding{
+        meta, additionalProtocols, Global<FunctionTemplate>(isolate, bindingTemplate)});
   }
   return bindingTemplate;
 }

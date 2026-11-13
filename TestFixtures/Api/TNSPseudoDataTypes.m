@@ -9,6 +9,26 @@
 
 @end
 
+@interface TNSWithOptionalMember : NSObject <TNSOptionalMemberProtocol>
+@end
+
+@implementation TNSWithOptionalMember
+
+-(NSString*)optionalMember {
+    return @"optional member";
+}
+
+@end
+
+@interface TNSWithoutOptionalMember : NSObject <TNSOptionalMemberProtocol>
+@end
+
+@implementation TNSWithoutOptionalMember
+@end
+
+@implementation TNSReadwriteValue
+@end
+
 @implementation TNSType
 
 -(void)method {
@@ -39,6 +59,18 @@
     internal.propertyFromProto1 = @"property from proto1";
     internal.propertyFromProto2 = @"property from proto2";
     return internal;
+}
+
++(id<TNSOptionalMemberProtocol>)getWithOptionalMember {
+    return [[TNSWithOptionalMember alloc] init];
+}
+
++(id<TNSOptionalMemberProtocol>)getWithoutOptionalMember {
+    return [[TNSWithoutOptionalMember alloc] init];
+}
+
++(id<TNSReadonlyValueProtocol>)getReadwriteValue {
+    return [[TNSReadwriteValue alloc] init];
 }
 
 +(TNSType<Proto1, Proto2>*)getType {
