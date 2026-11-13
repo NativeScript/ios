@@ -18,6 +18,10 @@ describe("Wrapper lifetime leak cycles", function () {
     var WeakBackRef = shape("TNSLeakWeakBackRef");
     var Unexplained = shape("TNSLeakUnexplained");
     var Counted = shape("TNSLeakCounted");
+    var InFlight = shape("TNSLeakInFlight");
+    // The operation retains its execution blocks.
+    var SelfHandler = NSBlockOperation.extend({}, { name: "TNSLeakSelfHandler" });
+    var WeakHandler = NSBlockOperation.extend({}, { name: "TNSLeakWeakHandler" });
 
     // Which shapes leak, per mode: state referencing its own object only under
     // canary, a cycle through a native retain under both new modes, and a JS
@@ -30,6 +34,8 @@ describe("Wrapper lifetime leak cycles", function () {
         TNSLeakOwnedSelfRef: false,
         TNSLeakWeakBackRef: false,
         TNSLeakUnexplained: false,
+        TNSLeakSelfHandler: true,
+        TNSLeakWeakHandler: false,
     };
 
     function scrub(n) {
@@ -48,6 +54,21 @@ describe("Wrapper lifetime leak cycles", function () {
                 callback();
             }
         }, 10);
+    }
+
+    function aliveNamed(table, name) {
+        var count = 0;
+        table.allObjects.enumerateObjectsUsingBlock(function (o) {
+            if (NSStringFromClass(o.class()).indexOf(name) !== -1) {
+                count++;
+            }
+        });
+        return count;
+    }
+
+    function hostOrigin() {
+        var reportUrl = NSProcessInfo.processInfo.environment.objectForKey("REPORT_BASEURL");
+        return reportUrl ? new URL(String(reportUrl)).origin : null;
     }
 
     function cyclesNaming(report, name) {
@@ -124,7 +145,23 @@ describe("Wrapper lifetime leak cycles", function () {
                     NSValue.valueWithNonretainedObject(unexplained),
                 ];
 
-                [selfRef, closure, nativeCycle, blockCycle, ownedSelfRef, weakBackRef, unexplained].forEach(
+                // A handler on the object that owns it, naming the object: the
+                // block's strong handle on its function closes the cycle.
+                var selfHandler = SelfHandler.new();
+                selfHandler.x = 1;
+                selfHandler.addExecutionBlock(function () {
+                    return selfHandler.x;
+                });
+
+                var weakHandler = WeakHandler.new();
+                weakHandler.x = 1;
+                var weakHandlerRef = new WeakRef(weakHandler);
+                weakHandler.addExecutionBlock(function () {
+                    var o = weakHandlerRef.deref();
+                    return o && o.x;
+                });
+
+                [selfRef, closure, nativeCycle, blockCycle, ownedSelfRef, weakBackRef, unexplained, selfHandler, weakHandler].forEach(
                     function (o) {
                         watched.addObject(o);
                     }
@@ -200,11 +237,67 @@ describe("Wrapper lifetime leak cycles", function () {
             });
         });
 
+        it("collects a handler that reaches its owner through a WeakRef", function () {
+            expect(aliveNamed(watched, "TNSLeakWeakHandler")).toBe(0);
+            expect(aliveNamed(watched, "TNSLeakSelfHandler")).toBe(1);
+        });
+
         it("keeps the controls alive", function () {
             expect(owner.count).toBe(1);
             expect(hiddenOwner.count).toBe(1);
         });
     });
+
+    // The session owns the task, the task its completion block, and the block
+    // its JS callback: what the callback captures is not leaked while the
+    // request is in flight, and is collectable once it completes.
+    it("does not report what an in-flight NSURLSession task's completion handler captures", function (done) {
+        var origin = hostOrigin();
+        if (!origin) {
+            pending("REPORT_BASEURL not set; no host HTTP server");
+            done();
+            return;
+        }
+        var watchedInFlight = NSHashTable.weakObjectsHashTable();
+        var completed = false;
+        (function () {
+            var captured = InFlight.new();
+            captured.tag = "in flight";
+            watchedInFlight.addObject(captured);
+            var session = NSURLSession.sessionWithConfigurationDelegateDelegateQueue(
+                NSURLSessionConfiguration.ephemeralSessionConfiguration,
+                null,
+                NSOperationQueue.mainQueue
+            );
+            var url = NSURL.URLWithString(origin + "/esm/timeout.mjs?delayMs=4000");
+            session
+                .dataTaskWithRequestCompletionHandler(NSURLRequest.requestWithURL(url), function () {
+                    completed = captured.tag === "in flight";
+                })
+                .resume();
+            session.finishTasksAndInvalidate();
+        })();
+        settle(1, function () {
+            expect(completed).toBe(false);
+            [runtime.findLeakCycles(), runtime.findLeakCycles({ strict: true })].forEach(function (report) {
+                expect(cyclesNaming(report, "TNSLeakInFlight").length).toBe(0);
+            });
+            expect(aliveNamed(watchedInFlight, "TNSLeakInFlight")).toBe(1);
+            var waited = 0;
+            (function waitForCompletion() {
+                if (!completed && waited < 15000) {
+                    waited += 100;
+                    setTimeout(waitForCompletion, 100);
+                    return;
+                }
+                expect(completed).toBe(true);
+                settle(3, function () {
+                    expect(aliveNamed(watchedInFlight, "TNSLeakInFlight")).toBe(0);
+                    done();
+                });
+            })();
+        });
+    }, 30000);
 
     it("logs class counts on a memory warning", function () {
         expect(function () {
