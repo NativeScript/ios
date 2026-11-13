@@ -18,8 +18,9 @@ struct CanaryRecord;
 // for the same object forwards to the same state.
 //
 // The state object is rooted from its first write until the native object is
-// deallocated, reported by an associated token's -dealloc or found by a sweep
-// of weak references after major collections (NS_CANARY_DEATH_SIGNAL in the
+// deallocated. A JS-extended class's own -dealloc reports its instances; for
+// other objects an associated token's -dealloc does, or a sweep of weak
+// references after major collections finds it (NS_CANARY_DEATH_SIGNAL in the
 // .mm chooses). It cannot be rooted
 // only once the canary dies instead: a state reachable only through the canary
 // is garbage in the same collection, before any phantom callback runs. The
@@ -36,6 +37,11 @@ struct CanaryRecord;
 class WrapperLifetimeCanary {
  public:
   static void Init(v8::Isolate* isolate);
+
+  // Gives a JS-extended class a -dealloc that reports its instances' deaths,
+  // so their state needs no associated token or weak reference. No-op unless
+  // the mode is canary.
+  static void InstallDeallocHook(Class extendedClass);
 
   // Installs the forwarding handlers on an ObjC instance template. No-op unless
   // the mode is canary.
