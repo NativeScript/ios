@@ -2,11 +2,16 @@
 #include <Block.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <sstream>
+#include <unordered_map>
+#include <vector>
 #include "Caches.h"
 #include "Constants.h"
 #include "DataWrapper.h"
 #include "FFICall.h"
+#include "EventLoop.h"
 #include "Helpers.h"
+#include "Runtime.h"
+#include "TNSDerivedClass.h"
 
 using namespace v8;
 using namespace std;
@@ -14,11 +19,6 @@ using namespace std;
 namespace tns {
 
 static Class NSTimerClass = objc_getClass("NSTimer");
-
-void ObjectManager::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
-  globalTemplate->Set(tns::ToV8String(isolate, "__releaseNativeCounterpart"),
-                      FunctionTemplate::New(isolate, ReleaseNativeCounterpartCallback));
-}
 
 namespace {
 
@@ -52,7 +52,95 @@ void UnlinkRegistered(ObjectWeakCallbackState* state) {
   state->next_ = nullptr;
 }
 
+// The native release of an object that first reached JS on its runtime's
+// thread belongs on that thread. JS, and with it a collection and its
+// finalizers, can run on any thread that holds the isolate's Locker (a JS
+// callback dispatched to a background queue), and a -dealloc that tears down a
+// view, a CA transaction or a block capturing one crashes off the main thread.
+// Objects first wrapped on another thread are still released where the
+// collection runs.
+//
+// Every access holds the isolate's Locker: finalizers and
+// __releaseNativeCounterpart on any thread, and on the runtime's thread the
+// drain task, wrapper creation and teardown. So no other synchronization.
+struct DeferredReleases {
+  // Object -> releases it is owed. An object stays alive while it is owed one,
+  // so its address cannot be reused by another object meanwhile.
+  std::unordered_map<void*, unsigned> objects;
+  std::vector<const void*> blocks;
+  bool drainPosted = false;
+};
+
+void DrainDeferredReleases(DeferredReleases* pending) {
+  std::unordered_map<void*, unsigned> objects;
+  std::vector<const void*> blocks;
+  objects.swap(pending->objects);
+  blocks.swap(pending->blocks);
+  pending->drainPosted = false;
+  for (const auto& entry : objects) {
+    id obj = (__bridge id)entry.first;
+    for (unsigned i = 0; i < entry.second; i++) {
+      [obj release];
+    }
+  }
+  for (const void* block : blocks) {
+    Block_release(block);
+  }
+}
+
+// The queue to hand a release to, or null when the caller releases inline.
+// Created by Init, so a collection on another thread never creates it; read
+// without the validity check because a collection can still run on another
+// thread between InvalidateIsolate and teardown, which drains it.
+DeferredReleases* DeferralQueue(Isolate* isolate, bool bornOnRuntimeThread) {
+  if (!bornOnRuntimeThread || OnRuntimeThreadOf(isolate)) {
+    return nullptr;
+  }
+  return Caches::ExistingStateFor<DeferredReleases>(isolate);
+}
+
+// One event loop task per batch. If the loop no longer takes work, teardown is
+// under way and drains the queue itself.
+void PostDrain(Isolate* isolate, DeferredReleases* pending) {
+  if (pending->drainPosted) {
+    return;
+  }
+  Runtime* runtime = Runtime::GetRuntime(isolate);
+  std::shared_ptr<EventLoop> loop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
+  pending->drainPosted = loop != nullptr && loop->PostInternal([isolate]() {
+    if (DeferredReleases* queued = Caches::ExistingStateFor<DeferredReleases>(isolate)) {
+      DrainDeferredReleases(queued);
+    }
+  });
+}
+
+void ReleaseOnRuntimeThread(Isolate* isolate, id obj, bool bornOnRuntimeThread) {
+  DeferredReleases* pending = DeferralQueue(isolate, bornOnRuntimeThread);
+  if (pending == nullptr) {
+    [obj release];
+    return;
+  }
+  pending->objects[(__bridge void*)obj]++;
+  PostDrain(isolate, pending);
+}
+
+void BlockReleaseOnRuntimeThread(Isolate* isolate, const void* block, bool bornOnRuntimeThread) {
+  DeferredReleases* pending = DeferralQueue(isolate, bornOnRuntimeThread);
+  if (pending == nullptr) {
+    Block_release(block);
+    return;
+  }
+  pending->blocks.push_back(block);
+  PostDrain(isolate, pending);
+}
+
 }  // namespace
+
+void ObjectManager::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate) {
+  globalTemplate->Set(tns::ToV8String(isolate, "__releaseNativeCounterpart"),
+                      FunctionTemplate::New(isolate, ReleaseNativeCounterpartCallback));
+  Caches::StateFor<DeferredReleases>(isolate);
+}
 
 std::shared_ptr<Persistent<Value>> ObjectManager::Register(Local<Context> context,
                                                            const Local<Value> obj) {
@@ -104,6 +192,12 @@ void ObjectManager::DisposeAllRegistered(Isolate* isolate) {
   Isolate::Scope isolateScope(isolate);
   HandleScope scope(isolate);
 
+  // The event loop has stopped taking work, so nothing else would drain.
+  DeferredReleases* deferred = Caches::ExistingStateFor<DeferredReleases>(isolate);
+  if (deferred != nullptr) {
+    DrainDeferredReleases(deferred);
+  }
+
   // Detach the whole list first so disposal can't walk into freed entries, and
   // claim every state up front: disposing one entry can re-enter JS from
   // -dealloc and reach __releaseNativeCounterpart for any other entry this
@@ -128,6 +222,12 @@ void ObjectManager::DisposeAllRegistered(Isolate* isolate) {
     delete state;
 
     state = next;
+  }
+
+  // The walk's own releases are inline on the runtime's thread; this catches
+  // any made from another.
+  if (deferred != nullptr) {
+    DrainDeferredReleases(deferred);
   }
 
   DisposeHandleMap(isolate, cache->CtorFuncs);
@@ -175,6 +275,28 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
   state->target_->SetWeak(state, FinalizerCallback, WeakCallbackType::kFinalizer);
 }
 
+bool ObjectManager::TakeDeferredRelease(Isolate* isolate, id obj) {
+  DeferredReleases* pending = Caches::ExistingStateFor<DeferredReleases>(isolate);
+  if (pending == nullptr || pending->objects.empty()) {
+    return false;
+  }
+  auto it = pending->objects.find((__bridge void*)obj);
+  if (it == pending->objects.end()) {
+    return false;
+  }
+  if (--it->second == 0) {
+    pending->objects.erase(it);
+  }
+  return true;
+}
+
+void ObjectManager::ProtectIfNativelyRetained(id obj, ObjCDataWrapper* wrapper) {
+  if (class_conformsToProtocol(object_getClass(obj), @protocol(TNSDerivedClass)) &&
+      [obj retainCount] > 1) {
+    wrapper->GcProtect();
+  }
+}
+
 bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFinalDisposal) {
   if (value.IsEmpty() || value->IsNullOrUndefined() || !value->IsObject()) {
     return true;
@@ -219,7 +341,12 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
             cache->Instances.erase(it);
           }
         }
-        [target release];
+        if (objCObjectWrapper->IsAdapterClaim()) {
+          // The adapter's -dealloc retires this wrapper; it must run first.
+          [target release];
+        } else {
+          ReleaseOnRuntimeThread(isolate, target, objCObjectWrapper->BornOnRuntimeThread());
+        }
       }
       break;
     }
@@ -237,7 +364,8 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
       // Block_copy and runs the block's dispose helper once we drop the last
       // reference. (Using CFRelease here over-released stack blocks that were
       // never promoted to the heap, crashing in objc_release during GC.)
-      Block_release(blockWrapper->Block());
+      BlockReleaseOnRuntimeThread(isolate, blockWrapper->Block(),
+                                  blockWrapper->BornOnRuntimeThread());
       break;
     }
     case WrapperType::Reference: {
@@ -386,7 +514,11 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
     // wrapper, so it must not be touched afterwards.
     bool adapterClaim = objcWrapper->IsAdapterClaim();
 
-    [data release];
+    if (adapterClaim) {
+      [data release];
+    } else {
+      ReleaseOnRuntimeThread(isolate, data, objcWrapper->BornOnRuntimeThread());
+    }
 
     // The release above can run a -dealloc that detaches this wrapper; the
     // internal field owns it, so free only what is still attached. An

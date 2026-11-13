@@ -1,6 +1,7 @@
 #ifndef Runtime_h
 #define Runtime_h
 
+#include <pthread.h>
 #include <atomic>
 #include <optional>
 
@@ -50,6 +51,8 @@ class Runtime {
   inline bool IsRuntimeWorker() { return workerId_ > 0; }
 
   inline CFRunLoopRef RuntimeLoop() { return runtimeLoop_; }
+
+  inline bool IsOnRuntimeThread() const { return pthread_equal(runtimeThread_, pthread_self()) != 0; }
 
   /*
    * Scheduler bound to this runtime's runloop. Producers on any thread post;
@@ -192,6 +195,7 @@ class Runtime {
   std::unique_ptr<ModuleInternal> moduleInternal_;
   int workerId_;
   CFRunLoopRef runtimeLoop_;
+  pthread_t runtimeThread_;
   std::shared_ptr<EventLoop> eventLoop_;
   // Drains unhandled promise rejections once per runloop turn
   // (kCFRunLoopBeforeWaiting). Torn down before isolate disposal in ~Runtime.

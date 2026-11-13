@@ -1,4 +1,5 @@
 #include "Runtime.h"
+#include "DataWrapper.h"
 #include <chrono>
 #include <string>
 #include "ArgConverter.h"
@@ -265,6 +266,7 @@ Runtime::Runtime(const RuntimeOptions& options) : workerId_(options.workerId) {
 #endif
   Isolate* isolate = Isolate::New(create_params);
   runtimeLoop_ = CFRunLoopGetCurrent();
+  runtimeThread_ = pthread_self();
   // v8 already asked for this isolate's task runner during Isolate::New, so
   // the registry may hold an unbound loop - or a stopped one, when a worker
   // isolate reuses a disposed isolate's address. Refresh, then attach to this
@@ -385,6 +387,14 @@ Runtime::~Runtime() {
   }
 
   currentRuntime_ = nullptr;
+}
+
+bool OnRuntimeThreadOf(v8::Isolate* isolate) {
+  if (isolate == nullptr) {
+    return false;
+  }
+  Runtime* runtime = Runtime::GetRuntime(isolate);
+  return runtime != nullptr && runtime->IsOnRuntimeThread();
 }
 
 Runtime* Runtime::GetRuntime(v8::Isolate* isolate) {

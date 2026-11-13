@@ -20,6 +20,11 @@ class WorkerInspectorClient;
 
 namespace tns {
 
+// Whether the calling thread is the one `isolate`'s runtime runs on (its event
+// loop's thread). JS can also run on other threads, any that take the
+// isolate's Locker. Several runtimes may share a thread. Defined in Runtime.mm.
+bool OnRuntimeThreadOf(v8::Isolate* isolate);
+
 class PrimitiveDataWrapper;
 struct ObjectWeakCallbackState;
 class EventLoop;
@@ -396,7 +401,8 @@ class ObjCDataWrapper : public BaseDataWrapper {
   ObjCDataWrapper(id data, const TypeEncoding* typeEncoding = nullptr)
       : data_(data),
         typeEncoding_(typeEncoding),
-        klass_(object_getClass(data)) {}
+        klass_(object_getClass(data)),
+        bornOnRuntimeThread_(OnRuntimeThreadOf(v8::Isolate::TryGetCurrent())) {}
 
   const WrapperType Type() { return WrapperType::ObjCObject; }
 
@@ -408,6 +414,11 @@ class ObjCDataWrapper : public BaseDataWrapper {
   // other retirement path may free it.
   bool IsAdapterClaim() { return this->adapterClaim_; }
   void MarkAdapterClaim() { this->adapterClaim_ = true; }
+
+  // Whether the object first reached JS on its runtime's thread, the stand-in
+  // for "belongs to that thread": its native release must happen there too.
+  bool BornOnRuntimeThread() { return this->bornOnRuntimeThread_; }
+  void SetBornOnRuntimeThread() { this->bornOnRuntimeThread_ = true; }
 
   const TypeEncoding* TypeEncoding() { return this->typeEncoding_; }
 
@@ -421,6 +432,7 @@ class ObjCDataWrapper : public BaseDataWrapper {
   id data_;
   const tns::TypeEncoding* typeEncoding_;
   Class klass_;
+  bool bornOnRuntimeThread_;
 };
 
 class ObjCClassWrapper : public BaseDataWrapper {
@@ -488,7 +500,10 @@ class AnonymousFunctionWrapper : public BaseDataWrapper {
 class BlockWrapper : public BaseDataWrapper {
  public:
   BlockWrapper(void* block, const TypeEncoding* typeEncoding, bool ownsBlock)
-      : block_(block), typeEncoding_(typeEncoding), ownsBlock_(ownsBlock) {}
+      : block_(block),
+        typeEncoding_(typeEncoding),
+        ownsBlock_(ownsBlock),
+        bornOnRuntimeThread_(OnRuntimeThreadOf(v8::Isolate::TryGetCurrent())) {}
 
   const WrapperType Type() { return WrapperType::Block; }
 
@@ -498,10 +513,14 @@ class BlockWrapper : public BaseDataWrapper {
 
   bool OwnsBlock() { return this->ownsBlock_; }
 
+  // See ObjCDataWrapper::BornOnRuntimeThread.
+  bool BornOnRuntimeThread() { return this->bornOnRuntimeThread_; }
+
  private:
   void* block_;
   const TypeEncoding* typeEncoding_;
   bool ownsBlock_;
+  bool bornOnRuntimeThread_;
 };
 
 class FunctionReferenceTypeWrapper : public BaseDataWrapper {
