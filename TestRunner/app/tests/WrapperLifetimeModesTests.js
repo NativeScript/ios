@@ -337,6 +337,31 @@ describe("Wrapper lifetime modes", function () {
         });
     });
 
+    // Plain objects have no class -dealloc of ours: an associated token or a
+    // weak-reference sweep reports them.
+    it("lets a plain native object's JS state go when the object is deallocated", function (done) {
+        var owner = NSMutableArray.new();
+        var before = runtime.getWrapperLifetimeStats();
+        var watched;
+        (function () {
+            var obj = TNSAllocLog.new();
+            obj.tag = "state";
+            owner.addObject(obj);
+            watched = watch(obj);
+        })();
+        settle(2, function () {
+            owner.removeAllObjects();
+            settle(3, function () {
+                var after = runtime.getWrapperLifetimeStats();
+                expect(alive(watched)).toBe(0);
+                if (canary && scope === "all") {
+                    expect(after.canaryNativeDeaths).toBeGreaterThan(before.canaryNativeDeaths);
+                }
+                done();
+            });
+        });
+    });
+
     // The documented cost of the canary contract: state that references its own
     // object keeps the state, the object's wrapper and the native object alive
     // until native code would have released it anyway, which nothing does here.

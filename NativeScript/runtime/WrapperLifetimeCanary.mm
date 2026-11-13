@@ -1,5 +1,6 @@
 #include "WrapperLifetimeCanary.h"
 #import <Foundation/Foundation.h>
+#include <objc/message.h>
 #include <objc/runtime.h>
 #include <atomic>
 #include <memory>
@@ -12,10 +13,12 @@
 #include "Helpers.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
+#import "TNSDerivedClass.h"
 #include "WrapperLifetime.h"
 
 // How canary mode learns that a native object with state was deallocated, so
-// its state can be let go of:
+// its state can be let go of. Instances of JS-extended classes are reported by
+// their class's own -dealloc (InstallDeallocHook) either way; for others:
 // - ASSOCIATION: a token associated with the object reports it from its
 //   -dealloc, immediately and on any thread. The ObjC runtime aborts the
 //   process for a class that forbids associated objects (no public query).
@@ -28,10 +31,8 @@
 #define NS_CANARY_DEATH_SIGNAL NS_CANARY_DEATH_ASSOCIATION
 #endif
 
-#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
 extern "C" id objc_initWeakOrNil(id* location, id value);
 extern "C" void objc_destroyWeak(id* location);
-#endif
 
 using namespace v8;
 
@@ -45,8 +46,12 @@ namespace tns {
 struct CanaryRecord {
   Global<Object> state;
   std::atomic<bool> died{false};
-#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
-  // Zeroed by the ObjC runtime when the object is deallocated, on any thread.
+  // Something reports this object's deallocation: a JS-extended class's
+  // -dealloc, or the associated token. Otherwise only the weak reference below
+  // tells, when a sweep reads it.
+  bool reportsDeath = false;
+  // An ObjC weak reference to the object, zeroed by the runtime when it is
+  // deallocated, on any thread. Set for records nothing reports.
   id object = nil;
 
   ~CanaryRecord() { objc_destroyWeak(&object); }
@@ -54,11 +59,9 @@ struct CanaryRecord {
   // A racy read is enough: the slot only goes from the object to nil, and is
   // never dereferenced here.
   bool ObjectAlive() const {
-    return __atomic_load_n(reinterpret_cast<void* const*>(&object), __ATOMIC_ACQUIRE) != nullptr;
+    return reportsDeath ||
+           __atomic_load_n(reinterpret_cast<void* const*>(&object), __ATOMIC_ACQUIRE) != nullptr;
   }
-#else
-  bool ObjectAlive() const { return true; }
-#endif
 };
 
 namespace {
@@ -89,7 +92,6 @@ struct CanaryState {
   std::shared_ptr<CanaryRegistry> registry = std::make_shared<CanaryRegistry>();
 };
 
-#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
 void DrainDead(const std::shared_ptr<CanaryRegistry>& registry) {
   std::vector<std::shared_ptr<CanaryRecord>> dead;
   {
@@ -109,8 +111,11 @@ void DrainDead(const std::shared_ptr<CanaryRegistry>& registry) {
   }
 }
 
-// From the token's -dealloc, on whichever thread deallocates the object.
+// From a reporter's -dealloc, on whichever thread deallocates the object.
 void NativeDied(const std::shared_ptr<CanaryRegistry>& registry, void* object) {
+  if (registry->count.load(std::memory_order_relaxed) == 0) {
+    return;
+  }
   std::shared_ptr<EventLoop> loop;
   {
     std::lock_guard<std::mutex> lock(registry->mutex);
@@ -139,7 +144,35 @@ void NativeDied(const std::shared_ptr<CanaryRegistry>& registry, void* object) {
     registry->drainPosted = false;
   }
 }
-#endif
+
+// Every isolate's registry, for the extended classes' -dealloc: an instance can
+// have state in an isolate other than the one that defined its class.
+std::mutex registriesMutex_;
+std::vector<std::weak_ptr<CanaryRegistry>> registries_;
+
+void ReportDeallocToAllRegistries(void* object) {
+  std::vector<std::shared_ptr<CanaryRegistry>> live;
+  {
+    std::lock_guard<std::mutex> lock(registriesMutex_);
+    for (auto it = registries_.begin(); it != registries_.end();) {
+      if (std::shared_ptr<CanaryRegistry> registry = it->lock()) {
+        if (registry->count.load(std::memory_order_relaxed) > 0) {
+          live.push_back(std::move(registry));
+        }
+        ++it;
+      } else {
+        it = registries_.erase(it);
+      }
+    }
+  }
+  for (const std::shared_ptr<CanaryRegistry>& registry : live) {
+    NativeDied(registry, object);
+  }
+}
+
+bool IsExtendedInstance(id object) {
+  return [object_getClass(object) conformsToProtocol:@protocol(TNSDerivedClass)];
+}
 
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
 // Lets go of the state of every object that was deallocated. Runs as an event
@@ -271,6 +304,8 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
       }
     }
     id object = canary->lifetimeTarget_;
+    // A JS-extended class's own -dealloc reports its instances' deaths.
+    bool extended = IsExtendedInstance(object);
     bool created = false;
     {
       std::lock_guard<std::mutex> lock(registry->mutex);
@@ -284,13 +319,12 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
       std::shared_ptr<CanaryRecord>& slot = registry->records[(__bridge void*)object];
       if (slot == nullptr) {
         auto record = std::make_shared<CanaryRecord>();
-#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
-        if (objc_initWeakOrNil(&record->object, object) == nil) {
+        record->reportsDeath = extended || NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION;
+        if (!record->reportsDeath && objc_initWeakOrNil(&record->object, object) == nil) {
           // The class refuses weak references.
           registry->records.erase((__bridge void*)object);
           return false;
         }
-#endif
         record->state.Reset(isolate, Object::New(isolate, Null(isolate), nullptr, nullptr, 0));
         slot = std::move(record);
         registry->count.fetch_add(1, std::memory_order_relaxed);
@@ -300,12 +334,14 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
     }
     if (created) {
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
-      TNSCanaryLifecycleToken* token = [[TNSCanaryLifecycleToken alloc] init];
-      token->registry_ = registry;
-      token->object_ = (__bridge void*)object;
-      objc_setAssociatedObject(object, &registry->associationKey, token,
-                               OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-      [token release];
+      if (!extended) {
+        TNSCanaryLifecycleToken* token = [[TNSCanaryLifecycleToken alloc] init];
+        token->registry_ = registry;
+        token->object_ = (__bridge void*)object;
+        objc_setAssociatedObject(object, &registry->associationKey, token,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [token release];
+      }
 #endif
       if (ObjectManager::LifetimeStats* stats = ObjectManager::GetLifetimeStats(isolate)) {
         stats->canaryStates++;
@@ -480,10 +516,37 @@ void WrapperLifetimeCanary::Init(Isolate* isolate) {
   if (Runtime* runtime = Runtime::GetRuntime(isolate)) {
     state->registry->loop = runtime->GetEventLoop();
   }
+  {
+    std::lock_guard<std::mutex> lock(registriesMutex_);
+    registries_.push_back(state->registry);
+  }
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
   isolate->AddGCPrologueCallback(
       PostSweepAfterGC, static_cast<GCType>(kGCTypeMarkSweepCompact | kGCTypeIncrementalMarking));
 #endif
+}
+
+void WrapperLifetimeCanary::InstallDeallocHook(Class extendedClass) {
+  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
+    return;
+  }
+  static std::mutex hookedMutex;
+  static std::unordered_map<Class, bool> hooked;
+  {
+    std::lock_guard<std::mutex> lock(hookedMutex);
+    if (hooked[extendedClass]) {
+      return;
+    }
+    hooked[extendedClass] = true;
+  }
+  Class superclass = class_getSuperclass(extendedClass);
+  IMP dealloc = imp_implementationWithBlock(^(id self) {
+    ReportDeallocToAllRegistries((__bridge void*)self);
+    struct objc_super super = {.receiver = self, .super_class = superclass};
+    reinterpret_cast<void (*)(struct objc_super*, SEL)>(objc_msgSendSuper)(&super,
+                                                                           @selector(dealloc));
+  });
+  class_addMethod(extendedClass, @selector(dealloc), dealloc, "v@:");
 }
 
 void WrapperLifetimeCanary::ConfigureInstanceTemplate(Local<ObjectTemplate> instanceTemplate) {

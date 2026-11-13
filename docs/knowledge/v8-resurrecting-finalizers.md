@@ -229,15 +229,16 @@ that dies with its JS references, releasing the runtime's retain through the sam
 `kNonMasking` named interceptors on the instance templates forward JS properties to a
 null-prototype state object, so prototype members never reach them. The state is rooted from
 its first write until the native object is deallocated; a canary built later for the same
-object forwards to the same state. How the deallocation is noticed is a compile-time choice
+object forwards to the same state. Instances of JS-extended classes report their own
+deallocation: the runtime gives each extended class a `-dealloc` that tells every isolate's
+registry, then calls the superclass's. For other objects it is a compile-time choice
 (`NS_CANARY_DEATH_SIGNAL` in `WrapperLifetimeCanary.mm`): by default a token associated with the
 object reports it from its `-dealloc`, immediately and on any thread, but the ObjC runtime aborts
 the process for a class that forbids associated objects, and there is no public query for that;
 the alternative keeps an ObjC weak reference in each record (`objc_initWeakOrNil`, which declines
 instead of aborting for classes that refuse weak references) and sweeps the records after every
 major collection, so state lingers until then. With the default, `"scope": "all"` is
-experimental for that reason; with `"extended"` only instances of JS-extended classes get a
-token (the flag is inherited, so a JS subclass of a forbidding class would still abort). It cannot be
+experimental for that reason; `"extended"` attaches no tokens at all. It cannot be
 rooted at canary death instead, because a state reachable only through the canary is garbage in
 the same collection. The cost: state that references its own object (a closure over `this`)
 keeps it alive. A canary built after a death is a new object, but `===` cannot tell: only one
