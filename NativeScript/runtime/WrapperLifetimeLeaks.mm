@@ -39,6 +39,10 @@ constexpr const char* kCountsNotification = "org.nativescript.wrapperLifetime.co
 constexpr const char* kCyclesNotification = "org.nativescript.wrapperLifetime.findLeakCycles";
 constexpr const char* kStrictCyclesNotification =
     "org.nativescript.wrapperLifetime.findLeakCycles.strict";
+// Inspects the class-name prefixes listed one per line in
+// <tmp>/ns-wrapper-lifetime-inspect.txt.
+constexpr const char* kInspectCyclesNotification =
+    "org.nativescript.wrapperLifetime.findLeakCycles.inspect";
 constexpr const char* kLogPrefix = "NativeScript wrapper lifetime:";
 
 constexpr size_t kMaxNativeObjects = 200000;
@@ -1033,9 +1037,24 @@ void ReportCounts(Isolate* isolate) {
   Log("%s class counts written to %s", kLogPrefix, path.c_str());
 }
 
-void ReportCycles(Isolate* isolate, bool strict) {
+std::vector<std::string> InspectPrefixes() {
+  std::vector<std::string> prefixes;
+  NSString* path =
+      [NSTemporaryDirectory() stringByAppendingPathComponent:@"ns-wrapper-lifetime-inspect.txt"];
+  NSString* text = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
+  for (NSString* line in [text componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]) {
+    NSString* prefix =
+        [line stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+    if (prefix.length > 0) {
+      prefixes.push_back(prefix.UTF8String);
+    }
+  }
+  return prefixes;
+}
+
+void ReportCycles(Isolate* isolate, bool strict, const std::vector<std::string>& inspect = {}) {
   Local<Context> context = isolate->GetCurrentContext();
-  Local<Object> report = FindLeakCycles(isolate, context, strict);
+  Local<Object> report = FindLeakCycles(isolate, context, strict, inspect);
   Local<Value> cycles;
   uint32_t count = 0;
   if (report->Get(context, tns::ToV8String(isolate, "cycles")).ToLocal(&cycles) &&
@@ -1053,7 +1072,8 @@ void ReportCycles(Isolate* isolate, bool strict) {
       }
     }
   }
-  std::string path = WriteReport(isolate, context, strict ? "cycles-strict" : "cycles", report);
+  const char* kind = !inspect.empty() ? "cycles-inspect" : strict ? "cycles-strict" : "cycles";
+  std::string path = WriteReport(isolate, context, kind, report);
   Log("%s %u leak cycle(s)%s, report written to %s", kLogPrefix, count, strict ? " (strict)" : "",
       path.c_str());
 }
@@ -1136,6 +1156,14 @@ void InstallTriggers(Isolate* isolate) {
       {kCountsNotification, [](Isolate* target) { ReportCounts(target); }},
       {kCyclesNotification, [](Isolate* target) { ReportCycles(target, false); }},
       {kStrictCyclesNotification, [](Isolate* target) { ReportCycles(target, true); }},
+      {kInspectCyclesNotification,
+       [](Isolate* target) {
+         for (int i = 0; i < kCountCollections; i++) {
+           target->LowMemoryNotification();
+           WrapperLifetime::DrainReleases(target);
+         }
+         ReportCycles(target, false, InspectPrefixes());
+       }},
   };
   for (const auto& [name, handler] : handlers) {
     int token = 0;
