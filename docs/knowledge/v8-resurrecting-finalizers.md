@@ -243,8 +243,12 @@ rooted at canary death instead, because a state reachable only through the canar
 the same collection. The cost: state that references its own object (a closure over `this`)
 keeps it alive. A canary built after a death is a new object, but `===` cannot tell: only one
 canary lives at a time, and anything still referencing the old one would have kept it alive.
-What does notice is whatever keys on the canary without keeping it: `WeakMap` keys and `WeakRef`s
-of the old canary, and native `#private` fields, which are branded on it. Other
+What could notice is whatever keys on the canary without keeping it. The weak collections
+don't: in canary mode a builtin (`js/weak-collections.js`) replaces `WeakMap`, `WeakSet`,
+`WeakRef` and `FinalizationRegistry` with subclasses that key a native object by an opaque,
+frozen key held by its state, so entries and targets live exactly as long as the native object,
+and `WeakRef.prototype.deref` returns the live canary, a new one, or `undefined` once the object
+is gone. Native `#private` fields are branded on the canary and do not carry over. Other
 limits: `Object.freeze`, `seal` and `preventExtensions` throw on a canary (V8 refuses them on
 objects with interceptors); index-keyed properties are not forwarded and die with the canary;
 a write through an object whose prototype is a canary lands in the canary's state, since
