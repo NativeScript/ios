@@ -232,8 +232,10 @@ its first write until the native object is deallocated, which an associated toke
 reports; a canary built later for the same object forwards to the same state. It cannot be
 rooted at canary death instead, because a state reachable only through the canary is garbage in
 the same collection. The cost: state that references its own object (a closure over `this`)
-keeps it alive. Identity changes across a canary's death, so `===` with an old wrapper, `WeakMap`
-keys and `WeakRef`s of the old canary, and native `#private` fields do not carry over. Other
+keeps it alive. A canary built after a death is a new object, but `===` cannot tell: only one
+canary lives at a time, and anything still referencing the old one would have kept it alive.
+What does notice is whatever keys on the canary without keeping it: `WeakMap` keys and `WeakRef`s
+of the old canary, and native `#private` fields, which are branded on it. Other
 limits: `Object.freeze`, `seal` and `preventExtensions` throw on a canary (V8 refuses them on
 objects with interceptors); index-keyed properties are not forwarded and die with the canary;
 a write through an object whose prototype is a canary lands in the canary's state, since
