@@ -54,7 +54,8 @@ declare module "ns:runtime" {
      * - `"canary"`: no resurrection. A wrapper in scope dies with its JS
      *   references; JS properties set on it live on a state object kept until
      *   the native object is deallocated, and a wrapper built for the object
-     *   later has them again (as a new object: `===` with the old one fails).
+     *   later has them again. Weak references to the old wrapper (WeakMap keys,
+     *   WeakRef) and native `#private` fields do not carry over.
      *   State that references its own object keeps that object alive.
      */
     wrapperLifetimeMode: "resurrecting" | "rooted" | "canary";
