@@ -14,6 +14,25 @@
 
 @end
 
+@protocol TNSOptionalMemberProtocol
+
+@optional
+-(NSString*)optionalMember;
+
+@end
+
+@protocol TNSReadonlyValueProtocol
+
+@property (nonatomic, readonly) NSInteger value;
+
+@end
+
+@interface TNSReadwriteValue : NSObject
+
+@property (nonatomic) NSInteger value;
+
+@end
+
 @interface TNSType : NSObject
 
 -(void)method;
@@ -24,5 +43,8 @@
 
 +(id<Proto1, Proto2>)getId;
 +(TNSType<Proto1, Proto2>*)getType;
++(id<TNSOptionalMemberProtocol>)getWithOptionalMember;
++(id<TNSOptionalMemberProtocol>)getWithoutOptionalMember;
++(id<TNSReadonlyValueProtocol>)getReadwriteValue;
 
 @end
