@@ -30,5 +30,6 @@ $(SRCROOT)/NativeScript/runtime/js/require-factory.js
 $(SRCROOT)/NativeScript/runtime/js/structured-clone.js
 $(SRCROOT)/NativeScript/runtime/js/text-encoding.js
 $(SRCROOT)/NativeScript/runtime/js/ts-helpers.js
+$(SRCROOT)/NativeScript/runtime/js/weak-collections.js
 $(SRCROOT)/NativeScript/runtime/js/weak-ref.js
 $(SRCROOT)/NativeScript/runtime/js/worker-events.js
