@@ -138,6 +138,43 @@ describe("Wrapper lifetime modes", function () {
         });
     });
 
+    // +new runs the JS-implemented init from native code, before JS has a
+    // wrapper for the object.
+    it("manages the lifetime of an object whose JS-implemented initializer created its wrapper", function (done) {
+        var JSInit = (function (_super) {
+            __extends(JSInit, _super);
+            function JSInit() {
+                return (_super !== null && _super.apply(this, arguments)) || this;
+            }
+            JSInit.prototype.init = function () {
+                var self = _super.prototype.init.call(this);
+                self.initialized = true;
+                return self;
+            };
+            return JSInit;
+        })(TNSAllocLog);
+        var owner = NSMutableArray.new();
+        (function () {
+            var obj = JSInit.new();
+            obj.state = { i: 1 };
+            owner.addObject(obj);
+        })();
+        settle(2, function () {
+            var obj = owner.objectAtIndex(0);
+            expect(obj.initialized).toBe(true);
+            expect(obj.state && obj.state.i).toBe(1);
+            obj = null;
+            expect(deallocs()).toBe(0);
+            owner.removeAllObjects();
+            settle(3, function () {
+                if (mode !== "resurrecting") {
+                    expect(deallocs()).toBe(1);
+                }
+                done();
+            });
+        });
+    });
+
     it("collects a native-retain cycle whose back reference is a WeakRef", function (done) {
         (function () {
             var owner = NSMutableArray.new();
