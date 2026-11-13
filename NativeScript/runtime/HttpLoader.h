@@ -105,6 +105,11 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
 //   - an NSURLSession GET on a background queue with the same request shape
 //     as the sync path (cache-bust nonce, zero-cache headers, no cookies) and
 //     one retry on transport error.
+// `fetchDeadline` is the enclosing graph load's fetch budget as an absolute
+// CFAbsoluteTime (double; 0 = unbounded): attempts clamp their request
+// timeout to the time remaining and the transport-error retry is skipped
+// once no budget is left, so a bounded fetch can never outlive the wait
+// that is pumping for it.
 // `completion(result)` is invoked exactly once, on an arbitrary thread —
 // callers must hop to their JS thread before touching V8.
 // `canonicalKey` as for HttpFetchModule: computed on the calling isolate's
@@ -112,6 +117,7 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
 // threads that cannot read per-isolate vocabulary.
 void FetchModuleBodyAsync(
     const std::string& url, const std::string& canonicalKey,
+    double fetchDeadline,
     std::function<void(ModuleFetchResult result)> completion);
 
 // Mark a URL set (canonicalized internally) so that the NEXT network
