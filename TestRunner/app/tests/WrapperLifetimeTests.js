@@ -111,6 +111,10 @@ describe("Wrapper lifetime", function () {
     // object reached UIKit as a dictionary. Zero husks is a legal (if unlucky)
     // outcome, as in GCFinalizerTests.
     it("names garbage collection as the reason for an object released under a resurrected holder", function () {
+        if (runtime.getConfig("wrapperLifetimeMode") !== "resurrecting") {
+            // Nothing is resurrected, so nothing reachable is released.
+            return;
+        }
         var Holder = (function (_super) {
             __extends(Holder, _super);
             function Holder() {
@@ -155,6 +159,12 @@ describe("Wrapper lifetime", function () {
     });
 
     it("reports JS state lost on a wrapper whose native object lives on", function (done) {
+        if (runtime.getConfig("wrapperLifetimeMode") !== "resurrecting") {
+            // Rooted wrappers keep their state; unrooted ones die in a phantom
+            // callback, where their properties can no longer be read.
+            done();
+            return;
+        }
         var previous = runtime.getConfig("wrapperLifetimeWarnings");
         runtime.setConfig("wrapperLifetimeWarnings", true);
         var N = 16;
@@ -220,9 +230,12 @@ describe("Wrapper lifetime", function () {
             "releasedAccesses",
             "releasedExplicitly",
             "resurrections",
+            "demotions",
+            "promotions",
+            "queuedReleases",
             "stateLostCandidates",
             "stateLostConfirmed",
-        ]);
+        ].sort());
         Object.keys(current).forEach(function (key) {
             expect(typeof current[key]).toBe("number");
         });

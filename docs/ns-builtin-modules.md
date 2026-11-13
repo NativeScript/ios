@@ -116,6 +116,8 @@ Config keys:
 | `releasedObjectPolicy` | `"report"` \| `"throw"` | process-wide (main-isolate writes only; read live by every isolate) | `"report"` |
 | `debug` | comma-separated category list, e.g. `"esm,fetch"` | process-wide (main-isolate writes only; read live by every isolate) | the `NS_DEBUG` environment variable, or `""` |
 | `wrapperLifetimeWarnings` | `true` \| `false` | process-wide (main-isolate writes only; read live by every isolate) | the app config `"wrapperLifetime": { "warnings": … }`, or on in debug builds |
+| `wrapperLifetimeMode` | `"resurrecting"` \| `"rooted"` | process-wide, read-only | the app config `"wrapperLifetime": { "mode": … }`, or `"resurrecting"` |
+| `wrapperLifetimeScope` | `"extended"` \| `"all"` | process-wide, read-only | the app config `"wrapperLifetime": { "scope": … }`, or `"extended"` |
 
 ```js
 const { setConfig, getConfig } = require("ns:runtime");
@@ -144,6 +146,7 @@ The `TypeError` messages are part of the contract:
 | invalid `releasedObjectPolicy` value | `'releasedObjectPolicy' must be 'report' or 'throw'` |
 | non-string `debug` value | `'debug' must be a comma-separated category string (<categories>), or '' to disable tracing` |
 | non-boolean `wrapperLifetimeWarnings` value | `'wrapperLifetimeWarnings' must be a boolean` |
+| `setConfig` of `wrapperLifetimeMode` or `wrapperLifetimeScope` | `'<key>' is read-only; set "wrapperLifetime" in the app config` |
 
 ### Wrapper lifetime counters
 
@@ -158,6 +161,9 @@ every build (they only cost an increment on finalizer and error paths):
 | `releasedAccesses` | times JS passed a released wrapper to native code, used it as a method receiver, or touched a released pointer, reference or struct |
 | `stateLostCandidates` | collected wrappers carrying JS properties whose object was still retained by something else (only while `wrapperLifetimeWarnings` is on) |
 | `stateLostConfirmed` | candidates whose object was still alive a runloop turn later; each class is also reported once in the log |
+| `promotions` | `"rooted"` only: weak wrappers made strong because native code retained their object |
+| `demotions` | `"rooted"` only: strong wrappers made weak at a major collection because native code no longer retained their object |
+| `queuedReleases` | `"rooted"` only: collected wrappers whose native object was queued for release on the runtime's thread |
 
 A wrapper whose native object was released keeps its JS identity. Passing it
 to native code follows `releasedObjectPolicy`: under `"report"` the argument

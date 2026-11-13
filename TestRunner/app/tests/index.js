@@ -135,6 +135,7 @@ require("./NsUrlTests");
 require("./NsInteropTests");
 require("./GCFinalizerTests");
 require("./WrapperLifetimeTests");
+require("./WrapperLifetimeModesTests");
 require("./BlockCacheRaceTests");
 require("./WorkerConcurrentStartupTests");
 require("./WorkerOptionsTests");

@@ -12,6 +12,7 @@
 #include "NSDataAdapter.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
+#include "WrapperLifetime.h"
 #include "OneByteStringResource.h"
 #include "Pointer.h"
 #include "Reference.h"
@@ -763,6 +764,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
         Interop::SetValue(dest, data);
       } else if (wrapper->Type() == WrapperType::ObjCObject) {
         ObjCDataWrapper* objCDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+        WrapperLifetime::Escape(objCDataWrapper);
         id data = objCDataWrapper->Data();
         Interop::SetValue(dest, data);
       } else if (wrapper->Type() == WrapperType::ObjCClass) {

@@ -41,6 +41,26 @@ declare module "ns:runtime" {
      * Process-wide; main-isolate writes only.
      */
     wrapperLifetimeWarnings: boolean;
+    /**
+     * How ObjC object wrappers live, from the app config
+     * `"wrapperLifetime": { "mode": ... }`. Read-only: `setConfig` throws.
+     *
+     * - `"resurrecting"` (default): a collected wrapper whose JS-extended
+     *   object native code still retains is resurrected by its finalizer.
+     * - `"rooted"`: no resurrection. A wrapper in scope stays a strong root
+     *   while something other than the runtime retains its object, and is
+     *   weak otherwise; native objects of collected wrappers are released on
+     *   the runtime's thread.
+     */
+    wrapperLifetimeMode: "resurrecting" | "rooted";
+    /**
+     * Which wrappers `"rooted"` roots, from the app config
+     * `"wrapperLifetime": { "scope": ... }`. Read-only: `setConfig` throws.
+     *
+     * - `"extended"` (default): instances of JS-extended classes.
+     * - `"all"`: every ObjC object wrapper except blocks and tagged pointers.
+     */
+    wrapperLifetimeScope: "extended" | "all";
   }
 
   /**
@@ -60,6 +80,12 @@ declare module "ns:runtime" {
     stateLostCandidates: number;
     /** Candidates whose object was still alive a runloop turn later (warnings enabled only). */
     stateLostConfirmed: number;
+    /** `"rooted"` only: weak wrappers made strong because native code retained their object. */
+    promotions: number;
+    /** `"rooted"` only: strong wrappers made weak because native code let go of their object. */
+    demotions: number;
+    /** `"rooted"` only: collected wrappers whose native object was queued for release. */
+    queuedReleases: number;
   }
 
   /**
