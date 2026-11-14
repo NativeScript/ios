@@ -117,6 +117,19 @@ if [[ -z "$CLANG_PATH" ]]; then
     exit 1
 fi
 
+# Weak-link NS_DEBUG_FRAMEWORKS (file names): most configurations don't embed them.
+DEBUG_FRAMEWORKS=" ${NS_DEBUG_FRAMEWORKS} "
+LINK_ARGS=()
+while [[ $# -gt 0 ]]; do
+    if [[ "$1" == "-framework" && $# -gt 1 && "$DEBUG_FRAMEWORKS" == *" $2.framework "* ]]; then
+        LINK_ARGS+=("-weak_framework" "$2")
+        shift 2
+        continue
+    fi
+    LINK_ARGS+=("$1")
+    shift
+done
+
 # For visibility downstream, set NS_LD to the resolved path and invoke.
 NS_LD="$CLANG_PATH"
-"$NS_LD" "$@"
+"$NS_LD" "${LINK_ARGS[@]}"

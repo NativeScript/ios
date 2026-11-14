@@ -9,6 +9,15 @@ else
     mv "$ENV_FILE.tmp" "$ENV_FILE"
 fi
 
+# Xcode reads these as lists too (EXCLUDED_SOURCE_FILE_NAMES / INCLUDED_SOURCE_FILE_NAMES)
+# and only splits on spaces, so a comma would leave the frameworks linked and embedded.
+case "$NS_DEBUG_FRAMEWORKS $NS_SHIP_DEBUG_FRAMEWORKS" in
+    *,*)
+        echo "error: NS_DEBUG_FRAMEWORKS and NS_SHIP_DEBUG_FRAMEWORKS take framework file names separated by spaces, not commas." >&2
+        exit 1
+        ;;
+esac
+
 # create temporary empty metadata files for XCode LD/LDPLUSPLUS flag analysis.
 # Never touch existing ones: the link step reads them, so a newer timestamp
 # would make Xcode relink on every build.
@@ -17,10 +26,11 @@ do :
     [ -e "$CONFIGURATION_BUILD_DIR/metadata-$arch.bin" ] || touch "$CONFIGURATION_BUILD_DIR/metadata-$arch.bin"
 done
 
-# The metadata generator reads these during linking, which Xcode would skip when
-# only they changed.
+# The link step reads these (the metadata generator its filters, nsld.sh
+# NS_DEBUG_FRAMEWORKS), and Xcode would skip it when only they changed.
 FILTERS_STAMP="$CONFIGURATION_BUILD_DIR/metadata-filters.stamp"
 FILTERS_HASH=$(cd "$SRCROOT" && shasum whitelist.mdg blacklist.mdg 2>/dev/null || true)
+FILTERS_HASH="$FILTERS_HASH NS_DEBUG_FRAMEWORKS=$NS_DEBUG_FRAMEWORKS"
 if [ ! -e "$FILTERS_STAMP" ] || [ "$FILTERS_HASH" != "$(cat "$FILTERS_STAMP")" ]; then
     for arch in $VALID_ARCHS
     do :

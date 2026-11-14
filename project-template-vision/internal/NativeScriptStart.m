@@ -9,11 +9,9 @@
 #import <NativeScript/NativeScript.h>
 #import <NativeScriptStart.h>
 
-#ifdef DEBUG
+#include <dlfcn.h>
 #include <notify.h>
-#include <TKLiveSync/TKLiveSync.h>
 #include "macros.h"
-#endif
 
 extern char startOfMetadataSection __asm("section$start$__DATA$__TNSMetadata");
 NativeScript* nativescriptStart;
@@ -24,24 +22,27 @@ NativeScript* nativescriptStart;
      @autoreleasepool {
          NSString* baseDir = [[NSBundle mainBundle] resourcePath];
 
-     #ifdef DEBUG
-             int refreshRequestSubscription;
-             notify_register_dispatch(NOTIFICATION("RefreshRequest"), &refreshRequestSubscription, dispatch_get_main_queue(), ^(int token) {
-                 notify_post(NOTIFICATION("AppRefreshStarted"));
-                 bool success = [nativescriptStart liveSync];
-                 if (success) {
-                     notify_post(NOTIFICATION("AppRefreshSucceeded"));
-                 } else {
-                     NSLog(@"__onLiveSync call failed");
-                     notify_post(NOTIFICATION("AppRefreshFailed"));
-                 }
-             });
+             // TKLiveSync is in NS_DEBUG_FRAMEWORKS: only debug configurations embed it, unless
+             // NS_SHIP_DEBUG_FRAMEWORKS lists it.
+             void (*initializeLiveSync)(void) = (void (*)(void))dlsym(RTLD_DEFAULT, "TNSInitializeLiveSync");
+             if (initializeLiveSync != NULL) {
+                 int refreshRequestSubscription;
+                 notify_register_dispatch(NOTIFICATION("RefreshRequest"), &refreshRequestSubscription, dispatch_get_main_queue(), ^(int token) {
+                     notify_post(NOTIFICATION("AppRefreshStarted"));
+                     bool success = [nativescriptStart liveSync];
+                     if (success) {
+                         notify_post(NOTIFICATION("AppRefreshSucceeded"));
+                     } else {
+                         NSLog(@"__onLiveSync call failed");
+                         notify_post(NOTIFICATION("AppRefreshFailed"));
+                     }
+                 });
 
-             TNSInitializeLiveSync();
-             if (getenv("TNSBaseDir")) {
-                 baseDir = @(getenv("TNSBaseDir"));
+                 initializeLiveSync();
+                 if (getenv("TNSBaseDir")) {
+                     baseDir = @(getenv("TNSBaseDir"));
+                 }
              }
-     #endif
 
              void* metadataPtr = &startOfMetadataSection;
 

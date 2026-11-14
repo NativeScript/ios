@@ -1,3 +1,5 @@
 // @COCOAPODS_SILENCE_WARNINGS@ //
 #include "build.xcconfig"
 #include "../plugins-debug.xcconfig"
+// Debug configurations embed every debug framework.
+NS_EMBEDDED_DEBUG_FRAMEWORKS = $(NS_DEBUG_FRAMEWORKS)
