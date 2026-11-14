@@ -105,6 +105,13 @@ class FFICall : public BaseCall {
   static ffi_type* GetArgumentType(const TypeEncoding* typeEncoding,
                                    bool isStructMember = false);
   static void DisposeFFIType(ffi_type* type, const TypeEncoding* typeEncoding);
+  // GetArgumentType(typeEncoding, isStructMember)->size, without building or
+  // disposing an ffi_type.
+  static size_t GetTypeSize(const TypeEncoding* typeEncoding,
+                            bool isStructMember = false);
+  // For a StructDeclarationReference or AnonymousStructEncoding. Same
+  // lifetime as the overloads below.
+  static const StructInfo& GetStructInfo(const TypeEncoding* typeEncoding);
   // The returned reference points into a process-wide cache that is never
   // pruned, so it stays valid for the lifetime of the process.
   static const StructInfo& GetStructInfo(const StructMeta* structMeta,
@@ -124,6 +131,12 @@ class FFICall : public BaseCall {
   static robin_hood::unordered_map<std::string, std::unique_ptr<StructInfo>>
       structInfosCache_;
   static SpinMutex structInfosCacheMutex_;
+  // Keyed by encoding address: metadata encodings live for the process, and
+  // the runtime-built ones (Interop::CreateEncoding, ClassBuilder) are never
+  // freed and never describe structs.
+  static robin_hood::unordered_map<const TypeEncoding*, const StructInfo*>
+      structInfosByEncoding_;
+  static SpinMutex structInfosByEncodingMutex_;
   void** argsArray_;
   bool useDynamicBuffer_;
   uint8_t staticBuffer[512];

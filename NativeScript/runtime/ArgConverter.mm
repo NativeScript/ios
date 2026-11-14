@@ -327,8 +327,15 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
     bool hasErrorOutParameter = false;
 
-    std::vector<Local<Value>> v8Args;
-    v8Args.reserve(data->paramsCount_);
+    constexpr int kInlineArgs = 8;
+    Local<Value> inlineArgs[kInlineArgs];
+    std::vector<Local<Value>> heapArgs;
+    Local<Value>* argv = inlineArgs;
+    if (data->paramsCount_ > kInlineArgs) {
+      heapArgs.resize(data->paramsCount_);
+      argv = heapArgs.data();
+    }
+    int argc = 0;
     const TypeEncoding* typeEncoding = data->typeEncoding_;
     for (int i = 0; i < data->paramsCount_; i++) {
       typeEncoding = typeEncoding->next();
@@ -344,11 +351,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
       BaseCall call(argBuffer);
       Local<Value> jsWrapper = Interop::GetResult(context, typeEncoding, &call, true);
 
-      if (!jsWrapper.IsEmpty()) {
-        v8Args.push_back(jsWrapper);
-      } else {
-        v8Args.push_back(v8::Undefined(isolate));
-      }
+      argv[argc++] = jsWrapper.IsEmpty() ? v8::Undefined(isolate).As<Value>() : jsWrapper;
     }
 
     Local<Object> thiz = context->Global();
@@ -374,7 +377,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
       // Those js errors will be marshalled to NSError* and sent directly to the calling native
       // code. The v8::TryCatch statement prevents the global handler to be called.
       TryCatch tc(isolate);
-      success = callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result);
+      success = callback->Call(context, thiz, argc, argv).ToLocal(&result);
       if (!success && tc.HasCaught()) {
         // A branded escapeException follows the @throw path even here, taking
         // precedence over NSError-out marshaling.
@@ -399,7 +402,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
       }
     } else {
       TryCatch tc(isolate);
-      success = callback->Call(context, thiz, (int)v8Args.size(), v8Args.data()).ToLocal(&result);
+      success = callback->Call(context, thiz, argc, argv).ToLocal(&result);
       if (!success && tc.HasCaught()) {
         NSException* escaped = ExtractEscapedException(context, tc.Exception());
         if (escaped != nil) {
@@ -553,11 +556,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
     } else if (type == BinaryTypeEncodingType::StructDeclarationReference) {
       BaseDataWrapper* baseWrapper = tns::GetValue(isolate, value);
       if (baseWrapper == nullptr) {
-        const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
-        const Meta* meta = ArgConverter::GetMeta(structName);
-        tns::Assert(meta != nullptr && meta->type() == MetaType::Struct, isolate);
-        const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
-        const StructInfo& structInfo = FFICall::GetStructInfo(structMeta);
+        const StructInfo& structInfo = FFICall::GetStructInfo(typeEncoding);
         Interop::InitializeStruct(context, retValue, structInfo.Fields(), value);
         return;
       } else if (baseWrapper->Type() == WrapperType::Struct) {
