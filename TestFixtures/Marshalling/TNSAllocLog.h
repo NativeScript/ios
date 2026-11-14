@@ -12,4 +12,11 @@
 
 @end
 
+// -init answers a new TNSAllocLog in place of the receiver.
+@interface TNSSubstitutingInit : NSObject
+
+- (instancetype)init;
+
+@end
+
 #endif /* TNSAllocLog_h */

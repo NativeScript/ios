@@ -2,6 +2,7 @@
 #include <Foundation/Foundation.h>
 #include <algorithm>
 #include <sstream>
+#include "ClassBuilder.h"
 #include "DictionaryAdapter.h"
 #include "ExternalMemory.h"
 #include "Helpers.h"
@@ -20,13 +21,60 @@ namespace tns {
 namespace {
 
 // -allowsWeakReference answers NO once deallocation has begun, and for the
-// rare classes that refuse weak references altogether.
+// rare classes that refuse weak references altogether. Runs before `obj` has
+// a cached wrapper, so nothing here may be a message a JS class implements:
+// it would re-enter MethodCallback for the same object.
 bool IsDeallocating(id obj) {
   static SEL allowsWeakReference = sel_registerName("allowsWeakReference");
-  if (![obj respondsToSelector:allowsWeakReference]) {
+  Class nativeClass = ClassBuilder::FindNativeClass(object_getClass(obj));
+  // class_getMethodImplementation answers the forwarding IMP for a selector
+  // the class lacks.
+  if (!class_respondsToSelector(nativeClass, allowsWeakReference)) {
     return false;
   }
-  return !((BOOL (*)(id, SEL))objc_msgSend)(obj, allowsWeakReference);
+  IMP imp = class_getMethodImplementation(nativeClass, allowsWeakReference);
+  return !((BOOL (*)(id, SEL))imp)(obj, allowsWeakReference);
+}
+
+// Clang's init method family: optional leading underscores, then "init", then
+// the end of the selector's first piece or anything but a lowercase letter.
+bool IsInitFamily(SEL selector) {
+  const char* name = sel_getName(selector);
+  while (*name == '_') {
+    name++;
+  }
+  return strncmp(name, "init", 4) == 0 && (name[4] < 'a' || name[4] > 'z');
+}
+
+// The native caller of an init-family method owns its result. SetValue hands
+// a wrapped object or a string over at +0: for the receiver that is the
+// reference the caller passed in, any other object needs its own. The
+// receiver is left alone: when a super initializer substituted it, that
+// initializer already released it, and nothing here can tell that case apart.
+void RetainInitializerResult(Isolate* isolate, void** argValues, void* retValue,
+                             const TypeEncoding* typeEncoding, Local<Value> value) {
+  BinaryTypeEncodingType type = typeEncoding->type;
+  if (type != BinaryTypeEncodingType::IdEncoding &&
+      type != BinaryTypeEncodingType::InterfaceDeclarationReference &&
+      type != BinaryTypeEncodingType::InstanceTypeEncoding) {
+    return;
+  }
+
+  id returned = *static_cast<id*>(retValue);
+  if (returned == nil || returned == *static_cast<id*>(argValues[0]) ||
+      !IsInitFamily(*static_cast<SEL*>(argValues[1]))) {
+    return;
+  }
+
+  // A plain JS object becomes a DictionaryAdapter SetValue already returns
+  // at +1.
+  value = tns::UnwrapProxy(value);
+  BaseDataWrapper* wrapper = value->IsObject() ? tns::GetValue(isolate, value) : nullptr;
+  bool atPlusZero =
+      value->IsString() || (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject);
+  if (atPlusZero) {
+    [returned retain];
+  }
 }
 
 // The borrowed wrapper WrapNativeCallbackSelf made for an object in -dealloc
@@ -467,6 +515,9 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         memset(retValue, 0, cif->rtype->size);
       } else {
         ArgConverter::SetValue(context, retValue, cif->rtype->size, result, data->typeEncoding_);
+        if (data->initialParamIndex_ == 2) {
+          RetainInitializerResult(isolate, argValues, retValue, data->typeEncoding_, result);
+        }
       }
     } else {
       memset(retValue, 0, cif->rtype->size);

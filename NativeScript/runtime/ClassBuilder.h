@@ -37,8 +37,9 @@ class ClassBuilder {
       v8::Local<v8::Context> context);
   static std::string GetTypeEncoding(const TypeEncoding* typeEncoding,
                                      int argsCount);
-  // The implementation of `method` from the nearest superclass not defined
-  // from JS.
+  // `klass` or its nearest superclass not defined from JS.
+  static Class FindNativeClass(Class klass);
+  // The implementation of `method` from FindNativeClass(klass).
   static IMP FindNotOverridenMethod(Class klass, SEL method);
 
  private:

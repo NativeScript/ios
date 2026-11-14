@@ -187,6 +187,154 @@ describe("Native callback self wrappers", function () {
         });
     });
 
+    // The JS init runs from native code on an object JS has no wrapper for
+    // yet; wrapping it must not send it a message its JS class implements.
+    function expectRespondsToSelectorOverrideWorks(Responder, counter) {
+        var creators = [
+            function () {
+                return Responder.alloc().init();
+            },
+            function () {
+                return Responder.new();
+            }
+        ];
+        creators.forEach(function (create) {
+            counter.inits = 0;
+            counter.responds = 0;
+            counter.voidCalls = 0;
+            var obj = create();
+            expect(obj instanceof Responder).toBe(true);
+            expect(counter.inits).toBe(1);
+            TNSTestNativeCallbacks.inheritanceVoidSelector(obj);
+            expect(counter.responds).toBeGreaterThan(0);
+            expect(counter.voidCalls).toBe(1);
+        });
+    }
+
+    it("wraps objects of an extend() class that implements respondsToSelector", function () {
+        var counter = {};
+        var Responder = NSObject.extend({
+            init: function () {
+                counter.inits++;
+                return NSObject.prototype.init.call(this);
+            },
+            respondsToSelector: function (selector) {
+                counter.responds++;
+                return NSObject.prototype.respondsToSelector.call(this, selector);
+            },
+            voidSelector: function () {
+                counter.voidCalls++;
+            }
+        }, {
+            name: "NativeCallbackSelfResponder",
+            exposedMethods: {
+                voidSelector: { returns: interop.types.void }
+            }
+        });
+        expectRespondsToSelectorOverrideWorks(Responder, counter);
+    });
+
+    it("wraps objects of an __extends class that implements respondsToSelector", function () {
+        var counter = {};
+        var Responder = (function (_super) {
+            __extends(Responder, _super);
+            function Responder() {
+                return (_super !== null && _super.apply(this, arguments)) || this;
+            }
+            Responder.prototype.init = function () {
+                counter.inits++;
+                return _super.prototype.init.call(this);
+            };
+            Responder.prototype.respondsToSelector = function (selector) {
+                counter.responds++;
+                return _super.prototype.respondsToSelector.call(this, selector);
+            };
+            Responder.prototype.voidSelector = function () {
+                counter.voidCalls++;
+            };
+            Responder.ObjCExposedMethods = {
+                voidSelector: { returns: interop.types.void }
+            };
+            return Responder;
+        })(NSObject);
+        expectRespondsToSelectorOverrideWorks(Responder, counter);
+    });
+
+    // Native callers own what an init-family method returns, including an
+    // object a JS initializer answers in place of its receiver.
+    function expectInitializerResultOwnedByCaller(create, done) {
+        var owner = NSMutableArray.new();
+        (function () {
+            var obj = create();
+            expect(obj instanceof TNSAllocLog).toBe(true);
+            owner.addObject(obj);
+        })();
+        settle(3, function () {
+            expect(initCalls).toBe(1);
+            expect(deallocs()).toBe(0);
+            var obj = owner.objectAtIndex(0);
+            expect(obj instanceof TNSAllocLog).toBe(true);
+            expect(obj.hash > 0).toBe(true);
+            obj = null;
+            owner.removeAllObjects();
+            settle(3, function () {
+                expect(deallocs()).toBe(1);
+                done();
+            });
+        });
+    }
+
+    var initResult = null;
+    var InitReturnsOther = NSObject.extend({
+        init: function () {
+            initCalls++;
+            return initResult;
+        }
+    }, { name: "NativeCallbackSelfInitReturnsOther" });
+
+    function createThroughInitReturningOther(construct) {
+        initResult = TNSAllocLog.new();
+        var obj = construct();
+        expect(obj).toBe(initResult);
+        initResult = null;
+        return obj;
+    }
+
+    it("keeps a wrapped object a JS initializer returns instead of its receiver (+new)", function (done) {
+        expectInitializerResultOwnedByCaller(function () {
+            return createThroughInitReturningOther(function () {
+                return InitReturnsOther.new();
+            });
+        }, done);
+    });
+
+    it("keeps a wrapped object a JS initializer returns instead of its receiver (new)", function (done) {
+        expectInitializerResultOwnedByCaller(function () {
+            return createThroughInitReturningOther(function () {
+                return new InitReturnsOther();
+            });
+        }, done);
+    });
+
+    var InitReturnsSubstitute = TNSSubstitutingInit.extend({
+        init: function () {
+            initCalls++;
+            return TNSSubstitutingInit.prototype.init.call(this);
+        }
+    }, { name: "NativeCallbackSelfInitReturnsSubstitute" });
+
+    it("keeps the substitute a super initializer returned through a JS initializer (+new)", function (done) {
+        expectInitializerResultOwnedByCaller(function () {
+            return InitReturnsSubstitute.new();
+        }, done);
+    });
+
+    it("keeps the substitute a super initializer returned through a JS initializer (new)", function (done) {
+        expectInitializerResultOwnedByCaller(function () {
+            return new InitReturnsSubstitute();
+        }, done);
+    });
+
     it("reports a receiver kept from a JS method run by -dealloc as released", function (done) {
         var saved = null;
         var Keeper = TNSApi.extend({
@@ -201,13 +349,17 @@ describe("Native callback self wrappers", function () {
         settle(4, function () {
             expect(saved).not.toBeNull();
             var value;
-            var threw = false;
+            var error = null;
             try {
                 value = saved.hash;
             } catch (e) {
-                threw = e instanceof ReferenceError;
+                error = e;
             }
-            expect(threw || value === undefined).toBe(true);
+            if (error !== null) {
+                expect(error.message).toContain("disposed native object");
+            } else {
+                expect(value).toBeUndefined();
+            }
             saved = null;
             done();
         });

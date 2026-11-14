@@ -1804,7 +1804,9 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     SEL selector = methodCall.selector_;
     if (isInstanceMethod) {
       SEL swizzledMethodSelector = Interop::GetSwizzledMethodSelector(selector);
-      if ([methodCall.target_ respondsToSelector:swizzledMethodSelector]) {
+      // Not -respondsToSelector:, which a JS class may implement by calling
+      // its base implementation through this very path.
+      if (class_respondsToSelector(object_getClass(methodCall.target_), swizzledMethodSelector)) {
         selector = swizzledMethodSelector;
       }
 

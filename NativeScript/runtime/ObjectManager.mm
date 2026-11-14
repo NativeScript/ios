@@ -36,13 +36,13 @@ void ApplyOwnership(ObjectWeakCallbackState* state, bool nativelyOwned) {
   if (nativelyOwned && weak) {
     state->target_->ClearWeak<ObjectWeakCallbackState>();
   } else if (!nativelyOwned && !weak) {
-    state->target_->SetWeak(state, ObjectManager::FinalizerCallback,
-                            WeakCallbackType::kFinalizer);
+    state->target_->SetWeak(state, ObjectManager::FinalizerCallback, WeakCallbackType::kFinalizer);
   }
 }
 
 // The GC prologue may not enter JS, so a JS-implemented -retainCount is
-// skipped. Matches ObjectManager::GetRetainCount, which counts timers as unowned.
+// skipped. Timers read as unowned: the retain count of an uninitialized NSTimer
+// (NSTimer.alloc()) can hang.
 bool NativelyOwnedWithoutJS(id obj) {
   for (Class c = object_getClass(obj); c != nil; c = class_getSuperclass(c)) {
     if (c == NSTimerClass) {
@@ -50,7 +50,7 @@ bool NativelyOwnedWithoutJS(id obj) {
     }
   }
   IMP imp = ClassBuilder::FindNotOverridenMethod(object_getClass(obj), @selector(retainCount));
-  return ((NSUInteger(*)(id, SEL))imp)(obj, @selector(retainCount)) > 1;
+  return ((NSUInteger (*)(id, SEL))imp)(obj, @selector(retainCount)) > 1;
 }
 
 void ReconcileOwnershipBeforeGC(Isolate* isolate, GCType, GCCallbackFlags) {

@@ -21,3 +21,11 @@
 }
 
 @end
+
+@implementation TNSSubstitutingInit
+
+- (instancetype)init {
+    return (id)[[TNSAllocLog alloc] init];
+}
+
+@end

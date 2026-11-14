@@ -60,8 +60,9 @@ class ObjectManager {
   // when a major collection starts.
   static void ManageOwnership(v8::Isolate* isolate, ObjCDataWrapper* wrapper,
                               ObjectWeakCallbackState* state);
-  // Runs on the isolate's thread with the isolate entered.
-  static void ReconcileOwnership(v8::Isolate* isolate, ObjCDataWrapper* wrapper);
+  // Requires the isolate locked and entered, on any thread.
+  static void ReconcileOwnership(v8::Isolate* isolate,
+                                 ObjCDataWrapper* wrapper);
 
  private:
   static void ReleaseNativeCounterpartCallback(

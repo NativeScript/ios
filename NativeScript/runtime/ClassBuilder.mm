@@ -1017,12 +1017,16 @@ void ClassBuilder::SuperAccessorGetterCallback(const FunctionCallbackInfo<Value>
   info.GetReturnValue().Set(superValue);
 }
 
-IMP ClassBuilder::FindNotOverridenMethod(Class klass, SEL method) {
+Class ClassBuilder::FindNativeClass(Class klass) {
   while (class_conformsToProtocol(klass, @protocol(TNSDerivedClass))) {
     klass = class_getSuperclass(klass);
   }
 
-  return class_getMethodImplementation(klass, method);
+  return klass;
+}
+
+IMP ClassBuilder::FindNotOverridenMethod(Class klass, SEL method) {
+  return class_getMethodImplementation(FindNativeClass(klass), method);
 }
 
 std::atomic<unsigned long long> ClassBuilder::classNameCounter_{0};
