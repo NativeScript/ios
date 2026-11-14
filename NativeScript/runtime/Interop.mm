@@ -168,6 +168,19 @@ Local<Value> Interop::CallFunction(ObjCMethodCall& methodCall) {
   return Interop::CallFunctionInternal(methodCall);
 }
 
+bool Interop::ConsumesReceiver(SEL selector, bool isInitializer) {
+  return isInitializer || selector == @selector(awakeAfterUsingCoder:);
+}
+
+// Balanced only while every owned result other than a consumed receiver
+// reaches here at +1, JS-implemented methods included: MethodCallback retains
+// what a JS implementation answers at +0, and for initializers anything but
+// the receiver. AllocatedForCall does not check that the result is the
+// receiver, so narrowing that retain makes this over-release.
+bool Interop::ReleasesCachedOwnedReturn(bool ownsReturnedObject, OwnedReturnReceiver receiver) {
+  return ownsReturnedObject && receiver != OwnedReturnReceiver::Consumed;
+}
+
 id Interop::CallInitializer(Local<Context> context, const MethodMeta* methodMeta, id target,
                             Class clazz, V8Args& args) {
   const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
@@ -1029,7 +1042,7 @@ Local<Value> Interop::GetResultByType(Local<Context> context, BaseDataWrapper* t
 Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding,
                                 BaseCall* call, bool marshalToPrimitive, Local<Object> parentStruct,
                                 bool isStructMember, bool ownsReturnedObject, bool returnsUnmanaged,
-                                bool isInitializer, bool releaseCachedOwnedReturn) {
+                                bool isInitializer, OwnedReturnReceiver ownedReturnReceiver) {
   Isolate* isolate = v8::Isolate::GetCurrent();
 
   if (returnsUnmanaged) {
@@ -1364,12 +1377,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     auto poInstance = ArgConverter::FindCachedInstance(isolate, cache, result);
     if (poInstance != nullptr) {
       Local<Value> cached = poInstance->Get(isolate);
-      // The Instances entry holds its own reference, so a returned +1 is
-      // surplus. Only class methods and C functions qualify: an instance
-      // method can hand back its receiver without a net retain (initializers,
-      // NS_REPLACES_RECEIVER) or come from a JS implementation, which returns
-      // at +0.
-      if (ownsReturnedObject && releaseCachedOwnedReturn) {
+      if (ReleasesCachedOwnedReturn(ownsReturnedObject || isInitializer, ownedReturnReceiver)) {
         [result release];
       }
       return cached;
@@ -1937,10 +1945,21 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     }
   }
 
-  Local<Value> result = Interop::GetResult(
-      methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive, Local<Object>(),
-      false, methodCall.ownsReturnedObject_, methodCall.returnsUnmanaged_,
-      methodCall.isInitializer_, !isInstanceMethod);
+  OwnedReturnReceiver receiver = OwnedReturnReceiver::None;
+  if (isInstanceMethod) {
+    if (!ConsumesReceiver(methodCall.selector_, methodCall.isInitializer_)) {
+      receiver = OwnedReturnReceiver::Kept;
+    } else if (methodCall.receiverAllocatedForCall_) {
+      receiver = OwnedReturnReceiver::AllocatedForCall;
+    } else {
+      receiver = OwnedReturnReceiver::Consumed;
+    }
+  }
+
+  Local<Value> result =
+      Interop::GetResult(methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive,
+                         Local<Object>(), false, methodCall.ownsReturnedObject_,
+                         methodCall.returnsUnmanaged_, methodCall.isInitializer_, receiver);
 
   // Owned returns, initializers and class factory methods hand out objects JS
   // most likely holds the last reference to. Instance getters do not: their

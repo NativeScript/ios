@@ -29,3 +29,32 @@
 }
 
 @end
+
+@implementation TNSOwnedReturns
+
+- (id)newChild {
+    return [[TNSAllocLog alloc] init];
+}
+
++ (void)copyAndDrop:(id)object {
+    id result = [object copy];
+    (void)result;
+}
+
++ (void)mutableCopyAndDrop:(id)object {
+    id result = [object mutableCopy];
+    (void)result;
+}
+
++ (void)newChildAndDrop:(TNSOwnedReturns*)object {
+    id result = [object newChild];
+    (void)result;
+}
+
++ (void)awakeAndDrop:(id)object {
+    NSCoder* coder = nil;
+    id result = [object awakeAfterUsingCoder:coder];
+    (void)result;
+}
+
+@end

@@ -13,23 +13,34 @@ namespace tns {
 
 class ArgConverter;
 
+// What native callers of a JS-implemented method own of the object it answers.
+enum class NativeReturnOwnership : uint8_t {
+  Unowned,
+  // A +1; the receiver stays the caller's.
+  Owned,
+  // A +1 in place of the receiver, whose reference the caller passed in.
+  ReplacesReceiver,
+};
+
 struct MethodCallbackWrapper {
  public:
-  MethodCallbackWrapper(v8::Isolate* isolate,
-                        std::shared_ptr<v8::Persistent<v8::Value>> callback,
-                        const uint8_t initialParamIndex,
-                        const uint8_t paramsCount,
-                        const TypeEncoding* typeEncoding)
+  MethodCallbackWrapper(
+      v8::Isolate* isolate, std::shared_ptr<v8::Persistent<v8::Value>> callback,
+      const uint8_t initialParamIndex, const uint8_t paramsCount,
+      const TypeEncoding* typeEncoding,
+      NativeReturnOwnership returnOwnership = NativeReturnOwnership::Unowned)
       : isolateWrapper_(isolate),
         callback_(callback),
         initialParamIndex_(initialParamIndex),
         paramsCount_(paramsCount),
-        typeEncoding_(typeEncoding) {}
+        typeEncoding_(typeEncoding),
+        returnOwnership_(returnOwnership) {}
   IsolateWrapper isolateWrapper_;
   std::shared_ptr<v8::Persistent<v8::Value>> callback_;
   const uint8_t initialParamIndex_;
   const uint8_t paramsCount_;
   const TypeEncoding* typeEncoding_;
+  const NativeReturnOwnership returnOwnership_;
 };
 
 class ArgConverter {
@@ -71,6 +82,11 @@ class ArgConverter {
   static const ProtocolMeta* FindProtocolMeta(Protocol* protocol);
   static void MethodCallback(ffi_cif* cif, void* retValue, void** argValues,
                              void* userData);
+  // For a JS implementation of the instance method `selector`; `meta` is null
+  // for methods the metadata does not describe, which are classified by
+  // their selector's method family.
+  static NativeReturnOwnership ReturnOwnership(SEL selector,
+                                               const MethodMeta* meta);
   // returnSize is the ABI size of the return slot (cif->rtype->size); an
   // empty, null or undefined value zeroes all of it.
   static void SetValue(v8::Local<v8::Context> context, void* retValue,

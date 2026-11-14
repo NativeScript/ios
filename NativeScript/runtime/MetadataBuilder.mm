@@ -1397,7 +1397,8 @@ v8::Intercepted MetadataBuilder::SwizzledInstanceMethodCallback(
   std::shared_ptr<Persistent<Value>> poCallback =
       std::make_shared<Persistent<Value>>(isolate, value);
   MethodCallbackWrapper* userData =
-      new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);
+      new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding,
+                                ArgConverter::ReturnOwnership(methodMeta->selector(), methodMeta));
   IMP methodBody =
       Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
   IMP nativeImp =

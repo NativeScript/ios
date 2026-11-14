@@ -690,7 +690,8 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
       std::shared_ptr<Persistent<Value>> poCallback =
           std::make_shared<Persistent<Value>>(isolate, method);
       MethodCallbackWrapper* userData =
-          new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);
+          new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding,
+                                    ArgConverter::ReturnOwnership(selector, nullptr));
       IMP methodBody =
           Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
       std::string typeInfo = GetTypeEncoding(typeEncoding, argsCount);
@@ -793,9 +794,10 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
           std::make_shared<Persistent<Value>>(isolate, method);
       const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
       uint8_t argsCount = methodMeta->encodings()->count - 1;
-      MethodCallbackWrapper* userData =
-          new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);
       SEL selector = methodMeta->selector();
+      MethodCallbackWrapper* userData =
+          new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding,
+                                    ArgConverter::ReturnOwnership(selector, methodMeta));
       IMP methodBody =
           Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
       std::string typeInfo = GetTypeEncoding(typeEncoding, argsCount);

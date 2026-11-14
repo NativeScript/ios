@@ -36,23 +36,25 @@ bool IsDeallocating(id obj) {
   return !((BOOL (*)(id, SEL))imp)(obj, allowsWeakReference);
 }
 
-// Clang's init method family: optional leading underscores, then "init", then
-// the end of the selector's first piece or anything but a lowercase letter.
-bool IsInitFamily(SEL selector) {
+// Clang's method family rule: optional leading underscores, then the family
+// name, then the end of the selector's first piece or anything but a
+// lowercase letter.
+bool InMethodFamily(SEL selector, const char* family) {
   const char* name = sel_getName(selector);
   while (*name == '_') {
     name++;
   }
-  return strncmp(name, "init", 4) == 0 && (name[4] < 'a' || name[4] > 'z');
+  size_t length = strlen(family);
+  return strncmp(name, family, length) == 0 && (name[length] < 'a' || name[length] > 'z');
 }
 
-// The native caller of an init-family method owns its result. SetValue hands
-// a wrapped object or a string over at +0: for the receiver that is the
-// reference the caller passed in, any other object needs its own. The
-// receiver is left alone: when a super initializer substituted it, that
-// initializer already released it, and nothing here can tell that case apart.
-void RetainInitializerResult(Isolate* isolate, void** argValues, void* retValue,
-                             const TypeEncoding* typeEncoding, Local<Value> value) {
+// SetValue hands a wrapped object or a string over at +0, so an owned result
+// gets a reference of its own, except a receiver answered in place of itself:
+// that is the reference the caller passed in. The receiver is never released
+// when another object is answered instead: a super initializer that
+// substituted it already did, and nothing here can tell that case apart.
+void RetainOwnedResult(Isolate* isolate, NativeReturnOwnership ownership, void** argValues,
+                       void* retValue, const TypeEncoding* typeEncoding, Local<Value> value) {
   BinaryTypeEncodingType type = typeEncoding->type;
   if (type != BinaryTypeEncodingType::IdEncoding &&
       type != BinaryTypeEncodingType::InterfaceDeclarationReference &&
@@ -61,8 +63,8 @@ void RetainInitializerResult(Isolate* isolate, void** argValues, void* retValue,
   }
 
   id returned = *static_cast<id*>(retValue);
-  if (returned == nil || returned == *static_cast<id*>(argValues[0]) ||
-      !IsInitFamily(*static_cast<SEL*>(argValues[1]))) {
+  if (returned == nil || (ownership == NativeReturnOwnership::ReplacesReceiver &&
+                          returned == *static_cast<id*>(argValues[0]))) {
     return;
   }
 
@@ -192,7 +194,7 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
     target = [allocKlass alloc];
   }
 
-  ObjCMethodCall methodCall(context, meta, target, klass, args, callSuper);
+  ObjCMethodCall methodCall(context, meta, target, klass, args, callSuper, allocKlass != nil);
   return Interop::CallFunction(methodCall);
 }
 
@@ -513,8 +515,9 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         memset(retValue, 0, cif->rtype->size);
       } else {
         ArgConverter::SetValue(context, retValue, cif->rtype->size, result, data->typeEncoding_);
-        if (data->initialParamIndex_ == 2) {
-          RetainInitializerResult(isolate, argValues, retValue, data->typeEncoding_, result);
+        if (data->returnOwnership_ != NativeReturnOwnership::Unowned) {
+          RetainOwnedResult(isolate, data->returnOwnership_, argValues, retValue,
+                            data->typeEncoding_, result);
         }
       }
     } else {
@@ -525,6 +528,19 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
   if (pendingThrow != nil) {
     @throw pendingThrow;
   }
+}
+
+NativeReturnOwnership ArgConverter::ReturnOwnership(SEL selector, const MethodMeta* meta) {
+  bool isInitializer = meta != nullptr ? meta->isInitializer() : InMethodFamily(selector, "init");
+  if (Interop::ConsumesReceiver(selector, isInitializer)) {
+    return NativeReturnOwnership::ReplacesReceiver;
+  }
+
+  bool owned = meta != nullptr
+                   ? meta->ownsReturnedCocoaObject()
+                   : InMethodFamily(selector, "copy") || InMethodFamily(selector, "mutableCopy") ||
+                         InMethodFamily(selector, "new");
+  return owned ? NativeReturnOwnership::Owned : NativeReturnOwnership::Unowned;
 }
 
 void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t returnSize,
@@ -706,7 +722,7 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
     // An initializer that answered with an already wrapped object (a singleton,
     // a tagged pointer, a cached cluster instance) leaves us holding a +1 the
     // existing entry has no use for.
-    if (resultIsOwned) {
+    if (Interop::ReleasesCachedOwnedReturn(resultIsOwned, OwnedReturnReceiver::AllocatedForCall)) {
       [result release];
     }
     info.GetReturnValue().Set(poInstance->Get(isolate));

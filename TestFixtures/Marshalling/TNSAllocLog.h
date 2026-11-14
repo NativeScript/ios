@@ -19,4 +19,18 @@
 
 @end
 
+// Native callers that own what an owned-return message answers and drop it
+// straight away.
+@interface TNSOwnedReturns : TNSAllocLog
+
+// Answers a new TNSAllocLog.
+- (id)newChild;
+
++ (void)copyAndDrop:(id)object;
++ (void)mutableCopyAndDrop:(id)object;
++ (void)newChildAndDrop:(TNSOwnedReturns*)object;
++ (void)awakeAndDrop:(id)object;
+
+@end
+
 #endif /* TNSAllocLog_h */
