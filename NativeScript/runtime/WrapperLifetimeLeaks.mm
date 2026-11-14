@@ -51,21 +51,39 @@ constexpr size_t kMaxStorageBytes = 64 * 1024;
 constexpr int kMaxStorageDepth = 2;
 constexpr size_t kMaxCycleLength = 64;
 constexpr size_t kMemoryWarningTopClasses = 10;
+constexpr uint32_t kMaxChangedListed = 50;
 
 // ---- Native object graph -------------------------------------------------
 
 using ClassSet = std::unordered_set<uintptr_t>;
 
+// An owning reference found in native memory. `cls` is read together with the
+// pointer: other threads keep running while the probe walks, so an object can
+// be freed after it was found, and its memory must not be read for its class
+// again.
+struct NativeEdge {
+  void* to;
+  Class cls;
+  std::string label;
+};
+
 struct NativeEntry {
   Class cls = nil;
+  size_t size = 0;
   bool block = false;
   // Wrapped by this isolate or holding JS state in it.
   bool seed = false;
+  // No longer the object that was found at this address: freed, or freed and
+  // reused, while the probe ran.
+  bool changed = false;
   int depth = 0;
   int64_t retainCount = 0;
   int64_t runtimeRetains = 0;
   int64_t incoming = 0;
-  std::vector<std::pair<void*, std::string>> out;
+  // The first reference that led to a non-seed object.
+  void* foundFrom = nullptr;
+  std::string foundVia;
+  std::vector<NativeEdge> out;
 
   int64_t Unexplained() const { return retainCount - runtimeRetains - incoming; }
   bool Immortal() const { return retainCount >= static_cast<int64_t>(NSUIntegerMax >> 1); }
@@ -85,6 +103,10 @@ struct ProbeRun {
   bool truncated = false;
 
   bool Root(const NativeEntry& entry) const {
+    // A gone object keeps nothing alive.
+    if (entry.changed) {
+      return false;
+    }
     if (entry.Immortal() || entry.Unexplained() > 0) {
       return true;
     }
@@ -213,7 +235,7 @@ bool NonOwningContainer(Class cls) {
 // Object pointers in a block that is not an object (collection storage, block
 // captures), following nested storage a little way.
 void ScanStorage(ProbeRun* run, uintptr_t p, size_t size, int depth, const std::string& prefix,
-                 std::vector<std::pair<void*, std::string>>* out) {
+                 std::vector<NativeEdge>* out) {
   size_t limit = std::min(size, kMaxStorageBytes);
   for (size_t offset = 0; offset + sizeof(void*) <= limit; offset += sizeof(void*)) {
     uintptr_t value = *reinterpret_cast<uintptr_t*>(p + offset);
@@ -225,8 +247,8 @@ void ScanStorage(ProbeRun* run, uintptr_t p, size_t size, int depth, const std::
       continue;
     }
     std::string label = prefix + "+" + std::to_string(offset);
-    if (ObjectClass(run->classes, value, valueSize) != nil) {
-      out->push_back({reinterpret_cast<void*>(value), label});
+    if (Class cls = ObjectClass(run->classes, value, valueSize)) {
+      out->push_back({reinterpret_cast<void*>(value), cls, label});
     } else if (depth < kMaxStorageDepth) {
       ScanStorage(run, value, valueSize, depth + 1, label, out);
     }
@@ -242,6 +264,13 @@ struct BlockHeader {
   void* invoke;
   void* descriptor;
 };
+
+// Whether `object` still holds the object that was found there. A freed and
+// reused address that holds an object of the same class again passes.
+bool StillThere(ProbeRun* run, void* object, const NativeEntry& entry) {
+  uintptr_t p = reinterpret_cast<uintptr_t>(object);
+  return ObjectClass(run->classes, p, HeapBlockSize(p)) == entry.cls;
+}
 
 int64_t RetainCountOf(ProbeRun* run, void* object, const NativeEntry& entry) {
   if (entry.block) {
@@ -283,8 +312,8 @@ void Expand(ProbeRun* run, void* object, NativeEntry* entry) {
     }
     uintptr_t value = *reinterpret_cast<uintptr_t*>(p + slot.first);
     size_t valueSize = HeapBlockSize(value);
-    if (valueSize != 0 && ObjectClass(run->classes, value, valueSize) != nil) {
-      entry->out.push_back({reinterpret_cast<void*>(value), slot.second});
+    if (Class cls = valueSize != 0 ? ObjectClass(run->classes, value, valueSize) : nil) {
+      entry->out.push_back({reinterpret_cast<void*>(value), cls, slot.second});
     }
   }
 }
@@ -354,10 +383,12 @@ bool RootedStrong(const Instance& instance) {
 // Reads native memory that other threads may be mutating; acceptable for an
 // on-demand diagnostic, which is why it never runs implicitly.
 void BuildNativeGraph(Isolate* isolate, ProbeRun* run, const std::shared_ptr<Caches>& cache) {
+  // Classes are only inspected through the runtime functions, never messaged:
+  // a first message runs +initialize, arbitrary code inside the snapshot.
   static Class blockClass = objc_getClass("NSBlock");
 
   std::deque<void*> queue;
-  auto add = [&](void* object, int depth) -> NativeEntry* {
+  auto add = [&](void* object, Class cls, int depth) -> NativeEntry* {
     auto found = run->natives.find(object);
     if (found != run->natives.end()) {
       return &found->second;
@@ -367,8 +398,11 @@ void BuildNativeGraph(Isolate* isolate, ProbeRun* run, const std::shared_ptr<Cac
       return nullptr;
     }
     NativeEntry entry;
-    entry.cls = object_getClass((__bridge id)object);
-    entry.block = blockClass != nil && [entry.cls isSubclassOfClass:blockClass];
+    entry.cls = cls;
+    entry.size = HeapBlockSize(reinterpret_cast<uintptr_t>(object));
+    for (Class c = cls; c != nil && !entry.block; c = class_getSuperclass(c)) {
+      entry.block = c == blockClass;
+    }
     entry.depth = depth;
     queue.push_back(object);
     return &run->natives.emplace(object, std::move(entry)).first->second;
@@ -379,13 +413,14 @@ void BuildNativeGraph(Isolate* isolate, ProbeRun* run, const std::shared_ptr<Cac
     if (!ReadInstance(isolate, run->classes, entry.first, entry.second, &instance)) {
       continue;
     }
-    if (NativeEntry* native = add((__bridge void*)entry.first, 0)) {
+    if (NativeEntry* native = add((__bridge void*)entry.first, instance.cls, 0)) {
       native->seed = true;
       native->runtimeRetains = instance.adapter ? 0 : 1;
     }
   }
+  // The registry lock keeps a stateful object from being freed meanwhile.
   WrapperLifetimeCanary::ForEachState(isolate, [&](id object, Local<Object>) {
-    if (NativeEntry* entry = add((__bridge void*)object, 0)) {
+    if (NativeEntry* entry = add((__bridge void*)object, object_getClass(object), 0)) {
       entry->seed = true;
     }
   });
@@ -400,32 +435,48 @@ void BuildNativeGraph(Isolate* isolate, ProbeRun* run, const std::shared_ptr<Cac
     Expand(run, object, &entry);
     // A pointer to itself never owns the object.
     entry.out.erase(std::remove_if(entry.out.begin(), entry.out.end(),
-                                   [&](const auto& edge) { return edge.first == object; }),
+                                   [&](const auto& edge) { return edge.to == object; }),
                     entry.out.end());
     int depth = entry.depth;
-    std::vector<std::pair<void*, std::string>> out = entry.out;
+    std::vector<NativeEdge> out = entry.out;
     for (const auto& edge : out) {
-      if (NativeEntry* target = add(edge.first, depth + 1)) {
+      auto known = run->natives.find(edge.to);
+      if (known != run->natives.end() && known->second.cls != edge.cls) {
+        known->second.changed = true;
+      }
+      if (NativeEntry* target = add(edge.to, edge.cls, depth + 1)) {
         target->incoming++;
+        if (!target->seed && target->foundFrom == nullptr) {
+          target->foundFrom = object;
+          target->foundVia = edge.label;
+        }
       }
     }
   }
   for (auto& native : run->natives) {
-    native.second.retainCount = RetainCountOf(run, native.first, native.second);
+    if (!native.second.changed && StillThere(run, native.first, native.second)) {
+      native.second.retainCount = RetainCountOf(run, native.first, native.second);
+    } else {
+      native.second.changed = true;
+    }
   }
 }
 
 class NativeObjectNode : public EmbedderGraph::Node {
  public:
-  NativeObjectNode(void* object, Class cls, bool root)
-      : object_(object), root_(root), name_(std::string("ObjC ") + class_getName(cls)) {}
+  NativeObjectNode(void* object, Class cls, size_t size, bool root)
+      : object_(object),
+        size_(size),
+        root_(root),
+        name_(std::string("ObjC ") + class_getName(cls)) {}
   const char* Name() override { return name_.c_str(); }
-  size_t SizeInBytes() override { return malloc_size(object_); }
+  size_t SizeInBytes() override { return size_; }
   const void* GetAddress() override { return object_; }
   bool IsRootNode() override { return root_; }
 
  private:
   void* object_;
+  size_t size_;
   bool root_;
   std::string name_;
 };
@@ -446,16 +497,21 @@ void BuildEmbedderGraph(Isolate* isolate, EmbedderGraph* graph, void*) {
   const ClassSet& classes = run != nullptr ? run->classes : ownClasses;
   HeapProfiler* profiler = isolate->GetHeapProfiler();
   std::unordered_map<void*, EmbedderGraph::Node*> nodes;
-  auto nodeFor = [&](void* object) {
+  // `cls` must have been read while the object was known to be alive.
+  auto nodeFor = [&](void* object, Class cls) {
     EmbedderGraph::Node*& node = nodes[object];
     if (node == nullptr) {
       bool root = false;
+      size_t size = 0;
       if (run != nullptr) {
         auto found = run->natives.find(object);
         root = found == run->natives.end() || run->Root(found->second);
+        if (found != run->natives.end()) {
+          cls = found->second.cls;
+          size = found->second.size;
+        }
       }
-      node = graph->AddNode(
-          std::make_unique<NativeObjectNode>(object, object_getClass((__bridge id)object), root));
+      node = graph->AddNode(std::make_unique<NativeObjectNode>(object, cls, size, root));
     }
     return node;
   };
@@ -468,9 +524,15 @@ void BuildEmbedderGraph(Isolate* isolate, EmbedderGraph* graph, void*) {
   for (auto& entry : cache->Instances) {
     Instance instance;
     if (!ReadInstance(isolate, classes, entry.first, entry.second, &instance)) {
+      if (run != nullptr) {
+        auto found = run->natives.find((__bridge void*)entry.first);
+        if (found != run->natives.end() && found->second.seed) {
+          found->second.changed = true;
+        }
+      }
       continue;
     }
-    EmbedderGraph::Node* native = nodeFor((__bridge void*)entry.first);
+    EmbedderGraph::Node* native = nodeFor((__bridge void*)entry.first, instance.cls);
     EmbedderGraph::Node* js = graph->V8Node(instance.js);
     if (instance.adapter) {
       graph->AddEdge(native, js, "ns:adapter");
@@ -484,18 +546,21 @@ void BuildEmbedderGraph(Isolate* isolate, EmbedderGraph* graph, void*) {
     }
   }
   WrapperLifetimeCanary::ForEachState(isolate, [&](id object, Local<Object> state) {
-    graph->AddEdge(nodeFor((__bridge void*)object), graph->V8Node(state.As<Value>()), "ns:state");
+    graph->AddEdge(nodeFor((__bridge void*)object, object_getClass(object)),
+                   graph->V8Node(state.As<Value>()), "ns:state");
     modeled(state);
   });
   if (run == nullptr) {
     return;
   }
   for (auto& native : run->natives) {
-    EmbedderGraph::Node* from = nodeFor(native.first);
+    EmbedderGraph::Node* from = nodeFor(native.first, native.second.cls);
     for (const auto& edge : native.second.out) {
-      graph->AddEdge(from, nodeFor(edge.first), edge.second.c_str());
+      graph->AddEdge(from, nodeFor(edge.to, edge.cls), edge.label.c_str());
     }
-    if (native.second.block) {
+    // A JS block's disposal takes the isolate's Locker, which the snapshot
+    // holds, so a block found alive stays readable until the snapshot ends.
+    if (native.second.block && !native.second.changed) {
       Local<Value> callback = Interop::JSBlockCallback(isolate, native.first);
       if (!callback.IsEmpty()) {
         graph->AddEdge(from, graph->V8Node(callback), "ns:block-callback");
@@ -648,6 +713,11 @@ Local<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool stri
   const HeapSnapshot* snapshot = profiler->TakeHeapSnapshot();
   activeRun_ = nullptr;
   auto t1 = std::chrono::steady_clock::now();
+  for (auto& native : run.natives) {
+    if (!native.second.changed && !StillThere(&run, native.first, native.second)) {
+      native.second.changed = true;
+    }
+  }
 
   std::unordered_set<const HeapGraphNode*> modeled;
   for (SnapshotObjectId id : run.modeledHandles) {
@@ -691,8 +761,11 @@ Local<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool stri
   std::vector<Cycle> cycles;
   std::unordered_set<const HeapGraphNode*> covered;
   uint32_t uncertain = 0;
+  uint32_t changed = 0;
   for (auto& native : run.natives) {
-    if (!native.second.Immortal() && native.second.Unexplained() < 0) {
+    if (native.second.changed) {
+      changed++;
+    } else if (!native.second.Immortal() && native.second.Unexplained() < 0) {
       uncertain++;
     }
   }
@@ -733,7 +806,12 @@ Local<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool stri
       if (seen.insert(found->second).second) {
         cycle.members.push_back({class_getName(entry.cls), found->second});
       }
-      if (entry.Unexplained() < 0 && !entry.Immortal()) {
+      if (entry.changed) {
+        cycle.reasons.push_back(std::string(class_getName(entry.cls)) + " " +
+                                HexAddress(found->second) +
+                                ": freed or replaced while the probe ran; its references are "
+                                "as found before");
+      } else if (entry.Unexplained() < 0 && !entry.Immortal()) {
         cycle.reasons.push_back(
             std::string(class_getName(entry.cls)) + " " + HexAddress(found->second) +
             ": retainCount " + std::to_string(entry.retainCount) + " is less than the " +
@@ -796,6 +874,28 @@ Local<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool stri
   set(result, "cycles", cycleArray);
   set(result, "nativeObjects", number(run.natives.size()));
   set(result, "uncertainNativeObjects", number(uncertain));
+  set(result, "changedNativeObjects", number(changed));
+  Local<v8::Array> changedList = v8::Array::New(isolate);
+  uint32_t listed = 0;
+  for (auto& native : run.natives) {
+    if (!native.second.changed || listed >= kMaxChangedListed) {
+      continue;
+    }
+    Local<Object> entry = Object::New(isolate);
+    set(entry, "className", string(class_getName(native.second.cls)));
+    set(entry, "address", string(HexAddress(native.first)));
+    set(entry, "seed", v8::Boolean::New(isolate, native.second.seed));
+    set(entry, "depth", number(native.second.depth));
+    std::string from;
+    if (native.second.foundFrom != nullptr) {
+      auto parent = run.natives.find(native.second.foundFrom);
+      from = std::string(parent != run.natives.end() ? class_getName(parent->second.cls) : "?") +
+             " " + HexAddress(native.second.foundFrom) + " -[" + native.second.foundVia + "]->";
+    }
+    set(entry, "foundFrom", string(from));
+    changedList->Set(context, listed++, entry).FromMaybe(false);
+  }
+  set(result, "changed", changedList);
   set(result, "truncated", v8::Boolean::New(isolate, run.truncated));
   if (!inspect.empty()) {
     Local<v8::Array> inspected = v8::Array::New(isolate);
@@ -819,8 +919,7 @@ Local<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool stri
       set(entry, "incoming", number(native.second.incoming));
       std::string out;
       for (const auto& edge : native.second.out) {
-        out += (out.empty() ? "" : ", ") + edge.second + " -> " +
-               class_getName(run.natives[edge.first].cls);
+        out += (out.empty() ? "" : ", ") + edge.label + " -> " + class_getName(edge.cls);
       }
       set(entry, "out", string(out));
       set(entry, "root", v8::Boolean::New(isolate, run.Root(native.second)));
@@ -1042,9 +1141,9 @@ std::vector<std::string> InspectPrefixes() {
   NSString* path =
       [NSTemporaryDirectory() stringByAppendingPathComponent:@"ns-wrapper-lifetime-inspect.txt"];
   NSString* text = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
-  for (NSString* line in [text componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]) {
-    NSString* prefix =
-        [line stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+  for (NSString* line in
+       [text componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]) {
+    NSString* prefix = [line stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
     if (prefix.length > 0) {
       prefixes.push_back(prefix.UTF8String);
     }
@@ -1074,8 +1173,14 @@ void ReportCycles(Isolate* isolate, bool strict, const std::vector<std::string>&
   }
   const char* kind = !inspect.empty() ? "cycles-inspect" : strict ? "cycles-strict" : "cycles";
   std::string path = WriteReport(isolate, context, kind, report);
-  Log("%s %u leak cycle(s)%s, report written to %s", kLogPrefix, count, strict ? " (strict)" : "",
-      path.c_str());
+  Local<Value> changed;
+  uint32_t changedCount = 0;
+  if (report->Get(context, tns::ToV8String(isolate, "changedNativeObjects")).ToLocal(&changed) &&
+      changed->IsNumber()) {
+    changedCount = static_cast<uint32_t>(changed.As<v8::Number>()->Value());
+  }
+  Log("%s %u leak cycle(s)%s, %u native object(s) freed while probing, report written to %s",
+      kLogPrefix, count, strict ? " (strict)" : "", changedCount, path.c_str());
 }
 
 struct Triggers {

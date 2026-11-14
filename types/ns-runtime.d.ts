@@ -149,6 +149,14 @@ declare module "ns:runtime" {
     nativeObjects: number;
     /** Native objects whose retain count is lower than the references found to them. */
     uncertainNativeObjects: number;
+    /**
+     * Native objects freed (or freed and replaced) by other threads while the
+     * probe ran. They are kept in the graph as found but own nothing, and a
+     * cycle through one is marked `uncertain`.
+     */
+    changedNativeObjects: number;
+    /** Up to 50 of them, with the reference that led to each. */
+    changed: { className: string; address: string; seed: boolean; depth: number; foundFrom: string }[];
     /** The native graph hit its size limit; cycles past it are not seen. */
     truncated: boolean;
     snapshotNodes: number;

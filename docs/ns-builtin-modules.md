@@ -209,7 +209,10 @@ snapshot, DevTools' included, carries the runtime's edges; only
 
 Each cycle has a `signature` (addresses and V8 ids removed, rotated
 canonically) to compare runs and modes, the `path` as found, and its
-`members`. What it cannot see: references held without an ivar or storage
+`members`. Other threads keep running while the probe walks native memory, so
+an object can be freed after it was found: such objects are counted in
+`changedNativeObjects` and listed in `changed`, own nothing, and a cycle
+through one is reported as `uncertain`. What it cannot see: references held without an ivar or storage
 pointer (manual retain/release bookkeeping, C++ members, associated objects)
 read as outside owners, so their cycles are missed rather than misreported.
 

@@ -195,6 +195,8 @@ describe("Wrapper lifetime leak cycles", function () {
                 expect(report.nativeObjects).toBeGreaterThan(0);
                 expect(report.snapshotNodes).toBeGreaterThan(0);
                 expect(report.truncated).toBe(false);
+                expect(typeof report.changedNativeObjects).toBe("number");
+                expect(Array.isArray(report.changed)).toBe(true);
             });
             expect(reports.default.strict).toBe(false);
             expect(reports.strict.strict).toBe(true);
