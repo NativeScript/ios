@@ -32,6 +32,14 @@ class MetadataBuilder {
                                                  v8::Local<v8::Object> parent);
 
  private:
+  // The binding of an object whose static type adds protocols to `meta`: a
+  // template inheriting from the class's own binding with the protocols'
+  // extra members, cached per class and protocol set. Never published as the
+  // class's constructor.
+  static v8::Local<v8::FunctionTemplate> GetOrCreateProtocolBindingTemplate(
+      v8::Local<v8::Context> context, const BaseClassMeta* meta,
+      KnownUnknownClassPair pair,
+      const std::vector<std::string>& additionalProtocols);
   static v8::Local<v8::FunctionTemplate>
   GetOrCreateConstructorFunctionTemplateInternal(
       v8::Local<v8::Context> context, const BaseClassMeta* meta,

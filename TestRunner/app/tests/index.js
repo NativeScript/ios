@@ -128,6 +128,7 @@ require("./ObjCConstructors");
 require("./MetadataTests");
 //
 require("./ApiTests");
+require("./ProtocolBindingTests");
 require("./ProxyReceiverTests");
 require("./NsRuntimeTests");
 require("./NsWorkerThreadsTests");
