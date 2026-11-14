@@ -41,16 +41,20 @@ using namespace tns;
 }
 
 - (id)nextObject {
-  if (!wrapper_->IsValid()) {
-    return nil;
-  }
   Isolate* isolate = wrapper_->Isolate();
   NSString* result = nil;
   // Scopes-before-@throw: keep V8 scopes in an inner block so a branded escape
   // is @thrown only after they destruct.
   NSException* __strong pendingThrow = nil;
   {
+    IsolatePin pin = wrapper_->Pin();
+    if (!pin || !wrapper_->IsValid()) {
+      return nil;
+    }
     v8::Locker locker(isolate);
+    if (!wrapper_->IsValid()) {
+      return nil;
+    }
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
@@ -140,14 +144,18 @@ using namespace tns;
 }
 
 - (id)nextObject {
-  if (!wrapper_->IsValid()) {
-    return nil;
-  }
   Isolate* isolate = wrapper_->Isolate();
   NSString* result = nil;
   NSException* __strong pendingThrow = nil;
   {
+    IsolatePin pin = wrapper_->Pin();
+    if (!pin || !wrapper_->IsValid()) {
+      return nil;
+    }
     v8::Locker locker(isolate);
+    if (!wrapper_->IsValid()) {
+      return nil;
+    }
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
@@ -174,14 +182,18 @@ using namespace tns;
 }
 
 - (NSArray*)allObjects {
-  if (!wrapper_->IsValid()) {
-    return nil;
-  }
   Isolate* isolate = wrapper_->Isolate();
   NSMutableArray* array = [NSMutableArray array];
   NSException* __strong pendingThrow = nil;
   {
+    IsolatePin pin = wrapper_->Pin();
+    if (!pin || !wrapper_->IsValid()) {
+      return nil;
+    }
     v8::Locker locker(isolate);
+    if (!wrapper_->IsValid()) {
+      return nil;
+    }
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
@@ -256,14 +268,18 @@ using namespace tns;
 }
 
 - (NSUInteger)count {
-  if (!wrapper_->IsValid()) {
-    return 0;
-  }
   Isolate* isolate = wrapper_->Isolate();
   NSUInteger result = 0;
   NSException* __strong pendingThrow = nil;
   {
+    IsolatePin pin = wrapper_->Pin();
+    if (!pin || !wrapper_->IsValid()) {
+      return 0;
+    }
     v8::Locker locker(isolate);
+    if (!wrapper_->IsValid()) {
+      return 0;
+    }
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
@@ -292,14 +308,18 @@ using namespace tns;
 }
 
 - (id)objectForKey:(id)aKey {
-  if (!wrapper_->IsValid()) {
-    return nil;
-  }
   Isolate* isolate = wrapper_->Isolate();
   id result = nil;
   NSException* __strong pendingThrow = nil;
   {
+    IsolatePin pin = wrapper_->Pin();
+    if (!pin || !wrapper_->IsValid()) {
+      return nil;
+    }
     v8::Locker locker(isolate);
+    if (!wrapper_->IsValid()) {
+      return nil;
+    }
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
@@ -343,11 +363,15 @@ using namespace tns;
 }
 
 - (NSEnumerator*)keyEnumerator {
+  Isolate* isolate = wrapper_->Isolate();
+  IsolatePin pin = wrapper_->Pin();
+  if (!pin || !wrapper_->IsValid()) {
+    return nil;
+  }
+  v8::Locker locker(isolate);
   if (!wrapper_->IsValid()) {
     return nil;
   }
-  Isolate* isolate = wrapper_->Isolate();
-  v8::Locker locker(isolate);
   Isolate::Scope isolate_scope(isolate);
   HandleScope handle_scope(isolate);
 
@@ -365,42 +389,46 @@ using namespace tns;
 }
 
 - (void)dealloc {
-  if (wrapper_->IsValid()) {
-    Isolate* isolate = wrapper_->Isolate();
-    v8::Locker locker(isolate);
-    Isolate::Scope isolate_scope(isolate);
-    HandleScope handle_scope(isolate);
-    wrapper_->GetCache()->Instances.erase(self);
-    // Detach and free only a wrapper that is still the one we attached: a
-    // finalizer or __releaseNativeCounterpart can have retired it already, and
-    // whatever else sits in the field belongs to another owner. Once the
-    // isolate is gone the field can no longer be read, so the claim is dropped
-    // rather than freed blind.
-    if (dataWrapper_ != nullptr) {
-      Local<Value> value =
-          claimTarget_ != nullptr ? claimTarget_->Get(isolate) : self->object_->Get(isolate);
-      if (tns::GetValue(isolate, value) == dataWrapper_) {
-        tns::DeleteValue(isolate, value);
-        delete dataWrapper_;
-      }
-      dataWrapper_ = nullptr;
-    }
-    // Persistent<Value> does not reset in its destructor; the enumerators
-    // vended by -keyEnumerator hold this adapter alive, so nothing can be
-    // reading the handle by the time this runs.
-    self->object_->Reset();
-    if (claimTarget_ != nullptr) {
-      claimTarget_->Reset();
-    }
-  } else if (dataWrapper_ != nullptr) {
-    // The isolate is gone, and with it the JS object and every reader of the
-    // claim; no other path deletes one (__releaseNativeCounterpart leaves
-    // adapter claims attached), so the owner frees it here — adapters
-    // released after a worker isolate's teardown otherwise leak one wrapper
-    // each.
-    delete dataWrapper_;
-    dataWrapper_ = nullptr;
+  // Reached from a thread inside another isolate, the teardown below runs on
+  // this adapter's own isolate instead; the object stays allocated until then.
+  if (wrapper_->HandOffTeardown([self]() { [self dealloc]; })) {
+    return;
   }
+  {
+    IsolatePin pin = wrapper_->Pin();
+    if (pin) {
+      Isolate* isolate = wrapper_->Isolate();
+      v8::Locker locker(isolate);
+      // Validity is not the test: until the teardown closes the gate it can
+      // still reach the claim through the JS object, so it is detached under
+      // the Locker even once the isolate is invalidated.
+      if (!wrapper_->IsTornDown()) {
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+        wrapper_->GetCache()->Instances.erase(self);
+        // Detach only a claim that is still the one we attached: marshalling
+        // the object once this adapter's last release has started detaches
+        // it, and whatever else sits in the field belongs to another owner.
+        if (dataWrapper_ != nullptr) {
+          Local<Value> value =
+              claimTarget_ != nullptr ? claimTarget_->Get(isolate) : self->object_->Get(isolate);
+          if (tns::GetValue(isolate, value) == dataWrapper_) {
+            tns::DeleteValue(isolate, value);
+          }
+        }
+        // Persistent<Value> does not reset in its destructor; the enumerators
+        // vended by -keyEnumerator hold this adapter alive, so nothing can be
+        // reading the handle by the time this runs.
+        self->object_->Reset();
+        if (claimTarget_ != nullptr) {
+          claimTarget_->Reset();
+        }
+      }
+    }
+  }
+  // No other path frees an adapter claim, attached or not.
+  delete dataWrapper_;
+  dataWrapper_ = nullptr;
   self->object_ = nullptr;
   delete claimTarget_;
   claimTarget_ = nullptr;
