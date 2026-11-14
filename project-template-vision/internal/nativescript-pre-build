@@ -9,6 +9,15 @@ else
     mv "$ENV_FILE.tmp" "$ENV_FILE"
 fi
 
+# Xcode reads these as lists too (EXCLUDED_SOURCE_FILE_NAMES / INCLUDED_SOURCE_FILE_NAMES)
+# and only splits on spaces, so a comma would leave the frameworks linked and embedded.
+case "$NS_DEBUG_FRAMEWORKS $NS_SHIP_DEBUG_FRAMEWORKS" in
+    *,*)
+        echo "error: NS_DEBUG_FRAMEWORKS and NS_SHIP_DEBUG_FRAMEWORKS take framework file names separated by spaces, not commas." >&2
+        exit 1
+        ;;
+esac
+
 # create temporary empty metadata files for XCode LD/LDPLUSPLUS flag analysis.
 # Never touch existing ones: the link step reads them, so a newer timestamp
 # would make Xcode relink on every build.
