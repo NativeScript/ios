@@ -107,7 +107,8 @@ class Interop {
       BaseCall* call, bool marshalToPrimitive,
       v8::Local<v8::Object> parentStruct = v8::Local<v8::Object>(),
       bool isStructMember = false, bool ownsReturnedObject = false,
-      bool returnsUnmanaged = false, bool isInitializer = false);
+      bool returnsUnmanaged = false, bool isInitializer = false,
+      bool releaseCachedOwnedReturn = false);
   static void SetStructPropertyValue(v8::Local<v8::Context> context,
                                      StructWrapper* wrapper,
                                      const StructField& field,

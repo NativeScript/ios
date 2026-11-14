@@ -37,6 +37,10 @@ class ClassBuilder {
       v8::Local<v8::Context> context);
   static std::string GetTypeEncoding(const TypeEncoding* typeEncoding,
                                      int argsCount);
+  // `klass` or its nearest superclass not defined from JS.
+  static Class FindNativeClass(Class klass);
+  // The implementation of `method` from FindNativeClass(klass).
+  static IMP FindNotOverridenMethod(Class klass, SEL method);
 
  private:
   static std::atomic<unsigned long long> classNameCounter_;
@@ -72,7 +76,6 @@ class ClassBuilder {
   static std::string GetTypeEncoding(const TypeEncoding* typeEncoding);
   static BinaryTypeEncodingType GetTypeEncodingType(v8::Isolate* isolate,
                                                     v8::Local<v8::Value> value);
-  static IMP FindNotOverridenMethod(Class klass, SEL method);
 
   struct CacheItem {
    public:

@@ -2,6 +2,7 @@
 #include <Foundation/Foundation.h>
 #include <algorithm>
 #include <sstream>
+#include "ClassBuilder.h"
 #include "DictionaryAdapter.h"
 #include "ExternalMemory.h"
 #include "Helpers.h"
@@ -16,6 +17,83 @@ using namespace v8;
 using namespace std;
 
 namespace tns {
+
+namespace {
+
+// -allowsWeakReference answers NO once deallocation has begun, and for the
+// rare classes that refuse weak references altogether. Runs before `obj` has
+// a cached wrapper, so nothing here may be a message a JS class implements:
+// it would re-enter MethodCallback for the same object.
+bool IsDeallocating(id obj) {
+  static SEL allowsWeakReference = sel_registerName("allowsWeakReference");
+  Class nativeClass = ClassBuilder::FindNativeClass(object_getClass(obj));
+  // class_getMethodImplementation answers the forwarding IMP for a selector
+  // the class lacks.
+  if (!class_respondsToSelector(nativeClass, allowsWeakReference)) {
+    return false;
+  }
+  IMP imp = class_getMethodImplementation(nativeClass, allowsWeakReference);
+  return !((BOOL (*)(id, SEL))imp)(obj, allowsWeakReference);
+}
+
+// Clang's init method family: optional leading underscores, then "init", then
+// the end of the selector's first piece or anything but a lowercase letter.
+bool IsInitFamily(SEL selector) {
+  const char* name = sel_getName(selector);
+  while (*name == '_') {
+    name++;
+  }
+  return strncmp(name, "init", 4) == 0 && (name[4] < 'a' || name[4] > 'z');
+}
+
+// The native caller of an init-family method owns its result. SetValue hands
+// a wrapped object or a string over at +0: for the receiver that is the
+// reference the caller passed in, any other object needs its own. The
+// receiver is left alone: when a super initializer substituted it, that
+// initializer already released it, and nothing here can tell that case apart.
+void RetainInitializerResult(Isolate* isolate, void** argValues, void* retValue,
+                             const TypeEncoding* typeEncoding, Local<Value> value) {
+  BinaryTypeEncodingType type = typeEncoding->type;
+  if (type != BinaryTypeEncodingType::IdEncoding &&
+      type != BinaryTypeEncodingType::InterfaceDeclarationReference &&
+      type != BinaryTypeEncodingType::InstanceTypeEncoding) {
+    return;
+  }
+
+  id returned = *static_cast<id*>(retValue);
+  if (returned == nil || returned == *static_cast<id*>(argValues[0]) ||
+      !IsInitFamily(*static_cast<SEL*>(argValues[1]))) {
+    return;
+  }
+
+  // A plain JS object becomes a DictionaryAdapter SetValue already returns
+  // at +1.
+  value = tns::UnwrapProxy(value);
+  BaseDataWrapper* wrapper = value->IsObject() ? tns::GetValue(isolate, value) : nullptr;
+  bool atPlusZero =
+      value->IsString() || (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject);
+  if (atPlusZero) {
+    [returned retain];
+  }
+}
+
+// The borrowed wrapper WrapNativeCallbackSelf made for an object in -dealloc
+// is detached once the native call returns: the object is gone afterwards,
+// so a receiver JS kept must read as released.
+struct BorrowedSelfScope {
+  explicit BorrowedSelfScope(Isolate* isolate) : isolate(isolate) {}
+  ~BorrowedSelfScope() {
+    if (wrapper != nullptr && tns::GetValue(isolate, receiver) == wrapper) {
+      tns::SetValue(isolate, receiver, nullptr);
+      delete wrapper;
+    }
+  }
+  Isolate* isolate;
+  Local<Object> receiver;
+  ObjCDataWrapper* wrapper = nullptr;
+};
+
+}  // namespace
 
 void ArgConverter::Init(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
@@ -119,15 +197,13 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
 }
 
 Local<Value> ArgConverter::ConvertArgument(Local<Context> context, BaseDataWrapper* wrapper,
-                                           bool skipGCRegistration,
                                            const std::vector<std::string>& additionalProtocols) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   if (wrapper == nullptr) {
     return Null(isolate);
   }
 
-  Local<Value> result =
-      CreateJsWrapper(context, wrapper, Local<Object>(), skipGCRegistration, additionalProtocols);
+  Local<Value> result = CreateJsWrapper(context, wrapper, Local<Object>(), additionalProtocols);
   return result;
 }
 
@@ -352,15 +428,15 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     }
 
     Local<Object> thiz = context->Global();
+    BorrowedSelfScope borrowedSelf(isolate);
     if (data->initialParamIndex_ > 1) {
       id self_ = *static_cast<const id*>(argValues[0]);
       auto it = cache->Instances.find(self_);
       if (it != cache->Instances.end()) {
         thiz = it->second->Get(data->isolateWrapper_.Isolate()).As<Object>();
       } else {
-        ObjCDataWrapper* wrapper = new ObjCDataWrapper(self_);
-        thiz = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true).As<Object>();
-        tns::DeleteWrapperIfUnused(isolate, thiz, wrapper);
+        thiz = ArgConverter::WrapNativeCallbackSelf(context, self_, &borrowedSelf.wrapper);
+        borrowedSelf.receiver = thiz;
       }
     }
 
@@ -437,6 +513,9 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         memset(retValue, 0, cif->rtype->size);
       } else {
         ArgConverter::SetValue(context, retValue, cif->rtype->size, result, data->typeEncoding_);
+        if (data->initialParamIndex_ == 2) {
+          RetainInitializerResult(isolate, argValues, retValue, data->typeEncoding_, result);
+        }
       }
     } else {
       memset(retValue, 0, cif->rtype->size);
@@ -845,7 +924,7 @@ std::vector<Local<Value>> ArgConverter::GetInitializerArgs(Local<Object> obj,
 }
 
 Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapper* wrapper,
-                                           Local<Object> receiver, bool skipGCRegistration,
+                                           Local<Object> receiver,
                                            const std::vector<std::string>& additionalProtocols) {
   Isolate* isolate = v8::Isolate::GetCurrent();
 
@@ -861,7 +940,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
     ObjCAllocDataWrapper* allocDataWrapper = static_cast<ObjCAllocDataWrapper*>(wrapper);
     Class klass = allocDataWrapper->Klass();
 
-    std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context, false);
+    std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context);
     receiver = poValue->Get(isolate).As<Object>();
 
     const Meta* meta = FindMeta(klass);
@@ -904,7 +983,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
     if (it != cache->Instances.end()) {
       receiver = it->second->Get(isolate).As<Object>();
     } else {
-      std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context, skipGCRegistration);
+      std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context);
       receiver = poValue->Get(isolate).As<Object>();
       tns::SetValue(isolate, receiver, wrapper);
       cache->Instances.emplace(target, poValue);
@@ -1069,12 +1148,42 @@ const ProtocolMeta* ArgConverter::FindProtocolMeta(Protocol* protocol) {
   return protocolMeta;
 }
 
-std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyObject(Local<Context> context,
-                                                                   bool skipGCRegistration) {
+Local<Object> ArgConverter::WrapNativeCallbackSelf(Local<Context> context, id self,
+                                                   ObjCDataWrapper** borrowed) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  auto cache = Caches::Get(isolate);
+  ObjCDataWrapper* wrapper = new ObjCDataWrapper(self);
+
+  if (IsDeallocating(self)) {
+    // Called from -dealloc: a retain cannot keep the object alive, so the
+    // wrapper is neither cached nor owning, and the caller detaches it.
+    wrapper->MarkBorrowed();
+    Local<Object> receiver = NewEmptyInstance(context, cache->EmptyObjCtorFunc.get());
+    CreateJsWrapper(context, wrapper, receiver);
+    *borrowed = wrapper;
+    return receiver;
+  }
+
+  Local<Object> result = CreateJsWrapper(context, wrapper, Local<Object>()).As<Object>();
+  if (tns::DeleteWrapperIfUnused(isolate, result, wrapper)) {
+    return result;
+  }
+  // Native code usually still holds the object (it is mid-initialization or
+  // owned by whoever called in), and its JS state must outlive this call: the
+  // handle stays strong until the Instances entry is the object's only owner.
+  auto it = cache->Instances.find(self);
+  if (it != cache->Instances.end() && it->second->IsWeak()) {
+    ObjectManager::ManageOwnership(isolate, wrapper,
+                                   it->second->ClearWeak<ObjectWeakCallbackState>());
+  }
+  return result;
+}
+
+std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyObject(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyObjCtorFunc.get();
   tns::Assert(ctorFunc != nullptr, isolate);
-  return ArgConverter::CreateEmptyInstance(context, ctorFunc, skipGCRegistration);
+  return ArgConverter::CreateEmptyInstance(context, ctorFunc);
 }
 
 Local<Object> ArgConverter::NewEmptyInstance(Local<Context> context,
@@ -1090,18 +1199,9 @@ Local<Object> ArgConverter::NewEmptyInstance(Local<Context> context,
 }
 
 std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(
-    Local<Context> context, Persistent<v8::Function>* ctorFunc, bool skipGCRegistration) {
-  Isolate* isolate = v8::Isolate::GetCurrent();
+    Local<Context> context, Persistent<v8::Function>* ctorFunc) {
   Local<Object> result = NewEmptyInstance(context, ctorFunc);
-
-  std::shared_ptr<Persistent<Value>> poValue;
-  if (!skipGCRegistration) {
-    poValue = ObjectManager::Register(context, result);
-  } else {
-    poValue = std::make_shared<Persistent<Value>>(isolate, result);
-  }
-
-  return poValue;
+  return ObjectManager::Register(context, result);
 }
 
 Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Local<Context> context) {

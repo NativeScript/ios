@@ -40,20 +40,23 @@ class ArgConverter {
                                      v8::Local<v8::Object> receiver,
                                      V8Args& args, const MethodMeta* meta,
                                      bool isMethodCallback);
-  // skipGCRegistration: for ObjC wrappers the object gets a strong handle and
-  // no finalizer.
   static v8::Local<v8::Value> ConvertArgument(
       v8::Local<v8::Context> context, BaseDataWrapper* wrapper,
-      bool skipGCRegistration = false,
       const std::vector<std::string>& additionalProtocols =
           std::vector<std::string>());
   static v8::Local<v8::Value> CreateJsWrapper(
       v8::Local<v8::Context> context, BaseDataWrapper* wrapper,
-      v8::Local<v8::Object> receiver, bool skipGCRegistration = false,
+      v8::Local<v8::Object> receiver,
       const std::vector<std::string>& additionalProtocols =
           std::vector<std::string>());
   static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyObject(
-      v8::Local<v8::Context> context, bool skipGCRegistration = false);
+      v8::Local<v8::Context> context);
+  // The JS `this` for native code calling a JS-implemented method on an
+  // object JS has no wrapper for yet. For an object already deallocating it
+  // is a borrowed wrapper, stored in `borrowed`, that the caller must detach
+  // and delete once the call returns.
+  static v8::Local<v8::Object> WrapNativeCallbackSelf(
+      v8::Local<v8::Context> context, id self, ObjCDataWrapper** borrowed);
   static const Meta* FindMeta(Class klass,
                               const TypeEncoding* typeEncoding = nullptr);
   // Looks up the JS wrapper cached for `target` in Caches::Instances, dropping
@@ -102,8 +105,7 @@ class ArgConverter {
   static v8::Local<v8::Object> NewEmptyInstance(
       v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc);
   static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyInstance(
-      v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc,
-      bool skipGCRegistration = false);
+      v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc);
   static void FindMethodOverloads(Class klass, std::string methodName,
                                   MemberType type,
                                   std::vector<const MethodMeta*>& overloads);

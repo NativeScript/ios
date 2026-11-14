@@ -1029,7 +1029,7 @@ Local<Value> Interop::GetResultByType(Local<Context> context, BaseDataWrapper* t
 Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding,
                                 BaseCall* call, bool marshalToPrimitive, Local<Object> parentStruct,
                                 bool isStructMember, bool ownsReturnedObject, bool returnsUnmanaged,
-                                bool isInitializer) {
+                                bool isInitializer, bool releaseCachedOwnedReturn) {
   Isolate* isolate = v8::Isolate::GetCurrent();
 
   if (returnsUnmanaged) {
@@ -1363,7 +1363,16 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     auto cache = Caches::Get(isolate);
     auto poInstance = ArgConverter::FindCachedInstance(isolate, cache, result);
     if (poInstance != nullptr) {
-      return poInstance->Get(isolate);
+      Local<Value> cached = poInstance->Get(isolate);
+      // The Instances entry holds its own reference, so a returned +1 is
+      // surplus. Only class methods and C functions qualify: an instance
+      // method can hand back its receiver without a net retain (initializers,
+      // NS_REPLACES_RECEIVER) or come from a JS implementation, which returns
+      // at +0.
+      if (ownsReturnedObject && releaseCachedOwnedReturn) {
+        [result release];
+      }
+      return cached;
     }
 
     // For NSProxy we will try to read the metadata from
@@ -1373,8 +1382,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
     ObjCDataWrapper* wrapper = new ObjCDataWrapper(result, te);
     std::vector<std::string> additionalProtocols = Interop::GetAdditionalProtocols(typeEncoding);
-    Local<Value> jsResult =
-        ArgConverter::ConvertArgument(context, wrapper, false, additionalProtocols);
+    Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper, additionalProtocols);
 
     if (ownsReturnedObject || isInitializer) {
       [result release];
@@ -1795,7 +1803,9 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     SEL selector = methodCall.selector_;
     if (isInstanceMethod) {
       SEL swizzledMethodSelector = Interop::GetSwizzledMethodSelector(selector);
-      if ([methodCall.target_ respondsToSelector:swizzledMethodSelector]) {
+      // Not -respondsToSelector:, which a JS class may implement by calling
+      // its base implementation through this very path.
+      if (class_respondsToSelector(object_getClass(methodCall.target_), swizzledMethodSelector)) {
         selector = swizzledMethodSelector;
       }
 
@@ -1867,8 +1877,8 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     }
 
     ObjCDataWrapper* wrapper = new ObjCDataWrapper((id)e);
-    Local<Value> nativeWrapper =
-        ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true);
+    Local<Value> nativeWrapper = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>());
+    tns::DeleteWrapperIfUnused(isolate, nativeWrapper, wrapper);
     jsErrObj->Set(context, tns::ToV8String(isolate, "nativeException"), nativeWrapper)
         .FromMaybe(false);
 
@@ -1911,8 +1921,8 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
 
       // Wrap the native NSError instance into a JS object and attach as nativeException
       ObjCDataWrapper* wrapper = new ObjCDataWrapper(error);
-      Local<Value> nativeWrapper =
-          ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>(), true);
+      Local<Value> nativeWrapper = ArgConverter::CreateJsWrapper(context, wrapper, Local<Object>());
+      tns::DeleteWrapperIfUnused(isolate, nativeWrapper, wrapper);
       jsErrObj->Set(context, tns::ToV8String(isolate, "nativeException"), nativeWrapper)
           .FromMaybe(false);
 
@@ -1927,10 +1937,10 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     }
   }
 
-  Local<Value> result =
-      Interop::GetResult(methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive,
-                         Local<Object>(), false, methodCall.ownsReturnedObject_,
-                         methodCall.returnsUnmanaged_, methodCall.isInitializer_);
+  Local<Value> result = Interop::GetResult(
+      methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive, Local<Object>(),
+      false, methodCall.ownsReturnedObject_, methodCall.returnsUnmanaged_,
+      methodCall.isInitializer_, !isInstanceMethod);
 
   // Owned returns, initializers and class factory methods hand out objects JS
   // most likely holds the last reference to. Instance getters do not: their

@@ -416,8 +416,22 @@ class ObjCDataWrapper : public BaseDataWrapper {
   // anything keyed on the raw pointer needs this to detect a recycled slot.
   Class Klass() { return this->klass_; }
 
+  // Set for a wrapper whose handle ObjectManager::ReconcileOwnership keeps
+  // strong while native code also retains the object, and weak once the
+  // Instances entry is its only owner. The handle's finalizer state, needed to
+  // re-arm it after a strong period.
+  ObjectWeakCallbackState* OwnershipState() { return this->ownershipState_; }
+  void SetOwnershipState(ObjectWeakCallbackState* state) { this->ownershipState_ = state; }
+
+  // A wrapper that holds no reference to its object (one made for an object
+  // already deallocating), so nothing may release on its behalf.
+  bool IsBorrowed() { return this->borrowed_; }
+  void MarkBorrowed() { this->borrowed_ = true; }
+
  private:
   bool adapterClaim_ = false;
+  bool borrowed_ = false;
+  ObjectWeakCallbackState* ownershipState_ = nullptr;
   id data_;
   const tns::TypeEncoding* typeEncoding_;
   Class klass_;
