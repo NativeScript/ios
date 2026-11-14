@@ -33,6 +33,25 @@
 
 @end
 
+@protocol TNSDeclaredMemberProtocol
+
+-(NSString*)declaredMember;
+
+@end
+
+@interface TNSDeclaredMemberBase : NSObject
+@end
+
+// Declared for the base class, implemented only by TNSDeclaredMemberSubclass.
+@interface TNSDeclaredMemberBase (TNSDeclaredOnly)
+
+-(NSString*)declaredMember;
+
+@end
+
+@interface TNSDeclaredMemberSubclass : TNSDeclaredMemberBase
+@end
+
 @interface TNSType : NSObject
 
 -(void)method;
@@ -46,5 +65,6 @@
 +(id<TNSOptionalMemberProtocol>)getWithOptionalMember;
 +(id<TNSOptionalMemberProtocol>)getWithoutOptionalMember;
 +(id<TNSReadonlyValueProtocol>)getReadwriteValue;
++(id<TNSDeclaredMemberProtocol>)getDeclaredMemberSubclass;
 
 @end

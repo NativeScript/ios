@@ -56,6 +56,15 @@ describe("Protocol-qualified object bindings", function () {
         expect(TNSPseudoDataType.getWithOptionalMember().optionalMember()).toBe("optional member");
     });
 
+    it("binds a protocol member a base class declares but only the subclass implements", function () {
+        // Builds the base class's binding for a class that lacks the member.
+        var base = TNSDeclaredMemberBase.alloc().init();
+        expect(base.declaredMember).toBeUndefined();
+
+        var object = TNSPseudoDataType.getDeclaredMemberSubclass();
+        expect(object.declaredMember()).toBe("declared member");
+    });
+
     it("keeps the class's own property when a protocol redeclares it readonly", function () {
         var object = TNSPseudoDataType.getReadwriteValue();
         object.value = 5;

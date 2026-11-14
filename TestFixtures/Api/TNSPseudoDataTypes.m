@@ -29,6 +29,17 @@
 @implementation TNSReadwriteValue
 @end
 
+@implementation TNSDeclaredMemberBase
+@end
+
+@implementation TNSDeclaredMemberSubclass
+
+-(NSString*)declaredMember {
+    return @"declared member";
+}
+
+@end
+
 @implementation TNSType
 
 -(void)method {
@@ -71,6 +82,10 @@
 
 +(id<TNSReadonlyValueProtocol>)getReadwriteValue {
     return [[TNSReadwriteValue alloc] init];
+}
+
++(id<TNSDeclaredMemberProtocol>)getDeclaredMemberSubclass {
+    return [[TNSDeclaredMemberSubclass alloc] init];
 }
 
 +(TNSType<Proto1, Proto2>*)getType {

@@ -676,12 +676,15 @@ struct ProtocolBindings {
   robin_hood::unordered_map<Class, std::vector<Binding>> byClass;
 };
 
-// The instance members the class's own binding registers, with the property
-// accessor counts RegisterInstanceProperties compares against, so a protocol
-// member only replaces the class's definition where the old leaf rebuild did.
-void CollectInstanceMemberNames(const BaseClassMeta* meta, KnownUnknownClassPair pair,
-                                bool ownMembers,
+// The instance members the bindings of `meta`'s class chain are guaranteed to
+// have, with the property accessor counts RegisterInstanceProperties compares
+// against: a protocol property replaces the class's only where it adds an
+// accessor, and a protocol method never replaces one the class chain has.
+// Each level is checked against its own class, the one class that every class
+// whose wrapping could have built that level's binding descends from.
+void CollectInstanceMemberNames(const BaseClassMeta* meta, Class klass, bool ownMembers,
                                 robin_hood::unordered_map<std::string, uint8_t>& names) {
+  KnownUnknownClassPair pair(klass);
   if (ownMembers) {
     for (auto it = meta->instanceMethods->begin(); it != meta->instanceMethods->end(); it++) {
       const MethodMeta* methodMeta = (*it).valuePtr();
@@ -704,7 +707,7 @@ void CollectInstanceMemberNames(const BaseClassMeta* meta, KnownUnknownClassPair
     for (auto it = meta->protocols->begin(); it != meta->protocols->end(); it++) {
       const Meta* protocolMeta = ArgConverter::GetMeta((*it).valuePtr());
       if (protocolMeta != nullptr && protocolMeta->type() == MetaType::ProtocolType) {
-        CollectInstanceMemberNames(static_cast<const BaseClassMeta*>(protocolMeta), pair, true,
+        CollectInstanceMemberNames(static_cast<const BaseClassMeta*>(protocolMeta), klass, true,
                                    names);
       }
     }
@@ -718,8 +721,11 @@ void CollectInstanceMemberNames(const BaseClassMeta* meta, KnownUnknownClassPair
   }
   const Meta* baseMeta = ArgConverter::GetMeta(baseName);
   if (baseMeta != nullptr && baseMeta->type() == MetaType::Interface) {
-    CollectInstanceMemberNames(static_cast<const BaseClassMeta*>(baseMeta), pair,
-                               baseMeta->isAvailable(), names);
+    // A nil class would count every member as implemented.
+    Class baseClass = objc_getClass(baseMeta->name());
+    CollectInstanceMemberNames(static_cast<const BaseClassMeta*>(baseMeta),
+                               baseClass != nil ? baseClass : klass, baseMeta->isAvailable(),
+                               names);
   }
 }
 
@@ -752,11 +758,10 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateProtocolBindingTemplate(
 
   Local<FunctionTemplate> classTemplate =
       MetadataBuilder::GetOrCreateConstructorFunctionTemplate(context, meta, pair);
-  // Seeded from the metadata's class alone: a member only the runtime class
-  // implements may be missing from the class's binding, so it is left to the
-  // protocols to bind.
+  // Seeded from the metadata's classes, never the runtime class: a member the
+  // class chain's bindings may lack is left to the protocols to bind.
   robin_hood::unordered_map<std::string, uint8_t> names;
-  CollectInstanceMemberNames(meta, KnownUnknownClassPair(pair.known), true, names);
+  CollectInstanceMemberNames(meta, pair.known, true, names);
 
   Local<FunctionTemplate> bindingTemplate = FunctionTemplate::New(isolate);
   bindingTemplate->InstanceTemplate()->SetInternalFieldCount(1);
