@@ -751,11 +751,24 @@ describe("Native callback self wrappers", function () {
         }
     }, { name: "NativeCallbackSelfDecodeDelegate", protocols: [NSKeyedUnarchiverDelegate] });
 
-    // Decodes an array of two TNSCodingAllocLogs through a delegate answering
-    // `answer(object)`, or through none when `answer` is null. `freedAfterDecode`
-    // TNSAllocLogs are gone once the unarchiver is, `freedAtEnd` once JS
-    // drops the decoded root too.
-    function expectBalancedDecode(answer, freedAfterDecode, freedAtEnd, checkRoot, done) {
+    // The same method with no metadata to describe it.
+    var ExposedDecodeDelegate = NSObject.extend({
+        "unarchiver:didDecodeObject:": function (unarchiver, object) {
+            decodeCalls++;
+            return decodeAnswer(object);
+        }
+    }, {
+        name: "NativeCallbackSelfExposedDecodeDelegate",
+        exposedMethods: {
+            "unarchiver:didDecodeObject:": { returns: NSObject, params: [NSObject, NSObject] }
+        }
+    });
+
+    // Decodes an array of two TNSCodingAllocLogs through a `Delegate`
+    // answering `answer(object)`, or through none when `answer` is null.
+    // `freedAfterDecode` TNSAllocLogs are gone once the unarchiver is,
+    // `freedAtEnd` once JS drops the decoded root too.
+    function expectBalancedDecode(Delegate, answer, freedAfterDecode, freedAtEnd, checkRoot, done) {
         var data = (function () {
             var root = NSMutableArray.new();
             root.addObject(TNSCodingAllocLog.new());
@@ -767,7 +780,7 @@ describe("Native callback self wrappers", function () {
             TNSClearOutput();
             var state = {};
             (function () {
-                var delegate = answer ? DecodeDelegate.new() : null;
+                var delegate = answer ? Delegate.new() : null;
                 decodeAnswer = answer;
                 decodeCalls = 0;
                 var unarchiver = NSKeyedUnarchiver.alloc().initForReadingFromDataError(data);
@@ -804,29 +817,36 @@ describe("Native callback self wrappers", function () {
     }
 
     it("decodes without an unarchiver delegate", function (done) {
-        expectBalancedDecode(null, 0, 2, expectDecodedRoot(TNSCodingAllocLog), done);
+        expectBalancedDecode(null, null, 0, 2, expectDecodedRoot(TNSCodingAllocLog), done);
     });
 
-    it("hands an unarchiver back the objects a JS delegate answers unchanged", function (done) {
-        expectBalancedDecode(function (object) {
-            return object;
-        }, 0, 2, expectDecodedRoot(TNSCodingAllocLog), done);
-    });
+    [
+        { Delegate: DecodeDelegate, suffix: "" },
+        { Delegate: ExposedDecodeDelegate, suffix: " (exposedMethods, no protocol)" }
+    ].forEach(function (variant) {
+        var Delegate = variant.Delegate;
 
-    it("releases the objects a JS unarchiver delegate replaces", function (done) {
-        expectBalancedDecode(function (object) {
-            return object instanceof TNSCodingAllocLog ? TNSAllocLog.new() : object;
-        }, 2, 4, function (root) {
-            expectDecodedRoot(TNSAllocLog)(root);
-            expect(root.objectAtIndex(0) instanceof TNSCodingAllocLog).toBe(false);
-        }, done);
-    });
+        it("hands an unarchiver back the objects a JS delegate answers unchanged" + variant.suffix, function (done) {
+            expectBalancedDecode(Delegate, function (object) {
+                return object;
+            }, 0, 2, expectDecodedRoot(TNSCodingAllocLog), done);
+        });
 
-    // The unarchiver keeps an object its delegate answers nil for.
-    it("releases the objects a JS unarchiver delegate answers nil for", function (done) {
-        expectBalancedDecode(function (object) {
-            return null;
-        }, 0, 2, expectDecodedRoot(TNSCodingAllocLog), done);
+        it("releases the objects a JS unarchiver delegate replaces" + variant.suffix, function (done) {
+            expectBalancedDecode(Delegate, function (object) {
+                return object instanceof TNSCodingAllocLog ? TNSAllocLog.new() : object;
+            }, 2, 4, function (root) {
+                expectDecodedRoot(TNSAllocLog)(root);
+                expect(root.objectAtIndex(0) instanceof TNSCodingAllocLog).toBe(false);
+            }, done);
+        });
+
+        // The unarchiver keeps an object its delegate answers nil for.
+        it("releases the objects a JS unarchiver delegate answers nil for" + variant.suffix, function (done) {
+            expectBalancedDecode(Delegate, function (object) {
+                return null;
+            }, 0, 2, expectDecodedRoot(TNSCodingAllocLog), done);
+        });
     });
 
     it("gives a native unarchiver delegate called from JS the reference it takes over", function (done) {

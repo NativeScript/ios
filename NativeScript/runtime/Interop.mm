@@ -172,9 +172,13 @@ bool Interop::ConsumesReceiver(SEL selector, bool isInitializer) {
   return isInitializer || selector == @selector(awakeAfterUsingCoder:);
 }
 
+// -[NSKeyedUnarchiverDelegate unarchiver:didDecodeObject:] is the only SDK
+// method with an NS_RELEASES_ARGUMENT parameter; it also returns retained.
 bool Interop::ConsumesArgument(SEL selector, int index) {
   return index == 1 && selector == @selector(unarchiver:didDecodeObject:);
 }
+
+bool Interop::ReturnsRetained(SEL selector) { return ConsumesArgument(selector, 1); }
 
 // Balanced only while every owned result other than a consumed receiver
 // reaches here at +1, JS-implemented methods included: MethodCallback retains

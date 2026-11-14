@@ -123,6 +123,10 @@ class Interop {
   // `index`, counted from the first after the selector: NS_RELEASES_ARGUMENT
   // parameters, which the metadata does not record.
   static bool ConsumesArgument(SEL selector, int index);
+  // Whether a method outside the copy, mutableCopy and new families answers
+  // an object its caller owns (NS_RETURNS_RETAINED), for implementations the
+  // metadata does not describe.
+  static bool ReturnsRetained(SEL selector);
   // Whether an owned object result that already has a wrapper carries a +1
   // the caller must drop, the Instances entry holding its own reference.
   static bool ReleasesCachedOwnedReturn(bool ownsReturnedObject,

@@ -55,6 +55,26 @@ bool IsObjectEncoding(const TypeEncoding* typeEncoding) {
          type == BinaryTypeEncodingType::InstanceTypeEncoding;
 }
 
+// The argument a JS-implemented method takes over from its native caller, or
+// nil. Reads only the native call, so it is usable without the isolate.
+id ConsumedArgument(const MethodCallbackWrapper* data, void** argValues) {
+  if (data->initialParamIndex_ != 2) {
+    return nil;
+  }
+  SEL selector = *static_cast<SEL*>(argValues[1]);
+  for (int i = 0; i < data->paramsCount_; i++) {
+    if (!Interop::ConsumesArgument(selector, i)) {
+      continue;
+    }
+    const TypeEncoding* typeEncoding = data->typeEncoding_;
+    for (int j = 0; j <= i; j++) {
+      typeEncoding = typeEncoding->next();
+    }
+    return IsObjectEncoding(typeEncoding) ? *static_cast<id*>(argValues[i + 2]) : nil;
+  }
+  return nil;
+}
+
 // The borrowed wrapper WrapNativeCallbackSelf made for an object in -dealloc
 // is detached once the native call returns: the object is gone afterwards,
 // so a receiver JS kept must read as released.
@@ -342,6 +362,8 @@ id ArgConverter::HandleBoundaryException(Local<Context> context, TryCatch& tc) {
 
 void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData) {
   MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
+  // Owned by this call, which gives it up on every path unless it answers it.
+  id consumedArgument = ConsumedArgument(data, argValues);
 
   Isolate* isolate = data->isolateWrapper_.Isolate();
 
@@ -358,6 +380,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     IsolatePin pin = data->isolateWrapper_.Pin();
     if (!pin || !data->isolateWrapper_.IsValid()) {
       memset(retValue, 0, cif->rtype->size);
+      [consumedArgument release];
       return;
     }
 
@@ -369,6 +392,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     // what makes this second look reliable.
     if (!data->isolateWrapper_.IsValid()) {
       memset(retValue, 0, cif->rtype->size);
+      [consumedArgument release];
       return;
     }
     Isolate::Scope isolate_scope(isolate);
@@ -383,8 +407,6 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
     std::vector<Local<Value>> v8Args;
     v8Args.reserve(data->paramsCount_);
-    SEL selector = data->initialParamIndex_ == 2 ? *static_cast<SEL*>(argValues[1]) : nullptr;
-    id consumedArgument = nil;
     const TypeEncoding* typeEncoding = data->typeEncoding_;
     for (int i = 0; i < data->paramsCount_; i++) {
       typeEncoding = typeEncoding->next();
@@ -395,10 +417,6 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
       }
 
       int argIndex = i + data->initialParamIndex_;
-      if (selector != nullptr && Interop::ConsumesArgument(selector, i) &&
-          IsObjectEncoding(typeEncoding)) {
-        consumedArgument = *static_cast<id*>(argValues[argIndex]);
-      }
 
       uint8_t* argBuffer = (uint8_t*)argValues[argIndex];
       BaseCall call(argBuffer);
@@ -504,8 +522,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
       memset(retValue, 0, cif->rtype->size);
     }
 
-    // The call owns the argument it consumed and hands that reference on only
-    // by answering it. A wrapper JS made for the argument holds its own.
+    // A wrapper JS made for the consumed argument holds a reference of its own.
     if (consumedArgument != nil && !(IsObjectEncoding(data->typeEncoding_) &&
                                      *static_cast<id*>(retValue) == consumedArgument)) {
       [consumedArgument release];
@@ -559,7 +576,7 @@ NativeReturnOwnership ArgConverter::ReturnOwnership(SEL selector, const MethodMe
   bool owned = meta != nullptr
                    ? meta->ownsReturnedCocoaObject()
                    : InMethodFamily(selector, "copy") || InMethodFamily(selector, "mutableCopy") ||
-                         InMethodFamily(selector, "new");
+                         InMethodFamily(selector, "new") || Interop::ReturnsRetained(selector);
   return owned ? NativeReturnOwnership::Owned : NativeReturnOwnership::Unowned;
 }
 
