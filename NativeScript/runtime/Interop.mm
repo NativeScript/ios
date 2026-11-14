@@ -1382,8 +1382,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
     ObjCDataWrapper* wrapper = new ObjCDataWrapper(result, te);
     std::vector<std::string> additionalProtocols = Interop::GetAdditionalProtocols(typeEncoding);
-    Local<Value> jsResult =
-        ArgConverter::ConvertArgument(context, wrapper, false, additionalProtocols);
+    Local<Value> jsResult = ArgConverter::ConvertArgument(context, wrapper, additionalProtocols);
 
     if (ownsReturnedObject || isInitializer) {
       [result release];
@@ -1938,10 +1937,10 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     }
   }
 
-  Local<Value> result =
-      Interop::GetResult(methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive,
-                         Local<Object>(), false, methodCall.ownsReturnedObject_,
-                         methodCall.returnsUnmanaged_, methodCall.isInitializer_, !isInstanceMethod);
+  Local<Value> result = Interop::GetResult(
+      methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive, Local<Object>(),
+      false, methodCall.ownsReturnedObject_, methodCall.returnsUnmanaged_,
+      methodCall.isInitializer_, !isInstanceMethod);
 
   // Owned returns, initializers and class factory methods hand out objects JS
   // most likely holds the last reference to. Instance getters do not: their
