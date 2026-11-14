@@ -271,10 +271,11 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
   }
 
   Local<Object> obj = value.As<Object>();
-  if (obj->InternalFieldCount() > 1 && !isFinalDisposal) {
+  if (obj->InternalFieldCount() > 1) {
     Local<Value> superValue = obj->GetInternalField(1).As<v8::Value>();
     if (!superValue.IsEmpty() && superValue->IsString()) {
-      // Do not dispose the ObjCWrapper contained in a "super" instance
+      // A "super" alias owns no wrapper; the one GetValue finds through it is
+      // its receiver's.
       return true;
     }
   }
@@ -431,8 +432,15 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
   }
 
   // The lookup, the Instances key and the final SetValue must all address the
-  // same object, so a Proxy is resolved once here.
+  // same object, so a Proxy is resolved once here, and a "super" alias to the
+  // receiver whose wrapper it reads.
   Local<Value> value = tns::UnwrapProxy(info[0]);
+  if (!value.IsEmpty() && value->IsObject()) {
+    Local<Object> receiver = tns::SuperAliasReceiver(value.As<Object>());
+    if (!receiver.IsEmpty()) {
+      value = receiver;
+    }
+  }
   BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
 
   if (wrapper == nullptr) {
