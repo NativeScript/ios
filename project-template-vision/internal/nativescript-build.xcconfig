@@ -12,12 +12,13 @@ FRAMEWORK_SEARCH_PATHS[sdk=*] = $(inherited) "$(SRCROOT)/internal/" "$(CONFIGURA
 LD = $SRCROOT/internal/nsld.sh
 LDPLUSPLUS = $SRCROOT/internal/nsld.sh
 
-// * Frameworks only debug builds use. They are weak-linked, and builds that don't define
-// * DEBUG leave them out of the app. Names are separated by spaces or commas.
-NS_DEBUG_FRAMEWORKS = TKLiveSync
-// * Debug frameworks to keep in builds that don't define DEBUG, e.g. in App_Resources/visionOS/build.xcconfig:
-// * NS_SHIP_DEBUG_FRAMEWORKS = TKLiveSync
-// NS_SHIP_DEBUG_FRAMEWORKS =
+// * Frameworks only debug builds use, listed by file name. They are weak-linked, and only
+// * configurations based on build-debug.xcconfig embed them.
+NS_DEBUG_FRAMEWORKS = TKLiveSync.framework
+// * Debug frameworks to embed in every configuration, e.g. in App_Resources/visionOS/build.xcconfig:
+// * NS_SHIP_DEBUG_FRAMEWORKS = TKLiveSync.framework
+EXCLUDED_SOURCE_FILE_NAMES[sdk=*] = $(inherited) $(NS_DEBUG_FRAMEWORKS)
+INCLUDED_SOURCE_FILE_NAMES[sdk=*] = $(inherited) $(NS_EMBEDDED_DEBUG_FRAMEWORKS) $(NS_SHIP_DEBUG_FRAMEWORKS)
 
 // * Uncomment this setting to generate TypeScript declarations for the iOS SDK and all linked libraries.
 // * They will be generated on each build, so you can find them after running "ns build ios" in "YOUR_APP/platforms/ios".

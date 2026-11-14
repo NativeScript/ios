@@ -117,11 +117,11 @@ if [[ -z "$CLANG_PATH" ]]; then
     exit 1
 fi
 
-# Weak-link NS_DEBUG_FRAMEWORKS so that strip-debug-frameworks.sh can leave them out of the app.
-DEBUG_FRAMEWORKS=" ${NS_DEBUG_FRAMEWORKS//,/ } "
+# Weak-link NS_DEBUG_FRAMEWORKS (file names): most configurations don't embed them.
+DEBUG_FRAMEWORKS=" ${NS_DEBUG_FRAMEWORKS} "
 LINK_ARGS=()
 while [[ $# -gt 0 ]]; do
-    if [[ "$1" == "-framework" && $# -gt 1 && "$DEBUG_FRAMEWORKS" == *" $2 "* ]]; then
+    if [[ "$1" == "-framework" && $# -gt 1 && "$DEBUG_FRAMEWORKS" == *" $2.framework "* ]]; then
         LINK_ARGS+=("-weak_framework" "$2")
         shift 2
         continue

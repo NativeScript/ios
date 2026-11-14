@@ -17,10 +17,11 @@ do :
     [ -e "$CONFIGURATION_BUILD_DIR/metadata-$arch.bin" ] || touch "$CONFIGURATION_BUILD_DIR/metadata-$arch.bin"
 done
 
-# The metadata generator reads these during linking, which Xcode would skip when
-# only they changed.
+# The link step reads these (the metadata generator its filters, nsld.sh
+# NS_DEBUG_FRAMEWORKS), and Xcode would skip it when only they changed.
 FILTERS_STAMP="$CONFIGURATION_BUILD_DIR/metadata-filters.stamp"
 FILTERS_HASH=$(cd "$SRCROOT" && shasum whitelist.mdg blacklist.mdg 2>/dev/null || true)
+FILTERS_HASH="$FILTERS_HASH NS_DEBUG_FRAMEWORKS=$NS_DEBUG_FRAMEWORKS"
 if [ ! -e "$FILTERS_STAMP" ] || [ "$FILTERS_HASH" != "$(cat "$FILTERS_STAMP")" ]; then
     for arch in $VALID_ARCHS
     do :

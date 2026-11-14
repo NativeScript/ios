@@ -2,6 +2,6 @@
 set -e
 
 pushd "$SRCROOT/internal"
-./strip-debug-frameworks.sh
+./remove-stale-debug-frameworks.sh
 ./strip-dynamic-framework-architectures.sh
 popd

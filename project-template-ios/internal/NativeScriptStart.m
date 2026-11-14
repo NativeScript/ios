@@ -22,8 +22,8 @@ NativeScript* nativescriptStart;
      @autoreleasepool {
          NSString* baseDir = [[NSBundle mainBundle] resourcePath];
 
-             // TKLiveSync is a debug framework (NS_DEBUG_FRAMEWORKS): builds without DEBUG only ship it
-             // when NS_SHIP_DEBUG_FRAMEWORKS lists it.
+             // TKLiveSync is in NS_DEBUG_FRAMEWORKS: only debug configurations embed it, unless
+             // NS_SHIP_DEBUG_FRAMEWORKS lists it.
              void (*initializeLiveSync)(void) = (void (*)(void))dlsym(RTLD_DEFAULT, "TNSInitializeLiveSync");
              if (initializeLiveSync != NULL) {
                  int refreshRequestSubscription;
