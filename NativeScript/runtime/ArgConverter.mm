@@ -69,11 +69,13 @@ void RetainOwnedResult(Isolate* isolate, NativeReturnOwnership ownership, void**
   }
 
   // A plain JS object becomes a DictionaryAdapter SetValue already returns
-  // at +1.
+  // at +1. SetValue writes a string only into an id or interface slot; for
+  // instancetype it leaves the slot unwritten.
   value = tns::UnwrapProxy(value);
   BaseDataWrapper* wrapper = value->IsObject() ? tns::GetValue(isolate, value) : nullptr;
   bool atPlusZero =
-      value->IsString() || (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject);
+      (value->IsString() && type != BinaryTypeEncodingType::InstanceTypeEncoding) ||
+      (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject);
   if (atPlusZero) {
     [returned retain];
   }
