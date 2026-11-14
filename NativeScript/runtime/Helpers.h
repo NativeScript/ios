@@ -290,6 +290,10 @@ v8::Local<v8::Context> GetCreationContextOrCurrent(v8::Isolate* isolate,
 
 // Set/Get/DeleteValue all resolve through proxies: wrapper state is keyed by
 // the Proxy target, so a proxied wrapper yields its target's wrapper.
+// GetValue alone also follows a `this.super` alias to its receiver
+// (SuperAliasReceiver), so code that writes back to an object it read with
+// GetValue must first resolve an alias, or it overwrites the alias's receiver
+// field instead of the wrapper it read.
 void SetValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, BaseDataWrapper* value);
 BaseDataWrapper* GetValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
 

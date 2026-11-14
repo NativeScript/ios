@@ -1002,27 +1002,34 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
 void ClassBuilder::SuperAccessorGetterCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
+  // Copying the implementation object or the class prototype (Object.assign,
+  // spread) reads `super` with a receiver that is no native instance: like the
+  // other native accessors, it reads undefined.
   Local<Value> target = tns::UnwrapProxy(info.This());
   if (target.IsEmpty() || !target->IsObject() || target.As<Object>()->InternalFieldCount() < 1) {
-    isolate->ThrowException(Exception::TypeError(tns::ToV8String(
-        isolate, "Cannot read 'super' of an object that is not a native instance")));
     return;
   }
-  Local<Object> thiz = target.As<Object>();
   // Field 0 holds the object that carries the wrapper, never another alias,
   // so resolving an alias takes one step.
-  Local<Object> receiver = tns::SuperAliasReceiver(thiz);
+  Local<Object> receiver = tns::SuperAliasReceiver(target.As<Object>());
   if (receiver.IsEmpty()) {
-    receiver = thiz;
+    receiver = target.As<Object>();
+  }
+
+  // receiver -> extended class prototype -> implementation object -> base
+  // class prototype.
+  Local<Value> superPrototype = receiver;
+  for (int i = 0; i < 3; i++) {
+    if (!superPrototype->IsObject()) {
+      return;
+    }
+    superPrototype = superPrototype.As<Object>()->GetPrototype();
   }
 
   std::shared_ptr<Persistent<Value>> poValue = ArgConverter::CreateEmptyObject(context);
   Local<Object> superValue = poValue->Get(isolate).As<Object>();
 
-  superValue
-      ->SetPrototype(context,
-                     thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype())
-      .ToChecked();
+  superValue->SetPrototype(context, superPrototype).ToChecked();
   superValue->SetInternalField(0, receiver);
   superValue->SetInternalField(1, tns::ToV8String(isolate, "super"));
 
