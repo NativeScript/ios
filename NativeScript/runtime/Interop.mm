@@ -172,6 +172,10 @@ bool Interop::ConsumesReceiver(SEL selector, bool isInitializer) {
   return isInitializer || selector == @selector(awakeAfterUsingCoder:);
 }
 
+bool Interop::ConsumesArgument(SEL selector, int index) {
+  return index == 1 && selector == @selector(unarchiver:didDecodeObject:);
+}
+
 // Balanced only while every owned result other than a consumed receiver
 // reaches here at +1, JS-implemented methods included: MethodCallback retains
 // what a JS implementation answers at +0, and for initializers anything but
@@ -1837,6 +1841,14 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
 
   Interop::SetFFIParams(methodCall.context_, methodCall.typeEncoding_, &call, argsCount,
                         initialParameterIndex, methodCall.args_);
+
+  if (initialParameterIndex > 1) {
+    for (int i = initialParameterIndex; i < argsCount; i++) {
+      if (ConsumesArgument(methodCall.selector_, i - initialParameterIndex)) {
+        [*static_cast<id*>(call.ArgumentBuffer(i)) retain];
+      }
+    }
+  }
 
   void* errorRef = nullptr;
   if (methodCall.provideErrorOutParameter_) {

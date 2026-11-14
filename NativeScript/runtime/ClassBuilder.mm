@@ -933,8 +933,13 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
             // Default getter result on a JS throw: zeroed return buffer.
             memset(retValue, 0, cif->rtype->size);
           } else {
-            const TypeEncoding* typeEncoding = context->meta_->getter()->encodings()->first();
+            const MethodMeta* getterMeta = context->meta_->getter();
+            const TypeEncoding* typeEncoding = getterMeta->encodings()->first();
             ArgConverter::SetValue(v8Context, retValue, cif->rtype->size, res, typeEncoding);
+            ArgConverter::RetainOwnedResult(
+                isolate,
+                ArgConverter::ReturnOwnership(*static_cast<SEL*>(argValues[1]), getterMeta),
+                argValues, retValue, typeEncoding, res);
           }
         }
         if (pendingThrow != nil) {

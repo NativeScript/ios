@@ -26,10 +26,47 @@
 // Answers a new TNSAllocLog.
 - (id)newChild;
 
+// Its getter answers a new TNSAllocLog, owned by the caller.
+@property(nonatomic, readonly) id newItem;
+
 + (void)copyAndDrop:(id)object;
 + (void)mutableCopyAndDrop:(id)object;
-+ (void)newChildAndDrop:(TNSOwnedReturns*)object;
++ (void)newChildAndDrop:(id)object;
 + (void)awakeAndDrop:(id)object;
++ (void)newItemAndDrop:(id)object;
+// Answers `newItem` of `object` without passing ownership on.
++ (id)readNewItemOf:(id)object;
+
+@end
+
+// Declares the owned-return members of TNSOwnedReturns itself, so JS can
+// replace them on this class alone: metadata leaves out members a subclass
+// redeclares.
+@interface TNSSwizzledOwnedReturns : TNSAllocLog
+
+- (id)newChild;
+
+@property(nonatomic, readonly) id newItem;
+
+@end
+
+// A TNSAllocLog that survives a keyed archive.
+@interface TNSCodingAllocLog : TNSAllocLog <NSSecureCoding>
+
+@end
+
+// Implements NSKeyedUnarchiverDelegate: answers the object it is given, or a
+// new TNSAllocLog once `substitutes` is set.
+@interface TNSDecodeDelegate : NSObject <NSKeyedUnarchiverDelegate>
+
+@property(nonatomic) BOOL substitutes;
+
+@end
+
+// -init sends -initHook to the receiver before returning it.
+@interface TNSInitCallsHook : TNSAllocLog
+
+- (void)initHook;
 
 @end
 

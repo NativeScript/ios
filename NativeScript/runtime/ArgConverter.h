@@ -87,6 +87,16 @@ class ArgConverter {
   // their selector's method family.
   static NativeReturnOwnership ReturnOwnership(SEL selector,
                                                const MethodMeta* meta);
+  // Gives the native caller of a JS implementation the reference it owns of
+  // the object SetValue wrote into retValue. `consumedArgument`, an argument
+  // the method took over, already carries that reference when it is the
+  // result.
+  static void RetainOwnedResult(v8::Isolate* isolate,
+                                NativeReturnOwnership ownership,
+                                void** argValues, void* retValue,
+                                const TypeEncoding* typeEncoding,
+                                v8::Local<v8::Value> value,
+                                id consumedArgument = nil);
   // returnSize is the ABI size of the return slot (cif->rtype->size); an
   // empty, null or undefined value zeroes all of it.
   static void SetValue(v8::Local<v8::Context> context, void* retValue,

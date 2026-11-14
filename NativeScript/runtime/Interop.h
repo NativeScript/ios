@@ -119,6 +119,10 @@ class Interop {
   // reference to it: the init family, and NS_REPLACES_RECEIVER methods, which
   // the metadata does not record.
   static bool ConsumesReceiver(SEL selector, bool isInitializer);
+  // Whether a method takes over the caller's reference to its argument at
+  // `index`, counted from the first after the selector: NS_RELEASES_ARGUMENT
+  // parameters, which the metadata does not record.
+  static bool ConsumesArgument(SEL selector, int index);
   // Whether an owned object result that already has a wrapper carries a +1
   // the caller must drop, the Instances entry holding its own reference.
   static bool ReleasesCachedOwnedReturn(bool ownsReturnedObject,

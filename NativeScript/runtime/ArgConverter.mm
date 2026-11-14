@@ -48,37 +48,11 @@ bool InMethodFamily(SEL selector, const char* family) {
   return strncmp(name, family, length) == 0 && (name[length] < 'a' || name[length] > 'z');
 }
 
-// SetValue hands a wrapped object or a string over at +0, so an owned result
-// gets a reference of its own, except a receiver answered in place of itself:
-// that is the reference the caller passed in. The receiver is never released
-// when another object is answered instead: a super initializer that
-// substituted it already did, and nothing here can tell that case apart.
-void RetainOwnedResult(Isolate* isolate, NativeReturnOwnership ownership, void** argValues,
-                       void* retValue, const TypeEncoding* typeEncoding, Local<Value> value) {
+bool IsObjectEncoding(const TypeEncoding* typeEncoding) {
   BinaryTypeEncodingType type = typeEncoding->type;
-  if (type != BinaryTypeEncodingType::IdEncoding &&
-      type != BinaryTypeEncodingType::InterfaceDeclarationReference &&
-      type != BinaryTypeEncodingType::InstanceTypeEncoding) {
-    return;
-  }
-
-  id returned = *static_cast<id*>(retValue);
-  if (returned == nil || (ownership == NativeReturnOwnership::ReplacesReceiver &&
-                          returned == *static_cast<id*>(argValues[0]))) {
-    return;
-  }
-
-  // A plain JS object becomes a DictionaryAdapter SetValue already returns
-  // at +1. SetValue writes a string only into an id or interface slot; for
-  // instancetype it leaves the slot unwritten.
-  value = tns::UnwrapProxy(value);
-  BaseDataWrapper* wrapper = value->IsObject() ? tns::GetValue(isolate, value) : nullptr;
-  bool atPlusZero =
-      (value->IsString() && type != BinaryTypeEncodingType::InstanceTypeEncoding) ||
-      (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject);
-  if (atPlusZero) {
-    [returned retain];
-  }
+  return type == BinaryTypeEncodingType::IdEncoding ||
+         type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
+         type == BinaryTypeEncodingType::InstanceTypeEncoding;
 }
 
 // The borrowed wrapper WrapNativeCallbackSelf made for an object in -dealloc
@@ -409,6 +383,8 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
 
     std::vector<Local<Value>> v8Args;
     v8Args.reserve(data->paramsCount_);
+    SEL selector = data->initialParamIndex_ == 2 ? *static_cast<SEL*>(argValues[1]) : nullptr;
+    id consumedArgument = nil;
     const TypeEncoding* typeEncoding = data->typeEncoding_;
     for (int i = 0; i < data->paramsCount_; i++) {
       typeEncoding = typeEncoding->next();
@@ -419,6 +395,10 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
       }
 
       int argIndex = i + data->initialParamIndex_;
+      if (selector != nullptr && Interop::ConsumesArgument(selector, i) &&
+          IsObjectEncoding(typeEncoding)) {
+        consumedArgument = *static_cast<id*>(argValues[argIndex]);
+      }
 
       uint8_t* argBuffer = (uint8_t*)argValues[argIndex];
       BaseCall call(argBuffer);
@@ -517,18 +497,56 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
         memset(retValue, 0, cif->rtype->size);
       } else {
         ArgConverter::SetValue(context, retValue, cif->rtype->size, result, data->typeEncoding_);
-        if (data->returnOwnership_ != NativeReturnOwnership::Unowned) {
-          RetainOwnedResult(isolate, data->returnOwnership_, argValues, retValue,
-                            data->typeEncoding_, result);
-        }
+        ArgConverter::RetainOwnedResult(isolate, data->returnOwnership_, argValues, retValue,
+                                        data->typeEncoding_, result, consumedArgument);
       }
     } else {
       memset(retValue, 0, cif->rtype->size);
+    }
+
+    // The call owns the argument it consumed and hands that reference on only
+    // by answering it. A wrapper JS made for the argument holds its own.
+    if (consumedArgument != nil && !(IsObjectEncoding(data->typeEncoding_) &&
+                                     *static_cast<id*>(retValue) == consumedArgument)) {
+      [consumedArgument release];
     }
   }  // all V8 scopes destruct here
 
   if (pendingThrow != nil) {
     @throw pendingThrow;
+  }
+}
+
+// SetValue hands a wrapped object or a string over at +0, so an owned result
+// gets a reference of its own, except a receiver answered in place of itself:
+// that is the reference the caller passed in. The receiver is never released
+// when another object is answered instead: a super initializer that
+// substituted it already did, and nothing here can tell that case apart.
+void ArgConverter::RetainOwnedResult(Isolate* isolate, NativeReturnOwnership ownership,
+                                     void** argValues, void* retValue,
+                                     const TypeEncoding* typeEncoding, Local<Value> value,
+                                     id consumedArgument) {
+  if (ownership == NativeReturnOwnership::Unowned || !IsObjectEncoding(typeEncoding)) {
+    return;
+  }
+
+  id returned = *static_cast<id*>(retValue);
+  if (returned == nil || returned == consumedArgument ||
+      (ownership == NativeReturnOwnership::ReplacesReceiver &&
+       returned == *static_cast<id*>(argValues[0]))) {
+    return;
+  }
+
+  // A plain JS object becomes a DictionaryAdapter SetValue already returns
+  // at +1. SetValue writes a string only into an id or interface slot; for
+  // instancetype it leaves the slot unwritten.
+  value = tns::UnwrapProxy(value);
+  BaseDataWrapper* wrapper = value->IsObject() ? tns::GetValue(isolate, value) : nullptr;
+  bool atPlusZero =
+      (value->IsString() && typeEncoding->type != BinaryTypeEncodingType::InstanceTypeEncoding) ||
+      (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject);
+  if (atPlusZero) {
+    [returned retain];
   }
 }
 

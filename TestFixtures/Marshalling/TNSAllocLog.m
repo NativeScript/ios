@@ -46,7 +46,7 @@
     (void)result;
 }
 
-+ (void)newChildAndDrop:(TNSOwnedReturns*)object {
++ (void)newChildAndDrop:(id)object {
     id result = [object newChild];
     (void)result;
 }
@@ -55,6 +55,67 @@
     NSCoder* coder = nil;
     id result = [object awakeAfterUsingCoder:coder];
     (void)result;
+}
+
+- (id)newItem {
+    return [[TNSAllocLog alloc] init];
+}
+
++ (void)newItemAndDrop:(id)object {
+    id result = [object newItem];
+    (void)result;
+}
+
++ (id)readNewItemOf:(id)object {
+    return [object newItem];
+}
+
+@end
+
+@implementation TNSSwizzledOwnedReturns
+
+- (id)newChild {
+    return [[TNSAllocLog alloc] init];
+}
+
+- (id)newItem {
+    return [[TNSAllocLog alloc] init];
+}
+
+@end
+
+@implementation TNSCodingAllocLog
+
++ (BOOL)supportsSecureCoding {
+    return YES;
+}
+
+- (instancetype)initWithCoder:(NSCoder*)coder {
+    return [super init];
+}
+
+- (void)encodeWithCoder:(NSCoder*)coder {
+}
+
+@end
+
+@implementation TNSDecodeDelegate
+
+- (id)unarchiver:(NSKeyedUnarchiver*)unarchiver didDecodeObject:(id)object {
+    return self.substitutes ? [[TNSAllocLog alloc] init] : object;
+}
+
+@end
+
+@implementation TNSInitCallsHook
+
+- (instancetype)init {
+    self = [super init];
+    [self initHook];
+    return self;
+}
+
+- (void)initHook {
 }
 
 @end
