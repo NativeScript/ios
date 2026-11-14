@@ -243,6 +243,16 @@ static napi_value GetWrapCount(napi_env env, napi_callback_info info) {
   return result;
 }
 
+// The isolate's external memory total; a zero adjustment only reads it.
+static napi_value GetExternalMemory(napi_env env, napi_callback_info info) {
+  (void)info;
+  int64_t total = 0;
+  napi_value result = NULL;
+  NAPI_CALL(env, napi_adjust_external_memory(env, 0, &total));
+  NAPI_CALL(env, napi_create_double(env, (double)total, &result));
+  return result;
+}
+
 //=== Async work ===========================================================
 
 typedef struct {
@@ -607,6 +617,7 @@ static napi_value InitNapiTestModule(napi_env env, napi_value exports) {
       NAPI_METHOD("invokeViaMakeCallback", InvokeViaMakeCallback),
       NAPI_METHOD("exerciseCleanupHooks", ExerciseCleanupHooks),
       NAPI_GETTER("wrapCount", GetWrapCount),
+      NAPI_METHOD("externalMemory", GetExternalMemory),
       NAPI_VALUE("moduleName", moduleName),
   };
 

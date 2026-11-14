@@ -185,6 +185,8 @@ class Runtime {
 
   static void DrainRejectionsObserver(CFRunLoopObserverRef observer,
                                       CFRunLoopActivity activity, void* info);
+  static void ChargeSoleOwnersObserver(CFRunLoopObserverRef observer,
+                                       CFRunLoopActivity activity, void* info);
   v8::Isolate* isolate_ = nullptr;
   bool initialized_ = false;
   std::atomic<bool> terminationRequested_{false};
@@ -196,6 +198,9 @@ class Runtime {
   // Drains unhandled promise rejections once per runloop turn
   // (kCFRunLoopBeforeWaiting). Torn down before isolate disposal in ~Runtime.
   CFRunLoopObserverRef rejectionObserver_ = nullptr;
+  // Charges +0 objects JS ended up owning (ExternalMemory::ChargeSoleOwners).
+  // Torn down with rejectionObserver_.
+  CFRunLoopObserverRef soleOwnerObserver_ = nullptr;
   double timeOriginMonotonic_;
   double timeOriginRealtimeMs_;
   // Keeps Caches::Workers alive for as long as this runtime exists: ~Runtime
