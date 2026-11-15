@@ -902,6 +902,17 @@ void ClassBuilder::VisitMethods(Class extendedClass, std::string methodName,
   }
 }
 
+namespace {
+
+// Whether `klass`, not one of its superclasses, implements `selector`.
+bool ImplementsItself(Class klass, SEL selector) {
+  Method method = class_getInstanceMethod(klass, selector);
+  return method != nullptr &&
+         method != class_getInstanceMethod(class_getSuperclass(klass), selector);
+}
+
+}  // namespace
+
 void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
                                     std::vector<const PropertyMeta*> propertyMetas,
                                     Local<Object> implementationObject, Local<Value> getter,
@@ -910,8 +921,12 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
     const PropertyMeta* propertyMeta = propertyMetas[j];
     std::string propertyName = propertyMeta->name();
 
-    bool hasGetter = !getter.IsEmpty() && getter->IsFunction() && propertyMeta->hasGetter();
-    bool hasSetter = !setter.IsEmpty() && setter->IsFunction() && propertyMeta->hasSetter();
+    // An accessor the class already implements itself came from an earlier
+    // metadata entry or exposedMethods; class_addMethod would refuse it.
+    bool hasGetter = !getter.IsEmpty() && getter->IsFunction() && propertyMeta->hasGetter() &&
+                     !ImplementsItself(extendedClass, propertyMeta->getter()->selector());
+    bool hasSetter = !setter.IsEmpty() && setter->IsFunction() && propertyMeta->hasSetter() &&
+                     !ImplementsItself(extendedClass, propertyMeta->setter()->selector());
 
     std::shared_ptr<Persistent<Object>> poImplementationObject;
     if (hasGetter || hasSetter) {

@@ -226,6 +226,27 @@ describe("JS-implemented native property accessors", function () {
         });
     });
 
+    // TNSDerivedInterface declares baseProperty through its base class and
+    // through a protocol, so two property metadata entries name each accessor.
+    it("run once per native call when the class and a protocol declare the property", function () {
+        var counts = { get: 0, set: 0, value: 0 };
+        var Klass = TNSDerivedInterface.extend({
+            get baseProperty() {
+                counts.get++;
+                return 41;
+            },
+            set baseProperty(value) {
+                counts.set++;
+                counts.value = value;
+            }
+        }, { name: "JSAccessorEncodingSharedSelector" });
+        var obj = Klass.new();
+        expect(obj.valueForKey("baseProperty")).toBe(41);
+        obj.setValueForKey(7, "baseProperty");
+        expect([counts.get, counts.set, counts.value]).toEqual([1, 1, 7]);
+        expect(typeString(Klass.instanceMethodSignatureForSelector("baseProperty").methodReturnType)).toBe("i");
+    });
+
     // TNSInheritedSwizzleDerived lists members only its superclass implements.
     // The replacements stay installed for the rest of the run, on classes no
     // other spec uses.
