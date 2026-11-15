@@ -902,12 +902,23 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
       FFIMethodCallback getterCallback = [](ffi_cif* cif, void* retValue, void** argValues,
                                             void* userData) {
         PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
-        Isolate* isolate = context->isolate_;
+        Isolate* isolate = context->isolateWrapper_.Isolate();
         // Scopes-before-@throw: a branded escape is captured and @thrown only
         // after every V8 scope in the inner block has destructed.
         NSException* __strong pendingThrow = nil;
         {
+          // Validity is checked before and again after taking the Locker, for
+          // the reasons given in ArgConverter::MethodCallback.
+          IsolatePin pin = context->isolateWrapper_.Pin();
+          if (!pin || !context->isolateWrapper_.IsValid()) {
+            memset(retValue, 0, cif->rtype->size);
+            return;
+          }
           v8::Locker locker(isolate);
+          if (!context->isolateWrapper_.IsValid()) {
+            memset(retValue, 0, cif->rtype->size);
+            return;
+          }
           Isolate::Scope isolate_scope(isolate);
           HandleScope handle_scope(isolate);
           Local<v8::Function> getterFunc = context->callback_->Get(isolate);
@@ -953,10 +964,17 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
       FFIMethodCallback setterCallback = [](ffi_cif* cif, void* retValue, void** argValues,
                                             void* userData) {
         PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
-        Isolate* isolate = context->isolate_;
+        Isolate* isolate = context->isolateWrapper_.Isolate();
         NSException* __strong pendingThrow = nil;
         {
+          IsolatePin pin = context->isolateWrapper_.Pin();
+          if (!pin || !context->isolateWrapper_.IsValid()) {
+            return;
+          }
           v8::Locker locker(isolate);
+          if (!context->isolateWrapper_.IsValid()) {
+            return;
+          }
           Isolate::Scope isolate_scope(isolate);
           HandleScope handle_scope(isolate);
           Local<v8::Function> setterFunc = context->callback_->Get(isolate);

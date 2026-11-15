@@ -2,6 +2,7 @@
 #define ClassBuilder_h
 
 #include "Common.h"
+#include "IsolateWrapper.h"
 #include "Metadata.h"
 
 namespace tns {
@@ -12,8 +13,8 @@ struct PropertyCallbackContext {
       v8::Isolate* isolate,
       std::shared_ptr<v8::Persistent<v8::Function>> callback,
       const PropertyMeta* meta)
-      : isolate_(isolate), callback_(callback), meta_(meta) {}
-  v8::Isolate* isolate_;
+      : isolateWrapper_(isolate), callback_(callback), meta_(meta) {}
+  IsolateWrapper isolateWrapper_;
   std::shared_ptr<v8::Persistent<v8::Function>> callback_;
   const PropertyMeta* meta_;
 };

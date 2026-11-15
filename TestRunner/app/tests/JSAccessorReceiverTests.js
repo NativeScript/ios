@@ -322,4 +322,30 @@ describe("JS accessor receivers", function () {
             }));
         });
     });
+
+    describe("of a class a worker defined", function () {
+        var wt = require("node:worker_threads");
+
+        it("answer nil and store nothing once the worker ended", function (done) {
+            var worker = new wt.Worker("~/tests/jsAccessorReceiverWorker.js");
+            worker.on("message", function (value) {
+                expect(value).toBe("worker:kept");
+                worker.terminate().then(function () {
+                    expect(TNSAccessorDriver.readKeptValue()).toBeNull();
+                    TNSAccessorDriver.writeKeptValue("after the worker");
+                    expect(TNSAccessorDriver.readKeptValue()).toBeNull();
+                    TNSAccessorDriver.dropKeptHost();
+                    expect(deallocs()).toBe(1);
+                    done();
+                });
+            });
+            worker.on("error", function (error) {
+                fail("worker error: " + error.message);
+                worker.terminate();
+                TNSAccessorDriver.dropKeptHost();
+                done();
+            });
+            worker.postMessage(0);
+        });
+    });
 });
