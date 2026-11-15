@@ -514,9 +514,10 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
       if (!success) {
         memset(retValue, 0, cif->rtype->size);
       } else {
-        ArgConverter::SetValue(context, retValue, cif->rtype->size, result, data->typeEncoding_);
-        ArgConverter::RetainOwnedResult(isolate, data->returnOwnership_, argValues, retValue,
-                                        data->typeEncoding_, result, consumedArgument);
+        bool writtenUnowned = ArgConverter::SetValue(context, retValue, cif->rtype->size, result,
+                                                     data->typeEncoding_);
+        ArgConverter::RetainOwnedResult(data->returnOwnership_, argValues, retValue, writtenUnowned,
+                                        consumedArgument);
       }
     } else {
       memset(retValue, 0, cif->rtype->size);
@@ -534,16 +535,14 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
   }
 }
 
-// SetValue hands a wrapped object or a string over at +0, so an owned result
-// gets a reference of its own, except a receiver answered in place of itself:
-// that is the reference the caller passed in. The receiver is never released
-// when another object is answered instead: a super initializer that
-// substituted it already did, and nothing here can tell that case apart.
-void ArgConverter::RetainOwnedResult(Isolate* isolate, NativeReturnOwnership ownership,
-                                     void** argValues, void* retValue,
-                                     const TypeEncoding* typeEncoding, Local<Value> value,
-                                     id consumedArgument) {
-  if (ownership == NativeReturnOwnership::Unowned || !IsObjectEncoding(typeEncoding)) {
+// An owned result SetValue wrote at +0 gets a reference of its own, except a
+// receiver answered in place of itself: that is the reference the caller
+// passed in. The receiver is never released when another object is answered
+// instead: a super initializer that substituted it already did, and nothing
+// here can tell that case apart.
+void ArgConverter::RetainOwnedResult(NativeReturnOwnership ownership, void** argValues,
+                                     void* retValue, bool writtenUnowned, id consumedArgument) {
+  if (ownership == NativeReturnOwnership::Unowned || !writtenUnowned) {
     return;
   }
 
@@ -554,17 +553,7 @@ void ArgConverter::RetainOwnedResult(Isolate* isolate, NativeReturnOwnership own
     return;
   }
 
-  // A plain JS object becomes a DictionaryAdapter SetValue already returns
-  // at +1. SetValue writes a string only into an id or interface slot; for
-  // instancetype it leaves the slot unwritten.
-  value = tns::UnwrapProxy(value);
-  BaseDataWrapper* wrapper = value->IsObject() ? tns::GetValue(isolate, value) : nullptr;
-  bool atPlusZero =
-      (value->IsString() && typeEncoding->type != BinaryTypeEncodingType::InstanceTypeEncoding) ||
-      (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject);
-  if (atPlusZero) {
-    [returned retain];
-  }
+  [returned retain];
 }
 
 NativeReturnOwnership ArgConverter::ReturnOwnership(SEL selector, const MethodMeta* meta) {
@@ -580,10 +569,10 @@ NativeReturnOwnership ArgConverter::ReturnOwnership(SEL selector, const MethodMe
   return owned ? NativeReturnOwnership::Owned : NativeReturnOwnership::Unowned;
 }
 
-void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t returnSize,
+bool ArgConverter::SetValue(Local<Context> context, void* retValue, size_t returnSize,
                             Local<Value> value, const TypeEncoding* typeEncoding) {
   if (typeEncoding->type == BinaryTypeEncodingType::VoidEncoding) {
-    return;
+    return false;
   }
 
   // Runs inside an ffi closure, where a C++ throw cannot propagate; a revoked
@@ -593,7 +582,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
   value = tns::UnwrapProxy(value);
   if (value.IsEmpty() || value->IsNullOrUndefined()) {
     memset(retValue, 0, std::max(returnSize, sizeof(ffi_arg)));
-    return;
+    return false;
   }
 
   Isolate* isolate = v8::Isolate::GetCurrent();
@@ -604,52 +593,52 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
   if (tns::IsBool(value)) {
     bool boolValue = value.As<v8::Boolean>()->Value();
     *(ffi_arg*)retValue = (bool)boolValue;
-    return;
+    return false;
   } else if (tns::IsNumber(value)) {
     double numValue = tns::ToNumber(isolate, value);
     switch (type) {
       case BinaryTypeEncodingType::UShortEncoding: {
         *static_cast<unsigned short*>(retValue) = (unsigned short)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::ShortEncoding: {
         *static_cast<short*>(retValue) = (short)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::UIntEncoding: {
         *static_cast<unsigned int*>(retValue) = (unsigned int)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::IntEncoding: {
         *static_cast<int*>(retValue) = (int)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::ULongEncoding: {
         *static_cast<unsigned long*>(retValue) = (unsigned long)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::LongEncoding: {
         *static_cast<long*>(retValue) = (long)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::ULongLongEncoding: {
         *static_cast<unsigned long long*>(retValue) = (unsigned long long)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::LongLongEncoding: {
         *static_cast<long long*>(retValue) = (long long)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::FloatEncoding: {
         *static_cast<float*>(retValue) = (float)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::DoubleEncoding: {
         *static_cast<double*>(retValue) = numValue;
-        return;
+        return false;
       }
       default:
-        return;
+        return false;
     }
   } else if (value->IsString()) {
     if (type == BinaryTypeEncodingType::IdEncoding ||
@@ -660,7 +649,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
       auto ref = CFBridgingRetain(data);
       *(CFTypeRef*)retValue = ref;
       CFRelease(ref);
-      return;
+      return true;
     }
   } else if (value->IsObject()) {
     if (type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
@@ -672,7 +661,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
         id data = wrapper->Data();
         memset(retValue, 0, sizeof(id));
         *static_cast<id __strong*>(retValue) = data;
-        return;
+        return true;
       } else {
         id adapter = [[DictionaryAdapter alloc]
             initWithJSObject:tns::ProxyReadSource(original, value).As<Object>()
@@ -680,7 +669,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
         memset(retValue, 0, sizeof(id));
         *static_cast<id __strong*>(retValue) = adapter;
         // CFAutorelease(adapter);
-        return;
+        return false;
       }
     } else if (type == BinaryTypeEncodingType::StructDeclarationReference) {
       BaseDataWrapper* baseWrapper = tns::GetValue(isolate, value);
@@ -691,19 +680,20 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
         const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
         const StructInfo& structInfo = FFICall::GetStructInfo(structMeta);
         Interop::InitializeStruct(context, retValue, structInfo.Fields(), value);
-        return;
+        return false;
       } else if (baseWrapper->Type() == WrapperType::Struct) {
         StructWrapper* structWrapper = static_cast<StructWrapper*>(baseWrapper);
         size_t size = structWrapper->StructInfo().FFIType()->size;
         void* data = structWrapper->Data();
         memcpy(retValue, data, size);
-        return;
+        return false;
       }
     }
   }
 
   // TODO: Handle other return types, i.e. assign the retValue parameter from the v8 result
   tns::Assert(false, isolate);
+  return false;
 }
 
 void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbackInfo<Value>& info,

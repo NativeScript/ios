@@ -70,6 +70,34 @@
     return [object newItem];
 }
 
++ (void)allocInitAndDrop:(Class)cls {
+    id result = [[cls alloc] init];
+    (void)result;
+}
+
+@end
+
+@implementation TNSCopyKeeper {
+    NSMutableArray* _copies;
+}
+
+- (void)keepCopyOf:(id)object {
+    if (_copies == nil) {
+        _copies = [NSMutableArray array];
+    }
+    [_copies addObject:[object copy]];
+}
+
+- (BOOL)keepTwoCopiesOf:(id)object {
+    [self keepCopyOf:object];
+    [self keepCopyOf:object];
+    return _copies[_copies.count - 1] == _copies[_copies.count - 2];
+}
+
+- (void)drop {
+    _copies = nil;
+}
+
 @end
 
 @implementation TNSOwnedBlocks {
@@ -161,10 +189,11 @@
 
 - (BOOL)isTaggedPointerAt:(NSUInteger)index {
     uintptr_t bits = (uintptr_t)(__bridge void*)_objects[index];
-#if __arm64__
-    return (bits >> 63) != 0;
-#else
+    // The ObjC runtime's OBJC_MSB_TAGGED_POINTERS condition (objc-internal.h).
+#if (TARGET_OS_OSX || TARGET_OS_MACCATALYST) && __x86_64__
     return (bits & 1) != 0;
+#else
+    return (bits >> 63) != 0;
 #endif
 }
 

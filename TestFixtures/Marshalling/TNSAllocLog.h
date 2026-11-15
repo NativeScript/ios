@@ -36,6 +36,8 @@
 + (void)newItemAndDrop:(id)object;
 // Answers `newItem` of `object` without passing ownership on.
 + (id)readNewItemOf:(id)object;
+// Sends -init to a new instance of `cls` and drops what it answers.
++ (void)allocInitAndDrop:(Class)cls;
 
 @end
 
@@ -49,6 +51,16 @@
 - (id)objectAt:(NSUInteger)index;
 - (NSUInteger)retainCountAt:(NSUInteger)index;
 - (BOOL)isTaggedPointerAt:(NSUInteger)index;
+
+@end
+
+// Keeps what -copy answers until -drop.
+@interface TNSCopyKeeper : NSObject
+
+- (void)keepCopyOf:(id)object;
+// Answers whether both copies are the same object.
+- (BOOL)keepTwoCopiesOf:(id)object;
+- (void)drop;
 
 @end
 

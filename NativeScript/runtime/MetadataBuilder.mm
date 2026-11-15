@@ -1480,10 +1480,11 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
         } else {
           const MethodMeta* getterMeta = context->meta_->getter();
           const TypeEncoding* typeEncoding = getterMeta->encodings()->first();
-          ArgConverter::SetValue(v8Context, retValue, cif->rtype->size, res, typeEncoding);
+          bool writtenUnowned =
+              ArgConverter::SetValue(v8Context, retValue, cif->rtype->size, res, typeEncoding);
           ArgConverter::RetainOwnedResult(
-              isolate, ArgConverter::ReturnOwnership(*static_cast<SEL*>(argValues[1]), getterMeta),
-              argValues, retValue, typeEncoding, res);
+              ArgConverter::ReturnOwnership(*static_cast<SEL*>(argValues[1]), getterMeta),
+              argValues, retValue, writtenUnowned);
         }
       }
       if (pendingThrow != nil) {

@@ -1082,4 +1082,96 @@ describe("Native callback self wrappers", function () {
             });
         });
     });
+
+    // A plain JS object reaches native code as a DictionaryAdapter whose
+    // handle keeps the object alive, so the object outlives the adapter only
+    // if the adapter leaks.
+    function freshObjectState() {
+        var state = { weak: null };
+        state.answer = function () {
+            var object = { fresh: true };
+            state.weak = new WeakRef(object);
+            return object;
+        };
+        return state;
+    }
+
+    function expectCollected(state, done) {
+        settle(3, function () {
+            expect(state.weak).not.toBeNull();
+            expect(state.weak && state.weak.deref()).toBeUndefined();
+            done();
+        });
+    }
+
+    it("keeps a fresh plain object a JS copyWithZone answers while native code holds its copy", function (done) {
+        var state = freshObjectState();
+        var Klass = NSObject.extend({
+            copyWithZone: function () {
+                return state.answer();
+            }
+        }, { name: "NativeCallbackSelfCopyKeptPlainObject", protocols: [NSCopying] });
+        var keeper = TNSCopyKeeper.new();
+        keeper.keepCopyOf(Klass.new());
+        settle(3, function () {
+            expect(state.weak.deref() && state.weak.deref().fresh).toBe(true);
+            keeper.drop();
+            expectCollected(state, done);
+        });
+    });
+
+    it("frees the adapter for a fresh plain object a JS copyWithZone answers", function (done) {
+        var state = freshObjectState();
+        var Klass = NSObject.extend({
+            copyWithZone: function () {
+                return state.answer();
+            }
+        }, { name: "NativeCallbackSelfCopyPlainObject", protocols: [NSCopying] });
+        TNSOwnedReturns.copyAndDrop(Klass.new());
+        expectCollected(state, done);
+    });
+
+    it("frees the adapter for a fresh plain object a JS new-family method answers", function (done) {
+        var state = freshObjectState();
+        var Klass = TNSOwnedReturns.extend({
+            newChild: function () {
+                return state.answer();
+            }
+        }, { name: "NativeCallbackSelfNewPlainObject" });
+        TNSOwnedReturns.newChildAndDrop(Klass.new());
+        expectCollected(state, done);
+    });
+
+    it("frees the adapter for a fresh plain object a JS initializer answers", function (done) {
+        var state = freshObjectState();
+        var Klass = NSObject.extend({
+            init: function () {
+                return state.answer();
+            }
+        }, { name: "NativeCallbackSelfInitPlainObject" });
+        TNSOwnedReturns.allocInitAndDrop(Klass.class());
+        expectCollected(state, done);
+    });
+
+    it("balances the adapter for a plain object a JS copyWithZone answers twice", function (done) {
+        var state = { weak: null };
+        (function () {
+            var object = { same: true };
+            state.weak = new WeakRef(object);
+            state.answer = object;
+        })();
+        var Klass = NSObject.extend({
+            copyWithZone: function () {
+                return state.answer;
+            }
+        }, { name: "NativeCallbackSelfCopySamePlainObject", protocols: [NSCopying] });
+        var keeper = TNSCopyKeeper.new();
+        expect(keeper.keepTwoCopiesOf(Klass.new())).toBe(true);
+        state.answer = null;
+        settle(3, function () {
+            expect(state.weak.deref() && state.weak.deref().same).toBe(true);
+            keeper.drop();
+            expectCollected(state, done);
+        });
+    });
 });
