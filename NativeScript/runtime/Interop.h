@@ -127,10 +127,10 @@ class Interop {
   // an object its caller owns (NS_RETURNS_RETAINED), for implementations the
   // metadata does not describe.
   static bool ReturnsRetained(SEL selector);
-  // Whether an owned object result the runtime keeps no reference to carries
-  // a +1 the caller must drop: one that already has a wrapper, whose
-  // Instances entry holds its own reference, or one handed to JS as a
-  // primitive.
+  // Whether the +1 of an owned object or block result is the caller's to
+  // drop once the runtime holds what it keeps: an Instances entry and a
+  // native block's wrapper hold references of their own, and a primitive or
+  // the JS function a block was made for keeps none.
   static bool ReleasesCachedOwnedReturn(bool ownsReturnedObject,
                                         OwnedReturnReceiver receiver);
   static v8::Local<v8::Value> GetResultByType(

@@ -1052,6 +1052,9 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
                                 bool isStructMember, bool ownsReturnedObject, bool returnsUnmanaged,
                                 bool isInitializer, OwnedReturnReceiver ownedReturnReceiver) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  // Dropped only once the runtime holds whatever reference it keeps.
+  bool releasesOwnedReturn =
+      ReleasesCachedOwnedReturn(ownsReturnedObject || isInitializer, ownedReturnReceiver);
 
   if (returnsUnmanaged) {
     uint8_t* data = call->GetResult<uint8_t*>();
@@ -1192,6 +1195,12 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     if (block->descriptor == &JSBlock::kJSBlockDescriptor) {
       MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
       Local<v8::Function> callback = wrapper->callback_->Get(isolate).As<v8::Function>();
+      // The last reference runs the dispose helper right here, under the
+      // Locker this thread holds, which frees `wrapper`; `callback` is a
+      // handle of its own and stays usable.
+      if (releasesOwnedReturn) {
+        Block_release(block);
+      }
       return callback;
     }
 
@@ -1203,6 +1212,9 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     // just bumps the refcount when it is already a heap/global block); the
     // matching Block_release runs in ObjectManager::DisposeValue.
     JSBlock* ownedBlock = reinterpret_cast<JSBlock*>(Block_copy(block));
+    if (releasesOwnedReturn) {
+      Block_release(block);
+    }
     BlockWrapper* blockWrapper = new BlockWrapper(ownedBlock, typeEncoding, true);
     Local<External> ext = External::New(isolate, blockWrapper, v8::kExternalPointerTypeTagDefault);
     Local<v8::Function> callback;
@@ -1337,7 +1349,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     }
 
     auto releaseSurplusOwnedReturn = [&]() {
-      if (ReleasesCachedOwnedReturn(ownsReturnedObject || isInitializer, ownedReturnReceiver)) {
+      if (releasesOwnedReturn) {
         [result release];
       }
     };

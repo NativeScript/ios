@@ -72,6 +72,46 @@
 
 @end
 
+@implementation TNSOwnedBlocks {
+    NSInteger (^_stored)(void);
+}
+
+- (NSInteger (^)(void))retainedBlockAnswering:(NSInteger)value {
+    return [self blockAnswering:value];
+}
+
+- (NSInteger (^)(void))blockAnswering:(NSInteger)value {
+    TNSAllocLog* captured = [[TNSAllocLog alloc] init];
+    return ^NSInteger {
+        (void)captured;
+        return value;
+    };
+}
+
+- (NSInteger (^)(void))retainedBlockFrom:(NSInteger (^)(void))block {
+    return block;
+}
+
+- (NSInteger (^)(void))blockFrom:(NSInteger (^)(void))block {
+    return block;
+}
+
++ (NSInteger)callBlock:(NSInteger (^)(void))block {
+    return block();
+}
+
+- (void)storeBlock:(NSInteger (^)(void))block {
+    _stored = block;
+}
+
+- (NSInteger (^)(void))retainedStoredBlock {
+    NSInteger (^block)(void) = _stored;
+    _stored = nil;
+    return block;
+}
+
+@end
+
 // Foundation answers tagged pointers for dates in the range JS can represent.
 @interface TNSHeapDate : NSDate
 @end

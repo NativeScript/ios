@@ -961,4 +961,125 @@ describe("Native callback self wrappers", function () {
             expect(state.receiver.copy()).toBe(primitiveText);
         }
     });
+
+    // Each block TNSOwnedBlocks makes captures a TNSAllocLog, freed with it.
+    function expectNativeBlocksFreedOnce(answer, done) {
+        var holder = TNSOwnedBlocks.new();
+        var blocks = [];
+        for (var i = 0; i < 5; i++) {
+            blocks.push(answer(holder, i));
+            expect(blocks[i]()).toBe(i);
+        }
+        settle(3, function () {
+            expect(deallocs()).toBe(0);
+            for (var i = 0; i < blocks.length; i++) {
+                expect(blocks[i]()).toBe(i);
+            }
+            blocks = null;
+            settle(3, function () {
+                expect(deallocs()).toBe(5);
+                done();
+            });
+        });
+    }
+
+    it("frees a native block an owned-return method answers once JS drops it", function (done) {
+        expectNativeBlocksFreedOnce(function (holder, value) {
+            return holder.retainedBlockAnswering(value);
+        }, done);
+    });
+
+    it("frees a native block an unowned method answers once JS drops it", function (done) {
+        expectNativeBlocksFreedOnce(function (holder, value) {
+            return holder.blockAnswering(value);
+        }, done);
+    });
+
+    // A JS function handed to native code becomes a block that keeps the
+    // function, and what it captures, alive until the block is freed.
+    function expectJsBlockRoundTrips(answer, done) {
+        var holder = TNSOwnedBlocks.new();
+        var state = {};
+        (function () {
+            var captured = TNSAllocLog.new();
+            state.fn = function () {
+                return captured.hash > 0 ? 7 : -1;
+            };
+        })();
+        for (var i = 0; i < 20; i++) {
+            expect(answer(holder, state.fn)).toBe(state.fn);
+        }
+        settle(3, function () {
+            expect(deallocs()).toBe(0);
+            expect(state.fn()).toBe(7);
+            expect(TNSOwnedBlocks.callBlock(state.fn)).toBe(7);
+            expect(answer(holder, state.fn)).toBe(state.fn);
+            state.fn = null;
+            settle(3, function () {
+                expect(deallocs()).toBe(1);
+                done();
+            });
+        });
+    }
+
+    it("answers the JS function a block an owned-return method hands back was made for", function (done) {
+        expectJsBlockRoundTrips(function (holder, fn) {
+            return holder.retainedBlockFrom(fn);
+        }, done);
+    });
+
+    it("answers the JS function a block an unowned method hands back was made for", function (done) {
+        expectJsBlockRoundTrips(function (holder, fn) {
+            return holder.blockFrom(fn);
+        }, done);
+    });
+
+    // Once the autorelease pool has drained, the stored reference is the
+    // block's only one, so dropping it runs the block's dispose helper while
+    // the call that answered it is still marshalling the result.
+    it("answers the JS function of a block whose last reference an owned-return method hands back", function (done) {
+        var holder = TNSOwnedBlocks.new();
+        var state = {};
+        (function () {
+            var captured = TNSAllocLog.new();
+            state.fn = function () {
+                return captured.hash > 0 ? 7 : -1;
+            };
+        })();
+        holder.storeBlock(state.fn);
+        settle(3, function () {
+            expect(deallocs()).toBe(0);
+            expect(holder.retainedStoredBlock()).toBe(state.fn);
+            expect(state.fn()).toBe(7);
+            expect(TNSOwnedBlocks.callBlock(state.fn)).toBe(7);
+            state.fn = null;
+            settle(3, function () {
+                expect(deallocs()).toBe(1);
+                done();
+            });
+        });
+    });
+
+    it("frees what a JS function given to dispatch_block_create captures once JS drops the block", function (done) {
+        var state = { calls: 0 };
+        (function () {
+            var captured = TNSAllocLog.new();
+            state.block = dispatch_block_create(0, function () {
+                state.calls += captured.hash > 0 ? 1 : 0;
+            });
+        })();
+        state.block();
+        state.block();
+        expect(state.calls).toBe(2);
+        settle(3, function () {
+            expect(deallocs()).toBe(0);
+            state.block();
+            expect(state.calls).toBe(3);
+            state.block = null;
+            settle(3, function () {
+                expect(deallocs()).toBe(1);
+                done();
+            });
+        });
+    });
 });

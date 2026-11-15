@@ -52,6 +52,23 @@
 
 @end
 
+// Blocks answered owned or not. Method families do not apply to block
+// results, so ownership is declared.
+@interface TNSOwnedBlocks : NSObject
+
+// A heap block capturing a new TNSAllocLog; calling it answers `value`.
+- (NSInteger (^)(void))retainedBlockAnswering:(NSInteger)value NS_RETURNS_RETAINED;
+- (NSInteger (^)(void))blockAnswering:(NSInteger)value;
+// Answers `block` itself.
+- (NSInteger (^)(void))retainedBlockFrom:(NSInteger (^)(void))block NS_RETURNS_RETAINED;
+- (NSInteger (^)(void))blockFrom:(NSInteger (^)(void))block;
++ (NSInteger)callBlock:(NSInteger (^)(void))block;
+// Keeps `block` until -retainedStoredBlock hands that reference over.
+- (void)storeBlock:(NSInteger (^)(void))block;
+- (NSInteger (^)(void))retainedStoredBlock NS_RETURNS_RETAINED;
+
+@end
+
 // Declares the owned-return members of TNSOwnedReturns itself, so JS can
 // replace them on this class alone: metadata leaves out members a subclass
 // redeclares.
