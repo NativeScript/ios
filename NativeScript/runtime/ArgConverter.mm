@@ -1,6 +1,7 @@
 #include "ArgConverter.h"
 #include <Foundation/Foundation.h>
 #include <algorithm>
+#include <optional>
 #include <sstream>
 #include "ClassBuilder.h"
 #include "DictionaryAdapter.h"
@@ -48,23 +49,27 @@ bool InMethodFamily(SEL selector, const char* family) {
   return strncmp(name, family, length) == 0 && (name[length] < 'a' || name[length] > 'z');
 }
 
-// The borrowed wrapper WrapNativeCallbackSelf made for an object in -dealloc
-// is detached once the native call returns: the object is gone afterwards,
-// so a receiver JS kept must read as released.
-struct BorrowedSelfScope {
-  explicit BorrowedSelfScope(Isolate* isolate) : isolate(isolate) {}
-  ~BorrowedSelfScope() {
-    if (wrapper != nullptr && tns::GetValue(isolate, receiver) == wrapper) {
-      tns::SetValue(isolate, receiver, nullptr);
-      delete wrapper;
-    }
-  }
-  Isolate* isolate;
-  Local<Object> receiver;
-  ObjCDataWrapper* wrapper = nullptr;
-};
-
 }  // namespace
+
+NativeCallbackSelf::NativeCallbackSelf(Local<Context> context, id self)
+    : isolate_(v8::Isolate::GetCurrent()) {
+  auto cache = Caches::Get(isolate_);
+  auto it = cache->Instances.find(self);
+  if (it != cache->Instances.end()) {
+    receiver_ = it->second->Get(isolate_).As<Object>();
+  } else {
+    receiver_ = ArgConverter::WrapNativeCallbackSelf(context, self, &borrowed_);
+  }
+}
+
+// The object is gone once the native call returns, so a borrowed receiver JS
+// kept must read as released.
+NativeCallbackSelf::~NativeCallbackSelf() {
+  if (borrowed_ != nullptr && tns::GetValue(isolate_, receiver_) == borrowed_) {
+    tns::SetValue(isolate_, receiver_, nullptr);
+    delete borrowed_;
+  }
+}
 
 void ArgConverter::Init(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
@@ -405,18 +410,12 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
       }
     }
 
-    Local<Object> thiz = context->Global();
-    BorrowedSelfScope borrowedSelf(isolate);
+    // Blocks and C function pointers have no receiver.
+    std::optional<NativeCallbackSelf> receiver;
     if (data->initialParamIndex_ > 1) {
-      id self_ = *static_cast<const id*>(argValues[0]);
-      auto it = cache->Instances.find(self_);
-      if (it != cache->Instances.end()) {
-        thiz = it->second->Get(data->isolateWrapper_.Isolate()).As<Object>();
-      } else {
-        thiz = ArgConverter::WrapNativeCallbackSelf(context, self_, &borrowedSelf.wrapper);
-        borrowedSelf.receiver = thiz;
-      }
+      receiver.emplace(context, *static_cast<const id*>(argValues[0]));
     }
+    Local<Object> thiz = receiver ? receiver->Get() : context->Global();
 
     Local<Value> result;
     Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
