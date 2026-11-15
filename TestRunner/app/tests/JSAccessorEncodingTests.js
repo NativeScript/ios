@@ -368,4 +368,98 @@ describe("JS-implemented native property accessors", function () {
             expect(obj.valueForKey("scalarValue")).toBe(2120);
         });
     });
+
+    // TNSLinkedNode refers to itself through a pointer field.
+    describe("of self-referential struct types", function () {
+        var state = {};
+        var Klass = null;
+
+        function linkedClass() {
+            if (Klass === null) {
+                Klass = TNSLinkedTypes.extend({
+                    get nodeProperty() {
+                        return state.node;
+                    },
+                    set nodeProperty(value) {
+                        state.node = value;
+                    },
+                    get holderProperty() {
+                        return { node: null, leaf: null, count: 3 };
+                    },
+                    set holderProperty(value) {
+                        state.holder = value;
+                    },
+                    get leafProperty() {
+                        return null;
+                    },
+                    set leafProperty(value) {
+                        state.leaf = value;
+                    },
+                    nextOf: function (node) {
+                        return null;
+                    },
+                    holderWithLeaf: function (leaf) {
+                        return { node: null, leaf: leaf, count: 0 };
+                    }
+                }, { name: "JSAccessorEncodingLinked" });
+            }
+            return Klass;
+        }
+
+        function address(value) {
+            return value ? interop.handleof(value).toNumber() : 0;
+        }
+
+        function outcome(action) {
+            try {
+                return { value: action() };
+            } catch (e) {
+                return { error: e.nativeException ? e.nativeException.name : String(e) };
+            }
+        }
+
+        it("report the compiler's types in the signatures of JS accessors and methods", function () {
+            var Linked = linkedClass();
+            [
+                "nodeProperty", "setNodeProperty:", "holderProperty", "setHolderProperty:",
+                "leafProperty", "setLeafProperty:", "nextOf:", "holderWithLeaf:"
+            ].forEach(function (selector) {
+                var expected = TNSLinkedTypes.instanceMethodSignatureForSelector(selector);
+                var registered = NSMethodSignature.signatureWithObjCTypes(method_getTypeEncoding(class_getInstanceMethod(Linked.class(), selector)));
+                expect([selector, typeString(registered.methodReturnType)]).toEqual([selector, typeString(expected.methodReturnType)]);
+                expect([selector, registered.numberOfArguments]).toEqual([selector, expected.numberOfArguments]);
+                for (var i = 2; i < expected.numberOfArguments; i++) {
+                    expect([selector, typeString(registered.getArgumentTypeAtIndex(i))])
+                        .toEqual([selector, typeString(expected.getArgumentTypeAtIndex(i))]);
+                }
+            });
+        });
+
+        // KVC answers NSUnknownKeyException for pointer-typed keys.
+        it("read and write a pointer property through KVC as the base class does", function () {
+            var Linked = linkedClass();
+            var node = interop.alloc(16);
+            var base = TNSLinkedTypes.new();
+            var obj = Linked.new();
+            state.node = null;
+
+            function read(target) {
+                return outcome(function () {
+                    var boxed = target.valueForKey("nodeProperty");
+                    return [typeString(boxed.objCType), address(boxed.pointerValue)];
+                });
+            }
+            expect(read(obj)).toEqual(read(base));
+
+            var written = outcome(function () {
+                base.setValueForKey(NSValue.valueWithPointer(node), "nodeProperty");
+                return address(base.nodeProperty);
+            });
+            var writtenByJS = outcome(function () {
+                obj.setValueForKey(NSValue.valueWithPointer(node), "nodeProperty");
+                return address(state.node);
+            });
+            expect(writtenByJS).toEqual(written);
+        });
+    });
 });

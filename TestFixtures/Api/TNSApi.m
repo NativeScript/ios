@@ -153,3 +153,17 @@ void functionThrowsException() {
 
 @implementation TNSInheritedSwizzleTwice
 @end
+
+static TNSLinkedNode sharedLinkedNodes[2] = {{1, &sharedLinkedNodes[1]}, {2, NULL}};
+
+@implementation TNSLinkedTypes
+
+- (TNSLinkedNode*)nextOf:(TNSLinkedNode*)node {
+  return node != NULL ? node->next : NULL;
+}
+
+- (TNSLinkedHolder)holderWithLeaf:(TNSLinkedLeaf*)leaf {
+  return (TNSLinkedHolder){&sharedLinkedNodes[0], leaf, 1};
+}
+
+@end

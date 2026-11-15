@@ -435,7 +435,8 @@ void ClassBuilder::ExposeDynamicMembers(v8::Local<v8::Context> context, Class ex
                                      implementationObject);
 }
 
-std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding, bool* encodable) {
+std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding, bool* encodable,
+                                          bool expandStructures, bool expandPointedToStructures) {
   BinaryTypeEncodingType type = typeEncoding->type;
   switch (type) {
     case BinaryTypeEncodingType::VoidEncoding: {
@@ -504,6 +505,9 @@ std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding, bool
     }
     case BinaryTypeEncodingType::StructDeclarationReference: {
       const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
+      if (!expandStructures) {
+        return std::string("{") + structName + "}";
+      }
       const Meta* meta = ArgConverter::GetMeta(structName);
       if (encodable != nullptr && (meta == nullptr || meta->type() != MetaType::Struct)) {
         *encodable = false;
@@ -516,7 +520,7 @@ std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding, bool
       std::stringstream ss;
       ss << "{" << structName << "=";
       for (int i = 0; i < structMeta->fieldsCount(); i++) {
-        ss << GetTypeEncoding(fieldEncoding, encodable);
+        ss << GetTypeEncoding(fieldEncoding, encodable, true, false);
         fieldEncoding = fieldEncoding->next();
       }
       ss << "}";
@@ -526,14 +530,15 @@ std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding, bool
       std::stringstream ss;
       ss << "^";
       const TypeEncoding* innerType = typeEncoding->details.pointer.getInnerType();
-      ss << GetTypeEncoding(innerType, encodable);
+      ss << GetTypeEncoding(innerType, encodable, expandPointedToStructures, false);
       return ss.str();
     }
     case BinaryTypeEncodingType::ConstantArrayEncoding: {
       const TypeEncoding* innerType = typeEncoding->details.constantArray.getInnerType();
       std::stringstream ss;
       ss << "[";
-      ss << typeEncoding->details.constantArray.size << GetTypeEncoding(innerType, encodable);
+      ss << typeEncoding->details.constantArray.size
+         << GetTypeEncoding(innerType, encodable, expandStructures, expandPointedToStructures);
       ss << "]";
       return ss.str();
     }
@@ -541,7 +546,7 @@ std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding, bool
       const TypeEncoding* innerType = typeEncoding->details.incompleteArray.getInnerType();
       std::stringstream ss;
       ss << "^";
-      ss << GetTypeEncoding(innerType, encodable);
+      ss << GetTypeEncoding(innerType, encodable, expandPointedToStructures, false);
       return ss.str();
     }
     case BinaryTypeEncodingType::FunctionPointerEncoding: {

@@ -80,8 +80,13 @@ class ClassBuilder {
                                v8::Local<v8::Object> implementationObject,
                                v8::Local<v8::Value> getter,
                                v8::Local<v8::Value> setter);
+  // Follows clang: a struct behind a pointer is expanded only when that
+  // pointer is the outermost type, otherwise it is named only ("{Name}"),
+  // which also bounds self-referential structs.
   static std::string GetTypeEncoding(const TypeEncoding* typeEncoding,
-                                     bool* encodable);
+                                     bool* encodable,
+                                     bool expandStructures = true,
+                                     bool expandPointedToStructures = true);
   static BinaryTypeEncodingType GetTypeEncodingType(v8::Isolate* isolate,
                                                     v8::Local<v8::Value> value);
 

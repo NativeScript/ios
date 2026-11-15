@@ -143,3 +143,26 @@ typedef NSError* _Nullable TNSNullableError;
 @interface TNSInheritedSwizzleTwice (Redeclared)
 @property(nonatomic) TNSEnums scalarValue;
 @end
+
+typedef struct TNSLinkedNode {
+  int value;
+  struct TNSLinkedNode* next;
+} TNSLinkedNode;
+
+typedef struct TNSLinkedLeaf {
+  int value;
+} TNSLinkedLeaf;
+
+typedef struct TNSLinkedHolder {
+  TNSLinkedNode* node;
+  TNSLinkedLeaf* leaf;
+  int count;
+} TNSLinkedHolder;
+
+@interface TNSLinkedTypes : NSObject
+@property(nonatomic) TNSLinkedNode* nodeProperty;
+@property(nonatomic) TNSLinkedHolder holderProperty;
+@property(nonatomic) TNSLinkedLeaf* leafProperty;
+- (TNSLinkedNode*)nextOf:(TNSLinkedNode*)node;
+- (TNSLinkedHolder)holderWithLeaf:(TNSLinkedLeaf*)leaf;
+@end
