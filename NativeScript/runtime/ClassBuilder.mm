@@ -1026,9 +1026,9 @@ void ClassBuilder::SuperAccessorGetterCallback(const FunctionCallbackInfo<Value>
     superPrototype = superPrototype.As<Object>()->GetPrototype();
   }
 
-  std::shared_ptr<Persistent<Value>> poValue = ArgConverter::CreateEmptyObject(context);
-  Local<Object> superValue = poValue->Get(isolate).As<Object>();
-
+  // An alias owns no wrapper, so it is not registered with ObjectManager.
+  Local<Object> superValue =
+      ArgConverter::NewEmptyInstance(context, Caches::Get(isolate)->EmptyObjCtorFunc.get());
   superValue->SetPrototype(context, superPrototype).ToChecked();
   superValue->SetInternalField(0, receiver);
   superValue->SetInternalField(1, tns::ToV8String(isolate, "super"));
