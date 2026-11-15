@@ -144,6 +144,62 @@ typedef NSError* _Nullable TNSNullableError;
 @property(nonatomic) TNSEnums scalarValue;
 @end
 
+// Families for specs that replace members on a class and on its subclass.
+@interface TNSSwizzleChainBase : NSObject
+@property(nonatomic, strong) id objectValue;
+@property(nonatomic) NSInteger scalarValue;
+- (id)describeValue:(int)value;
+- (id)storedObjectValue;
+- (NSInteger)storedScalarValue;
+@end
+
+@interface TNSSwizzleChainDerived : TNSSwizzleChainBase
+@end
+
+@interface TNSSwizzleChainDerived (Redeclared)
+@property(nonatomic, strong) NSString* objectValue;
+@property(nonatomic) TNSEnums scalarValue;
+- (NSString*)describeValue:(int)value;
+@end
+
+@interface TNSSwizzleReverseBase : NSObject
+@property(nonatomic, strong) id objectValue;
+@property(nonatomic) NSInteger scalarValue;
+- (id)describeValue:(int)value;
+- (id)storedObjectValue;
+- (NSInteger)storedScalarValue;
+@end
+
+@interface TNSSwizzleReverseDerived : TNSSwizzleReverseBase
+@end
+
+@interface TNSSwizzleReverseDerived (Redeclared)
+@property(nonatomic, strong) NSString* objectValue;
+@property(nonatomic) TNSEnums scalarValue;
+- (NSString*)describeValue:(int)value;
+@end
+
+@interface TNSSwizzleMiddleBase : NSObject
+@property(nonatomic, strong) id objectValue;
+@property(nonatomic) NSInteger scalarValue;
+- (id)describeValue:(int)value;
+- (id)storedObjectValue;
+- (NSInteger)storedScalarValue;
+@end
+
+// Overrides every member of its superclass natively, without calling it.
+@interface TNSSwizzleMiddle : TNSSwizzleMiddleBase
+@end
+
+@interface TNSSwizzleMiddleLeaf : TNSSwizzleMiddle
+@end
+
+@interface TNSSwizzleMiddleLeaf (Redeclared)
+@property(nonatomic, strong) NSString* objectValue;
+@property(nonatomic) TNSEnums scalarValue;
+- (NSString*)describeValue:(int)value;
+@end
+
 typedef struct TNSLinkedNode {
   int value;
   struct TNSLinkedNode* next;

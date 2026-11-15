@@ -907,16 +907,11 @@ void ClassBuilder::VisitMethods(Class extendedClass, std::string methodName,
   }
 }
 
-namespace {
-
-// Whether `klass`, not one of its superclasses, implements `selector`.
-bool ImplementsItself(Class klass, SEL selector) {
+bool ClassBuilder::ImplementsItself(Class klass, SEL selector) {
   Method method = class_getInstanceMethod(klass, selector);
   return method != nullptr &&
          method != class_getInstanceMethod(class_getSuperclass(klass), selector);
 }
-
-}  // namespace
 
 void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
                                     std::vector<const PropertyMeta*> propertyMetas,

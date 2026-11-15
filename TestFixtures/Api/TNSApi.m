@@ -154,6 +154,98 @@ void functionThrowsException() {
 @implementation TNSInheritedSwizzleTwice
 @end
 
+@implementation TNSSwizzleChainBase
+
+- (id)describeValue:(int)value {
+  return [NSString stringWithFormat:@"base %d", value];
+}
+
+- (id)storedObjectValue {
+  return _objectValue;
+}
+
+- (NSInteger)storedScalarValue {
+  return _scalarValue;
+}
+
+@end
+
+@implementation TNSSwizzleChainDerived
+@end
+
+@implementation TNSSwizzleReverseBase
+
+- (id)describeValue:(int)value {
+  return [NSString stringWithFormat:@"base %d", value];
+}
+
+- (id)storedObjectValue {
+  return _objectValue;
+}
+
+- (NSInteger)storedScalarValue {
+  return _scalarValue;
+}
+
+@end
+
+@implementation TNSSwizzleReverseDerived
+@end
+
+@implementation TNSSwizzleMiddleBase
+
+- (id)describeValue:(int)value {
+  return [NSString stringWithFormat:@"base %d", value];
+}
+
+- (id)storedObjectValue {
+  return _objectValue;
+}
+
+- (NSInteger)storedScalarValue {
+  return _scalarValue;
+}
+
+@end
+
+@implementation TNSSwizzleMiddle {
+  id _middleObject;
+  NSInteger _middleScalar;
+}
+
+- (id)describeValue:(int)value {
+  return [NSString stringWithFormat:@"middle %d", value];
+}
+
+- (id)objectValue {
+  return [NSString stringWithFormat:@"middle %@", _middleObject];
+}
+
+- (void)setObjectValue:(id)value {
+  _middleObject = [NSString stringWithFormat:@"%@ via middle", value];
+}
+
+- (NSInteger)scalarValue {
+  return _middleScalar + 1000;
+}
+
+- (void)setScalarValue:(NSInteger)value {
+  _middleScalar = value * 3;
+}
+
+- (id)storedObjectValue {
+  return _middleObject;
+}
+
+- (NSInteger)storedScalarValue {
+  return _middleScalar;
+}
+
+@end
+
+@implementation TNSSwizzleMiddleLeaf
+@end
+
 static TNSLinkedNode sharedLinkedNodes[2] = {{1, &sharedLinkedNodes[1]}, {2, NULL}};
 
 @implementation TNSLinkedTypes

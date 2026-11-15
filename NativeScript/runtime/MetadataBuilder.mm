@@ -1368,18 +1368,29 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
 
 namespace {
 
-// The implementation `klass` answered `selector` with, its own or inherited,
-// stays reachable under the swizzled-prefixed selector that native calls from
-// JS prefer. An existing alias is kept, so it names the implementation from
-// before the first replacement.
+// The native implementation `klass` would run for `selector` had nothing been
+// replaced from JS. The class that provides `selector` keeps its native one
+// under `alias` once it has been replaced.
+IMP NativeImplementation(Class klass, SEL selector, SEL alias) {
+  for (Class owner = klass; owner != nil; owner = class_getSuperclass(owner)) {
+    if (ClassBuilder::ImplementsItself(owner, selector)) {
+      SEL native = ClassBuilder::ImplementsItself(owner, alias) ? alias : selector;
+      return method_getImplementation(class_getInstanceMethod(owner, native));
+    }
+  }
+  return nullptr;
+}
+
+// The native implementation stays reachable under the swizzled-prefixed
+// selector that native calls from JS prefer. An alias `klass` already has is
+// kept, so it names the implementation from before the first replacement.
 void ReplaceKeepingOriginal(Class klass, SEL selector, const char* selectorName, IMP imp,
                             const char* types) {
-  Method original = class_getInstanceMethod(klass, selector);
-  IMP originalImp = original != nullptr ? method_getImplementation(original) : nullptr;
+  SEL alias = sel_registerName((Constants::SwizzledPrefix + selectorName).c_str());
+  IMP original = NativeImplementation(klass, selector, alias);
   class_replaceMethod(klass, selector, imp, types);
-  if (originalImp != nullptr) {
-    SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selectorName).c_str());
-    class_addMethod(klass, nativeSelector, originalImp, types);
+  if (original != nullptr) {
+    class_addMethod(klass, alias, original, types);
   }
 }
 

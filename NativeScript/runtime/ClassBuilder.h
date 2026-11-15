@@ -48,6 +48,8 @@ class ClassBuilder {
   static Class FindNativeClass(Class klass);
   // The implementation of `method` from FindNativeClass(klass).
   static IMP FindNotOverridenMethod(Class klass, SEL method);
+  // Whether `klass`, not one of its superclasses, implements `selector`.
+  static bool ImplementsItself(Class klass, SEL selector);
 
  private:
   static std::atomic<unsigned long long> classNameCounter_;
