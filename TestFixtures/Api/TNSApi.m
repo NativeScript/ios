@@ -192,6 +192,25 @@ void functionThrowsException() {
 @implementation TNSSwizzleReverseDerived
 @end
 
+@implementation TNSSwizzleRepeatBase
+
+- (id)describeValue:(int)value {
+  return [NSString stringWithFormat:@"base %d", value];
+}
+
+- (id)storedObjectValue {
+  return _objectValue;
+}
+
+- (NSInteger)storedScalarValue {
+  return _scalarValue;
+}
+
+@end
+
+@implementation TNSSwizzleRepeatDerived
+@end
+
 @implementation TNSSwizzleMiddleBase
 
 - (id)describeValue:(int)value {

@@ -179,6 +179,23 @@ typedef NSError* _Nullable TNSNullableError;
 - (NSString*)describeValue:(int)value;
 @end
 
+@interface TNSSwizzleRepeatBase : NSObject
+@property(nonatomic, strong) id objectValue;
+@property(nonatomic) NSInteger scalarValue;
+- (id)describeValue:(int)value;
+- (id)storedObjectValue;
+- (NSInteger)storedScalarValue;
+@end
+
+@interface TNSSwizzleRepeatDerived : TNSSwizzleRepeatBase
+@end
+
+@interface TNSSwizzleRepeatDerived (Redeclared)
+@property(nonatomic, strong) NSString* objectValue;
+@property(nonatomic) TNSEnums scalarValue;
+- (NSString*)describeValue:(int)value;
+@end
+
 @interface TNSSwizzleMiddleBase : NSObject
 @property(nonatomic, strong) id objectValue;
 @property(nonatomic) NSInteger scalarValue;

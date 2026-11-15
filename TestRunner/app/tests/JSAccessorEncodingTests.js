@@ -504,6 +504,54 @@ describe("JS-implemented native property accessors", function () {
             });
         });
 
+        // The subclass's second replacement finds the first one as its
+        // original, and the first one still finds the native members.
+        describe("the superclass once, then the subclass twice", function () {
+            var install = installer(function () {
+                return {
+                    base: replaceMembers(TNSSwizzleRepeatBase, "B", 1),
+                    first: replaceMembers(TNSSwizzleRepeatDerived, "D", 2),
+                    second: replaceMembers(TNSSwizzleRepeatDerived, "E", 3)
+                };
+            });
+
+            it("reach the native method through both of the subclass's replacements", function () {
+                var originals = install();
+                var derived = TNSSwizzleRepeatDerived.new();
+                expect(traced(function () { return derived.describeValue(1); })).toEqual({ result: "E(D(base 1))", trace: ["E", "D"] });
+                expect(traced(function () { return originals.first.describe.call(derived, 2); })).toEqual({ result: "base 2", trace: [] });
+                expect(traced(function () { return originals.base.describe.call(derived, 3); })).toEqual({ result: "base 3", trace: [] });
+                expect(traced(function () { return TNSSwizzleRepeatBase.new().describeValue(4); })).toEqual({ result: "B(base 4)", trace: ["B"] });
+            });
+
+            it("reach the native accessors of an object property through both of the subclass's replacements", function () {
+                var originals = install();
+                var derived = TNSSwizzleRepeatDerived.new();
+                expect(traced(function () { derived.objectValue = "x"; return derived.storedObjectValue(); }))
+                    .toEqual({ result: "D(E(x))", trace: ["E set", "D set"] });
+                expect(traced(function () { return derived.objectValue; })).toEqual({ result: "E(D(D(E(x))))", trace: ["E get", "D get"] });
+                expect(traced(function () { return derived.valueForKey("objectValue"); })).toEqual({ result: "E(D(D(E(x))))", trace: ["E get", "D get"] });
+                expect(traced(function () { return originals.first.object.get.call(derived); })).toEqual({ result: "D(E(x))", trace: [] });
+                expect(traced(function () { return originals.base.object.get.call(derived); })).toEqual({ result: "D(E(x))", trace: [] });
+                var base = TNSSwizzleRepeatBase.new();
+                base.objectValue = "y";
+                expect([base.storedObjectValue(), base.valueForKey("objectValue")]).toEqual(["B(y)", "B(B(y))"]);
+            });
+
+            it("reach the native accessors of a scalar property through both of the subclass's replacements", function () {
+                var originals = install();
+                var derived = TNSSwizzleRepeatDerived.new();
+                expect(traced(function () { derived.scalarValue = 5; return derived.storedScalarValue(); }))
+                    .toEqual({ result: 532, trace: ["E set", "D set"] });
+                expect(traced(function () { return derived.valueForKey("scalarValue"); })).toEqual({ result: 53223, trace: ["E get", "D get"] });
+                expect(traced(function () { return originals.first.scalar.get.call(derived); })).toEqual({ result: 532, trace: [] });
+                expect(traced(function () { return originals.base.scalar.get.call(derived); })).toEqual({ result: 532, trace: [] });
+                var base = TNSSwizzleRepeatBase.new();
+                base.scalarValue = 5;
+                expect([base.storedScalarValue(), base.valueForKey("scalarValue")]).toEqual([51, 511]);
+            });
+        });
+
         // TNSSwizzleMiddle overrides every member natively, between the
         // replaced superclass and the replaced leaf. The leaf's originals run
         // the superclass's native members, not the middle class's overrides.

@@ -1368,21 +1368,20 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
 
 namespace {
 
-// The implementation `klass` answered `selector` with stays reachable under
-// the swizzled-prefixed selector that native calls from JS prefer; an alias
-// `klass` already has is kept, so it names the one from before the first
-// replacement. A class that inherits `selector` and already responds to the
-// alias, because an ancestor was replaced, gets none of its own: an own alias
-// naming a native override that calls super would send the replaced
-// ancestor's original back to that override.
+// The native implementation `klass` answered `selector` with stays reachable
+// under the swizzled-prefixed selector that native calls from JS prefer. A
+// class that only inherits `selector` below a replaced ancestor takes that
+// ancestor's alias: its selector resolves to the ancestor's JS replacement,
+// and an alias naming a native override in between would be re-entered when
+// that override calls super. Every replaced class gets an alias of its own,
+// which a later replacement keeps, so it never names an earlier replacement.
 void ReplaceKeepingOriginal(Class klass, SEL selector, const char* selectorName, IMP imp,
                             const char* types) {
   SEL alias = sel_registerName((Constants::SwizzledPrefix + selectorName).c_str());
-  IMP original = nullptr;
-  if (ClassBuilder::ImplementsItself(klass, selector) || !class_respondsToSelector(klass, alias)) {
-    Method method = class_getInstanceMethod(klass, selector);
-    original = method != nullptr ? method_getImplementation(method) : nullptr;
-  }
+  bool inheritsAlias =
+      !ClassBuilder::ImplementsItself(klass, selector) && class_respondsToSelector(klass, alias);
+  Method method = class_getInstanceMethod(klass, inheritsAlias ? alias : selector);
+  IMP original = method != nullptr ? method_getImplementation(method) : nullptr;
   class_replaceMethod(klass, selector, imp, types);
   if (original != nullptr) {
     class_addMethod(klass, alias, original, types);
