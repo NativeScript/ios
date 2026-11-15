@@ -36,45 +36,16 @@ bool IsDeallocating(id obj) {
   return !((BOOL (*)(id, SEL))imp)(obj, allowsWeakReference);
 }
 
-// Clang's init method family: optional leading underscores, then "init", then
-// the end of the selector's first piece or anything but a lowercase letter.
-bool IsInitFamily(SEL selector) {
+// Clang's method family rule: optional leading underscores, then the family
+// name, then the end of the selector's first piece or anything but a
+// lowercase letter.
+bool InMethodFamily(SEL selector, const char* family) {
   const char* name = sel_getName(selector);
   while (*name == '_') {
     name++;
   }
-  return strncmp(name, "init", 4) == 0 && (name[4] < 'a' || name[4] > 'z');
-}
-
-// The native caller of an init-family method owns its result. SetValue hands
-// a wrapped object or a string over at +0: for the receiver that is the
-// reference the caller passed in, any other object needs its own. The
-// receiver is left alone: when a super initializer substituted it, that
-// initializer already released it, and nothing here can tell that case apart.
-void RetainInitializerResult(Isolate* isolate, void** argValues, void* retValue,
-                             const TypeEncoding* typeEncoding, Local<Value> value) {
-  BinaryTypeEncodingType type = typeEncoding->type;
-  if (type != BinaryTypeEncodingType::IdEncoding &&
-      type != BinaryTypeEncodingType::InterfaceDeclarationReference &&
-      type != BinaryTypeEncodingType::InstanceTypeEncoding) {
-    return;
-  }
-
-  id returned = *static_cast<id*>(retValue);
-  if (returned == nil || returned == *static_cast<id*>(argValues[0]) ||
-      !IsInitFamily(*static_cast<SEL*>(argValues[1]))) {
-    return;
-  }
-
-  // A plain JS object becomes a DictionaryAdapter SetValue already returns
-  // at +1.
-  value = tns::UnwrapProxy(value);
-  BaseDataWrapper* wrapper = value->IsObject() ? tns::GetValue(isolate, value) : nullptr;
-  bool atPlusZero =
-      value->IsString() || (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject);
-  if (atPlusZero) {
-    [returned retain];
-  }
+  size_t length = strlen(family);
+  return strncmp(name, family, length) == 0 && (name[length] < 'a' || name[length] > 'z');
 }
 
 // The borrowed wrapper WrapNativeCallbackSelf made for an object in -dealloc
@@ -192,7 +163,7 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
     target = [allocKlass alloc];
   }
 
-  ObjCMethodCall methodCall(context, meta, target, klass, args, callSuper);
+  ObjCMethodCall methodCall(context, meta, target, klass, args, callSuper, allocKlass != nil);
   return Interop::CallFunction(methodCall);
 }
 
@@ -364,6 +335,11 @@ id ArgConverter::HandleBoundaryException(Local<Context> context, TryCatch& tc) {
 
 void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData) {
   MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
+  // Owned by this call, which gives it up on every path unless it answers it.
+  id consumedArgument =
+      data->consumedArgumentIndex_ < 0
+          ? nil
+          : *static_cast<id*>(argValues[data->initialParamIndex_ + data->consumedArgumentIndex_]);
 
   Isolate* isolate = data->isolateWrapper_.Isolate();
 
@@ -380,6 +356,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     IsolatePin pin = data->isolateWrapper_.Pin();
     if (!pin || !data->isolateWrapper_.IsValid()) {
       memset(retValue, 0, cif->rtype->size);
+      [consumedArgument release];
       return;
     }
 
@@ -391,6 +368,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     // what makes this second look reliable.
     if (!data->isolateWrapper_.IsValid()) {
       memset(retValue, 0, cif->rtype->size);
+      [consumedArgument release];
       return;
     }
     Isolate::Scope isolate_scope(isolate);
@@ -512,13 +490,19 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
       if (!success) {
         memset(retValue, 0, cif->rtype->size);
       } else {
-        ArgConverter::SetValue(context, retValue, cif->rtype->size, result, data->typeEncoding_);
-        if (data->initialParamIndex_ == 2) {
-          RetainInitializerResult(isolate, argValues, retValue, data->typeEncoding_, result);
-        }
+        bool writtenUnowned = ArgConverter::SetValue(context, retValue, cif->rtype->size, result,
+                                                     data->typeEncoding_);
+        ArgConverter::RetainOwnedResult(data->returnOwnership_, argValues, retValue, writtenUnowned,
+                                        consumedArgument);
       }
     } else {
       memset(retValue, 0, cif->rtype->size);
+    }
+
+    // A wrapper JS made for the consumed argument holds a reference of its own.
+    if (consumedArgument != nil && !(Interop::IsObjectEncoding(data->typeEncoding_) &&
+                                     *static_cast<id*>(retValue) == consumedArgument)) {
+      [consumedArgument release];
     }
   }  // all V8 scopes destruct here
 
@@ -527,10 +511,44 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
   }
 }
 
-void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t returnSize,
+// An owned result SetValue wrote at +0 gets a reference of its own, except a
+// receiver answered in place of itself: that is the reference the caller
+// passed in. The receiver is never released when another object is answered
+// instead: a super initializer that substituted it already did, and nothing
+// here can tell that case apart.
+void ArgConverter::RetainOwnedResult(NativeReturnOwnership ownership, void** argValues,
+                                     void* retValue, bool writtenUnowned, id consumedArgument) {
+  if (ownership == NativeReturnOwnership::Unowned || !writtenUnowned) {
+    return;
+  }
+
+  id returned = *static_cast<id*>(retValue);
+  if (returned == nil || returned == consumedArgument ||
+      (ownership == NativeReturnOwnership::ReplacesReceiver &&
+       returned == *static_cast<id*>(argValues[0]))) {
+    return;
+  }
+
+  [returned retain];
+}
+
+NativeReturnOwnership ArgConverter::ReturnOwnership(SEL selector, const MethodMeta* meta) {
+  bool isInitializer = meta != nullptr ? meta->isInitializer() : InMethodFamily(selector, "init");
+  if (Interop::ConsumesReceiver(selector, isInitializer)) {
+    return NativeReturnOwnership::ReplacesReceiver;
+  }
+
+  bool owned = meta != nullptr
+                   ? meta->ownsReturnedCocoaObject()
+                   : InMethodFamily(selector, "copy") || InMethodFamily(selector, "mutableCopy") ||
+                         InMethodFamily(selector, "new") || Interop::ReturnsRetained(selector);
+  return owned ? NativeReturnOwnership::Owned : NativeReturnOwnership::Unowned;
+}
+
+bool ArgConverter::SetValue(Local<Context> context, void* retValue, size_t returnSize,
                             Local<Value> value, const TypeEncoding* typeEncoding) {
   if (typeEncoding->type == BinaryTypeEncodingType::VoidEncoding) {
-    return;
+    return false;
   }
 
   // Runs inside an ffi closure, where a C++ throw cannot propagate; a revoked
@@ -540,7 +558,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
   value = tns::UnwrapProxy(value);
   if (value.IsEmpty() || value->IsNullOrUndefined()) {
     memset(retValue, 0, std::max(returnSize, sizeof(ffi_arg)));
-    return;
+    return false;
   }
 
   Isolate* isolate = v8::Isolate::GetCurrent();
@@ -551,52 +569,52 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
   if (tns::IsBool(value)) {
     bool boolValue = value.As<v8::Boolean>()->Value();
     *(ffi_arg*)retValue = (bool)boolValue;
-    return;
+    return false;
   } else if (tns::IsNumber(value)) {
     double numValue = tns::ToNumber(isolate, value);
     switch (type) {
       case BinaryTypeEncodingType::UShortEncoding: {
         *static_cast<unsigned short*>(retValue) = (unsigned short)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::ShortEncoding: {
         *static_cast<short*>(retValue) = (short)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::UIntEncoding: {
         *static_cast<unsigned int*>(retValue) = (unsigned int)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::IntEncoding: {
         *static_cast<int*>(retValue) = (int)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::ULongEncoding: {
         *static_cast<unsigned long*>(retValue) = (unsigned long)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::LongEncoding: {
         *static_cast<long*>(retValue) = (long)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::ULongLongEncoding: {
         *static_cast<unsigned long long*>(retValue) = (unsigned long long)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::LongLongEncoding: {
         *static_cast<long long*>(retValue) = (long long)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::FloatEncoding: {
         *static_cast<float*>(retValue) = (float)numValue;
-        return;
+        return false;
       }
       case BinaryTypeEncodingType::DoubleEncoding: {
         *static_cast<double*>(retValue) = numValue;
-        return;
+        return false;
       }
       default:
-        return;
+        return false;
     }
   } else if (value->IsString()) {
     if (type == BinaryTypeEncodingType::IdEncoding ||
@@ -607,7 +625,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
       auto ref = CFBridgingRetain(data);
       *(CFTypeRef*)retValue = ref;
       CFRelease(ref);
-      return;
+      return true;
     }
   } else if (value->IsObject()) {
     if (type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
@@ -619,7 +637,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
         id data = wrapper->Data();
         memset(retValue, 0, sizeof(id));
         *static_cast<id __strong*>(retValue) = data;
-        return;
+        return true;
       } else {
         id adapter = [[DictionaryAdapter alloc]
             initWithJSObject:tns::ProxyReadSource(original, value).As<Object>()
@@ -627,7 +645,7 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
         memset(retValue, 0, sizeof(id));
         *static_cast<id __strong*>(retValue) = adapter;
         // CFAutorelease(adapter);
-        return;
+        return false;
       }
     } else if (type == BinaryTypeEncodingType::StructDeclarationReference) {
       BaseDataWrapper* baseWrapper = tns::GetValue(isolate, value);
@@ -638,19 +656,20 @@ void ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
         const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
         const StructInfo& structInfo = FFICall::GetStructInfo(structMeta);
         Interop::InitializeStruct(context, retValue, structInfo.Fields(), value);
-        return;
+        return false;
       } else if (baseWrapper->Type() == WrapperType::Struct) {
         StructWrapper* structWrapper = static_cast<StructWrapper*>(baseWrapper);
         size_t size = structWrapper->StructInfo().FFIType()->size;
         void* data = structWrapper->Data();
         memcpy(retValue, data, size);
-        return;
+        return false;
       }
     }
   }
 
   // TODO: Handle other return types, i.e. assign the retValue parameter from the v8 result
   tns::Assert(false, isolate);
+  return false;
 }
 
 void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbackInfo<Value>& info,
@@ -703,13 +722,16 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
   auto cache = Caches::Get(isolate);
   auto poInstance = ArgConverter::FindCachedInstance(isolate, cache, result);
   if (poInstance != nullptr) {
+    // Read before the release below: when it drops a DictionaryAdapter's last
+    // reference, the adapter's -dealloc resets this handle.
+    Local<Value> cached = poInstance->Get(isolate);
     // An initializer that answered with an already wrapped object (a singleton,
     // a tagged pointer, a cached cluster instance) leaves us holding a +1 the
     // existing entry has no use for.
-    if (resultIsOwned) {
+    if (Interop::ReleasesCachedOwnedReturn(resultIsOwned, OwnedReturnReceiver::AllocatedForCall)) {
       [result release];
     }
-    info.GetReturnValue().Set(poInstance->Get(isolate));
+    info.GetReturnValue().Set(cached);
   } else {
     ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
     Local<Object> thiz = info.This();

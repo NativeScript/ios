@@ -1396,8 +1396,10 @@ v8::Intercepted MetadataBuilder::SwizzledInstanceMethodCallback(
   std::string compilerEncoding = ClassBuilder::GetTypeEncoding(typeEncoding, argsCount);
   std::shared_ptr<Persistent<Value>> poCallback =
       std::make_shared<Persistent<Value>>(isolate, value);
-  MethodCallbackWrapper* userData =
-      new MethodCallbackWrapper(isolate, poCallback, 2, argsCount, typeEncoding);
+  MethodCallbackWrapper* userData = new MethodCallbackWrapper(
+      isolate, poCallback, 2, argsCount, typeEncoding,
+      ArgConverter::ReturnOwnership(methodMeta->selector(), methodMeta),
+      Interop::ConsumedObjectArgumentIndex(methodMeta->selector(), typeEncoding, argsCount));
   IMP methodBody =
       Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
   IMP nativeImp =
@@ -1477,8 +1479,13 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
           }
           memset(retValue, 0, cif->rtype->size);
         } else {
-          const TypeEncoding* typeEncoding = context->meta_->getter()->encodings()->first();
-          ArgConverter::SetValue(v8Context, retValue, cif->rtype->size, res, typeEncoding);
+          const MethodMeta* getterMeta = context->meta_->getter();
+          const TypeEncoding* typeEncoding = getterMeta->encodings()->first();
+          bool writtenUnowned =
+              ArgConverter::SetValue(v8Context, retValue, cif->rtype->size, res, typeEncoding);
+          ArgConverter::RetainOwnedResult(
+              ArgConverter::ReturnOwnership(*static_cast<SEL*>(argValues[1]), getterMeta),
+              argValues, retValue, writtenUnowned);
         }
       }
       if (pendingThrow != nil) {

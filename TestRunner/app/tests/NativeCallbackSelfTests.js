@@ -408,4 +408,815 @@ describe("Native callback self wrappers", function () {
             });
         });
     });
+
+    it("leaves the retain count of an immutable object whose -copy answers itself unchanged", function (done) {
+        var array = NSArray.arrayWithArray([1, 2, 3]);
+        settle(2, function () {
+            var before = array.retainCount();
+            var same = 0;
+            for (var i = 0; i < 50; i++) {
+                if (array.copy() === array) {
+                    same++;
+                }
+            }
+            expect(same).toBe(50);
+            settle(2, function () {
+                expect(array.retainCount()).toBe(before);
+                done();
+            });
+        });
+    });
+
+    it("frees an object JS alone holds after alloc().init() ran its JS initializer", function (done) {
+        var obj = JSInit.alloc().init();
+        obj.state = { i: 3 };
+        settle(2, function () {
+            expect(initCalls).toBe(1);
+            expect(obj.state.i).toBe(3);
+            expect(deallocs()).toBe(0);
+            obj = null;
+            settle(3, function () {
+                expect(deallocs()).toBe(1);
+                done();
+            });
+        });
+    });
+
+    it("keeps the JS state of a natively owned object whose JS initializer ran from alloc().init(), then frees it once", function (done) {
+        var owner = NSMutableArray.new();
+        (function () {
+            var obj = JSInit.alloc().init();
+            obj.state = { i: 4 };
+            owner.addObject(obj);
+        })();
+        settle(3, function () {
+            var obj = owner.objectAtIndex(0);
+            expect(initCalls).toBe(1);
+            expect(obj.initialized).toBe(true);
+            expect(obj.state && obj.state.i).toBe(4);
+            obj = null;
+            expect(deallocs()).toBe(0);
+            owner.removeAllObjects();
+            settle(3, function () {
+                expect(deallocs()).toBe(1);
+                done();
+            });
+        });
+    });
+
+    it("keeps a wrapped object a JS initializer returns instead of its receiver (alloc().init())", function (done) {
+        expectInitializerResultOwnedByCaller(function () {
+            return createThroughInitReturningOther(function () {
+                return InitReturnsOther.alloc().init();
+            });
+        }, done);
+    });
+
+    it("keeps the substitute a super initializer returned through a JS initializer (alloc().init())", function (done) {
+        expectInitializerResultOwnedByCaller(function () {
+            return InitReturnsSubstitute.alloc().init();
+        }, done);
+    });
+
+    it("does not release a wrapped receiver that is initialized again", function (done) {
+        var plain = TNSAllocLog.new();
+        var jsInit = JSInit.new();
+        expect(plain.init()).toBe(plain);
+        expect(TNSAllocLog.prototype.init.call(plain)).toBe(plain);
+        expect(TNSAllocLog.prototype.init.apply(plain, [])).toBe(plain);
+        expect(jsInit.init()).toBe(jsInit);
+        expect(JSInit.prototype.init.call(jsInit)).toBe(jsInit);
+        expect(JSInit.prototype.init.apply(jsInit, [])).toBe(jsInit);
+        expect(TNSAllocLog.prototype.init.call(jsInit)).toBe(jsInit);
+        settle(3, function () {
+            var freed = deallocs();
+            expect(freed).toBe(0);
+            if (freed === 0) {
+                expect(plain.hash > 0).toBe(true);
+                expect(jsInit.initialized).toBe(true);
+            }
+            plain = null;
+            jsInit = null;
+            settle(3, function () {
+                expect(deallocs()).toBe(2);
+                done();
+            });
+        });
+    });
+
+    // Native code that owns what an owned-return method answers drops it. The
+    // object a JS implementation answered must outlive that, and be freed
+    // exactly once after JS lets go. TNSOwnedReturns and TNSAllocLog log their
+    // deallocation; `freedAfterwards` counts those among receiver and result.
+    function expectKeptThroughNativeDrop(state, drop, freedAfterwards, done) {
+        drop(state.receiver);
+        settle(3, function () {
+            var freed = deallocs();
+            expect(freed).toBe(0);
+            if (freed === 0) {
+                expect(state.receiver.hash > 0).toBe(true);
+                expect(state.result.hash > 0).toBe(true);
+            }
+            state.receiver = null;
+            state.result = null;
+            settle(3, function () {
+                expect(deallocs()).toBe(freedAfterwards);
+                done();
+            });
+        });
+    }
+
+    function ownedReturnState(base, name, method, protocols, answersReceiver, extra) {
+        var state = {};
+        var implementation = {};
+        var answer = function () {
+            return answersReceiver ? this : state.result;
+        };
+        // `extra.getter` implements `method` as a property getter;
+        // `extra.exposedMethods` declares it to a class that has no metadata
+        // for it.
+        extra = extra || {};
+        if (extra.getter) {
+            Object.defineProperty(implementation, method, { get: answer, enumerable: true, configurable: true });
+        } else {
+            implementation[method] = answer;
+        }
+        var Klass = base.extend(implementation, { name: name, protocols: protocols, exposedMethods: extra.exposedMethods });
+        state.receiver = Klass.new();
+        state.result = answersReceiver ? state.receiver : TNSAllocLog.new();
+        return state;
+    }
+
+    it("hands a native -copy the receiver a JS copyWithZone answers at +1", function (done) {
+        var state = ownedReturnState(TNSOwnedReturns, "NativeCallbackSelfCopySelf", "copyWithZone", [NSCopying], true);
+        expectKeptThroughNativeDrop(state, function (receiver) {
+            TNSOwnedReturns.copyAndDrop(receiver);
+        }, 1, done);
+    });
+
+    it("hands a native -copy the other object a JS copyWithZone answers at +1", function (done) {
+        var state = ownedReturnState(TNSOwnedReturns, "NativeCallbackSelfCopyOther", "copyWithZone", [NSCopying], false);
+        expectKeptThroughNativeDrop(state, function (receiver) {
+            TNSOwnedReturns.copyAndDrop(receiver);
+        }, 2, done);
+    });
+
+    it("hands a native -mutableCopy the object a JS mutableCopyWithZone answers at +1", function (done) {
+        var state = ownedReturnState(TNSOwnedReturns, "NativeCallbackSelfMutableCopy", "mutableCopyWithZone", [NSMutableCopying], false);
+        expectKeptThroughNativeDrop(state, function (receiver) {
+            TNSOwnedReturns.mutableCopyAndDrop(receiver);
+        }, 2, done);
+    });
+
+    it("hands a native caller the object a JS new-family method answers at +1", function (done) {
+        var state = ownedReturnState(TNSOwnedReturns, "NativeCallbackSelfNewOther", "newChild", [], false);
+        expectKeptThroughNativeDrop(state, function (receiver) {
+            TNSOwnedReturns.newChildAndDrop(receiver);
+        }, 2, done);
+    });
+
+    it("hands a native caller the receiver a JS new-family method answers at +1", function (done) {
+        var state = ownedReturnState(TNSOwnedReturns, "NativeCallbackSelfNewSelf", "newChild", [], true);
+        expectKeptThroughNativeDrop(state, function (receiver) {
+            TNSOwnedReturns.newChildAndDrop(receiver);
+        }, 1, done);
+    });
+
+    it("hands a native caller back the receiver a JS awakeAfterUsingCoder answers", function (done) {
+        var state = ownedReturnState(TNSOwnedReturns, "NativeCallbackSelfAwakeSelf", "awakeAfterUsingCoder", [], true);
+        expectKeptThroughNativeDrop(state, function (receiver) {
+            TNSOwnedReturns.awakeAndDrop(receiver);
+        }, 1, done);
+    });
+
+    // The receiver is not a TNSAllocLog: its reference, consumed by the call,
+    // is not given back when the JS method answers another object.
+    it("hands a native caller the other object a JS awakeAfterUsingCoder answers at +1", function (done) {
+        var state = ownedReturnState(NSObject, "NativeCallbackSelfAwakeOther", "awakeAfterUsingCoder", [], false);
+        expectKeptThroughNativeDrop(state, function (receiver) {
+            TNSOwnedReturns.awakeAndDrop(receiver);
+        }, 1, done);
+    });
+
+    function expectBalancedJsCopies(answersReceiver, name, done) {
+        var state = ownedReturnState(TNSOwnedReturns, name, "copyWithZone", [NSCopying], answersReceiver);
+        for (var i = 0; i < 20; i++) {
+            expect(state.receiver.copy()).toBe(state.result);
+        }
+        settle(3, function () {
+            var freed = deallocs();
+            expect(freed).toBe(0);
+            if (freed === 0) {
+                expect(state.receiver.hash > 0).toBe(true);
+                expect(state.result.hash > 0).toBe(true);
+            }
+            state.receiver = null;
+            state.result = null;
+            settle(3, function () {
+                expect(deallocs()).toBe(answersReceiver ? 1 : 2);
+                done();
+            });
+        });
+    }
+
+    it("balances copy() called from JS on a JS copyWithZone that answers its receiver", function (done) {
+        expectBalancedJsCopies(true, "NativeCallbackSelfJsCopySelf", done);
+    });
+
+    it("balances copy() called from JS on a JS copyWithZone that answers another object", function (done) {
+        expectBalancedJsCopies(false, "NativeCallbackSelfJsCopyOther", done);
+    });
+
+    it("hands a native caller the object a JS new-family method without metadata answers at +1", function (done) {
+        var state = ownedReturnState(TNSAllocLog, "NativeCallbackSelfExposedNew", "newChild", [], false, {
+            exposedMethods: { newChild: { returns: NSObject, params: [] } }
+        });
+        expectKeptThroughNativeDrop(state, function (receiver) {
+            TNSOwnedReturns.newChildAndDrop(receiver);
+        }, 2, done);
+    });
+
+    function ownedGetterState(answersReceiver, name) {
+        return ownedReturnState(TNSOwnedReturns, name, "newItem", [], answersReceiver, { getter: true });
+    }
+
+    it("hands a native caller the other object a JS new-family getter answers at +1", function (done) {
+        var state = ownedGetterState(false, "NativeCallbackSelfGetterOther");
+        expectKeptThroughNativeDrop(state, function (receiver) {
+            TNSOwnedReturns.newItemAndDrop(receiver);
+        }, 2, done);
+    });
+
+    it("hands a native caller the receiver a JS new-family getter answers at +1", function (done) {
+        var state = ownedGetterState(true, "NativeCallbackSelfGetterSelf");
+        expectKeptThroughNativeDrop(state, function (receiver) {
+            TNSOwnedReturns.newItemAndDrop(receiver);
+        }, 1, done);
+    });
+
+    function expectBalancedGetterReads(answersReceiver, name, done) {
+        var state = ownedGetterState(answersReceiver, name);
+        for (var i = 0; i < 20; i++) {
+            expect(state.receiver.newItem).toBe(state.result);
+            expect(TNSOwnedReturns.readNewItemOf(state.receiver)).toBe(state.result);
+        }
+        expectKeptThroughNativeDrop(state, function () {}, answersReceiver ? 1 : 2, done);
+    }
+
+    it("balances reads of a JS new-family getter that answers another object", function (done) {
+        expectBalancedGetterReads(false, "NativeCallbackSelfGetterReadsOther", done);
+    });
+
+    it("balances reads of a JS new-family getter that answers its receiver", function (done) {
+        expectBalancedGetterReads(true, "NativeCallbackSelfGetterReadsSelf", done);
+    });
+
+    // The replacements stay installed for the rest of the run, on a class no
+    // other spec uses, and answer what `swizzled.answer` gives them.
+    var swizzled = { installed: false, answer: null };
+
+    function swizzledState(answersReceiver) {
+        if (!swizzled.installed) {
+            swizzled.installed = true;
+            TNSSwizzledOwnedReturns.prototype.newChild = function () {
+                return swizzled.answer(this);
+            };
+            Object.defineProperty(TNSSwizzledOwnedReturns.prototype, "newItem", {
+                get: function () {
+                    return swizzled.answer(this);
+                },
+                configurable: true
+            });
+        }
+        var state = { receiver: TNSSwizzledOwnedReturns.new() };
+        state.result = answersReceiver ? state.receiver : TNSAllocLog.new();
+        swizzled.answer = function (self) {
+            return answersReceiver ? self : state.result;
+        };
+        return state;
+    }
+
+    it("hands a native caller the other object a JS replacement of a new-family method answers at +1", function (done) {
+        var state = swizzledState(false);
+        expectKeptThroughNativeDrop(state, function (receiver) {
+            TNSOwnedReturns.newChildAndDrop(receiver);
+        }, 2, done);
+    });
+
+    it("hands a native caller the receiver a JS replacement of a new-family method answers at +1", function (done) {
+        var state = swizzledState(true);
+        expectKeptThroughNativeDrop(state, function (receiver) {
+            TNSOwnedReturns.newChildAndDrop(receiver);
+        }, 1, done);
+    });
+
+    it("hands a native caller the other object a JS replacement of a new-family getter answers at +1", function (done) {
+        var state = swizzledState(false);
+        expectKeptThroughNativeDrop(state, function (receiver) {
+            TNSOwnedReturns.newItemAndDrop(receiver);
+            expect(TNSOwnedReturns.readNewItemOf(receiver)).toBe(state.result);
+        }, 2, done);
+    });
+
+    it("frees once an object whose native -init ran a JS method on it (alloc().init())", function (done) {
+        var hooks = 0;
+        var Hooked = TNSInitCallsHook.extend({
+            initHook: function () {
+                hooks++;
+                this.hooked = true;
+            }
+        }, { name: "NativeCallbackSelfInitHook" });
+        var obj = Hooked.alloc().init();
+        expect(hooks).toBe(1);
+        expect(obj.hooked).toBe(true);
+        settle(3, function () {
+            expect(deallocs()).toBe(0);
+            expect(obj.hash > 0).toBe(true);
+            obj = null;
+            settle(3, function () {
+                expect(deallocs()).toBe(1);
+                done();
+            });
+        });
+    });
+
+    // -unarchiver:didDecodeObject: takes over the object it is given
+    // (NS_RELEASES_ARGUMENT) and answers an owned one.
+    var decodeAnswer = null;
+    var decodeCalls = 0;
+    var DecodeDelegate = NSObject.extend({
+        unarchiverDidDecodeObject: function (unarchiver, object) {
+            decodeCalls++;
+            return decodeAnswer(object);
+        }
+    }, { name: "NativeCallbackSelfDecodeDelegate", protocols: [NSKeyedUnarchiverDelegate] });
+
+    // The same method with no metadata to describe it.
+    var ExposedDecodeDelegate = NSObject.extend({
+        "unarchiver:didDecodeObject:": function (unarchiver, object) {
+            decodeCalls++;
+            return decodeAnswer(object);
+        }
+    }, {
+        name: "NativeCallbackSelfExposedDecodeDelegate",
+        exposedMethods: {
+            "unarchiver:didDecodeObject:": { returns: NSObject, params: [NSObject, NSObject] }
+        }
+    });
+
+    // Decodes an array of two TNSCodingAllocLogs through a `Delegate`
+    // answering `answer(object)`, or through none when `answer` is null.
+    // `freedAfterDecode` TNSAllocLogs are gone once the unarchiver is,
+    // `freedAtEnd` once JS drops the decoded root too.
+    function expectBalancedDecode(Delegate, answer, freedAfterDecode, freedAtEnd, checkRoot, done) {
+        var data = (function () {
+            var root = NSMutableArray.new();
+            root.addObject(TNSCodingAllocLog.new());
+            root.addObject(TNSCodingAllocLog.new());
+            return NSKeyedArchiver.archivedDataWithRootObjectRequiringSecureCodingError(root, false);
+        })();
+        settle(3, function () {
+            expect(deallocs()).toBe(2);
+            TNSClearOutput();
+            var state = {};
+            (function () {
+                var delegate = answer ? Delegate.new() : null;
+                decodeAnswer = answer;
+                decodeCalls = 0;
+                var unarchiver = NSKeyedUnarchiver.alloc().initForReadingFromDataError(data);
+                unarchiver.requiresSecureCoding = false;
+                unarchiver.delegate = delegate;
+                state.root = unarchiver.decodeObjectForKey(NSKeyedArchiveRootObjectKey);
+                unarchiver.finishDecoding();
+                unarchiver.delegate = null;
+                decodeAnswer = null;
+            })();
+            expect(decodeCalls).toBe(answer ? 3 : 0);
+            settle(3, function () {
+                expect(deallocs()).toBe(freedAfterDecode);
+                checkRoot(state.root);
+                state.root = null;
+                settle(3, function () {
+                    expect(deallocs()).toBe(freedAtEnd);
+                    done();
+                });
+            });
+        });
+    }
+
+    function expectDecodedRoot(elementClass) {
+        return function (root) {
+            expect(root instanceof NSArray).toBe(true);
+            expect(root.count).toBe(2);
+            for (var i = 0; i < root.count; i++) {
+                var element = root.objectAtIndex(i);
+                expect(element instanceof elementClass).toBe(true);
+                expect(element.hash > 0).toBe(true);
+            }
+        };
+    }
+
+    it("decodes without an unarchiver delegate", function (done) {
+        expectBalancedDecode(null, null, 0, 2, expectDecodedRoot(TNSCodingAllocLog), done);
+    });
+
+    [
+        { Delegate: DecodeDelegate, suffix: "" },
+        { Delegate: ExposedDecodeDelegate, suffix: " (exposedMethods, no protocol)" }
+    ].forEach(function (variant) {
+        var Delegate = variant.Delegate;
+
+        it("hands an unarchiver back the objects a JS delegate answers unchanged" + variant.suffix, function (done) {
+            expectBalancedDecode(Delegate, function (object) {
+                return object;
+            }, 0, 2, expectDecodedRoot(TNSCodingAllocLog), done);
+        });
+
+        it("releases the objects a JS unarchiver delegate replaces" + variant.suffix, function (done) {
+            expectBalancedDecode(Delegate, function (object) {
+                return object instanceof TNSCodingAllocLog ? TNSAllocLog.new() : object;
+            }, 2, 4, function (root) {
+                expectDecodedRoot(TNSAllocLog)(root);
+                expect(root.objectAtIndex(0) instanceof TNSCodingAllocLog).toBe(false);
+            }, done);
+        });
+
+        // The unarchiver keeps an object its delegate answers nil for.
+        it("releases the objects a JS unarchiver delegate answers nil for" + variant.suffix, function (done) {
+            expectBalancedDecode(Delegate, function (object) {
+                return null;
+            }, 0, 2, expectDecodedRoot(TNSCodingAllocLog), done);
+        });
+    });
+
+    it("gives a native unarchiver delegate called from JS the reference it takes over", function (done) {
+        var delegate = TNSDecodeDelegate.new();
+        var object = TNSAllocLog.new();
+        var i;
+        for (i = 0; i < 20; i++) {
+            expect(delegate.unarchiverDidDecodeObject(null, object)).toBe(object);
+        }
+        delegate.substitutes = true;
+        for (i = 0; i < 20; i++) {
+            var other = delegate.unarchiverDidDecodeObject(null, object);
+            expect(other instanceof TNSAllocLog).toBe(true);
+            expect(other).not.toBe(object);
+        }
+        other = null;
+        settle(3, function () {
+            var freed = deallocs();
+            expect(freed).toBe(20);
+            if (freed === 20) {
+                expect(object.hash > 0).toBe(true);
+            }
+            object = null;
+            settle(3, function () {
+                expect(deallocs()).toBe(21);
+                done();
+            });
+        });
+    });
+
+    // JS receives these as primitives, so only the native side sees their
+    // reference counts.
+    var primitiveText = "an owned string long enough to live on the heap";
+    var primitiveDateTime = (700000000.5 + 978307200) * 1000;
+
+    function expectPrimitiveAt(index, value) {
+        if (index === 0) {
+            expect(value).toBe(primitiveText);
+        } else if (index === 1) {
+            expect(value).toBe(Math.PI);
+        } else {
+            expect(value instanceof Date).toBe(true);
+            expect(value.getTime()).toBe(primitiveDateTime);
+        }
+    }
+
+    function expectPrimitivesRetainedAsBefore(read, done) {
+        var holder = TNSOwnedPrimitives.new();
+        for (var i = 0; i < 3; i++) {
+            expect([i, holder.isTaggedPointerAt(i)]).toEqual([i, false]);
+        }
+        settle(2, function () {
+            var before = [];
+            for (var i = 0; i < 3; i++) {
+                before.push(holder.retainCountAt(i));
+                for (var k = 0; k < 20; k++) {
+                    expectPrimitiveAt(i, read(holder, i));
+                }
+            }
+            settle(2, function () {
+                for (var i = 0; i < 3; i++) {
+                    expect([i, holder.retainCountAt(i)]).toEqual([i, before[i]]);
+                }
+                done();
+            });
+        });
+    }
+
+    it("releases owned results JS receives as a string, a number and a date", function (done) {
+        expectPrimitivesRetainedAsBefore(function (holder, index) {
+            return holder.newObjectAt(index);
+        }, done);
+    });
+
+    it("leaves unowned results JS receives as primitives retained as they were", function (done) {
+        expectPrimitivesRetainedAsBefore(function (holder, index) {
+            return holder.objectAt(index);
+        }, done);
+    });
+
+    it("releases owned C function results JS receives as a string, a number and a date", function (done) {
+        expectPrimitivesRetainedAsBefore(function (holder, index) {
+            return TNSOwnedPrimitivesRetainedObjectAt(holder, index);
+        }, done);
+    });
+
+    it("leaves unowned C function results JS receives as primitives retained as they were", function (done) {
+        expectPrimitivesRetainedAsBefore(function (holder, index) {
+            return TNSOwnedPrimitivesObjectAt(holder, index);
+        }, done);
+    });
+
+    function copiesAsStringState(name, answer) {
+        var state = { answer: answer };
+        var Copyable = TNSAllocLog.extend({
+            copyWithZone: function () {
+                return state.answer;
+            }
+        }, { name: name, protocols: [NSCopying] });
+        state.receiver = Copyable.new();
+        return state;
+    }
+
+    it("releases the string a native -copy answers for a JS copyWithZone returning an NSString", function (done) {
+        var text = primitiveText + ", wrapped";
+        var state = copiesAsStringState("NativeCallbackSelfCopyToWrappedString", NSString.alloc().initWithString(text));
+        settle(2, function () {
+            var before = state.answer.retainCount();
+            for (var i = 0; i < 20; i++) {
+                expect(state.receiver.copy()).toBe(text);
+            }
+            settle(2, function () {
+                expect(state.answer.retainCount()).toBe(before);
+                done();
+            });
+        });
+    });
+
+    // The NSString made for the JS string is never visible to JS, so only the
+    // answers are checked.
+    it("answers the string a JS copyWithZone returns through a native -copy", function () {
+        var state = copiesAsStringState("NativeCallbackSelfCopyToString", primitiveText);
+        for (var i = 0; i < 20; i++) {
+            expect(state.receiver.copy()).toBe(primitiveText);
+        }
+    });
+
+    // Each block TNSOwnedBlocks makes captures a TNSAllocLog, freed with it.
+    function expectNativeBlocksFreedOnce(answer, done) {
+        var holder = TNSOwnedBlocks.new();
+        var blocks = [];
+        for (var i = 0; i < 5; i++) {
+            blocks.push(answer(holder, i));
+            expect(blocks[i]()).toBe(i);
+        }
+        settle(3, function () {
+            expect(deallocs()).toBe(0);
+            for (var i = 0; i < blocks.length; i++) {
+                expect(blocks[i]()).toBe(i);
+            }
+            blocks = null;
+            settle(3, function () {
+                expect(deallocs()).toBe(5);
+                done();
+            });
+        });
+    }
+
+    it("frees a native block an owned-return method answers once JS drops it", function (done) {
+        expectNativeBlocksFreedOnce(function (holder, value) {
+            return holder.retainedBlockAnswering(value);
+        }, done);
+    });
+
+    it("frees a native block an unowned method answers once JS drops it", function (done) {
+        expectNativeBlocksFreedOnce(function (holder, value) {
+            return holder.blockAnswering(value);
+        }, done);
+    });
+
+    // A JS function handed to native code becomes a block that keeps the
+    // function, and what it captures, alive until the block is freed.
+    function expectJsBlockRoundTrips(answer, done) {
+        var holder = TNSOwnedBlocks.new();
+        var state = {};
+        (function () {
+            var captured = TNSAllocLog.new();
+            state.fn = function () {
+                return captured.hash > 0 ? 7 : -1;
+            };
+        })();
+        for (var i = 0; i < 20; i++) {
+            expect(answer(holder, state.fn)).toBe(state.fn);
+        }
+        settle(3, function () {
+            expect(deallocs()).toBe(0);
+            expect(state.fn()).toBe(7);
+            expect(TNSOwnedBlocks.callBlock(state.fn)).toBe(7);
+            expect(answer(holder, state.fn)).toBe(state.fn);
+            state.fn = null;
+            settle(3, function () {
+                expect(deallocs()).toBe(1);
+                done();
+            });
+        });
+    }
+
+    it("answers the JS function a block an owned-return method hands back was made for", function (done) {
+        expectJsBlockRoundTrips(function (holder, fn) {
+            return holder.retainedBlockFrom(fn);
+        }, done);
+    });
+
+    it("answers the JS function a block an unowned method hands back was made for", function (done) {
+        expectJsBlockRoundTrips(function (holder, fn) {
+            return holder.blockFrom(fn);
+        }, done);
+    });
+
+    // Once the autorelease pool has drained, the stored reference is the
+    // block's only one, so dropping it runs the block's dispose helper while
+    // the call that answered it is still marshalling the result.
+    it("answers the JS function of a block whose last reference an owned-return method hands back", function (done) {
+        var holder = TNSOwnedBlocks.new();
+        var state = {};
+        (function () {
+            var captured = TNSAllocLog.new();
+            state.fn = function () {
+                return captured.hash > 0 ? 7 : -1;
+            };
+        })();
+        holder.storeBlock(state.fn);
+        settle(3, function () {
+            expect(deallocs()).toBe(0);
+            expect(holder.retainedStoredBlock()).toBe(state.fn);
+            expect(state.fn()).toBe(7);
+            expect(TNSOwnedBlocks.callBlock(state.fn)).toBe(7);
+            state.fn = null;
+            settle(3, function () {
+                expect(deallocs()).toBe(1);
+                done();
+            });
+        });
+    });
+
+    it("frees what a JS function given to dispatch_block_create captures once JS drops the block", function (done) {
+        var state = { calls: 0 };
+        (function () {
+            var captured = TNSAllocLog.new();
+            state.block = dispatch_block_create(0, function () {
+                state.calls += captured.hash > 0 ? 1 : 0;
+            });
+        })();
+        state.block();
+        state.block();
+        expect(state.calls).toBe(2);
+        settle(3, function () {
+            expect(deallocs()).toBe(0);
+            state.block();
+            expect(state.calls).toBe(3);
+            state.block = null;
+            settle(3, function () {
+                expect(deallocs()).toBe(1);
+                done();
+            });
+        });
+    });
+
+    // A plain JS object reaches native code as a DictionaryAdapter whose
+    // handle keeps the object alive, so the object outlives the adapter only
+    // if the adapter leaks.
+    function freshObjectState() {
+        var state = { weak: null };
+        state.answer = function () {
+            var object = { fresh: true };
+            state.weak = new WeakRef(object);
+            return object;
+        };
+        return state;
+    }
+
+    function expectCollected(state, done) {
+        settle(3, function () {
+            expect(state.weak).not.toBeNull();
+            expect(state.weak && state.weak.deref()).toBeUndefined();
+            done();
+        });
+    }
+
+    it("keeps a fresh plain object a JS copyWithZone answers while native code holds its copy", function (done) {
+        var state = freshObjectState();
+        var Klass = NSObject.extend({
+            copyWithZone: function () {
+                return state.answer();
+            }
+        }, { name: "NativeCallbackSelfCopyKeptPlainObject", protocols: [NSCopying] });
+        var keeper = TNSCopyKeeper.new();
+        keeper.keepCopyOf(Klass.new());
+        settle(3, function () {
+            expect(state.weak.deref() && state.weak.deref().fresh).toBe(true);
+            keeper.drop();
+            expectCollected(state, done);
+        });
+    });
+
+    it("frees the adapter for a fresh plain object a JS copyWithZone answers", function (done) {
+        var state = freshObjectState();
+        var Klass = NSObject.extend({
+            copyWithZone: function () {
+                return state.answer();
+            }
+        }, { name: "NativeCallbackSelfCopyPlainObject", protocols: [NSCopying] });
+        TNSOwnedReturns.copyAndDrop(Klass.new());
+        expectCollected(state, done);
+    });
+
+    it("frees the adapter for a fresh plain object a JS new-family method answers", function (done) {
+        var state = freshObjectState();
+        var Klass = TNSOwnedReturns.extend({
+            newChild: function () {
+                return state.answer();
+            }
+        }, { name: "NativeCallbackSelfNewPlainObject" });
+        TNSOwnedReturns.newChildAndDrop(Klass.new());
+        expectCollected(state, done);
+    });
+
+    it("frees the adapter for a fresh plain object a JS initializer answers", function (done) {
+        var state = freshObjectState();
+        var Klass = NSObject.extend({
+            init: function () {
+                return state.answer();
+            }
+        }, { name: "NativeCallbackSelfInitPlainObject" });
+        TNSOwnedReturns.allocInitAndDrop(Klass.class());
+        expectCollected(state, done);
+    });
+
+    function expectConstructedFreshObject(name, construct, done) {
+        var state = freshObjectState();
+        var Klass = NSObject.extend({
+            init: function () {
+                return state.answer();
+            }
+        }, { name: name });
+        (function () {
+            var result = construct(Klass);
+            expect(result !== undefined && result === state.weak.deref()).toBe(true);
+            expect(!!result && result.fresh === true).toBe(true);
+        })();
+        expectCollected(state, done);
+    }
+
+    it("constructs with new the fresh plain object a JS initializer answers", function (done) {
+        expectConstructedFreshObject("NativeCallbackSelfNewOperatorPlainObject", function (Klass) {
+            return new Klass();
+        }, done);
+    });
+
+    it("answers from alloc().init() the fresh plain object a JS initializer answers", function (done) {
+        expectConstructedFreshObject("NativeCallbackSelfAllocInitPlainObject", function (Klass) {
+            return Klass.alloc().init();
+        }, done);
+    });
+
+    it("answers from new() the fresh plain object a JS initializer answers", function (done) {
+        expectConstructedFreshObject("NativeCallbackSelfNewMethodPlainObject", function (Klass) {
+            return Klass.new();
+        }, done);
+    });
+
+    it("balances the adapter for a plain object a JS copyWithZone answers twice", function (done) {
+        var state = { weak: null };
+        (function () {
+            var object = { same: true };
+            state.weak = new WeakRef(object);
+            state.answer = object;
+        })();
+        var Klass = NSObject.extend({
+            copyWithZone: function () {
+                return state.answer;
+            }
+        }, { name: "NativeCallbackSelfCopySamePlainObject", protocols: [NSCopying] });
+        var keeper = TNSCopyKeeper.new();
+        expect(keeper.keepTwoCopiesOf(Klass.new())).toBe(true);
+        state.answer = null;
+        settle(3, function () {
+            expect(state.weak.deref() && state.weak.deref().same).toBe(true);
+            keeper.drop();
+            expectCollected(state, done);
+        });
+    });
 });

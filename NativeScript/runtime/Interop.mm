@@ -168,6 +168,50 @@ Local<Value> Interop::CallFunction(ObjCMethodCall& methodCall) {
   return Interop::CallFunctionInternal(methodCall);
 }
 
+bool Interop::ConsumesReceiver(SEL selector, bool isInitializer) {
+  return isInitializer || selector == @selector(awakeAfterUsingCoder:);
+}
+
+// -[NSKeyedUnarchiverDelegate unarchiver:didDecodeObject:] is the only SDK
+// method with an NS_RELEASES_ARGUMENT parameter; it also returns retained.
+static int ConsumedArgumentIndex(SEL selector) {
+  return selector == @selector(unarchiver:didDecodeObject:) ? 1 : -1;
+}
+
+bool Interop::ConsumesArgument(SEL selector, int index) {
+  return index >= 0 && index == ConsumedArgumentIndex(selector);
+}
+
+int Interop::ConsumedObjectArgumentIndex(SEL selector, const TypeEncoding* typeEncoding,
+                                         int paramsCount) {
+  int index = ConsumedArgumentIndex(selector);
+  if (index < 0 || index >= paramsCount) {
+    return -1;
+  }
+  for (int i = 0; i <= index; i++) {
+    typeEncoding = typeEncoding->next();
+  }
+  return IsObjectEncoding(typeEncoding) ? index : -1;
+}
+
+bool Interop::IsObjectEncoding(const TypeEncoding* typeEncoding) {
+  BinaryTypeEncodingType type = typeEncoding->type;
+  return type == BinaryTypeEncodingType::IdEncoding ||
+         type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
+         type == BinaryTypeEncodingType::InstanceTypeEncoding;
+}
+
+bool Interop::ReturnsRetained(SEL selector) { return ConsumesArgument(selector, 1); }
+
+// Balanced only while every owned result other than a consumed receiver
+// reaches here at +1, JS-implemented methods included: MethodCallback retains
+// what a JS implementation answers at +0, and for initializers anything but
+// the receiver. AllocatedForCall does not check that the result is the
+// receiver, so narrowing that retain makes this over-release.
+bool Interop::ReleasesCachedOwnedReturn(bool ownsReturnedObject, OwnedReturnReceiver receiver) {
+  return ownsReturnedObject && receiver != OwnedReturnReceiver::Consumed;
+}
+
 id Interop::CallInitializer(Local<Context> context, const MethodMeta* methodMeta, id target,
                             Class clazz, V8Args& args) {
   const TypeEncoding* typeEncoding = methodMeta->encodings()->first();
@@ -1029,8 +1073,11 @@ Local<Value> Interop::GetResultByType(Local<Context> context, BaseDataWrapper* t
 Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* typeEncoding,
                                 BaseCall* call, bool marshalToPrimitive, Local<Object> parentStruct,
                                 bool isStructMember, bool ownsReturnedObject, bool returnsUnmanaged,
-                                bool isInitializer, bool releaseCachedOwnedReturn) {
+                                bool isInitializer, OwnedReturnReceiver ownedReturnReceiver) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  // Dropped only once the runtime holds whatever reference it keeps.
+  bool releasesOwnedReturn =
+      ReleasesCachedOwnedReturn(ownsReturnedObject || isInitializer, ownedReturnReceiver);
 
   if (returnsUnmanaged) {
     uint8_t* data = call->GetResult<uint8_t*>();
@@ -1171,6 +1218,12 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     if (block->descriptor == &JSBlock::kJSBlockDescriptor) {
       MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
       Local<v8::Function> callback = wrapper->callback_->Get(isolate).As<v8::Function>();
+      // The last reference runs the dispose helper right here, under the
+      // Locker this thread holds, which frees `wrapper`; `callback` is a
+      // handle of its own and stays usable.
+      if (releasesOwnedReturn) {
+        Block_release(block);
+      }
       return callback;
     }
 
@@ -1182,6 +1235,9 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     // just bumps the refcount when it is already a heap/global block); the
     // matching Block_release runs in ObjectManager::DisposeValue.
     JSBlock* ownedBlock = reinterpret_cast<JSBlock*>(Block_copy(block));
+    if (releasesOwnedReturn) {
+      Block_release(block);
+    }
     BlockWrapper* blockWrapper = new BlockWrapper(ownedBlock, typeEncoding, true);
     Local<External> ext = External::New(isolate, blockWrapper, v8::kExternalPointerTypeTagDefault);
     Local<v8::Function> callback;
@@ -1315,23 +1371,34 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
       return Null(isolate);
     }
 
+    auto releaseSurplusOwnedReturn = [&]() {
+      if (releasesOwnedReturn) {
+        [result release];
+      }
+    };
+
     if (marshalToPrimitive && result == [NSNull null]) {
+      releaseSurplusOwnedReturn();
       return Null(isolate);
     }
 
     if ([result isKindOfClass:[@YES class]]) {
-      return v8::Boolean::New(isolate, [result boolValue]);
+      Local<Value> boolean = v8::Boolean::New(isolate, [result boolValue]);
+      releaseSurplusOwnedReturn();
+      return boolean;
     }
 
     if (marshalToPrimitive && [result isKindOfClass:[NSDate class]]) {
       double time = [result timeIntervalSince1970] * 1000.0;
       Local<Value> date;
       if (Date::New(context, time).ToLocal(&date)) {
+        releaseSurplusOwnedReturn();
         return date;
       }
 
       std::ostringstream errorStream;
       errorStream << "Unable to convert " << [result description] << " to a Date object";
+      releaseSurplusOwnedReturn();
       std::string errorMessage = errorStream.str();
       Local<Value> error = Exception::Error(tns::ToV8String(isolate, errorMessage));
       isolate->ThrowException(error);
@@ -1349,7 +1416,9 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
       if (marshalToPrimitive) {
         // Convert NSString instances to javascript strings for all instance method calls
-        return tns::ToV8String(isolate, result);
+        Local<Value> string = tns::ToV8String(isolate, result);
+        releaseSurplusOwnedReturn();
+        return string;
       }
     }
 
@@ -1357,6 +1426,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         ![result isKindOfClass:[NSDecimalNumber class]]) {
       // Convert NSNumber instances to javascript numbers for all instance method calls
       double value = [result doubleValue];
+      releaseSurplusOwnedReturn();
       return Number::New(isolate, value);
     }
 
@@ -1364,14 +1434,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     auto poInstance = ArgConverter::FindCachedInstance(isolate, cache, result);
     if (poInstance != nullptr) {
       Local<Value> cached = poInstance->Get(isolate);
-      // The Instances entry holds its own reference, so a returned +1 is
-      // surplus. Only class methods and C functions qualify: an instance
-      // method can hand back its receiver without a net retain (initializers,
-      // NS_REPLACES_RECEIVER) or come from a JS implementation, which returns
-      // at +0.
-      if (ownsReturnedObject && releaseCachedOwnedReturn) {
-        [result release];
-      }
+      releaseSurplusOwnedReturn();
       return cached;
     }
 
@@ -1830,6 +1893,14 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
   Interop::SetFFIParams(methodCall.context_, methodCall.typeEncoding_, &call, argsCount,
                         initialParameterIndex, methodCall.args_);
 
+  if (initialParameterIndex > 1) {
+    int consumed = ConsumedObjectArgumentIndex(methodCall.selector_, methodCall.typeEncoding_,
+                                               argsCount - initialParameterIndex);
+    if (consumed >= 0) {
+      [*static_cast<id*>(call.ArgumentBuffer(initialParameterIndex + consumed)) retain];
+    }
+  }
+
   void* errorRef = nullptr;
   if (methodCall.provideErrorOutParameter_) {
     void* dest = call.ArgumentBuffer(argsCount);
@@ -1937,10 +2008,21 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
     }
   }
 
-  Local<Value> result = Interop::GetResult(
-      methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive, Local<Object>(),
-      false, methodCall.ownsReturnedObject_, methodCall.returnsUnmanaged_,
-      methodCall.isInitializer_, !isInstanceMethod);
+  OwnedReturnReceiver receiver = OwnedReturnReceiver::None;
+  if (isInstanceMethod) {
+    if (!ConsumesReceiver(methodCall.selector_, methodCall.isInitializer_)) {
+      receiver = OwnedReturnReceiver::Kept;
+    } else if (methodCall.receiverAllocatedForCall_) {
+      receiver = OwnedReturnReceiver::AllocatedForCall;
+    } else {
+      receiver = OwnedReturnReceiver::Consumed;
+    }
+  }
+
+  Local<Value> result =
+      Interop::GetResult(methodCall.context_, methodCall.typeEncoding_, &call, marshalToPrimitive,
+                         Local<Object>(), false, methodCall.ownsReturnedObject_,
+                         methodCall.returnsUnmanaged_, methodCall.isInitializer_, receiver);
 
   // Owned returns, initializers and class factory methods hand out objects JS
   // most likely holds the last reference to. Instance getters do not: their

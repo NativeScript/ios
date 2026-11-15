@@ -13,23 +13,38 @@ namespace tns {
 
 class ArgConverter;
 
+// What native callers of a JS-implemented method own of the object it answers.
+enum class NativeReturnOwnership : uint8_t {
+  Unowned,
+  // A +1; the receiver stays the caller's.
+  Owned,
+  // A +1 in place of the receiver, whose reference the caller passed in.
+  ReplacesReceiver,
+};
+
 struct MethodCallbackWrapper {
  public:
-  MethodCallbackWrapper(v8::Isolate* isolate,
-                        std::shared_ptr<v8::Persistent<v8::Value>> callback,
-                        const uint8_t initialParamIndex,
-                        const uint8_t paramsCount,
-                        const TypeEncoding* typeEncoding)
+  MethodCallbackWrapper(
+      v8::Isolate* isolate, std::shared_ptr<v8::Persistent<v8::Value>> callback,
+      const uint8_t initialParamIndex, const uint8_t paramsCount,
+      const TypeEncoding* typeEncoding,
+      NativeReturnOwnership returnOwnership = NativeReturnOwnership::Unowned,
+      int8_t consumedArgumentIndex = -1)
       : isolateWrapper_(isolate),
         callback_(callback),
         initialParamIndex_(initialParamIndex),
         paramsCount_(paramsCount),
-        typeEncoding_(typeEncoding) {}
+        typeEncoding_(typeEncoding),
+        returnOwnership_(returnOwnership),
+        consumedArgumentIndex_(consumedArgumentIndex) {}
   IsolateWrapper isolateWrapper_;
   std::shared_ptr<v8::Persistent<v8::Value>> callback_;
   const uint8_t initialParamIndex_;
   const uint8_t paramsCount_;
   const TypeEncoding* typeEncoding_;
+  const NativeReturnOwnership returnOwnership_;
+  // Interop::ConsumedObjectArgumentIndex of the implemented method.
+  const int8_t consumedArgumentIndex_;
 };
 
 class ArgConverter {
@@ -75,9 +90,24 @@ class ArgConverter {
   static const ProtocolMeta* FindProtocolMeta(Protocol* protocol);
   static void MethodCallback(ffi_cif* cif, void* retValue, void** argValues,
                              void* userData);
+  // For a JS implementation of the instance method `selector`; `meta` is null
+  // for methods the metadata does not describe, which are classified by
+  // their selector's method family.
+  static NativeReturnOwnership ReturnOwnership(SEL selector,
+                                               const MethodMeta* meta);
+  // Gives the native caller of a JS implementation the reference it owns of
+  // the object SetValue wrote into retValue; `writtenUnowned` is what
+  // SetValue answered. `consumedArgument`, an argument the method took over,
+  // already carries that reference when it is the result.
+  static void RetainOwnedResult(NativeReturnOwnership ownership,
+                                void** argValues, void* retValue,
+                                bool writtenUnowned, id consumedArgument = nil);
   // returnSize is the ABI size of the return slot (cif->rtype->size); an
-  // empty, null or undefined value zeroes all of it.
-  static void SetValue(v8::Local<v8::Context> context, void* retValue,
+  // empty, null or undefined value zeroes all of it. Answers whether it wrote
+  // an object the caller does not own: a wrapped object, or a string made
+  // for an id or interface slot. A plain JS object is written as a new
+  // DictionaryAdapter the caller owns.
+  static bool SetValue(v8::Local<v8::Context> context, void* retValue,
                        size_t returnSize, v8::Local<v8::Value> value,
                        const TypeEncoding* typeEncoding);
   // Returns (lazily creating) the per-isolate interop.escapeException brand

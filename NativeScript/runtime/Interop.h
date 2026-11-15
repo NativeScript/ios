@@ -15,6 +15,21 @@ namespace tns {
 typedef void (*FFIMethodCallback)(ffi_cif* cif, void* retValue,
                                   void** argValues, void* userData);
 
+// The receiver of a call that returns an object, as far as releasing an owned
+// result that already has a wrapper is concerned.
+enum class OwnedReturnReceiver : uint8_t {
+  // A class method or a C function.
+  None,
+  // An instance method that leaves its receiver to the caller.
+  Kept,
+  // An initializer or NS_REPLACES_RECEIVER method sent to a receiver that
+  // existed before the call.
+  Consumed,
+  // An initializer or NS_REPLACES_RECEIVER method sent to a receiver the
+  // runtime allocated for this call.
+  AllocatedForCall,
+};
+
 struct MethodCall {
   MethodCall(v8::Local<v8::Context> context, bool isPrimitiveFunction,
              void* functionPointer, const TypeEncoding* typeEncoding,
@@ -50,6 +65,7 @@ struct MethodCall {
   bool ownsReturnedObject_;
   bool returnsUnmanaged_;
   bool isInitializer_;
+  bool receiverAllocatedForCall_ = false;
 };
 
 struct CMethodCall : MethodCall {
@@ -63,7 +79,8 @@ struct CMethodCall : MethodCall {
 
 struct ObjCMethodCall : public MethodCall {
   ObjCMethodCall(v8::Local<v8::Context> context, const MethodMeta* meta,
-                 id target, Class clazz, V8Args& args, bool callSuper)
+                 id target, Class clazz, V8Args& args, bool callSuper,
+                 bool receiverAllocatedForCall = false)
       : MethodCall(context, false,
                    callSuper ? (void*)objc_msgSendSuper : (void*)objc_msgSend,
                    meta->encodings()->first(), args, target, clazz,
@@ -71,7 +88,9 @@ struct ObjCMethodCall : public MethodCall {
                    meta->hasErrorOutParameter() &&
                        args.Length() < meta->encodings()->count - 1,
                    meta->ownsReturnedCocoaObject(), false,
-                   meta->isInitializer()) {}
+                   meta->isInitializer()) {
+    receiverAllocatedForCall_ = receiverAllocatedForCall;
+  }
 };
 
 class Interop {
@@ -96,19 +115,46 @@ class Interop {
                             Class clazz, V8Args& args);
   static v8::Local<v8::Value> CallFunction(ObjCMethodCall& methodCall);
   static v8::Local<v8::Value> CallFunction(CMethodCall& methodCall);
+  // Whether a method answers in place of its receiver, consuming the caller's
+  // reference to it: the init family, and NS_REPLACES_RECEIVER methods, which
+  // the metadata does not record.
+  static bool ConsumesReceiver(SEL selector, bool isInitializer);
+  // Whether a method takes over the caller's reference to its argument at
+  // `index`, counted from the first after the selector: NS_RELEASES_ARGUMENT
+  // parameters, which the metadata does not record.
+  static bool ConsumesArgument(SEL selector, int index);
+  // The index ConsumesArgument names for `selector` when that parameter is an
+  // object, else -1. `typeEncoding` is the signature's return type, followed
+  // by its `paramsCount` parameter types.
+  static int ConsumedObjectArgumentIndex(SEL selector,
+                                         const TypeEncoding* typeEncoding,
+                                         int paramsCount);
+  static bool IsObjectEncoding(const TypeEncoding* typeEncoding);
+  // Whether a method outside the copy, mutableCopy and new families answers
+  // an object its caller owns (NS_RETURNS_RETAINED), for implementations the
+  // metadata does not describe.
+  static bool ReturnsRetained(SEL selector);
+  // Whether the +1 of an owned object or block result is the caller's to
+  // drop once the runtime holds what it keeps: an Instances entry and a
+  // native block's wrapper hold references of their own, and a primitive or
+  // the JS function a block was made for keeps none.
+  static bool ReleasesCachedOwnedReturn(bool ownsReturnedObject,
+                                        OwnedReturnReceiver receiver);
   static v8::Local<v8::Value> GetResultByType(
       v8::Local<v8::Context> context, BaseDataWrapper* typeWrapper,
       BaseCall* call,
       v8::Local<v8::Object> parentStruct = v8::Local<v8::Object>());
   // A non-empty `parentStruct` makes a struct-typed result a view into the
-  // parent's buffer (`call` points at the field) instead of a copy.
+  // parent's buffer (`call` points at the field) instead of a copy. The
+  // default `ownedReturnReceiver` never releases an owned result found already
+  // wrapped.
   static v8::Local<v8::Value> GetResult(
       v8::Local<v8::Context> context, const TypeEncoding* typeEncoding,
       BaseCall* call, bool marshalToPrimitive,
       v8::Local<v8::Object> parentStruct = v8::Local<v8::Object>(),
       bool isStructMember = false, bool ownsReturnedObject = false,
       bool returnsUnmanaged = false, bool isInitializer = false,
-      bool releaseCachedOwnedReturn = false);
+      OwnedReturnReceiver ownedReturnReceiver = OwnedReturnReceiver::Consumed);
   static void SetStructPropertyValue(v8::Local<v8::Context> context,
                                      StructWrapper* wrapper,
                                      const StructField& field,

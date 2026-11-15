@@ -29,3 +29,228 @@
 }
 
 @end
+
+@implementation TNSOwnedReturns
+
+- (id)newChild {
+    return [[TNSAllocLog alloc] init];
+}
+
++ (void)copyAndDrop:(id)object {
+    id result = [object copy];
+    (void)result;
+}
+
++ (void)mutableCopyAndDrop:(id)object {
+    id result = [object mutableCopy];
+    (void)result;
+}
+
++ (void)newChildAndDrop:(id)object {
+    id result = [object newChild];
+    (void)result;
+}
+
++ (void)awakeAndDrop:(id)object {
+    NSCoder* coder = nil;
+    id result = [object awakeAfterUsingCoder:coder];
+    (void)result;
+}
+
+- (id)newItem {
+    return [[TNSAllocLog alloc] init];
+}
+
++ (void)newItemAndDrop:(id)object {
+    id result = [object newItem];
+    (void)result;
+}
+
++ (id)readNewItemOf:(id)object {
+    return [object newItem];
+}
+
++ (void)allocInitAndDrop:(Class)cls {
+    id result = [[cls alloc] init];
+    (void)result;
+}
+
+@end
+
+@implementation TNSCopyKeeper {
+    NSMutableArray* _copies;
+}
+
+- (void)keepCopyOf:(id)object {
+    if (_copies == nil) {
+        _copies = [NSMutableArray array];
+    }
+    [_copies addObject:[object copy]];
+}
+
+- (BOOL)keepTwoCopiesOf:(id)object {
+    [self keepCopyOf:object];
+    [self keepCopyOf:object];
+    return _copies[_copies.count - 1] == _copies[_copies.count - 2];
+}
+
+- (void)drop {
+    _copies = nil;
+}
+
+@end
+
+@implementation TNSOwnedBlocks {
+    NSInteger (^_stored)(void);
+}
+
+- (NSInteger (^)(void))retainedBlockAnswering:(NSInteger)value {
+    return [self blockAnswering:value];
+}
+
+- (NSInteger (^)(void))blockAnswering:(NSInteger)value {
+    TNSAllocLog* captured = [[TNSAllocLog alloc] init];
+    return ^NSInteger {
+        (void)captured;
+        return value;
+    };
+}
+
+- (NSInteger (^)(void))retainedBlockFrom:(NSInteger (^)(void))block {
+    return block;
+}
+
+- (NSInteger (^)(void))blockFrom:(NSInteger (^)(void))block {
+    return block;
+}
+
++ (NSInteger)callBlock:(NSInteger (^)(void))block {
+    return block();
+}
+
+- (void)storeBlock:(NSInteger (^)(void))block {
+    _stored = block;
+}
+
+- (NSInteger (^)(void))retainedStoredBlock {
+    NSInteger (^block)(void) = _stored;
+    _stored = nil;
+    return block;
+}
+
+@end
+
+// Foundation answers tagged pointers for dates in the range JS can represent.
+@interface TNSHeapDate : NSDate
+@end
+
+@implementation TNSHeapDate {
+    NSTimeInterval _interval;
+}
+
+// NSDate's initializers end in the one this class would have to override, so
+// the instance is used uninitialized, which NSObject allows.
++ (instancetype)heapDateWithInterval:(NSTimeInterval)interval {
+    TNSHeapDate* date = [self alloc];
+    date->_interval = interval;
+    return date;
+}
+
+- (NSTimeInterval)timeIntervalSinceReferenceDate {
+    return _interval;
+}
+
+@end
+
+@implementation TNSOwnedPrimitives {
+    NSArray* _objects;
+}
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        NSString* string = [[NSMutableString stringWithString:@"an owned string long enough to live on the heap"] copy];
+        _objects = @[ string, [NSNumber numberWithDouble:M_PI], [TNSHeapDate heapDateWithInterval:700000000.5] ];
+    }
+    return self;
+}
+
+- (id)newObjectAt:(NSUInteger)index {
+    return _objects[index];
+}
+
+- (id)objectAt:(NSUInteger)index {
+    return _objects[index];
+}
+
+- (NSUInteger)retainCountAt:(NSUInteger)index {
+    return CFGetRetainCount((__bridge CFTypeRef)_objects[index]);
+}
+
+- (BOOL)isTaggedPointerAt:(NSUInteger)index {
+    uintptr_t bits = (uintptr_t)(__bridge void*)_objects[index];
+    // The ObjC runtime's OBJC_MSB_TAGGED_POINTERS condition (objc-internal.h).
+#if (TARGET_OS_OSX || TARGET_OS_MACCATALYST) && __x86_64__
+    return (bits & 1) != 0;
+#else
+    return (bits >> 63) != 0;
+#endif
+}
+
+@end
+
+id TNSOwnedPrimitivesRetainedObjectAt(TNSOwnedPrimitives* holder, NSUInteger index) {
+    return [holder objectAt:index];
+}
+
+id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index) {
+    return [holder objectAt:index];
+}
+
+@implementation TNSSwizzledOwnedReturns
+
+- (id)newChild {
+    return [[TNSAllocLog alloc] init];
+}
+
+- (id)newItem {
+    return [[TNSAllocLog alloc] init];
+}
+
+@end
+
+@implementation TNSCodingAllocLog
+
++ (BOOL)supportsSecureCoding {
+    return YES;
+}
+
+- (instancetype)initWithCoder:(NSCoder*)coder {
+    return [super init];
+}
+
+- (void)encodeWithCoder:(NSCoder*)coder {
+}
+
+@end
+
+@implementation TNSDecodeDelegate
+
+- (id)unarchiver:(NSKeyedUnarchiver*)unarchiver didDecodeObject:(id)object {
+    return self.substitutes ? [[TNSAllocLog alloc] init] : object;
+}
+
+@end
+
+@implementation TNSInitCallsHook
+
+- (instancetype)init {
+    self = [super init];
+    [self initHook];
+    return self;
+}
+
+- (void)initHook {
+}
+
+@end

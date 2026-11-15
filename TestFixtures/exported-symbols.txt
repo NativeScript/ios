@@ -150,6 +150,8 @@ _TNSGetOutput
 _TNSLog
 _TNSMutableObjectGet
 _TNSObjectGet
+_TNSOwnedPrimitivesObjectAt
+_TNSOwnedPrimitivesRetainedObjectAt
 _TNSSaveResults
 _TNSStructFunctionConflict
 _TNSStructVarConflict
