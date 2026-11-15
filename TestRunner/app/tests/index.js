@@ -138,6 +138,7 @@ require("./NsInteropTests");
 require("./GCFinalizerTests");
 require("./NativeCallbackSelfTests");
 require("./BlockCacheRaceTests");
+require("./FunctionReferenceBlockTests");
 require("./WorkerConcurrentStartupTests");
 require("./WorkerOptionsTests");
 require("./WorkerResourceLimitsTests");

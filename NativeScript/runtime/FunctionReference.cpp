@@ -62,11 +62,19 @@ void FunctionReference::FunctionReferenceConstructorCallback(
   tns::Assert(info[0]->IsFunction(), isolate);
 
   Local<v8::Function> arg = info[0].As<v8::Function>();
+  info.GetReturnValue().Set(arg);
+
+  // The existing wrapper may already hold the trampoline native code calls.
+  BaseDataWrapper* existing = tns::GetValue(isolate, arg);
+  if (existing != nullptr &&
+      existing->Type() == WrapperType::FunctionReference) {
+    return;
+  }
+
   std::shared_ptr<Persistent<v8::Value>> poArg =
       ObjectManager::Register(context, arg);
   FunctionReferenceWrapper* wrapper = new FunctionReferenceWrapper(poArg);
   tns::SetValue(isolate, arg, wrapper);
-  info.GetReturnValue().Set(arg);
 }
 
 }  // namespace tns
