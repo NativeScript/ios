@@ -505,34 +505,77 @@ describe("JS-implemented native property accessors", function () {
         });
 
         // TNSSwizzleMiddle overrides every member natively, between the
-        // replaced superclass and the replaced leaf, whose originals are
-        // native functions.
+        // replaced superclass and the replaced leaf. The leaf's originals run
+        // the superclass's native members, not the middle class's overrides.
         describe("the superclass first, with a native override in between", function () {
             var install = installer(function () {
                 return { base: replaceMembers(TNSSwizzleMiddleBase, "B", 1), leaf: replaceMembers(TNSSwizzleMiddleLeaf, "L", 3) };
             });
 
-            it("reach the middle class's native method", function () {
+            it("reach the superclass's native method", function () {
                 var originals = install();
                 var leaf = TNSSwizzleMiddleLeaf.new();
-                expect(traced(function () { return leaf.describeValue(1); })).toEqual({ result: "L(middle 1)", trace: ["L"] });
-                expect(traced(function () { return originals.base.describe.call(leaf, 2); })).toEqual({ result: "middle 2", trace: [] });
+                expect(traced(function () { return leaf.describeValue(1); })).toEqual({ result: "L(base 1)", trace: ["L"] });
+                expect(traced(function () { return originals.base.describe.call(leaf, 2); })).toEqual({ result: "base 2", trace: [] });
             });
 
-            it("reach the middle class's native accessors of an object property", function () {
+            it("reach the superclass's native accessors of an object property", function () {
                 install();
                 var leaf = TNSSwizzleMiddleLeaf.new();
                 leaf.objectValue = "x";
-                expect(leaf.storedObjectValue()).toBe("L(x) via middle");
-                expect(leaf.valueForKey("objectValue")).toBe("L(middle L(x) via middle)");
+                expect(leaf.storedObjectValue()).toBe("L(x)");
+                expect(leaf.valueForKey("objectValue")).toBe("L(L(x))");
             });
 
-            it("reach the middle class's native accessors of a scalar property", function () {
+            it("reach the superclass's native accessors of a scalar property", function () {
                 install();
                 var leaf = TNSSwizzleMiddleLeaf.new();
                 leaf.scalarValue = 5;
-                expect(leaf.storedScalarValue()).toBe(159);
-                expect(leaf.valueForKey("scalarValue")).toBe(11593);
+                expect(leaf.storedScalarValue()).toBe(53);
+                expect(leaf.valueForKey("scalarValue")).toBe(533);
+            });
+        });
+
+        // TNSSwizzleSuperMiddle overrides every member natively and calls the
+        // superclass's, which is replaced; so is the leaf below it.
+        describe("the superclass first, with a native override calling super in between", function () {
+            var install = installer(function () {
+                return { base: replaceMembers(TNSSwizzleSuperBase, "B", 1), leaf: replaceMembers(TNSSwizzleSuperLeaf, "L", 3) };
+            });
+
+            it("reach the superclass's native method from the leaf", function () {
+                var originals = install();
+                var leaf = TNSSwizzleSuperLeaf.new();
+                expect(traced(function () { return leaf.describeValue(1); })).toEqual({ result: "L(base 1)", trace: ["L"] });
+                expect(traced(function () { return originals.base.describe.call(leaf, 2); })).toEqual({ result: "base 2", trace: [] });
+            });
+
+            it("reach the superclass's native accessors of an object property", function () {
+                install();
+                var leaf = TNSSwizzleSuperLeaf.new();
+                expect(traced(function () { leaf.objectValue = "x"; return leaf.storedObjectValue(); })).toEqual({ result: "L(x)", trace: ["L set"] });
+                expect(traced(function () { return leaf.valueForKey("objectValue"); })).toEqual({ result: "L(L(x))", trace: ["L get"] });
+                var middle = TNSSwizzleSuperMiddle.new();
+                expect(traced(function () { middle.setValueForKey("y", "objectValue"); return middle.storedObjectValue(); }))
+                    .toEqual({ result: "B(y via middle)", trace: ["B set"] });
+                expect(traced(function () { return middle.valueForKey("objectValue"); })).toEqual({ result: "middle B(B(y via middle))", trace: ["B get"] });
+                var base = TNSSwizzleSuperBase.new();
+                base.objectValue = "z";
+                expect([base.storedObjectValue(), base.valueForKey("objectValue")]).toEqual(["B(z)", "B(B(z))"]);
+            });
+
+            it("reach the superclass's native accessors of a scalar property", function () {
+                install();
+                var leaf = TNSSwizzleSuperLeaf.new();
+                expect(traced(function () { leaf.scalarValue = 5; return leaf.storedScalarValue(); })).toEqual({ result: 53, trace: ["L set"] });
+                expect(traced(function () { return leaf.valueForKey("scalarValue"); })).toEqual({ result: 533, trace: ["L get"] });
+                var middle = TNSSwizzleSuperMiddle.new();
+                expect(traced(function () { middle.setValueForKey(5, "scalarValue"); return middle.storedScalarValue(); }))
+                    .toEqual({ result: 151, trace: ["B set"] });
+                expect(traced(function () { return middle.valueForKey("scalarValue"); })).toEqual({ result: 2511, trace: ["B get"] });
+                var base = TNSSwizzleSuperBase.new();
+                base.scalarValue = 5;
+                expect([base.storedScalarValue(), base.valueForKey("scalarValue")]).toEqual([51, 511]);
             });
         });
     });

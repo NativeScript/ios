@@ -233,17 +233,52 @@ void functionThrowsException() {
   _middleScalar = value * 3;
 }
 
+@end
+
+@implementation TNSSwizzleMiddleLeaf
+@end
+
+@implementation TNSSwizzleSuperBase
+
+- (id)describeValue:(int)value {
+  return [NSString stringWithFormat:@"base %d", value];
+}
+
 - (id)storedObjectValue {
-  return _middleObject;
+  return _objectValue;
 }
 
 - (NSInteger)storedScalarValue {
-  return _middleScalar;
+  return _scalarValue;
 }
 
 @end
 
-@implementation TNSSwizzleMiddleLeaf
+@implementation TNSSwizzleSuperMiddle
+
+- (id)describeValue:(int)value {
+  return [NSString stringWithFormat:@"middle %@", [super describeValue:value]];
+}
+
+- (id)objectValue {
+  return [NSString stringWithFormat:@"middle %@", [super objectValue]];
+}
+
+- (void)setObjectValue:(id)value {
+  [super setObjectValue:[NSString stringWithFormat:@"%@ via middle", value]];
+}
+
+- (NSInteger)scalarValue {
+  return [super scalarValue] + 1000;
+}
+
+- (void)setScalarValue:(NSInteger)value {
+  [super setScalarValue:value * 3];
+}
+
+@end
+
+@implementation TNSSwizzleSuperLeaf
 @end
 
 static TNSLinkedNode sharedLinkedNodes[2] = {{1, &sharedLinkedNodes[1]}, {2, NULL}};

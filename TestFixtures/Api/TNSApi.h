@@ -200,6 +200,27 @@ typedef NSError* _Nullable TNSNullableError;
 - (NSString*)describeValue:(int)value;
 @end
 
+@interface TNSSwizzleSuperBase : NSObject
+@property(nonatomic, strong) id objectValue;
+@property(nonatomic) NSInteger scalarValue;
+- (id)describeValue:(int)value;
+- (id)storedObjectValue;
+- (NSInteger)storedScalarValue;
+@end
+
+// Overrides every member of its superclass natively, calling it.
+@interface TNSSwizzleSuperMiddle : TNSSwizzleSuperBase
+@end
+
+@interface TNSSwizzleSuperLeaf : TNSSwizzleSuperMiddle
+@end
+
+@interface TNSSwizzleSuperLeaf (Redeclared)
+@property(nonatomic, strong) NSString* objectValue;
+@property(nonatomic) TNSEnums scalarValue;
+- (NSString*)describeValue:(int)value;
+@end
+
 typedef struct TNSLinkedNode {
   int value;
   struct TNSLinkedNode* next;

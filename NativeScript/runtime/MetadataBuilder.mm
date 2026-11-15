@@ -1368,26 +1368,21 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
 
 namespace {
 
-// The native implementation `klass` would run for `selector` had nothing been
-// replaced from JS. The class that provides `selector` keeps its native one
-// under `alias` once it has been replaced.
-IMP NativeImplementation(Class klass, SEL selector, SEL alias) {
-  for (Class owner = klass; owner != nil; owner = class_getSuperclass(owner)) {
-    if (ClassBuilder::ImplementsItself(owner, selector)) {
-      SEL native = ClassBuilder::ImplementsItself(owner, alias) ? alias : selector;
-      return method_getImplementation(class_getInstanceMethod(owner, native));
-    }
-  }
-  return nullptr;
-}
-
-// The native implementation stays reachable under the swizzled-prefixed
-// selector that native calls from JS prefer. An alias `klass` already has is
-// kept, so it names the implementation from before the first replacement.
+// The implementation `klass` answered `selector` with stays reachable under
+// the swizzled-prefixed selector that native calls from JS prefer; an alias
+// `klass` already has is kept, so it names the one from before the first
+// replacement. A class that inherits `selector` and already responds to the
+// alias, because an ancestor was replaced, gets none of its own: an own alias
+// naming a native override that calls super would send the replaced
+// ancestor's original back to that override.
 void ReplaceKeepingOriginal(Class klass, SEL selector, const char* selectorName, IMP imp,
                             const char* types) {
   SEL alias = sel_registerName((Constants::SwizzledPrefix + selectorName).c_str());
-  IMP original = NativeImplementation(klass, selector, alias);
+  IMP original = nullptr;
+  if (ClassBuilder::ImplementsItself(klass, selector) || !class_respondsToSelector(klass, alias)) {
+    Method method = class_getInstanceMethod(klass, selector);
+    original = method != nullptr ? method_getImplementation(method) : nullptr;
+  }
   class_replaceMethod(klass, selector, imp, types);
   if (original != nullptr) {
     class_addMethod(klass, alias, original, types);
