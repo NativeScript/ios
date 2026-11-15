@@ -137,6 +137,7 @@ require("./NsUrlTests");
 require("./NsInteropTests");
 require("./GCFinalizerTests");
 require("./NativeCallbackSelfTests");
+require("./JSAccessorEncodingTests");
 require("./BlockCacheRaceTests");
 require("./WorkerConcurrentStartupTests");
 require("./WorkerOptionsTests");

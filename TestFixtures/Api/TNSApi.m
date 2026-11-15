@@ -106,3 +106,25 @@ void functionThrowsException() {
 }
 
 @end
+
+@implementation TNSAccessorTypes
+@end
+
+@implementation TNSAccessorSwizzleBase
+@end
+
+@implementation TNSAccessorSwizzleDerived {
+  double _derivedDouble;
+  BOOL _derivedBool;
+}
+@dynamic doubleProperty, boolProperty;
+
+- (void)setDoubleProperty:(double)value {
+  _derivedDouble = value;
+}
+
+- (void)setBoolProperty:(BOOL)value {
+  _derivedBool = value;
+}
+
+@end

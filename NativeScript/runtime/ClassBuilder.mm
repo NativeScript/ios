@@ -435,7 +435,7 @@ void ClassBuilder::ExposeDynamicMembers(v8::Local<v8::Context> context, Class ex
                                      implementationObject);
 }
 
-std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding) {
+std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding, bool* encodable) {
   BinaryTypeEncodingType type = typeEncoding->type;
   switch (type) {
     case BinaryTypeEncodingType::VoidEncoding: {
@@ -505,6 +505,10 @@ std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding) {
     case BinaryTypeEncodingType::StructDeclarationReference: {
       const char* structName = typeEncoding->details.declarationReference.name.valuePtr();
       const Meta* meta = ArgConverter::GetMeta(structName);
+      if (encodable != nullptr && (meta == nullptr || meta->type() != MetaType::Struct)) {
+        *encodable = false;
+        return "";
+      }
       tns::Assert(meta != nullptr && meta->type() == MetaType::Struct);
       const StructMeta* structMeta = static_cast<const StructMeta*>(meta);
       const TypeEncoding* fieldEncoding = structMeta->fieldsEncodings()->first();
@@ -512,7 +516,7 @@ std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding) {
       std::stringstream ss;
       ss << "{" << structName << "=";
       for (int i = 0; i < structMeta->fieldsCount(); i++) {
-        ss << GetTypeEncoding(fieldEncoding);
+        ss << GetTypeEncoding(fieldEncoding, encodable);
         fieldEncoding = fieldEncoding->next();
       }
       ss << "}";
@@ -522,14 +526,14 @@ std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding) {
       std::stringstream ss;
       ss << "^";
       const TypeEncoding* innerType = typeEncoding->details.pointer.getInnerType();
-      ss << GetTypeEncoding(innerType);
+      ss << GetTypeEncoding(innerType, encodable);
       return ss.str();
     }
     case BinaryTypeEncodingType::ConstantArrayEncoding: {
       const TypeEncoding* innerType = typeEncoding->details.constantArray.getInnerType();
       std::stringstream ss;
       ss << "[";
-      ss << typeEncoding->details.constantArray.size << GetTypeEncoding(innerType);
+      ss << typeEncoding->details.constantArray.size << GetTypeEncoding(innerType, encodable);
       ss << "]";
       return ss.str();
     }
@@ -537,8 +541,11 @@ std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding) {
       const TypeEncoding* innerType = typeEncoding->details.incompleteArray.getInnerType();
       std::stringstream ss;
       ss << "^";
-      ss << GetTypeEncoding(innerType);
+      ss << GetTypeEncoding(innerType, encodable);
       return ss.str();
+    }
+    case BinaryTypeEncodingType::FunctionPointerEncoding: {
+      return "^?";
     }
     case BinaryTypeEncodingType::ProtocolEncoding:
     case BinaryTypeEncodingType::InterfaceDeclarationReference:
@@ -549,22 +556,34 @@ std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding) {
 
     default:
       // TODO: Handle the other possible types
+      if (encodable != nullptr) {
+        *encodable = false;
+        return "";
+      }
       tns::Assert(false);
       return "";
   }
 }
 
-std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding, int argsCount) {
+std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding, int argsCount,
+                                          bool* encodable) {
   std::stringstream compilerEncoding;
-  compilerEncoding << GetTypeEncoding(typeEncoding);
+  compilerEncoding << GetTypeEncoding(typeEncoding, encodable);
   compilerEncoding << "@:";  // id self, SEL _cmd
 
   for (int i = 0; i < argsCount; i++) {
     typeEncoding = typeEncoding->next();
-    compilerEncoding << GetTypeEncoding(typeEncoding);
+    compilerEncoding << GetTypeEncoding(typeEncoding, encodable);
   }
 
   return compilerEncoding.str();
+}
+
+std::string ClassBuilder::GetAccessorTypeEncoding(const TypeEncoding* typeEncoding, int argsCount,
+                                                  const char* fallback) {
+  bool encodable = true;
+  std::string encoding = GetTypeEncoding(typeEncoding, argsCount, &encodable);
+  return encodable ? encoding : fallback;
 }
 
 BinaryTypeEncodingType ClassBuilder::GetTypeEncodingType(Isolate* isolate, Local<Value> value) {
@@ -950,8 +969,9 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
       };
       const TypeEncoding* typeEncoding = propertyMeta->getter()->encodings()->first();
       IMP impGetter = Interop::CreateMethod(2, 0, typeEncoding, getterCallback, userData);
+      std::string types = GetAccessorTypeEncoding(typeEncoding, 0, "@@:");
 
-      class_addMethod(extendedClass, propertyMeta->getter()->selector(), impGetter, "@@:");
+      class_addMethod(extendedClass, propertyMeta->getter()->selector(), impGetter, types.c_str());
     }
 
     if (hasSetter) {
@@ -1002,8 +1022,9 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
 
       const TypeEncoding* typeEncoding = propertyMeta->setter()->encodings()->first();
       IMP impSetter = Interop::CreateMethod(2, 1, typeEncoding, setterCallback, userData);
+      std::string types = GetAccessorTypeEncoding(typeEncoding, 1, "v@:@");
 
-      class_addMethod(extendedClass, propertyMeta->setter()->selector(), impSetter, "v@:@");
+      class_addMethod(extendedClass, propertyMeta->setter()->selector(), impSetter, types.c_str());
     }
   }
 }

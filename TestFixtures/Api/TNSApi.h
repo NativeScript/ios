@@ -1,3 +1,5 @@
+#import <simd/simd.h>
+
 typedef NS_ENUM(NSInteger, TNSEnums) {
   TNSEnum1 = -1,
   TNSEnum2,
@@ -76,4 +78,39 @@ typedef NSError* _Nullable TNSNullableError;
 @end
 
 @interface RectClass : NSObject <RectProtocol>
+@end
+
+@interface TNSAccessorTypes : NSObject
+@property(nonatomic) BOOL boolProperty;
+@property(nonatomic) NSUInteger unsignedProperty;
+@property(nonatomic) NSInteger integerProperty;
+@property(nonatomic) short shortProperty;
+@property(nonatomic) unichar unicharProperty;
+@property(nonatomic) char charProperty;
+@property(nonatomic) unsigned char unsignedCharProperty;
+@property(nonatomic) long long longLongProperty;
+@property(nonatomic) float floatProperty;
+@property(nonatomic) double doubleProperty;
+@property(nonatomic) CGRect rectProperty;
+@property(nonatomic) CGPoint pointProperty;
+@property(nonatomic) SEL selectorProperty;
+@property(nonatomic, strong) Class classProperty;
+@property(nonatomic, copy) void (^blockProperty)(void);
+@property(nonatomic) void* pointerProperty;
+@property(nonatomic) int (*functionPointerProperty)(int);
+@property(nonatomic) simd_float4 vectorProperty;
+@property(nonatomic, copy) NSString* objectProperty;
+@property(nonatomic, strong) id<NSCopying> protocolObjectProperty;
+@end
+
+@interface TNSAccessorSwizzleBase : NSObject
+@property(nonatomic, readonly) double doubleProperty;
+@property(nonatomic, readonly) BOOL boolProperty;
+@end
+
+// Readwrite redeclarations keep these properties in this class's metadata,
+// while their getters stay implemented by the superclass only.
+@interface TNSAccessorSwizzleDerived : TNSAccessorSwizzleBase
+@property(nonatomic, readwrite) double doubleProperty;
+@property(nonatomic, readwrite) BOOL boolProperty;
 @end

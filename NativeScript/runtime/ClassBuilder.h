@@ -35,8 +35,15 @@ class ClassBuilder {
       v8::Local<v8::Context> context);
   static void RegisterNativeTypeScriptExtendsFunction(
       v8::Local<v8::Context> context);
+  // Clears `*encodable` instead of asserting when a type has no compiler
+  // encoding the runtime can reproduce.
   static std::string GetTypeEncoding(const TypeEncoding* typeEncoding,
-                                     int argsCount);
+                                     int argsCount, bool* encodable = nullptr);
+  // A JS-implemented property accessor's encoding, or `fallback` when its
+  // types have no compiler encoding the runtime can reproduce.
+  static std::string GetAccessorTypeEncoding(const TypeEncoding* typeEncoding,
+                                             int argsCount,
+                                             const char* fallback);
   // `klass` or its nearest superclass not defined from JS.
   static Class FindNativeClass(Class klass);
   // The implementation of `method` from FindNativeClass(klass).
@@ -73,7 +80,8 @@ class ClassBuilder {
                                v8::Local<v8::Object> implementationObject,
                                v8::Local<v8::Value> getter,
                                v8::Local<v8::Value> setter);
-  static std::string GetTypeEncoding(const TypeEncoding* typeEncoding);
+  static std::string GetTypeEncoding(const TypeEncoding* typeEncoding,
+                                     bool* encodable);
   static BinaryTypeEncodingType GetTypeEncodingType(v8::Isolate* isolate,
                                                     v8::Local<v8::Value> value);
 
