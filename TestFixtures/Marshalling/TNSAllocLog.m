@@ -141,9 +141,10 @@
 static NSInteger (^gSharedBlock)(NSInteger);
 
 // A JS block's dispose waits for its isolate, so the slot's previous block is
-// released outside the lock.
+// released outside the lock. Precise lifetime keeps ARC from releasing it
+// earlier, at its last use inside the lock.
 + (void)storeSharedBlock:(NSInteger (^)(NSInteger))block {
-    NSInteger (^previous)(NSInteger);
+    __attribute__((objc_precise_lifetime)) NSInteger (^previous)(NSInteger);
     @synchronized([TNSOwnedBlocks class]) {
         previous = gSharedBlock;
         gSharedBlock = block;
@@ -173,7 +174,7 @@ static NSInteger (^gSharedBlock)(NSInteger);
 }
 
 + (void)clearSharedBlock {
-    NSInteger (^block)(NSInteger);
+    __attribute__((objc_precise_lifetime)) NSInteger (^block)(NSInteger);
     @synchronized([TNSOwnedBlocks class]) {
         block = gSharedBlock;
         gSharedBlock = nil;
