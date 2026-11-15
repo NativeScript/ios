@@ -138,6 +138,53 @@
     return block;
 }
 
+static NSInteger (^gSharedBlock)(NSInteger);
+
+// A JS block's dispose waits for its isolate, so the slot's previous block is
+// released outside the lock.
++ (void)storeSharedBlock:(NSInteger (^)(NSInteger))block {
+    NSInteger (^previous)(NSInteger);
+    @synchronized([TNSOwnedBlocks class]) {
+        previous = gSharedBlock;
+        gSharedBlock = block;
+    }
+    previous = nil;
+}
+
++ (NSInteger (^)(NSInteger))sharedBlock {
+    NSInteger (^block)(NSInteger);
+    @synchronized([TNSOwnedBlocks class]) {
+        block = gSharedBlock;
+    }
+    return block;
+}
+
++ (NSInteger (^)(NSInteger))retainedSharedBlock {
+    return [self sharedBlock];
+}
+
++ (NSInteger (^)(NSInteger))takeSharedBlock {
+    NSInteger (^block)(NSInteger);
+    @synchronized([TNSOwnedBlocks class]) {
+        block = gSharedBlock;
+        gSharedBlock = nil;
+    }
+    return block;
+}
+
++ (void)clearSharedBlock {
+    NSInteger (^block)(NSInteger);
+    @synchronized([TNSOwnedBlocks class]) {
+        block = gSharedBlock;
+        gSharedBlock = nil;
+    }
+    block = nil;
+}
+
++ (NSInteger)callBlock:(NSInteger (^)(NSInteger))block withValue:(NSInteger)value {
+    return block(value);
+}
+
 @end
 
 // Foundation answers tagged pointers for dates in the range JS can represent.

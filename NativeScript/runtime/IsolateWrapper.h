@@ -82,6 +82,11 @@ public:
     // True once the teardown has finished with every wrapper reachable from
     // JS. Read it while pinned.
     inline bool IsTornDown() const { return IsolateGates::IsClosed(gateId_); }
+    // Compares isolate ids, not addresses: a disposed isolate's address can be
+    // reused by a later isolate. `isolate` must be alive.
+    inline bool BelongsTo(v8::Isolate* isolate) const {
+      return gateId_ != -1 && tns::Caches::Get(isolate)->getGateId() == gateId_;
+    }
 
    private:
     v8::Isolate* isolate_;

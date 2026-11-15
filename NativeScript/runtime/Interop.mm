@@ -1217,14 +1217,18 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
     if (block->descriptor == &JSBlock::kJSBlockDescriptor) {
       MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(block->userData);
-      Local<v8::Function> callback = wrapper->callback_->Get(isolate).As<v8::Function>();
-      // The last reference runs the dispose helper right here, under the
-      // Locker this thread holds, which frees `wrapper`; `callback` is a
-      // handle of its own and stays usable.
-      if (releasesOwnedReturn) {
-        Block_release(block);
+      // Another isolate's block is wrapped below like any native block:
+      // calling it runs the function in the isolate that made it.
+      if (wrapper->isolateWrapper_.BelongsTo(isolate)) {
+        Local<v8::Function> callback = wrapper->callback_->Get(isolate).As<v8::Function>();
+        // The last reference runs the dispose helper right here, under the
+        // Locker this thread holds, which frees `wrapper`; `callback` is a
+        // handle of its own and stays usable.
+        if (releasesOwnedReturn) {
+          Block_release(block);
+        }
+        return callback;
       }
-      return callback;
     }
 
     // Take ownership of the returned block. Block_copy (not CFRetain) is the
