@@ -876,4 +876,89 @@ describe("Native callback self wrappers", function () {
             });
         });
     });
+
+    // JS receives these as primitives, so only the native side sees their
+    // reference counts.
+    var primitiveText = "an owned string long enough to live on the heap";
+    var primitiveDateTime = (700000000.5 + 978307200) * 1000;
+
+    function expectPrimitiveAt(index, value) {
+        if (index === 0) {
+            expect(value).toBe(primitiveText);
+        } else if (index === 1) {
+            expect(value).toBe(Math.PI);
+        } else {
+            expect(value instanceof Date).toBe(true);
+            expect(value.getTime()).toBe(primitiveDateTime);
+        }
+    }
+
+    function expectPrimitivesRetainedAsBefore(read, done) {
+        var holder = TNSOwnedPrimitives.new();
+        for (var i = 0; i < 3; i++) {
+            expect([i, holder.isTaggedPointerAt(i)]).toEqual([i, false]);
+        }
+        settle(2, function () {
+            var before = [];
+            for (var i = 0; i < 3; i++) {
+                before.push(holder.retainCountAt(i));
+                for (var k = 0; k < 20; k++) {
+                    expectPrimitiveAt(i, read(holder, i));
+                }
+            }
+            settle(2, function () {
+                for (var i = 0; i < 3; i++) {
+                    expect([i, holder.retainCountAt(i)]).toEqual([i, before[i]]);
+                }
+                done();
+            });
+        });
+    }
+
+    it("releases owned results JS receives as a string, a number and a date", function (done) {
+        expectPrimitivesRetainedAsBefore(function (holder, index) {
+            return holder.newObjectAt(index);
+        }, done);
+    });
+
+    it("leaves unowned results JS receives as primitives retained as they were", function (done) {
+        expectPrimitivesRetainedAsBefore(function (holder, index) {
+            return holder.objectAt(index);
+        }, done);
+    });
+
+    function copiesAsStringState(name, answer) {
+        var state = { answer: answer };
+        var Copyable = TNSAllocLog.extend({
+            copyWithZone: function () {
+                return state.answer;
+            }
+        }, { name: name, protocols: [NSCopying] });
+        state.receiver = Copyable.new();
+        return state;
+    }
+
+    it("releases the string a native -copy answers for a JS copyWithZone returning an NSString", function (done) {
+        var text = primitiveText + ", wrapped";
+        var state = copiesAsStringState("NativeCallbackSelfCopyToWrappedString", NSString.alloc().initWithString(text));
+        settle(2, function () {
+            var before = state.answer.retainCount();
+            for (var i = 0; i < 20; i++) {
+                expect(state.receiver.copy()).toBe(text);
+            }
+            settle(2, function () {
+                expect(state.answer.retainCount()).toBe(before);
+                done();
+            });
+        });
+    });
+
+    // The NSString made for the JS string is never visible to JS, so only the
+    // answers are checked.
+    it("answers the string a JS copyWithZone returns through a native -copy", function () {
+        var state = copiesAsStringState("NativeCallbackSelfCopyToString", primitiveText);
+        for (var i = 0; i < 20; i++) {
+            expect(state.receiver.copy()).toBe(primitiveText);
+        }
+    });
 });

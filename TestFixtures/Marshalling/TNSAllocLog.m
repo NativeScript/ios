@@ -72,6 +72,64 @@
 
 @end
 
+// Foundation answers tagged pointers for dates in the range JS can represent.
+@interface TNSHeapDate : NSDate
+@end
+
+@implementation TNSHeapDate {
+    NSTimeInterval _interval;
+}
+
+// NSDate's initializers end in the one this class would have to override, so
+// the instance is used uninitialized, which NSObject allows.
++ (instancetype)heapDateWithInterval:(NSTimeInterval)interval {
+    TNSHeapDate* date = [self alloc];
+    date->_interval = interval;
+    return date;
+}
+
+- (NSTimeInterval)timeIntervalSinceReferenceDate {
+    return _interval;
+}
+
+@end
+
+@implementation TNSOwnedPrimitives {
+    NSArray* _objects;
+}
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        NSString* string = [[NSMutableString stringWithString:@"an owned string long enough to live on the heap"] copy];
+        _objects = @[ string, [NSNumber numberWithDouble:M_PI], [TNSHeapDate heapDateWithInterval:700000000.5] ];
+    }
+    return self;
+}
+
+- (id)newObjectAt:(NSUInteger)index {
+    return _objects[index];
+}
+
+- (id)objectAt:(NSUInteger)index {
+    return _objects[index];
+}
+
+- (NSUInteger)retainCountAt:(NSUInteger)index {
+    return CFGetRetainCount((__bridge CFTypeRef)_objects[index]);
+}
+
+- (BOOL)isTaggedPointerAt:(NSUInteger)index {
+    uintptr_t bits = (uintptr_t)(__bridge void*)_objects[index];
+#if __arm64__
+    return (bits >> 63) != 0;
+#else
+    return (bits & 1) != 0;
+#endif
+}
+
+@end
+
 @implementation TNSSwizzledOwnedReturns
 
 - (id)newChild {

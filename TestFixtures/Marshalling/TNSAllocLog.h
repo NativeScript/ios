@@ -39,6 +39,19 @@
 
 @end
 
+// Keeps one object of each kind JS receives as a primitive: at index 0 a
+// string, 1 a number, 2 a date, none of them a tagged pointer.
+@interface TNSOwnedPrimitives : NSObject
+
+// Answers the object at `index`, owned by the caller.
+- (id)newObjectAt:(NSUInteger)index;
+// Answers the object at `index` without passing ownership on.
+- (id)objectAt:(NSUInteger)index;
+- (NSUInteger)retainCountAt:(NSUInteger)index;
+- (BOOL)isTaggedPointerAt:(NSUInteger)index;
+
+@end
+
 // Declares the owned-return members of TNSOwnedReturns itself, so JS can
 // replace them on this class alone: metadata leaves out members a subclass
 // redeclares.

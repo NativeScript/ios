@@ -1336,23 +1336,34 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
       return Null(isolate);
     }
 
+    auto releaseSurplusOwnedReturn = [&]() {
+      if (ReleasesCachedOwnedReturn(ownsReturnedObject || isInitializer, ownedReturnReceiver)) {
+        [result release];
+      }
+    };
+
     if (marshalToPrimitive && result == [NSNull null]) {
+      releaseSurplusOwnedReturn();
       return Null(isolate);
     }
 
     if ([result isKindOfClass:[@YES class]]) {
-      return v8::Boolean::New(isolate, [result boolValue]);
+      Local<Value> boolean = v8::Boolean::New(isolate, [result boolValue]);
+      releaseSurplusOwnedReturn();
+      return boolean;
     }
 
     if (marshalToPrimitive && [result isKindOfClass:[NSDate class]]) {
       double time = [result timeIntervalSince1970] * 1000.0;
       Local<Value> date;
       if (Date::New(context, time).ToLocal(&date)) {
+        releaseSurplusOwnedReturn();
         return date;
       }
 
       std::ostringstream errorStream;
       errorStream << "Unable to convert " << [result description] << " to a Date object";
+      releaseSurplusOwnedReturn();
       std::string errorMessage = errorStream.str();
       Local<Value> error = Exception::Error(tns::ToV8String(isolate, errorMessage));
       isolate->ThrowException(error);
@@ -1370,7 +1381,9 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
 
       if (marshalToPrimitive) {
         // Convert NSString instances to javascript strings for all instance method calls
-        return tns::ToV8String(isolate, result);
+        Local<Value> string = tns::ToV8String(isolate, result);
+        releaseSurplusOwnedReturn();
+        return string;
       }
     }
 
@@ -1378,6 +1391,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         ![result isKindOfClass:[NSDecimalNumber class]]) {
       // Convert NSNumber instances to javascript numbers for all instance method calls
       double value = [result doubleValue];
+      releaseSurplusOwnedReturn();
       return Number::New(isolate, value);
     }
 
@@ -1385,9 +1399,7 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
     auto poInstance = ArgConverter::FindCachedInstance(isolate, cache, result);
     if (poInstance != nullptr) {
       Local<Value> cached = poInstance->Get(isolate);
-      if (ReleasesCachedOwnedReturn(ownsReturnedObject || isInitializer, ownedReturnReceiver)) {
-        [result release];
-      }
+      releaseSurplusOwnedReturn();
       return cached;
     }
 
