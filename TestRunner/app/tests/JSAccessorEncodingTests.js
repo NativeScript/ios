@@ -225,4 +225,126 @@ describe("JS-implemented native property accessors", function () {
             });
         });
     });
+
+    // TNSInheritedSwizzleDerived lists members only its superclass implements.
+    // The replacements stay installed for the rest of the run, on classes no
+    // other spec uses.
+    describe("replaced on a native class that inherits them", function () {
+        var installed = false;
+
+        // The prototype of a class whose redeclaration keeps the accessor
+        // count of its superclass's property does not define it again.
+        function inheritedDescriptor(proto, name) {
+            for (var current = proto; current !== null; current = Object.getPrototypeOf(current)) {
+                var descriptor = Object.getOwnPropertyDescriptor(current, name);
+                if (descriptor !== undefined) {
+                    return descriptor;
+                }
+            }
+            return undefined;
+        }
+
+        function install() {
+            if (installed) {
+                return;
+            }
+            installed = true;
+            var proto = TNSInheritedSwizzleDerived.prototype;
+            var objectOriginal = inheritedDescriptor(proto, "objectValue");
+            Object.defineProperty(proto, "objectValue", {
+                get: function () {
+                    var value = objectOriginal.get.call(this);
+                    return value === null ? null : "js " + value;
+                },
+                set: function (value) {
+                    objectOriginal.set.call(this, value + "!");
+                },
+                configurable: true
+            });
+            var scalarOriginal = inheritedDescriptor(proto, "scalarValue");
+            Object.defineProperty(proto, "scalarValue", {
+                get: function () {
+                    return scalarOriginal.get.call(this) * 2;
+                },
+                set: function (value) {
+                    scalarOriginal.set.call(this, value + 1);
+                },
+                configurable: true
+            });
+            var describeOriginal = proto.describeValue;
+            proto.describeValue = function (value) {
+                return "js " + describeOriginal.call(this, value);
+            };
+        }
+
+        it("reach the inherited implementation of a method from JS", function () {
+            install();
+            expect(TNSInheritedSwizzleDerived.new().describeValue(3)).toBe("js base 3");
+            expect(TNSInheritedSwizzleSubclass.new().describeValue(4)).toBe("js base 4");
+            expect(TNSInheritedSwizzleBase.new().describeValue(5)).toBe("base 5");
+        });
+
+        it("reach the inherited accessors of an object property from JS", function () {
+            install();
+            [TNSInheritedSwizzleDerived, TNSInheritedSwizzleSubclass].forEach(function (Klass) {
+                var obj = Klass.new();
+                obj.objectValue = "a";
+                expect(obj.storedObjectValue()).toBe("a!");
+                expect(obj.objectValue).toBe("js a!");
+                expect(obj.valueForKey("objectValue")).toBe("js a!");
+                obj.setValueForKey("b", "objectValue");
+                expect(obj.storedObjectValue()).toBe("b!");
+            });
+            var base = TNSInheritedSwizzleBase.new();
+            base.objectValue = "a";
+            base.setValueForKey("b", "objectValue");
+            expect([base.storedObjectValue(), base.objectValue, base.valueForKey("objectValue")]).toEqual(["b", "b", "b"]);
+        });
+
+        it("reach the inherited accessors of a scalar property from JS", function () {
+            install();
+            [TNSInheritedSwizzleDerived, TNSInheritedSwizzleSubclass].forEach(function (Klass) {
+                var obj = Klass.new();
+                obj.scalarValue = 5;
+                expect(obj.storedScalarValue()).toBe(6);
+                expect(obj.scalarValue).toBe(12);
+                expect(obj.valueForKey("scalarValue")).toBe(12);
+                obj.setValueForKey(7, "scalarValue");
+                expect(obj.storedScalarValue()).toBe(8);
+            });
+            var base = TNSInheritedSwizzleBase.new();
+            base.scalarValue = 5;
+            base.setValueForKey(7, "scalarValue");
+            expect([base.storedScalarValue(), base.scalarValue, base.valueForKey("scalarValue")]).toEqual([7, 7, 7]);
+        });
+
+        it("reach the inherited accessors after a second replacement", function () {
+            var proto = TNSInheritedSwizzleTwice.prototype;
+            var original = inheritedDescriptor(proto, "scalarValue");
+            Object.defineProperty(proto, "scalarValue", {
+                get: function () {
+                    return original.get.call(this) * 2;
+                },
+                set: function (value) {
+                    original.set.call(this, value + 1);
+                },
+                configurable: true
+            });
+            var first = Object.getOwnPropertyDescriptor(proto, "scalarValue");
+            Object.defineProperty(proto, "scalarValue", {
+                get: function () {
+                    return first.get.call(this) * 10;
+                },
+                set: function (value) {
+                    first.set.call(this, value + 100);
+                },
+                configurable: true
+            });
+            var obj = TNSInheritedSwizzleTwice.new();
+            obj.scalarValue = 5;
+            expect(obj.storedScalarValue()).toBe(106);
+            expect(obj.scalarValue).toBe(2120);
+            expect(obj.valueForKey("scalarValue")).toBe(2120);
+        });
+    });
 });

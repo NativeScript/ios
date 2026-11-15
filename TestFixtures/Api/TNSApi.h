@@ -114,3 +114,32 @@ typedef NSError* _Nullable TNSNullableError;
 @property(nonatomic, readwrite) double doubleProperty;
 @property(nonatomic, readwrite) BOOL boolProperty;
 @end
+
+@interface TNSInheritedSwizzleBase : NSObject
+@property(nonatomic, strong) id objectValue;
+@property(nonatomic) NSInteger scalarValue;
+- (id)describeValue:(int)value;
+- (id)storedObjectValue;
+- (NSInteger)storedScalarValue;
+@end
+
+@interface TNSInheritedSwizzleDerived : TNSInheritedSwizzleBase
+@end
+
+// Compatible redeclarations with other types keep these members in this
+// class's metadata, while only the superclass implements them.
+@interface TNSInheritedSwizzleDerived (Redeclared)
+@property(nonatomic, strong) NSString* objectValue;
+@property(nonatomic) TNSEnums scalarValue;
+- (NSString*)describeValue:(int)value;
+@end
+
+@interface TNSInheritedSwizzleSubclass : TNSInheritedSwizzleDerived
+@end
+
+@interface TNSInheritedSwizzleTwice : TNSInheritedSwizzleBase
+@end
+
+@interface TNSInheritedSwizzleTwice (Redeclared)
+@property(nonatomic) TNSEnums scalarValue;
+@end

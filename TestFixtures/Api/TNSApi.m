@@ -128,3 +128,28 @@ void functionThrowsException() {
 }
 
 @end
+
+@implementation TNSInheritedSwizzleBase
+
+- (id)describeValue:(int)value {
+  return [NSString stringWithFormat:@"base %d", value];
+}
+
+- (id)storedObjectValue {
+  return _objectValue;
+}
+
+- (NSInteger)storedScalarValue {
+  return _scalarValue;
+}
+
+@end
+
+@implementation TNSInheritedSwizzleDerived
+@end
+
+@implementation TNSInheritedSwizzleSubclass
+@end
+
+@implementation TNSInheritedSwizzleTwice
+@end

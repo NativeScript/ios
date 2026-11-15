@@ -1366,6 +1366,25 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
   }
 }
 
+namespace {
+
+// The implementation `klass` answered `selector` with, its own or inherited,
+// stays reachable under the swizzled-prefixed selector that native calls from
+// JS prefer. An existing alias is kept, so it names the implementation from
+// before the first replacement.
+void ReplaceKeepingOriginal(Class klass, SEL selector, const char* selectorName, IMP imp,
+                            const char* types) {
+  Method original = class_getInstanceMethod(klass, selector);
+  IMP originalImp = original != nullptr ? method_getImplementation(original) : nullptr;
+  class_replaceMethod(klass, selector, imp, types);
+  if (originalImp != nullptr) {
+    SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selectorName).c_str());
+    class_addMethod(klass, nativeSelector, originalImp, types);
+  }
+}
+
+}  // namespace
+
 v8::Intercepted MetadataBuilder::SwizzledInstanceMethodCallback(
     Local<v8::Name> property, Local<Value> value, const PropertyCallbackInfo<v8::Boolean>& info) {
   Isolate* isolate = info.GetIsolate();
@@ -1402,13 +1421,8 @@ v8::Intercepted MetadataBuilder::SwizzledInstanceMethodCallback(
       Interop::ConsumedObjectArgumentIndex(methodMeta->selector(), typeEncoding, argsCount));
   IMP methodBody =
       Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
-  IMP nativeImp =
-      class_replaceMethod(klass, methodMeta->selector(), methodBody, compilerEncoding.c_str());
-  if (nativeImp) {
-    std::string selector = methodMeta->selectorAsString();
-    SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selector).c_str());
-    class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding.c_str());
-  }
+  ReplaceKeepingOriginal(klass, methodMeta->selector(), methodMeta->selectorAsString(), methodBody,
+                         compilerEncoding.c_str());
   // Not intercepted: the native write is done, but V8 must still perform
   // the ordinary store, which is what the old void-returning callback did
   // by falling through without setting a return value.
@@ -1502,11 +1516,9 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
     PropertyCallbackContext* userData =
         new PropertyCallbackContext(isolate, poGetterFunc, nullptr, propertyMeta);
     IMP impGetter = Interop::CreateMethod(2, 0, typeEncoding, getterCallback, userData);
-    IMP nativeImp = class_replaceMethod(klass, propertyMeta->getter()->selector(), impGetter,
-                                        compilerEncoding.c_str());
-    std::string selector = propertyMeta->getter()->selectorAsString();
-    SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selector).c_str());
-    class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding.c_str());
+    ReplaceKeepingOriginal(klass, propertyMeta->getter()->selector(),
+                           propertyMeta->getter()->selectorAsString(), impGetter,
+                           compilerEncoding.c_str());
   }
 
   if (desc.has_set()) {
@@ -1567,11 +1579,9 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
     IMP impSetter = Interop::CreateMethod(2, 1, typeEncoding, setterCallback, userData);
 
     std::string compilerEncoding = ClassBuilder::GetAccessorTypeEncoding(typeEncoding, 1, "v@:@");
-    IMP nativeImp = class_replaceMethod(klass, propertyMeta->setter()->selector(), impSetter,
-                                        compilerEncoding.c_str());
-    std::string selector = propertyMeta->setter()->selectorAsString();
-    SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selector).c_str());
-    class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding.c_str());
+    ReplaceKeepingOriginal(klass, propertyMeta->setter()->selector(),
+                           propertyMeta->setter()->selectorAsString(), impSetter,
+                           compilerEncoding.c_str());
   }
   // Not intercepted: the native write is done, but V8 must still perform
   // the ordinary store, which is what the old void-returning callback did
