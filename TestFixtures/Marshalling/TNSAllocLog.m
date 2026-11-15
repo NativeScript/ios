@@ -199,6 +199,14 @@
 
 @end
 
+id TNSOwnedPrimitivesRetainedObjectAt(TNSOwnedPrimitives* holder, NSUInteger index) {
+    return [holder objectAt:index];
+}
+
+id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index) {
+    return [holder objectAt:index];
+}
+
 @implementation TNSSwizzledOwnedReturns
 
 - (id)newChild {

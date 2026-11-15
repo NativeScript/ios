@@ -54,6 +54,11 @@
 
 @end
 
+// The object `holder` keeps at `index`, owned by the caller.
+id TNSOwnedPrimitivesRetainedObjectAt(TNSOwnedPrimitives* holder, NSUInteger index) NS_RETURNS_RETAINED;
+// The object `holder` keeps at `index`, without passing ownership on.
+id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index);
+
 // Keeps what -copy answers until -drop.
 @interface TNSCopyKeeper : NSObject
 

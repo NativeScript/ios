@@ -927,6 +927,18 @@ describe("Native callback self wrappers", function () {
         }, done);
     });
 
+    it("releases owned C function results JS receives as a string, a number and a date", function (done) {
+        expectPrimitivesRetainedAsBefore(function (holder, index) {
+            return TNSOwnedPrimitivesRetainedObjectAt(holder, index);
+        }, done);
+    });
+
+    it("leaves unowned C function results JS receives as primitives retained as they were", function (done) {
+        expectPrimitivesRetainedAsBefore(function (holder, index) {
+            return TNSOwnedPrimitivesObjectAt(holder, index);
+        }, done);
+    });
+
     function copiesAsStringState(name, answer) {
         var state = { answer: answer };
         var Copyable = TNSAllocLog.extend({
