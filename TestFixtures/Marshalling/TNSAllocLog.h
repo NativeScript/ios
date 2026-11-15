@@ -117,4 +117,42 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index);
 
 @end
 
+// JS subclasses implement `value`; `name` is state native code sets.
+@interface TNSAccessorHost : TNSAllocLog
+
+@property(nonatomic, strong) id value;
+@property(nonatomic, copy) NSString* name;
+
+@end
+
+// -dealloc reads `value`.
+@interface TNSAccessorDeallocHost : TNSAccessorHost
+
+@end
+
+// Reaches the `value` accessors of the host it keeps through compiled property
+// access only.
+@interface TNSAccessorDriver : NSObject
+
+// Keeps a new instance of `cls`, created natively and named `name`.
+- (instancetype)initWithNewHostOf:(Class)cls name:(NSString*)name;
+- (instancetype)initWithHost:(TNSAccessorHost*)host;
+- (id)readValue;
+- (void)writeValue:(id)value;
+- (TNSAccessorHost*)host;
+- (void)dropHost;
+
+// Creates an instance of `cls` named `name`, reads its `value` and drops it.
++ (id)valueOfNewHostOf:(Class)cls name:(NSString*)name;
+// Creates an instance of `cls` named `name` and drops it.
++ (void)dropNewHostOf:(Class)cls name:(NSString*)name;
+
+// A process-wide host, kept until +dropKeptHost.
++ (void)keepNewHostOf:(Class)cls name:(NSString*)name;
++ (id)readKeptValue;
++ (void)writeKeptValue:(id)value;
++ (void)dropKeptHost;
+
+@end
+
 #endif /* TNSAllocLog_h */

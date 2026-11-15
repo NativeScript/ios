@@ -1500,7 +1500,7 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
     std::shared_ptr<Persistent<v8::Function>> poGetterFunc =
         std::make_shared<Persistent<v8::Function>>(isolate, getter.As<v8::Function>());
     PropertyCallbackContext* userData =
-        new PropertyCallbackContext(isolate, poGetterFunc, nullptr, propertyMeta);
+        new PropertyCallbackContext(isolate, poGetterFunc, propertyMeta);
     IMP impGetter = Interop::CreateMethod(2, 0, typeEncoding, getterCallback, userData);
     IMP nativeImp =
         class_replaceMethod(klass, propertyMeta->getter()->selector(), impGetter, compilerEncoding);
@@ -1563,7 +1563,7 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
     std::shared_ptr<Persistent<v8::Function>> poSetterFunc =
         std::make_shared<Persistent<v8::Function>>(isolate, setter.As<v8::Function>());
     PropertyCallbackContext* userData =
-        new PropertyCallbackContext(isolate, poSetterFunc, nullptr, propertyMeta);
+        new PropertyCallbackContext(isolate, poSetterFunc, propertyMeta);
     IMP impSetter = Interop::CreateMethod(2, 1, typeEncoding, setterCallback, userData);
 
     const char* compilerEncoding = "v@:@";

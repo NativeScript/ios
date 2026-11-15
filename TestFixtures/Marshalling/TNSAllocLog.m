@@ -254,3 +254,85 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index) {
 }
 
 @end
+
+@implementation TNSAccessorHost
+@end
+
+@implementation TNSAccessorDeallocHost
+
+- (void)dealloc {
+    id value = self.value;
+    (void)value;
+}
+
+@end
+
+static TNSAccessorHost* keptAccessorHost;
+
+@implementation TNSAccessorDriver {
+    TNSAccessorHost* _host;
+}
+
+- (instancetype)initWithNewHostOf:(Class)cls name:(NSString*)name {
+    self = [super init];
+    if (self) {
+        _host = [[cls alloc] init];
+        _host.name = name;
+    }
+    return self;
+}
+
+- (instancetype)initWithHost:(TNSAccessorHost*)host {
+    self = [super init];
+    if (self) {
+        _host = host;
+    }
+    return self;
+}
+
+- (id)readValue {
+    return _host.value;
+}
+
+- (void)writeValue:(id)value {
+    _host.value = value;
+}
+
+- (TNSAccessorHost*)host {
+    return _host;
+}
+
+- (void)dropHost {
+    _host = nil;
+}
+
++ (id)valueOfNewHostOf:(Class)cls name:(NSString*)name {
+    TNSAccessorHost* host = [[cls alloc] init];
+    host.name = name;
+    return host.value;
+}
+
++ (void)dropNewHostOf:(Class)cls name:(NSString*)name {
+    TNSAccessorHost* host = [[cls alloc] init];
+    host.name = name;
+}
+
++ (void)keepNewHostOf:(Class)cls name:(NSString*)name {
+    TNSAccessorHost* host = [[cls alloc] init];
+    host.name = name;
+    keptAccessorHost = host;
+}
+
++ (id)readKeptValue {
+    return keptAccessorHost.value;
+}
+
++ (void)writeKeptValue:(id)value {
+    keptAccessorHost.value = value;
+}
+
++ (void)dropKeptHost {
+    keptAccessorHost = nil;
+}
+
+@end

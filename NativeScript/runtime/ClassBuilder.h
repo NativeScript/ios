@@ -11,15 +11,10 @@ struct PropertyCallbackContext {
   PropertyCallbackContext(
       v8::Isolate* isolate,
       std::shared_ptr<v8::Persistent<v8::Function>> callback,
-      std::shared_ptr<v8::Persistent<v8::Object>> implementationObject,
       const PropertyMeta* meta)
-      : isolate_(isolate),
-        callback_(callback),
-        implementationObject_(implementationObject),
-        meta_(meta) {}
+      : isolate_(isolate), callback_(callback), meta_(meta) {}
   v8::Isolate* isolate_;
   std::shared_ptr<v8::Persistent<v8::Function>> callback_;
-  std::shared_ptr<v8::Persistent<v8::Object>> implementationObject_;
   const PropertyMeta* meta_;
 };
 
@@ -70,7 +65,6 @@ class ClassBuilder {
       std::vector<const ProtocolMeta*> exposedProtocols);
   static void ExposeProperties(v8::Isolate* isolate, Class extendedClass,
                                std::vector<const PropertyMeta*> propertyMetas,
-                               v8::Local<v8::Object> implementationObject,
                                v8::Local<v8::Value> getter,
                                v8::Local<v8::Value> setter);
   static std::string GetTypeEncoding(const TypeEncoding* typeEncoding);
