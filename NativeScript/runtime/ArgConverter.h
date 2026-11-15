@@ -51,6 +51,10 @@ class ArgConverter {
           std::vector<std::string>());
   static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyObject(
       v8::Local<v8::Context> context);
+  // CreateEmptyObject's object without the ObjectManager registration, for an
+  // object whose collection has nothing to dispose.
+  static v8::Local<v8::Object> NewEmptyInstance(
+      v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc);
   // The JS `this` for native code calling a JS-implemented method on an
   // object JS has no wrapper for yet. For an object already deallocating it
   // is a borrowed wrapper, stored in `borrowed`, that the caller must detach
@@ -102,8 +106,6 @@ class ArgConverter {
  private:
   static v8::Local<v8::Function> CreateEmptyInstanceFunction(
       v8::Local<v8::Context> context);
-  static v8::Local<v8::Object> NewEmptyInstance(
-      v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc);
   static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyInstance(
       v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc);
   static void FindMethodOverloads(Class klass, std::string methodName,

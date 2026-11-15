@@ -305,6 +305,21 @@ void tns::SetValue(Isolate* isolate, const Local<Object>& val, BaseDataWrapper* 
   }
 }
 
+Local<Object> tns::SuperAliasReceiver(const Local<Object>& obj) {
+  if (obj->InternalFieldCount() < 2) {
+    return Local<Object>();
+  }
+  Local<Value> marker = obj->GetInternalField(1).As<v8::Value>();
+  if (marker.IsEmpty() || !marker->IsString()) {
+    return Local<Object>();
+  }
+  Local<Value> receiver = obj->GetInternalField(0).As<v8::Value>();
+  if (receiver.IsEmpty() || !receiver->IsObject() || receiver->IsExternal()) {
+    return Local<Object>();
+  }
+  return receiver.As<Object>();
+}
+
 tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
   if (val.IsEmpty() || val->IsNullOrUndefined() || !val->IsObject()) {
     return nullptr;
@@ -320,8 +335,12 @@ tns::BaseDataWrapper* tns::GetValue(Isolate* isolate, const Local<Value>& val) {
   }
   if (obj->InternalFieldCount() > 0) {
     Local<Value> field = obj->GetInternalField(0).As<v8::Value>();
-    if (field.IsEmpty() || field->IsNullOrUndefined() || !field->IsExternal()) {
+    if (field.IsEmpty() || field->IsNullOrUndefined()) {
       return nullptr;
+    }
+    if (!field->IsExternal()) {
+      Local<Object> receiver = SuperAliasReceiver(obj);
+      return receiver.IsEmpty() ? nullptr : GetValue(isolate, receiver);
     }
 
     return static_cast<BaseDataWrapper*>(
