@@ -54,9 +54,9 @@ bool InMethodFamily(SEL selector, const char* family) {
 NativeCallbackSelf::NativeCallbackSelf(Local<Context> context, id self)
     : isolate_(v8::Isolate::GetCurrent()) {
   auto cache = Caches::Get(isolate_);
-  auto it = cache->Instances.find(self);
-  if (it != cache->Instances.end()) {
-    receiver_ = it->second->Get(isolate_).As<Object>();
+  auto cached = ArgConverter::FindCachedInstance(isolate_, cache, self);
+  if (cached != nullptr) {
+    receiver_ = cached->Get(isolate_).As<Object>();
   } else {
     receiver_ = ArgConverter::WrapNativeCallbackSelf(context, self, &borrowed_);
   }
