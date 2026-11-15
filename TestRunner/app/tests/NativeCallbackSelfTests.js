@@ -1153,6 +1153,39 @@ describe("Native callback self wrappers", function () {
         expectCollected(state, done);
     });
 
+    function expectConstructedFreshObject(name, construct, done) {
+        var state = freshObjectState();
+        var Klass = NSObject.extend({
+            init: function () {
+                return state.answer();
+            }
+        }, { name: name });
+        (function () {
+            var result = construct(Klass);
+            expect(result !== undefined && result === state.weak.deref()).toBe(true);
+            expect(!!result && result.fresh === true).toBe(true);
+        })();
+        expectCollected(state, done);
+    }
+
+    it("constructs with new the fresh plain object a JS initializer answers", function (done) {
+        expectConstructedFreshObject("NativeCallbackSelfNewOperatorPlainObject", function (Klass) {
+            return new Klass();
+        }, done);
+    });
+
+    it("answers from alloc().init() the fresh plain object a JS initializer answers", function (done) {
+        expectConstructedFreshObject("NativeCallbackSelfAllocInitPlainObject", function (Klass) {
+            return Klass.alloc().init();
+        }, done);
+    });
+
+    it("answers from new() the fresh plain object a JS initializer answers", function (done) {
+        expectConstructedFreshObject("NativeCallbackSelfNewMethodPlainObject", function (Klass) {
+            return Klass.new();
+        }, done);
+    });
+
     it("balances the adapter for a plain object a JS copyWithZone answers twice", function (done) {
         var state = { weak: null };
         (function () {

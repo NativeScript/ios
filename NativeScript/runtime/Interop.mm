@@ -174,8 +174,31 @@ bool Interop::ConsumesReceiver(SEL selector, bool isInitializer) {
 
 // -[NSKeyedUnarchiverDelegate unarchiver:didDecodeObject:] is the only SDK
 // method with an NS_RELEASES_ARGUMENT parameter; it also returns retained.
+static int ConsumedArgumentIndex(SEL selector) {
+  return selector == @selector(unarchiver:didDecodeObject:) ? 1 : -1;
+}
+
 bool Interop::ConsumesArgument(SEL selector, int index) {
-  return index == 1 && selector == @selector(unarchiver:didDecodeObject:);
+  return index >= 0 && index == ConsumedArgumentIndex(selector);
+}
+
+int Interop::ConsumedObjectArgumentIndex(SEL selector, const TypeEncoding* typeEncoding,
+                                         int paramsCount) {
+  int index = ConsumedArgumentIndex(selector);
+  if (index < 0 || index >= paramsCount) {
+    return -1;
+  }
+  for (int i = 0; i <= index; i++) {
+    typeEncoding = typeEncoding->next();
+  }
+  return IsObjectEncoding(typeEncoding) ? index : -1;
+}
+
+bool Interop::IsObjectEncoding(const TypeEncoding* typeEncoding) {
+  BinaryTypeEncodingType type = typeEncoding->type;
+  return type == BinaryTypeEncodingType::IdEncoding ||
+         type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
+         type == BinaryTypeEncodingType::InstanceTypeEncoding;
 }
 
 bool Interop::ReturnsRetained(SEL selector) { return ConsumesArgument(selector, 1); }
@@ -1871,10 +1894,10 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
                         initialParameterIndex, methodCall.args_);
 
   if (initialParameterIndex > 1) {
-    for (int i = initialParameterIndex; i < argsCount; i++) {
-      if (ConsumesArgument(methodCall.selector_, i - initialParameterIndex)) {
-        [*static_cast<id*>(call.ArgumentBuffer(i)) retain];
-      }
+    int consumed = ConsumedObjectArgumentIndex(methodCall.selector_, methodCall.typeEncoding_,
+                                               argsCount - initialParameterIndex);
+    if (consumed >= 0) {
+      [*static_cast<id*>(call.ArgumentBuffer(initialParameterIndex + consumed)) retain];
     }
   }
 

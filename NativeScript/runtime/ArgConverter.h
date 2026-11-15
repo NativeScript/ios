@@ -28,19 +28,23 @@ struct MethodCallbackWrapper {
       v8::Isolate* isolate, std::shared_ptr<v8::Persistent<v8::Value>> callback,
       const uint8_t initialParamIndex, const uint8_t paramsCount,
       const TypeEncoding* typeEncoding,
-      NativeReturnOwnership returnOwnership = NativeReturnOwnership::Unowned)
+      NativeReturnOwnership returnOwnership = NativeReturnOwnership::Unowned,
+      int8_t consumedArgumentIndex = -1)
       : isolateWrapper_(isolate),
         callback_(callback),
         initialParamIndex_(initialParamIndex),
         paramsCount_(paramsCount),
         typeEncoding_(typeEncoding),
-        returnOwnership_(returnOwnership) {}
+        returnOwnership_(returnOwnership),
+        consumedArgumentIndex_(consumedArgumentIndex) {}
   IsolateWrapper isolateWrapper_;
   std::shared_ptr<v8::Persistent<v8::Value>> callback_;
   const uint8_t initialParamIndex_;
   const uint8_t paramsCount_;
   const TypeEncoding* typeEncoding_;
   const NativeReturnOwnership returnOwnership_;
+  // Interop::ConsumedObjectArgumentIndex of the implemented method.
+  const int8_t consumedArgumentIndex_;
 };
 
 class ArgConverter {

@@ -48,33 +48,6 @@ bool InMethodFamily(SEL selector, const char* family) {
   return strncmp(name, family, length) == 0 && (name[length] < 'a' || name[length] > 'z');
 }
 
-bool IsObjectEncoding(const TypeEncoding* typeEncoding) {
-  BinaryTypeEncodingType type = typeEncoding->type;
-  return type == BinaryTypeEncodingType::IdEncoding ||
-         type == BinaryTypeEncodingType::InterfaceDeclarationReference ||
-         type == BinaryTypeEncodingType::InstanceTypeEncoding;
-}
-
-// The argument a JS-implemented method takes over from its native caller, or
-// nil. Reads only the native call, so it is usable without the isolate.
-id ConsumedArgument(const MethodCallbackWrapper* data, void** argValues) {
-  if (data->initialParamIndex_ != 2) {
-    return nil;
-  }
-  SEL selector = *static_cast<SEL*>(argValues[1]);
-  for (int i = 0; i < data->paramsCount_; i++) {
-    if (!Interop::ConsumesArgument(selector, i)) {
-      continue;
-    }
-    const TypeEncoding* typeEncoding = data->typeEncoding_;
-    for (int j = 0; j <= i; j++) {
-      typeEncoding = typeEncoding->next();
-    }
-    return IsObjectEncoding(typeEncoding) ? *static_cast<id*>(argValues[i + 2]) : nil;
-  }
-  return nil;
-}
-
 // The borrowed wrapper WrapNativeCallbackSelf made for an object in -dealloc
 // is detached once the native call returns: the object is gone afterwards,
 // so a receiver JS kept must read as released.
@@ -363,7 +336,10 @@ id ArgConverter::HandleBoundaryException(Local<Context> context, TryCatch& tc) {
 void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues, void* userData) {
   MethodCallbackWrapper* data = static_cast<MethodCallbackWrapper*>(userData);
   // Owned by this call, which gives it up on every path unless it answers it.
-  id consumedArgument = ConsumedArgument(data, argValues);
+  id consumedArgument =
+      data->consumedArgumentIndex_ < 0
+          ? nil
+          : *static_cast<id*>(argValues[data->initialParamIndex_ + data->consumedArgumentIndex_]);
 
   Isolate* isolate = data->isolateWrapper_.Isolate();
 
@@ -524,7 +500,7 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
     }
 
     // A wrapper JS made for the consumed argument holds a reference of its own.
-    if (consumedArgument != nil && !(IsObjectEncoding(data->typeEncoding_) &&
+    if (consumedArgument != nil && !(Interop::IsObjectEncoding(data->typeEncoding_) &&
                                      *static_cast<id*>(retValue) == consumedArgument)) {
       [consumedArgument release];
     }
@@ -746,13 +722,16 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
   auto cache = Caches::Get(isolate);
   auto poInstance = ArgConverter::FindCachedInstance(isolate, cache, result);
   if (poInstance != nullptr) {
+    // Read before the release below: when it drops a DictionaryAdapter's last
+    // reference, the adapter's -dealloc resets this handle.
+    Local<Value> cached = poInstance->Get(isolate);
     // An initializer that answered with an already wrapped object (a singleton,
     // a tagged pointer, a cached cluster instance) leaves us holding a +1 the
     // existing entry has no use for.
     if (Interop::ReleasesCachedOwnedReturn(resultIsOwned, OwnedReturnReceiver::AllocatedForCall)) {
       [result release];
     }
-    info.GetReturnValue().Set(poInstance->Get(isolate));
+    info.GetReturnValue().Set(cached);
   } else {
     ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
     Local<Object> thiz = info.This();
