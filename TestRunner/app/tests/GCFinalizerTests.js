@@ -118,6 +118,19 @@ describe("GC finalizer callbacks", function () {
         })(TNSApi);
     }
 
+    function collectAndWait(rounds, callback) {
+        scrubStack();
+        __collect();
+        __collect();
+        setTimeout(function () {
+            if (rounds > 1) {
+                collectAndWait(rounds - 1, callback);
+            } else {
+                callback();
+            }
+        }, 10);
+    }
+
     [
         {
             suffix: " (extend)",
@@ -170,19 +183,6 @@ describe("GC finalizer callbacks", function () {
                 retainCount = again.retainCount();
             });
 
-            function collectAndWait(rounds, callback) {
-                scrubStack();
-                __collect();
-                __collect();
-                setTimeout(function () {
-                    if (rounds > 1) {
-                        collectAndWait(rounds - 1, callback);
-                    } else {
-                        callback();
-                    }
-                }, 10);
-            }
-
             var attempts = 200;
             (function poll() {
                 if (retainCount === -1 && --attempts > 0) {
@@ -206,6 +206,63 @@ describe("GC finalizer callbacks", function () {
                 });
             })();
         });
+    });
+
+    // Releases wait in batches, and one of them can run JS (a -dealloc
+    // implemented in JS) that wraps an object whose own release comes later
+    // in the same batch. The order within a batch is unspecified, so the
+    // instance whose -dealloc does the wrapping is rarely the last one.
+    it("lets a wrapper adopt a release that waits behind the one running JS", function (done) {
+        var Held = defineTakeoverWithExtends(function () {});
+        var count = 16;
+        var holder = NSMutableArray.alloc().init();
+        var held = [];
+        for (var i = 0; i < count; i++) {
+            var instance = Held.alloc().init();
+            held.push(instance);
+            holder.addObject(instance);
+        }
+
+        var wrapped = 0;
+        var Trigger = TNSApi.extend({
+            methodCalledInDealloc: function () {
+                for (var j = 0; j < count; j++) {
+                    holder.objectAtIndex(j).marker = j;
+                    wrapped++;
+                }
+            }
+        }, { name: "TNSApiReleaseBatchTrigger" });
+        var trigger = Trigger.alloc().init();
+
+        var queue = dispatch_get_global_queue(qos_class_t.QOS_CLASS_DEFAULT, 0);
+        dispatch_async(queue, function () {
+            for (var k = 0; k < count; k++) {
+                __releaseNativeCounterpart(held[k]);
+            }
+            held = null;
+            __releaseNativeCounterpart(trigger);
+            trigger = null;
+        });
+
+        var attempts = 200;
+        (function poll() {
+            if (wrapped === 0 && --attempts > 0) {
+                setTimeout(poll, 10);
+                return;
+            }
+            expect(wrapped).toBe(count);
+            collectAndWait(2, function () {
+                var markers = [];
+                var expected = [];
+                for (var m = 0; m < count; m++) {
+                    markers.push(holder.objectAtIndex(m).marker);
+                    expected.push(m);
+                }
+                expect(markers).toEqual(expected);
+                holder.removeAllObjects();
+                done();
+            });
+        })();
     });
 
     // A GcProtected (natively retained) instance is resurrected by its

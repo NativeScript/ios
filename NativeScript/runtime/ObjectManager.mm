@@ -122,19 +122,23 @@ struct DeferredReleases {
   bool drainPosted = false;
 };
 
+// A release can run JS (a -dealloc implemented in JS) that wraps an object
+// whose own release still waits, or that reaches this drain again. So one
+// release leaves the queue at a time, the rest stay there for
+// TakeDeferredRelease, and nothing is held across a release.
 void DrainDeferredReleases(DeferredReleases* pending) {
-  std::unordered_map<void*, unsigned> objects;
-  std::vector<const void*> blocks;
-  objects.swap(pending->objects);
-  blocks.swap(pending->blocks);
   pending->drainPosted = false;
-  for (const auto& entry : objects) {
-    id obj = (__bridge id)entry.first;
-    for (unsigned i = 0; i < entry.second; i++) {
-      [obj release];
+  while (!pending->objects.empty()) {
+    auto it = pending->objects.begin();
+    id obj = (__bridge id)it->first;
+    if (--it->second == 0) {
+      pending->objects.erase(it);
     }
+    [obj release];
   }
-  for (const void* block : blocks) {
+  while (!pending->blocks.empty()) {
+    const void* block = pending->blocks.back();
+    pending->blocks.pop_back();
     Block_release(block);
   }
 }
