@@ -11,6 +11,12 @@ class TestRunnerTests: XCTestCase {
     private let progressLock = NSLock()
     private var lastSpecSeen = "(no spec reported yet)"
 
+    // Requests received per target (PATH_INFO plus query), readable back by
+    // specs through /esm/request-stats.json so a spec can prove a module was
+    // fetched exactly once — no retry, no synchronous-fallback round trip.
+    // Only ever touched on the server's serial connection queue.
+    private var requestCounts = [String: Int]()
+
     override func setUpWithError() throws {
         continueAfterFailure = false
 
@@ -49,6 +55,61 @@ class TestRunnerTests: XCTestCase {
 
             // Serve tiny ESM modules for runtime HTTP loader tests.
             if method == "GET" {
+                if path.hasPrefix("/esm/") && path != "/esm/request-stats.json" {
+                    let target = query.isEmpty ? path : "\(path)?\(query)"
+                    self.requestCounts[target] = (self.requestCounts[target] ?? 0) + 1
+                }
+
+                if path == "/esm/request-stats.json" {
+                    // `target` is the percent-encoded request target to count.
+                    var wanted = ""
+                    if let pair = query
+                        .split(separator: "&")
+                        .first(where: { $0.hasPrefix("target=") }),
+                       let decoded = String(pair.dropFirst("target=".count))
+                        .removingPercentEncoding {
+                        wanted = decoded
+                    }
+                    let body = "{\"target\":\"\(wanted)\",\"count\":\(self.requestCounts[wanted] ?? 0)}"
+                    startResponse("200 OK", [("Content-Type", "application/json; charset=utf-8")])
+                    sendBody(body.data(using: .utf8) ?? Data())
+                    return
+                }
+
+                // ── Slow-transform routes (fetch-budget coverage) ──
+                // Simulate a dev server answering a cold module transform in
+                // `delayMs` — the 5–9s real-world latency that used to expire
+                // mid-flight under the flat 5s request timeout. The parent
+                // re-exports the child so a spec covers a transitive HTTP
+                // edge the graph walk discovers after the slow fetch lands.
+                if path.hasPrefix("/esm/slow/") {
+                    var delayMs = path == "/esm/slow/child.mjs" ? 0 : 7000
+                    var key = "slow"
+                    for pair in query.split(separator: "&") {
+                        if pair.hasPrefix("delayMs="),
+                           let v = Int(pair.dropFirst("delayMs=".count)) {
+                            delayMs = v
+                        } else if pair.hasPrefix("k=") {
+                            key = String(pair.dropFirst(2))
+                        }
+                    }
+                    let body: String
+                    if path == "/esm/slow/parent.mjs" {
+                        body = "export { value } from \"./child.mjs?from=\(key)\";\n" +
+                               "export const parent = \"\(key)\";\n"
+                    } else {
+                        body = "export const value = 42; export const name = \"\(key)\";\n"
+                    }
+                    DispatchQueue.global(qos: .utility).asyncAfter(
+                        deadline: .now() + Double(delayMs) / 1000.0
+                    ) {
+                        startResponse("200 OK",
+                                      [("Content-Type", "application/javascript; charset=utf-8")])
+                        sendBody(body.data(using: .utf8) ?? Data())
+                    }
+                    return
+                }
+
                 if path == "/esm/query.mjs" || path == "/ns/m/query.mjs" {
                     func jsStringLiteral(_ s: String) -> String {
                         return s
@@ -132,9 +193,10 @@ class TestRunnerTests: XCTestCase {
                 if path == "/esm/timeout.mjs" {
                     // Delay the response without blocking request handling.
                     // The loader still hits its client-side timeout when
-                    // delayMs exceeds the async loader's request timeout
-                    // (HttpEsmLoaderTests passes delayMs=12000), and the
-                    // server keeps serving other connections meanwhile.
+                    // delayMs exceeds the request timeout (HttpEsmLoaderTests
+                    // passes 12000 in release or 32000 in debug — the request
+                    // budget is 5s and 30s respectively), and the server
+                    // keeps serving other connections meanwhile.
                     var delayMs = 12000
                     if let pair = query
                         .split(separator: "&")

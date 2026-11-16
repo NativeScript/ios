@@ -143,6 +143,12 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(
 // Compilation runs no user code, so pre-compiling the closure cannot change
 // evaluation order: V8 still evaluates in spec order from the root.
 //
+// `fetchDeadline` bounds the walk's HTTP fetches as an absolute CFAbsoluteTime
+// (double; 0 = unbounded): each attempt clamps its request timeout to the
+// time remaining and transport-error retries stop once no budget is left.
+// Callers that pump for the load pass their own wait deadline so a fetch can
+// never outlive the wait; callers that simply queue work pass 0.
+//
 // `onComplete(ok, errorMessage, context)` runs exactly once on the isolate's
 // JS thread with the isolate entered and `context` (the context captured at
 // start) already scoped. `ok` is false only when an HTTP ROOT fetch/compile
@@ -152,7 +158,7 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(
 // modes and steals no error text.
 void StartModuleGraphLoad(
     v8::Isolate* isolate, v8::Local<v8::Context> context,
-    const std::string& root,
+    const std::string& root, double fetchDeadline,
     std::function<void(bool ok, const std::string& errorMessage,
                        v8::Local<v8::Context> context)>
         onComplete);

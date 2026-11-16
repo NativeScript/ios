@@ -1015,6 +1015,10 @@ struct AsyncGraphLoad {
   size_t fetchedCount = 0;
   size_t compiledCount = 0;
   uint64_t startUs = 0;
+  // Absolute CFAbsoluteTime bounding this load's fetch attempts and their
+  // retries — the same deadline the pumped wait enforces, so a bounded fetch
+  // can never outlive the wait pumping for it. 0 = unbounded.
+  CFAbsoluteTime fetchDeadline = 0;
   std::atomic<bool> dead{false};  // set by isolate teardown (any thread)
   std::function<void(bool ok, const std::string& errorMessage, v8::Local<v8::Context> context)>
       onComplete;
@@ -1648,7 +1652,7 @@ static void AsyncGraphEnqueue(const std::shared_ptr<AsyncGraphLoad>& load,
   const std::string url = target;
   // The canonical key is computed here, on the isolate's thread; the fetch
   // carries it so background threads never touch per-isolate vocabulary.
-  FetchModuleBodyAsync(url, key, [loadRef, url](ModuleFetchResult result) {
+  FetchModuleBodyAsync(url, key, load->fetchDeadline, [loadRef, url](ModuleFetchResult result) {
     // Arbitrary thread. Hop to the isolate's home thread as a nestable v8
     // foreground task — thread-independent delivery, so an import() issued
     // from a background thread still lands on the isolate's own event loop,
@@ -1694,6 +1698,7 @@ static ModuleResolution ResolutionForRoot(const std::string& root) {
 
 void StartModuleGraphLoad(
     v8::Isolate* isolate, v8::Local<v8::Context> context, const std::string& root,
+    double fetchDeadline,
     std::function<void(bool ok, const std::string& errorMessage, v8::Local<v8::Context> context)>
         onComplete) {
   auto load = std::make_shared<AsyncGraphLoad>();
@@ -1701,6 +1706,7 @@ void StartModuleGraphLoad(
   load->context.Reset(isolate, context);
   load->rootKey = CanonicalizeRegistryKey(root);
   load->startUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
+  load->fetchDeadline = fetchDeadline;
   load->onComplete = std::move(onComplete);
 
   AsyncGraphLoad::g_asyncGraphLoadsInFlightCounter().fetch_add(1, std::memory_order_acq_rel);
@@ -1722,8 +1728,13 @@ bool RunModuleGraphLoadPumped(v8::Isolate* isolate, v8::Local<v8::Context> conte
   if (timeoutSeconds <= 0.0) {
     timeoutSeconds = 60.0;
   }
+  // One deadline shared by the wait below and by every fetch attempt the walk
+  // issues: attempts clamp to the time remaining and retries stop once no
+  // budget is left, so a fetch can never still be running after this wait
+  // has given up on it.
+  const CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + timeoutSeconds;
   auto done = std::make_shared<bool>(false);
-  StartModuleGraphLoad(isolate, context, root,
+  StartModuleGraphLoad(isolate, context, root, deadline,
                        [done](bool /*ok*/, const std::string& /*errorMessage*/,
                               v8::Local<v8::Context>) { *done = true; });
 
@@ -1735,7 +1746,6 @@ bool RunModuleGraphLoadPumped(v8::Isolate* isolate, v8::Local<v8::Context> conte
   // runloop services the remainder instead.
   Runtime* runtime = Runtime::GetRuntime(isolate);
   std::shared_ptr<EventLoop> eventLoop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
-  const CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + timeoutSeconds;
   for (;;) {
     // Termination outranks completion, which is why this precedes the `*done`
     // test rather than sharing a loop condition with it. A walk that finished
@@ -3097,7 +3107,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // immediately — no synchronous fetch, no runloop pump.
       const std::string requestUrl = normalizedSpec;
       StartModuleGraphLoad(
-          isolate, context, requestUrl,
+          isolate, context, requestUrl, /*fetchDeadline=*/0,
           [key, requestUrl, isolate](bool ok, const std::string& errorMessage,
                                      v8::Local<v8::Context> completionContext) {
             // JS thread; isolate entered and context scoped by the pipeline.
