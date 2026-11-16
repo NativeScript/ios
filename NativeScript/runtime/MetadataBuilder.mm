@@ -1366,6 +1366,30 @@ void MetadataBuilder::CFunctionCallback(const FunctionCallbackInfo<Value>& info)
   }
 }
 
+namespace {
+
+// The native implementation `klass` answered `selector` with stays reachable
+// under the swizzled-prefixed selector that native calls from JS prefer. A
+// class that only inherits `selector` below a replaced ancestor takes that
+// ancestor's alias: its selector resolves to the ancestor's JS replacement,
+// and an alias naming a native override in between would be re-entered when
+// that override calls super. Every replaced class gets an alias of its own,
+// which a later replacement keeps, so it never names an earlier replacement.
+void ReplaceKeepingOriginal(Class klass, SEL selector, const char* selectorName, IMP imp,
+                            const char* types) {
+  SEL alias = sel_registerName((Constants::SwizzledPrefix + selectorName).c_str());
+  bool inheritsAlias =
+      !ClassBuilder::ImplementsItself(klass, selector) && class_respondsToSelector(klass, alias);
+  Method method = class_getInstanceMethod(klass, inheritsAlias ? alias : selector);
+  IMP original = method != nullptr ? method_getImplementation(method) : nullptr;
+  class_replaceMethod(klass, selector, imp, types);
+  if (original != nullptr) {
+    class_addMethod(klass, alias, original, types);
+  }
+}
+
+}  // namespace
+
 v8::Intercepted MetadataBuilder::SwizzledInstanceMethodCallback(
     Local<v8::Name> property, Local<Value> value, const PropertyCallbackInfo<v8::Boolean>& info) {
   Isolate* isolate = info.GetIsolate();
@@ -1402,13 +1426,8 @@ v8::Intercepted MetadataBuilder::SwizzledInstanceMethodCallback(
       Interop::ConsumedObjectArgumentIndex(methodMeta->selector(), typeEncoding, argsCount));
   IMP methodBody =
       Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
-  IMP nativeImp =
-      class_replaceMethod(klass, methodMeta->selector(), methodBody, compilerEncoding.c_str());
-  if (nativeImp) {
-    std::string selector = methodMeta->selectorAsString();
-    SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selector).c_str());
-    class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding.c_str());
-  }
+  ReplaceKeepingOriginal(klass, methodMeta->selector(), methodMeta->selectorAsString(), methodBody,
+                         compilerEncoding.c_str());
   // Not intercepted: the native write is done, but V8 must still perform
   // the ordinary store, which is what the old void-returning callback did
   // by falling through without setting a return value.
@@ -1505,8 +1524,8 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
       }
     };
 
-    const char* compilerEncoding = "@@:";
     const TypeEncoding* typeEncoding = propertyMeta->getter()->encodings()->first();
+    std::string compilerEncoding = ClassBuilder::GetAccessorTypeEncoding(typeEncoding, 0, "@@:");
 
     Local<Value> getter = desc.get();
     std::shared_ptr<Persistent<v8::Function>> poGetterFunc =
@@ -1514,11 +1533,9 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
     PropertyCallbackContext* userData =
         new PropertyCallbackContext(isolate, poGetterFunc, propertyMeta);
     IMP impGetter = Interop::CreateMethod(2, 0, typeEncoding, getterCallback, userData);
-    IMP nativeImp =
-        class_replaceMethod(klass, propertyMeta->getter()->selector(), impGetter, compilerEncoding);
-    std::string selector = propertyMeta->getter()->selectorAsString();
-    SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selector).c_str());
-    class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding);
+    ReplaceKeepingOriginal(klass, propertyMeta->getter()->selector(),
+                           propertyMeta->getter()->selectorAsString(), impGetter,
+                           compilerEncoding.c_str());
   }
 
   if (desc.has_set()) {
@@ -1585,12 +1602,10 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
         new PropertyCallbackContext(isolate, poSetterFunc, propertyMeta);
     IMP impSetter = Interop::CreateMethod(2, 1, typeEncoding, setterCallback, userData);
 
-    const char* compilerEncoding = "v@:@";
-    IMP nativeImp =
-        class_replaceMethod(klass, propertyMeta->setter()->selector(), impSetter, compilerEncoding);
-    std::string selector = propertyMeta->setter()->selectorAsString();
-    SEL nativeSelector = sel_registerName((Constants::SwizzledPrefix + selector).c_str());
-    class_addMethod(klass, nativeSelector, nativeImp, compilerEncoding);
+    std::string compilerEncoding = ClassBuilder::GetAccessorTypeEncoding(typeEncoding, 1, "v@:@");
+    ReplaceKeepingOriginal(klass, propertyMeta->setter()->selector(),
+                           propertyMeta->setter()->selectorAsString(), impSetter,
+                           compilerEncoding.c_str());
   }
   // Not intercepted: the native write is done, but V8 must still perform
   // the ordinary store, which is what the old void-returning callback did

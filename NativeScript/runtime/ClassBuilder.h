@@ -31,12 +31,21 @@ class ClassBuilder {
       v8::Local<v8::Context> context);
   static void RegisterNativeTypeScriptExtendsFunction(
       v8::Local<v8::Context> context);
+  // Clears `*encodable` instead of asserting when a type has no compiler
+  // encoding the runtime can reproduce.
   static std::string GetTypeEncoding(const TypeEncoding* typeEncoding,
-                                     int argsCount);
+                                     int argsCount, bool* encodable = nullptr);
+  // A JS-implemented property accessor's encoding, or `fallback` when its
+  // types have no compiler encoding the runtime can reproduce.
+  static std::string GetAccessorTypeEncoding(const TypeEncoding* typeEncoding,
+                                             int argsCount,
+                                             const char* fallback);
   // `klass` or its nearest superclass not defined from JS.
   static Class FindNativeClass(Class klass);
   // The implementation of `method` from FindNativeClass(klass).
   static IMP FindNotOverridenMethod(Class klass, SEL method);
+  // Whether `klass`, not one of its superclasses, implements `selector`.
+  static bool ImplementsItself(Class klass, SEL selector);
 
  private:
   static std::atomic<unsigned long long> classNameCounter_;
@@ -68,7 +77,13 @@ class ClassBuilder {
                                std::vector<const PropertyMeta*> propertyMetas,
                                v8::Local<v8::Value> getter,
                                v8::Local<v8::Value> setter);
-  static std::string GetTypeEncoding(const TypeEncoding* typeEncoding);
+  // Follows clang: a struct behind a pointer is expanded only when that
+  // pointer is the outermost type, otherwise it is named only ("{Name}"),
+  // which also bounds self-referential structs.
+  static std::string GetTypeEncoding(const TypeEncoding* typeEncoding,
+                                     bool* encodable,
+                                     bool expandStructures = true,
+                                     bool expandPointedToStructures = true);
   static BinaryTypeEncodingType GetTypeEncodingType(v8::Isolate* isolate,
                                                     v8::Local<v8::Value> value);
 

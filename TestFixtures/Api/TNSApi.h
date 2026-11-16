@@ -1,3 +1,5 @@
+#import <simd/simd.h>
+
 typedef NS_ENUM(NSInteger, TNSEnums) {
   TNSEnum1 = -1,
   TNSEnum2,
@@ -76,4 +78,185 @@ typedef NSError* _Nullable TNSNullableError;
 @end
 
 @interface RectClass : NSObject <RectProtocol>
+@end
+
+@interface TNSAccessorTypes : NSObject
+@property(nonatomic) BOOL boolProperty;
+@property(nonatomic) NSUInteger unsignedProperty;
+@property(nonatomic) NSInteger integerProperty;
+@property(nonatomic) short shortProperty;
+@property(nonatomic) unichar unicharProperty;
+@property(nonatomic) char charProperty;
+@property(nonatomic) unsigned char unsignedCharProperty;
+@property(nonatomic) long long longLongProperty;
+@property(nonatomic) float floatProperty;
+@property(nonatomic) double doubleProperty;
+@property(nonatomic) CGRect rectProperty;
+@property(nonatomic) CGPoint pointProperty;
+@property(nonatomic) SEL selectorProperty;
+@property(nonatomic, strong) Class classProperty;
+@property(nonatomic, copy) void (^blockProperty)(void);
+@property(nonatomic) void* pointerProperty;
+@property(nonatomic) int (*functionPointerProperty)(int);
+@property(nonatomic) simd_float4 vectorProperty;
+@property(nonatomic, copy) NSString* objectProperty;
+@property(nonatomic, strong) id<NSCopying> protocolObjectProperty;
+@end
+
+@interface TNSAccessorSwizzleBase : NSObject
+@property(nonatomic, readonly) double doubleProperty;
+@property(nonatomic, readonly) BOOL boolProperty;
+@end
+
+// Readwrite redeclarations keep these properties in this class's metadata,
+// while their getters stay implemented by the superclass only.
+@interface TNSAccessorSwizzleDerived : TNSAccessorSwizzleBase
+@property(nonatomic, readwrite) double doubleProperty;
+@property(nonatomic, readwrite) BOOL boolProperty;
+@end
+
+@interface TNSInheritedSwizzleBase : NSObject
+@property(nonatomic, strong) id objectValue;
+@property(nonatomic) NSInteger scalarValue;
+- (id)describeValue:(int)value;
+- (id)storedObjectValue;
+- (NSInteger)storedScalarValue;
+@end
+
+@interface TNSInheritedSwizzleDerived : TNSInheritedSwizzleBase
+@end
+
+// Compatible redeclarations with other types keep these members in this
+// class's metadata, while only the superclass implements them.
+@interface TNSInheritedSwizzleDerived (Redeclared)
+@property(nonatomic, strong) NSString* objectValue;
+@property(nonatomic) TNSEnums scalarValue;
+- (NSString*)describeValue:(int)value;
+@end
+
+@interface TNSInheritedSwizzleSubclass : TNSInheritedSwizzleDerived
+@end
+
+@interface TNSInheritedSwizzleTwice : TNSInheritedSwizzleBase
+@end
+
+@interface TNSInheritedSwizzleTwice (Redeclared)
+@property(nonatomic) TNSEnums scalarValue;
+@end
+
+// Families for specs that replace members on a class and on its subclass.
+@interface TNSSwizzleChainBase : NSObject
+@property(nonatomic, strong) id objectValue;
+@property(nonatomic) NSInteger scalarValue;
+- (id)describeValue:(int)value;
+- (id)storedObjectValue;
+- (NSInteger)storedScalarValue;
+@end
+
+@interface TNSSwizzleChainDerived : TNSSwizzleChainBase
+@end
+
+@interface TNSSwizzleChainDerived (Redeclared)
+@property(nonatomic, strong) NSString* objectValue;
+@property(nonatomic) TNSEnums scalarValue;
+- (NSString*)describeValue:(int)value;
+@end
+
+@interface TNSSwizzleReverseBase : NSObject
+@property(nonatomic, strong) id objectValue;
+@property(nonatomic) NSInteger scalarValue;
+- (id)describeValue:(int)value;
+- (id)storedObjectValue;
+- (NSInteger)storedScalarValue;
+@end
+
+@interface TNSSwizzleReverseDerived : TNSSwizzleReverseBase
+@end
+
+@interface TNSSwizzleReverseDerived (Redeclared)
+@property(nonatomic, strong) NSString* objectValue;
+@property(nonatomic) TNSEnums scalarValue;
+- (NSString*)describeValue:(int)value;
+@end
+
+@interface TNSSwizzleRepeatBase : NSObject
+@property(nonatomic, strong) id objectValue;
+@property(nonatomic) NSInteger scalarValue;
+- (id)describeValue:(int)value;
+- (id)storedObjectValue;
+- (NSInteger)storedScalarValue;
+@end
+
+@interface TNSSwizzleRepeatDerived : TNSSwizzleRepeatBase
+@end
+
+@interface TNSSwizzleRepeatDerived (Redeclared)
+@property(nonatomic, strong) NSString* objectValue;
+@property(nonatomic) TNSEnums scalarValue;
+- (NSString*)describeValue:(int)value;
+@end
+
+@interface TNSSwizzleMiddleBase : NSObject
+@property(nonatomic, strong) id objectValue;
+@property(nonatomic) NSInteger scalarValue;
+- (id)describeValue:(int)value;
+- (id)storedObjectValue;
+- (NSInteger)storedScalarValue;
+@end
+
+// Overrides every member of its superclass natively, without calling it.
+@interface TNSSwizzleMiddle : TNSSwizzleMiddleBase
+@end
+
+@interface TNSSwizzleMiddleLeaf : TNSSwizzleMiddle
+@end
+
+@interface TNSSwizzleMiddleLeaf (Redeclared)
+@property(nonatomic, strong) NSString* objectValue;
+@property(nonatomic) TNSEnums scalarValue;
+- (NSString*)describeValue:(int)value;
+@end
+
+@interface TNSSwizzleSuperBase : NSObject
+@property(nonatomic, strong) id objectValue;
+@property(nonatomic) NSInteger scalarValue;
+- (id)describeValue:(int)value;
+- (id)storedObjectValue;
+- (NSInteger)storedScalarValue;
+@end
+
+// Overrides every member of its superclass natively, calling it.
+@interface TNSSwizzleSuperMiddle : TNSSwizzleSuperBase
+@end
+
+@interface TNSSwizzleSuperLeaf : TNSSwizzleSuperMiddle
+@end
+
+@interface TNSSwizzleSuperLeaf (Redeclared)
+@property(nonatomic, strong) NSString* objectValue;
+@property(nonatomic) TNSEnums scalarValue;
+- (NSString*)describeValue:(int)value;
+@end
+
+typedef struct TNSLinkedNode {
+  int value;
+  struct TNSLinkedNode* next;
+} TNSLinkedNode;
+
+typedef struct TNSLinkedLeaf {
+  int value;
+} TNSLinkedLeaf;
+
+typedef struct TNSLinkedHolder {
+  TNSLinkedNode* node;
+  TNSLinkedLeaf* leaf;
+  int count;
+} TNSLinkedHolder;
+
+@interface TNSLinkedTypes : NSObject
+@property(nonatomic) TNSLinkedNode* nodeProperty;
+@property(nonatomic) TNSLinkedHolder holderProperty;
+@property(nonatomic) TNSLinkedLeaf* leafProperty;
+- (TNSLinkedNode*)nextOf:(TNSLinkedNode*)node;
+- (TNSLinkedHolder)holderWithLeaf:(TNSLinkedLeaf*)leaf;
 @end

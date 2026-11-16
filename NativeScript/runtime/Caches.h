@@ -86,6 +86,14 @@ class Caches {
     // so we return a dummy cache
     return std::make_shared<Caches>(isolate);
   }
+  // The gate id of the Caches `isolate` holds, or -1 once they are removed.
+  // Cheaper than Get(): no shared_ptr copy, and no stand-in Caches.
+  inline static int GateIdOf(v8::Isolate* isolate) {
+    auto cache = isolate->GetData(0);
+    return cache != nullptr
+               ? (*reinterpret_cast<std::shared_ptr<Caches>*>(cache))->gateId_
+               : -1;
+  }
   static void Remove(v8::Isolate* isolate);
 
   // Per-isolate storage for subsystem state, so a subsystem can declare its
