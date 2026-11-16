@@ -75,13 +75,21 @@ public:
     }
     // Hold the returned pin across any wait for the isolate's Locker from a
     // thread that is not already inside the isolate; an empty pin means the
-    // isolate may already be disposed and must not be touched at all.
+    // isolate may already be disposed and must not be touched at all. The
+    // isolate this thread has entered counts only when its id matches too: it
+    // may be a later one at this isolate's address.
     inline IsolatePin Pin() const {
-      return IsolatePin(gateId_, v8::Isolate::TryGetCurrent() == isolate_);
+      v8::Isolate* current = v8::Isolate::TryGetCurrent();
+      return IsolatePin(gateId_, current == isolate_ && BelongsTo(current));
     }
     // True once the teardown has finished with every wrapper reachable from
     // JS. Read it while pinned.
     inline bool IsTornDown() const { return IsolateGates::IsClosed(gateId_); }
+    // Compares isolate ids, not addresses: a disposed isolate's address can be
+    // reused by a later isolate. `isolate` must be alive.
+    inline bool BelongsTo(v8::Isolate* isolate) const {
+      return gateId_ != -1 && tns::Caches::GateIdOf(isolate) == gateId_;
+    }
 
    private:
     v8::Isolate* isolate_;

@@ -84,6 +84,16 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index);
 - (void)storeBlock:(NSInteger (^)(void))block;
 - (NSInteger (^)(void))retainedStoredBlock NS_RETURNS_RETAINED;
 
+// One block slot for the whole process, reachable from every isolate.
++ (void)storeSharedBlock:(NSInteger (^)(NSInteger))block;
++ (NSInteger (^)(NSInteger))sharedBlock;
+// Answers an extra reference; the slot keeps its own.
++ (NSInteger (^)(NSInteger))retainedSharedBlock NS_RETURNS_RETAINED;
+// Hands the slot's reference over and empties the slot.
++ (NSInteger (^)(NSInteger))takeSharedBlock NS_RETURNS_RETAINED;
++ (void)clearSharedBlock;
++ (NSInteger)callBlock:(NSInteger (^)(NSInteger))block withValue:(NSInteger)value;
+
 @end
 
 // Declares the owned-return members of TNSOwnedReturns itself, so JS can

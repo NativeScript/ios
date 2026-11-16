@@ -138,6 +138,54 @@
     return block;
 }
 
+static NSInteger (^gSharedBlock)(NSInteger);
+
+// A JS block's dispose waits for its isolate, so the slot's previous block is
+// released outside the lock. Precise lifetime keeps ARC from releasing it
+// earlier, at its last use inside the lock.
++ (void)storeSharedBlock:(NSInteger (^)(NSInteger))block {
+    __attribute__((objc_precise_lifetime)) NSInteger (^previous)(NSInteger);
+    @synchronized([TNSOwnedBlocks class]) {
+        previous = gSharedBlock;
+        gSharedBlock = block;
+    }
+    previous = nil;
+}
+
++ (NSInteger (^)(NSInteger))sharedBlock {
+    NSInteger (^block)(NSInteger);
+    @synchronized([TNSOwnedBlocks class]) {
+        block = gSharedBlock;
+    }
+    return block;
+}
+
++ (NSInteger (^)(NSInteger))retainedSharedBlock {
+    return [self sharedBlock];
+}
+
++ (NSInteger (^)(NSInteger))takeSharedBlock {
+    NSInteger (^block)(NSInteger);
+    @synchronized([TNSOwnedBlocks class]) {
+        block = gSharedBlock;
+        gSharedBlock = nil;
+    }
+    return block;
+}
+
++ (void)clearSharedBlock {
+    __attribute__((objc_precise_lifetime)) NSInteger (^block)(NSInteger);
+    @synchronized([TNSOwnedBlocks class]) {
+        block = gSharedBlock;
+        gSharedBlock = nil;
+    }
+    block = nil;
+}
+
++ (NSInteger)callBlock:(NSInteger (^)(NSInteger))block withValue:(NSInteger)value {
+    return block(value);
+}
+
 @end
 
 // Foundation answers tagged pointers for dates in the range JS can represent.
