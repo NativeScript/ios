@@ -346,6 +346,31 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
                                      std::string& out, std::string& contentType, int& status,
                                      uint64_t* outBustGeneration = nullptr);
 
+// ── The module-fetch timeout policy ──────────────────────────────────────────
+//
+// One request timeout for every module-fetch attempt, read by every transport:
+// the synchronous NSURLConnection path, each NSURLSession attempt, and the
+// async session's own default. It MUST live in exactly one place — the async
+// session once said 10s while every NSMutableURLRequest overrode it to 5s, so
+// raising the session alone would have changed nothing.
+//
+// Debug runtimes get 30s: dev servers transform cold modules on demand, and
+// real toolchain responses have been measured at 5–9s — comfortably past the
+// old flat 5s, which expired mid-transform. A timed-out dependency fetch left
+// the module absent from the registry, hid its subtree from the graph walk,
+// and dumped it onto the blocking synchronous fallback (the "module graph
+// walk missed" warnings). Release keeps 5s: remote module loading there is
+// opt-in through the security gate, and nothing measured justifies relaxing
+// its budget.
+static NSTimeInterval ModuleFetchTimeoutInterval() {
+  return RuntimeConfig.IsDebug ? 30.0 : 5.0;
+}
+
+// Transport-error retry delay, shared by the sync and async paths. Long enough
+// to let a transient hiccup pass, short enough not to matter against the
+// request timeout.
+static constexpr double kModuleFetchRetryDelaySeconds = 0.12;
+
 // synchronous-fetch timing histogram.
 //
 // The histogram is intentionally coarse —
@@ -523,7 +548,7 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
     // One retry, and only for a transport error: an HTTP status is an answer,
     // not a failure to communicate, so asking again would just repeat it.
     TNS_DEBUG(Esm, "[http-loader] retrying %s after initial fetch error", url.c_str());
-    usleep(120 * 1000);
+    usleep((useconds_t)(kModuleFetchRetryDelaySeconds * 1000.0 * 1000.0));
     // The retry re-peeks, so the generation it carries — the one whose nonce is
     // on the wire for the body we end up with — replaces the first attempt's.
     transportOk =
@@ -652,7 +677,7 @@ static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url,
   [request setValue:@"application/javascript, text/javascript, */*;q=0.1"
       forHTTPHeaderField:@"Accept"];
   [request setValue:@"identity" forHTTPHeaderField:@"Accept-Encoding"];
-  [request setTimeoutInterval:5.0];
+  [request setTimeoutInterval:ModuleFetchTimeoutInterval()];
   // CRITICAL for HMR: layered defense to bypass CFNetwork's URL cache.
   // `setCachePolicy:` alone is insufficient on iOS 18+/26+ Simulator —
   // CFNetwork still serves a previous save's body from fsCachedData.
@@ -796,7 +821,10 @@ static NSURLSession* ModuleFetchSession() {
     config.URLCache = nil;
     config.requestCachePolicy = NSURLRequestReloadIgnoringLocalAndRemoteCacheData;
     config.HTTPShouldSetCookies = NO;
-    config.timeoutIntervalForRequest = 10.0;
+    // Every module request overrides this (BuildModuleFetchRequest sets the
+    // same policy value); the session default exists so the two settings can
+    // never disagree about the budget again.
+    config.timeoutIntervalForRequest = ModuleFetchTimeoutInterval();
     config.HTTPMaximumConnectionsPerHost = 16;
     // ARC is disabled in this file: sessionWithConfiguration: returns an
     // autoreleased object; retain it for the process-lifetime singleton.
@@ -810,10 +838,30 @@ static NSURLSession* ModuleFetchSession() {
 // std::function across threads without ARC) and guarantees exactly one
 // invocation + delete. Retries once on transport error, mirroring the
 // single-retry policy of the synchronous path.
+//
+// `fetchDeadline` (absolute CFAbsoluteTime, 0 = unbounded) is the enclosing
+// graph load's fetch budget. Two full policy attempts plus the retry delay
+// can outlast the pumped wait's deadline (e.g. 30s + 0.12s + 30s vs a 60s
+// graph budget), so a bounded attempt clamps its request timeout to the time
+// remaining and the retry fires only while some budget is left. A fetch that
+// lands late is still reported — a dep failure stays on the designed path —
+// but no request is issued that could only complete past the deadline.
 static void PerformModuleFetchAsyncAttempt(
     const std::string& url, const std::string& canonicalKey, int attempt,
+    CFAbsoluteTime fetchDeadline,
     std::function<void(ModuleFetchResult result)>* completionHeap) {
   @autoreleasepool {
+    const double remaining =
+        fetchDeadline > 0 ? fetchDeadline - CFAbsoluteTimeGetCurrent() : 0;
+    if (fetchDeadline > 0 && remaining <= 0) {
+      ModuleFetchResult failed;
+      failed.failureReason =
+          "HTTP import failed: " + url + " (module graph fetch deadline exceeded)";
+      (*completionHeap)(std::move(failed));
+      delete completionHeap;
+      return;
+    }
+
     uint64_t bustGeneration = 0;
     NSMutableURLRequest* request = BuildModuleFetchRequest(url, canonicalKey, &bustGeneration);
     if (!request) {
@@ -822,6 +870,10 @@ static void PerformModuleFetchAsyncAttempt(
       (*completionHeap)(std::move(failed));
       delete completionHeap;
       return;
+    }
+
+    if (fetchDeadline > 0 && remaining < request.timeoutInterval) {
+      [request setTimeoutInterval:remaining];
     }
 
     const std::string urlCopy = url;
@@ -857,17 +909,24 @@ static void PerformModuleFetchAsyncAttempt(
                             static_cast<size_t>([data length]));
               }
 
-              // Transport error → one retry, the same single-retry policy the
-              // sync path applies, without blocking any thread.
-              if (error != nil && attempt == 0) {
+              // Transport error → one retry while the enclosing load's budget
+              // can still fit the delay — the same single-retry policy the
+              // sync path applies, without blocking any thread. The retry's
+              // own request clamps to whatever remains when it fires.
+              const bool retryFitsDeadline =
+                  fetchDeadline <= 0 ||
+                  fetchDeadline - CFAbsoluteTimeGetCurrent() > kModuleFetchRetryDelaySeconds;
+              if (error != nil && attempt == 0 && retryFitsDeadline) {
                 TNS_DEBUG(Esm, "[http-loader][fetch-async] retrying %s after transport error: %s",
                           urlCopy.c_str(),
                           (error.localizedDescription ?: @"<no description>").UTF8String);
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(120 * NSEC_PER_MSEC)),
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                             (int64_t)(kModuleFetchRetryDelaySeconds *
+                                                       NSEC_PER_SEC)),
                                dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
                                  // Background thread: the carried key is the
                                  // only way this attempt can consult the bust set.
-                                 PerformModuleFetchAsyncAttempt(urlCopy, keyCopy, 1,
+                                 PerformModuleFetchAsyncAttempt(urlCopy, keyCopy, 1, fetchDeadline,
                                                                 completionHeap);
                                });
                 // Set only once the retry is actually queued: it now owns the
@@ -919,6 +978,7 @@ static void PerformModuleFetchAsyncAttempt(
 }
 
 void FetchModuleBodyAsync(const std::string& url, const std::string& canonicalKey,
+                          CFAbsoluteTime fetchDeadline,
                           std::function<void(ModuleFetchResult result)> completion) {
   // Security gate: single point of enforcement, same as HttpFetchModule.
   if (!IsRemoteUrlAllowed(url)) {
@@ -931,7 +991,7 @@ void FetchModuleBodyAsync(const std::string& url, const std::string& canonicalKe
   }
 
   auto* completionHeap = new std::function<void(ModuleFetchResult)>(std::move(completion));
-  PerformModuleFetchAsyncAttempt(url, canonicalKey, 0, completionHeap);
+  PerformModuleFetchAsyncAttempt(url, canonicalKey, 0, fetchDeadline, completionHeap);
 }
 
 // Cold-boot JS-thread runloop pump.

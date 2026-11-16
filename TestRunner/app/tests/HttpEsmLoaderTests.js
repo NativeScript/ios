@@ -227,6 +227,142 @@ describe("HTTP ESM Loader", function() {
             });
         });
 
+        // The module-fetch budget is build-dependent: 30s per request attempt
+        // in debug runtimes, 5s in release (HttpLoader.mm). A module whose
+        // response lands between the two — the measured 5–9s dev-server
+        // cold-transform latency — resolves in debug and still rejects in
+        // release. `canonicalizeHttpUrlKey` is a debug-only diagnostic export,
+        // so its presence identifies the build.
+        describe("fetch budget", function () {
+            var isDebugBuild =
+                typeof require("ns:module").canonicalizeHttpUrlKey === "function";
+            var originalTimeout;
+            beforeEach(function () {
+                originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+                jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
+            });
+            afterEach(function () {
+                jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+            });
+
+            function statsCount(origin, target) {
+                return import(origin + "/esm/request-stats.json?target=" +
+                              encodeURIComponent(target))
+                    .then(function (m) {
+                        return m.default.count;
+                    });
+            }
+
+            it("resolves a slow HTTP module inside the budget on its first request",
+               function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                var target = "/esm/slow/leaf.mjs?k=direct&delayMs=7000";
+                import(origin + target).then(function (mod) {
+                    if (!isDebugBuild) {
+                        fail("a 7s response must not resolve within the 5s release budget");
+                        done();
+                        return;
+                    }
+                    expect(mod.value).toBe(42);
+                    statsCount(origin, target).then(function (count) {
+                        // One request: no transport retry and no synchronous
+                        // fallback fetch — both issue a second request.
+                        expect(count).toBe(1);
+                        done();
+                    }).catch(function (error) {
+                        expect("stats rejected: " + formatError(error)).toBe("stats resolved");
+                        done();
+                    });
+                }).catch(function (error) {
+                    // Release: the 5s budget (and, on this allowlist, the
+                    // security gate) reject a 7s response — the budget must
+                    // not silently relax there.
+                    expect(isDebugBuild ? "rejected: " + formatError(error) : "rejected")
+                        .toBe("rejected");
+                    done();
+                });
+            });
+
+            it("resolves a slow HTTP re-export chain on one request per module",
+               function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                if (!isDebugBuild) {
+                    pending("release budget rejects the 7s parent — covered by the direct spec");
+                    done();
+                    return;
+                }
+                // The parent spends 7s transforming, then the walk discovers
+                // its re-exported child. Under the old 5s budget the parent's
+                // subtree was never discovered and every edge fell back to
+                // the blocking sync loader.
+                var parentTarget = "/esm/slow/parent.mjs?k=chain&delayMs=7000";
+                var childTarget = "/esm/slow/child.mjs?from=chain";
+                import(origin + parentTarget).then(function (mod) {
+                    expect(mod.value).toBe(42);
+                    expect(mod.parent).toBe("chain");
+                    Promise.all([statsCount(origin, parentTarget),
+                                 statsCount(origin, childTarget)]).then(function (counts) {
+                        expect(counts).toEqual([1, 1]);
+                        done();
+                    }).catch(function (error) {
+                        expect("stats rejected: " + formatError(error)).toBe("stats resolved");
+                        done();
+                    });
+                }).catch(function (error) {
+                    expect("rejected: " + formatError(error)).toBe("resolved");
+                    done();
+                });
+            });
+
+            it("waits for a slow HTTP leaf during a pumped require()", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                if (!isDebugBuild) {
+                    pending("release budget rejects the 7s leaf — covered by the direct spec");
+                    done();
+                    return;
+                }
+                var leafTarget = "/esm/slow/req-leaf.mjs?k=req&delayMs=7000";
+                var nsModule = require("ns:module");
+                nsModule.configureLoader({
+                    importMap: {
+                        imports: { "ns-slow-leaf": origin + leafTarget },
+                    },
+                });
+                try {
+                    var req = nsModule.createRequire(__dirname + "/anything.js");
+                    // Blocks the JS thread for the walk's ~7s fetch; the
+                    // re-export boundary at slow-mid.mjs keeps the leaf's
+                    // transitive edge inside the pumped graph.
+                    var mod = req("./esm/mixed/slow-entry.mjs");
+                    expect(mod.leaf).toBe(42);
+                } finally {
+                    nsModule.configureLoader({ importMap: { imports: {} } });
+                }
+                statsCount(origin, leafTarget).then(function (count) {
+                    expect(count).toBe(1);
+                    done();
+                }).catch(function (error) {
+                    expect("stats rejected: " + formatError(error)).toBe("stats resolved");
+                    done();
+                });
+            });
+        });
+
         // The import map is process-wide, so every spec here installs its own
         // and restores the empty map afterwards.
         // Each present configureLoader section replaces its state wholesale, so
@@ -854,14 +990,18 @@ describe("HTTP ESM Loader", function() {
         });
 
         describe("network timeouts", function() {
-            // The async loader's NSURLSession request timeout is 10s, so the
-            // rejection lands ~10s after the import — beyond jasmine's default
-            // 5s spec timeout. Jasmine 2.0 has no per-spec timeout argument;
-            // widen the global interval for just this describe.
+            // The loader's per-request timeout is 30s in debug builds, 5s in
+            // release, and a transport error is retried once — so the
+            // rejection lands ~60s (debug) or ~10s (release) after the import,
+            // beyond jasmine's default 5s spec timeout. Jasmine 2.0 has no
+            // per-spec timeout argument; widen the global interval for just
+            // this describe.
+            var isDebugBuild =
+                typeof require("ns:module").canonicalizeHttpUrlKey === "function";
             var originalTimeout;
             beforeEach(function() {
                 originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
-                jasmine.DEFAULT_TIMEOUT_INTERVAL = 15000;
+                jasmine.DEFAULT_TIMEOUT_INTERVAL = isDebugBuild ? 80000 : 15000;
             });
             afterEach(function() {
                 jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
@@ -874,9 +1014,12 @@ describe("HTTP ESM Loader", function() {
                 // Prefer the local XCTest server's delayed endpoint (deterministic, hermetic).
                 // The fallback is a closed local port (fast connection-refused), never a live
                 // external/TEST-NET host whose connect timeout would stall the JS thread on CI.
-                // delayMs must exceed the async loader's 10s request timeout so the
-                // fetch rejects (~10s) instead of completing late but successfully.
-                var spec = origin ? (origin + "/esm/timeout.mjs?delayMs=12000") : "http://127.0.0.1:59999/timeout-test.js";
+                // delayMs must exceed the per-request timeout (30s debug /
+                // 5s release) so the fetch rejects instead of completing
+                // late but successfully.
+                var spec = origin
+                    ? (origin + "/esm/timeout.mjs?delayMs=" + (isDebugBuild ? 32000 : 12000))
+                    : "http://127.0.0.1:59999/timeout-test.js";
 
                 import(spec).then(function(module) {
                     fail("Should not have succeeded for unreachable server");
