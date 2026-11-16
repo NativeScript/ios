@@ -35,6 +35,236 @@ describe("GC finalizer callbacks", function () {
         expect(calls).toBe(1);
     });
 
+    // A JS callback dispatched to a background queue holds the isolate's
+    // Locker there, so a collection and its finalizers can run off the main
+    // thread. The native releases they make must still happen on it.
+    it("releases natively on the runtime's thread after a background collection", function (done) {
+        var threads = [];
+        var DeallocThread = TNSApi.extend({
+            methodCalledInDealloc: function () {
+                threads.push(NSThread.isMainThread);
+            }
+        }, { name: "TNSApiDeallocThread" });
+
+        // Owned only through its wrapper, so its finalizer releases it. Held
+        // until the background block, so no collection on the main thread
+        // gets to it first.
+        var keep = DeallocThread.alloc().init();
+
+        var deallocsInBlock = -1;
+        var queue = dispatch_get_global_queue(qos_class_t.QOS_CLASS_DEFAULT, 0);
+        dispatch_async(queue, function () {
+            keep = null;
+            scrubStack();
+            __collect();
+            __collect();
+            deallocsInBlock = threads.length;
+        });
+
+        var attempts = 200;
+        (function poll() {
+            if (threads.length > 0 || --attempts === 0) {
+                expect(deallocsInBlock).toBe(0);
+                expect(threads).toEqual([true]);
+                done();
+                return;
+            }
+            setTimeout(poll, 10);
+        })();
+    });
+
+    // An object that first reached JS on a background thread has no tie to the
+    // runtime's thread, so its release stays with the collection that ran there.
+    it("releases a background-born object where the background collection runs", function (done) {
+        var threads = [];
+        var DeallocThread = TNSApi.extend({
+            methodCalledInDealloc: function () {
+                threads.push(NSThread.isMainThread);
+            }
+        }, { name: "TNSApiDeallocBackgroundThread" });
+
+        var queue = dispatch_get_global_queue(qos_class_t.QOS_CLASS_DEFAULT, 0);
+        dispatch_async(queue, function () {
+            (function () {
+                DeallocThread.alloc().init();
+            })();
+            scrubStack();
+            __collect();
+            __collect();
+        });
+
+        var attempts = 200;
+        (function poll() {
+            if (threads.length > 0 || --attempts === 0) {
+                expect(threads).toEqual([false]);
+                done();
+                return;
+            }
+            setTimeout(poll, 10);
+        })();
+    });
+
+    // A wrapper built for an object whose release still waits for the
+    // runtime's thread adopts that release as its own retain. The block below
+    // holds the Locker throughout, so the release cannot run in between.
+    function defineTakeoverWithExtends(onDealloc) {
+        return (function (_super) {
+            __extends(TNSApiReleaseTakeoverTS, _super);
+            function TNSApiReleaseTakeoverTS() {
+                return (_super !== null && _super.apply(this, arguments)) || this;
+            }
+            TNSApiReleaseTakeoverTS.prototype.methodCalledInDealloc = onDealloc;
+            return TNSApiReleaseTakeoverTS;
+        })(TNSApi);
+    }
+
+    function collectAndWait(rounds, callback) {
+        scrubStack();
+        __collect();
+        __collect();
+        setTimeout(function () {
+            if (rounds > 1) {
+                collectAndWait(rounds - 1, callback);
+            } else {
+                callback();
+            }
+        }, 10);
+    }
+
+    [
+        {
+            suffix: " (extend)",
+            // No retain/release swizzle: natively held instances are not kept.
+            keepsWrapper: false,
+            observed: false,
+            define: function (onDealloc) {
+                return TNSApi.extend({ methodCalledInDealloc: onDealloc }, { name: "TNSApiReleaseTakeover" });
+            }
+        },
+        {
+            suffix: " (__extends)",
+            keepsWrapper: true,
+            observed: false,
+            define: defineTakeoverWithExtends
+        },
+        {
+            // The instance's class is then the NSKVONotifying_ subclass of
+            // the JS class.
+            suffix: " (__extends, key-value observed)",
+            keepsWrapper: true,
+            observed: true,
+            define: defineTakeoverWithExtends
+        }
+    ].forEach(function (variant) {
+        it("hands a waiting release to the wrapper that replaces it" + variant.suffix, function (done) {
+            var threads = [];
+            var Klass = variant.define(function () {
+                threads.push(NSThread.isMainThread);
+            });
+
+            // Held until the background block, so its wrapper is still the
+            // main thread's when the block releases it.
+            var first = Klass.alloc().init();
+            var observer = NSObject.alloc().init();
+            if (variant.observed) {
+                first.addObserverForKeyPathOptionsContext(observer, "strokeColor", 0, null);
+            }
+            var holder = NSMutableArray.alloc().init();
+            holder.addObject(first);
+
+            var retainCount = -1;
+            var queue = dispatch_get_global_queue(qos_class_t.QOS_CLASS_DEFAULT, 0);
+            dispatch_async(queue, function () {
+                __releaseNativeCounterpart(first);
+                first = null;
+                var again = holder.objectAtIndex(0);
+                again.marker = "kept";
+                // The holder's reference and the adopted one.
+                retainCount = again.retainCount();
+            });
+
+            var attempts = 200;
+            (function poll() {
+                if (retainCount === -1 && --attempts > 0) {
+                    setTimeout(poll, 10);
+                    return;
+                }
+                expect(retainCount).toBe(2);
+                collectAndWait(2, function () {
+                    expect(threads).toEqual([]);
+                    if (variant.keepsWrapper) {
+                        expect(holder.objectAtIndex(0).marker).toBe("kept");
+                    }
+                    if (variant.observed) {
+                        holder.objectAtIndex(0).removeObserverForKeyPath(observer, "strokeColor");
+                    }
+                    holder.removeAllObjects();
+                    collectAndWait(3, function () {
+                        expect(threads).toEqual([true]);
+                        done();
+                    });
+                });
+            })();
+        });
+    });
+
+    // Releases wait in batches, and one of them can run JS (a -dealloc
+    // implemented in JS) that wraps an object whose own release comes later
+    // in the same batch. The order within a batch is unspecified, so the
+    // instance whose -dealloc does the wrapping is rarely the last one.
+    it("lets a wrapper adopt a release that waits behind the one running JS", function (done) {
+        var Held = defineTakeoverWithExtends(function () {});
+        var count = 16;
+        var holder = NSMutableArray.alloc().init();
+        var held = [];
+        for (var i = 0; i < count; i++) {
+            var instance = Held.alloc().init();
+            held.push(instance);
+            holder.addObject(instance);
+        }
+
+        var wrapped = 0;
+        var Trigger = TNSApi.extend({
+            methodCalledInDealloc: function () {
+                for (var j = 0; j < count; j++) {
+                    holder.objectAtIndex(j).marker = j;
+                    wrapped++;
+                }
+            }
+        }, { name: "TNSApiReleaseBatchTrigger" });
+        var trigger = Trigger.alloc().init();
+
+        var queue = dispatch_get_global_queue(qos_class_t.QOS_CLASS_DEFAULT, 0);
+        dispatch_async(queue, function () {
+            for (var k = 0; k < count; k++) {
+                __releaseNativeCounterpart(held[k]);
+            }
+            held = null;
+            __releaseNativeCounterpart(trigger);
+            trigger = null;
+        });
+
+        var attempts = 200;
+        (function poll() {
+            if (wrapped === 0 && --attempts > 0) {
+                setTimeout(poll, 10);
+                return;
+            }
+            expect(wrapped).toBe(count);
+            collectAndWait(2, function () {
+                var markers = [];
+                var expected = [];
+                for (var m = 0; m < count; m++) {
+                    markers.push(holder.objectAtIndex(m).marker);
+                    expected.push(m);
+                }
+                expect(markers).toEqual(expected);
+                holder.removeAllObjects();
+                done();
+            });
+        })();
+    });
+
     // A GcProtected (natively retained) instance is resurrected by its
     // finalizer, but anything reachable only through it is queued in the same
     // GC and disposed — the resurrected parent then holds "husks" whose

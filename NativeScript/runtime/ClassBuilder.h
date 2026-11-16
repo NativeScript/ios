@@ -42,6 +42,10 @@ class ClassBuilder {
                                              const char* fallback);
   // `klass` or its nearest superclass not defined from JS.
   static Class FindNativeClass(Class klass);
+  // Whether instances of `klass` run a -retain/-release pair that protects
+  // and unprotects their wrapper in `isolate`: one this isolate installed, on
+  // `klass` or a class it inherits from.
+  static bool TracksNativeRetains(v8::Isolate* isolate, Class klass);
   // The implementation of `method` from FindNativeClass(klass).
   static IMP FindNotOverridenMethod(Class klass, SEL method);
   // Whether `klass`, not one of its superclasses, implements `selector`.

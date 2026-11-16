@@ -2,6 +2,7 @@
 #include <Foundation/Foundation.h>
 #include <numeric>
 #include <sstream>
+#include <unordered_set>
 #include "ArgConverter.h"
 #include "BuiltinLoader.h"
 #include "Caches.h"
@@ -29,6 +30,14 @@ void ScopeClassNameToIsolate(std::string& name, int isolateId) {
     name += std::to_string(isolateId);
   }
 }
+
+// The classes an isolate gave the -retain/-release pair that protects and
+// unprotects an instance's wrapper. The pair looks the wrapper up in that
+// isolate only, so another isolate's wrapper of the same instance is never
+// unprotected by it.
+struct RetainTrackedClasses {
+  std::unordered_set<void*> classes;
+};
 }  // namespace
 
 Local<FunctionTemplate> ClassBuilder::GetExtendFunction(Isolate* isolate,
@@ -405,6 +414,9 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
           release(self, @selector(release));
         });
         class_addMethod(extendedClass, @selector(release), newRelease, "v@:");
+        if (auto* tracked = Caches::StateFor<RetainTrackedClasses>(isolate)) {
+          tracked->classes.insert((__bridge void*)extendedClass);
+        }
 
         info.GetReturnValue().SetUndefined();
       }).ToLocalChecked();
@@ -1099,6 +1111,19 @@ Class ClassBuilder::FindNativeClass(Class klass) {
   }
 
   return klass;
+}
+
+bool ClassBuilder::TracksNativeRetains(Isolate* isolate, Class klass) {
+  RetainTrackedClasses* tracked = Caches::ExistingStateFor<RetainTrackedClasses>(isolate);
+  if (tracked == nullptr || tracked->classes.empty()) {
+    return false;
+  }
+  for (; klass != nil; klass = class_getSuperclass(klass)) {
+    if (tracked->classes.count((__bridge void*)klass) != 0) {
+      return true;
+    }
+  }
+  return false;
 }
 
 IMP ClassBuilder::FindNotOverridenMethod(Class klass, SEL method) {
