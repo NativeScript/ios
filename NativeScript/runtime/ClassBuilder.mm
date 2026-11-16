@@ -538,7 +538,7 @@ std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding, bool
       std::stringstream ss;
       ss << "[";
       ss << typeEncoding->details.constantArray.size
-         << GetTypeEncoding(innerType, encodable, expandStructures, expandPointedToStructures);
+         << GetTypeEncoding(innerType, encodable, expandStructures, false);
       ss << "]";
       return ss.str();
     }
@@ -546,7 +546,7 @@ std::string ClassBuilder::GetTypeEncoding(const TypeEncoding* typeEncoding, bool
       const TypeEncoding* innerType = typeEncoding->details.incompleteArray.getInnerType();
       std::stringstream ss;
       ss << "^";
-      ss << GetTypeEncoding(innerType, encodable, expandPointedToStructures, false);
+      ss << GetTypeEncoding(innerType, encodable, expandStructures, false);
       return ss.str();
     }
     case BinaryTypeEncodingType::FunctionPointerEncoding: {
@@ -907,10 +907,18 @@ void ClassBuilder::VisitMethods(Class extendedClass, std::string methodName,
   }
 }
 
+// Reads the class's own method list: class_getInstanceMethod asks the class to
+// resolve a selector nothing implements, which initializes a class that is
+// still being built.
 bool ClassBuilder::ImplementsItself(Class klass, SEL selector) {
-  Method method = class_getInstanceMethod(klass, selector);
-  return method != nullptr &&
-         method != class_getInstanceMethod(class_getSuperclass(klass), selector);
+  unsigned int count = 0;
+  Method* methods = class_copyMethodList(klass, &count);
+  bool found = false;
+  for (unsigned int i = 0; i < count && !found; i++) {
+    found = method_getName(methods[i]) == selector;
+  }
+  free(methods);
+  return found;
 }
 
 void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,

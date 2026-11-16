@@ -339,6 +339,29 @@ describe("JS-implemented native property accessors", function () {
             expect([base.storedScalarValue(), base.scalarValue, base.valueForKey("scalarValue")]).toEqual([7, 7, 7]);
         });
 
+        it("reach the replacement and then the inherited implementation from a JS subclass calling super", function () {
+            install();
+            var Klass = TNSInheritedSwizzleDerived.extend({
+                describeValue: function (value) {
+                    return "sub " + this.super.describeValue(value);
+                },
+                get objectValue() {
+                    return "sub " + this.super.objectValue;
+                },
+                set objectValue(value) {
+                    this.super.objectValue = value + "?";
+                }
+            }, { name: "JSAccessorEncodingSwizzledSuper" });
+            var obj = Klass.new();
+            expect(obj.describeValue(6)).toBe("sub js base 6");
+            obj.objectValue = "a";
+            expect(obj.storedObjectValue()).toBe("a?!");
+            expect(obj.objectValue).toBe("sub js a?!");
+            expect(obj.valueForKey("objectValue")).toBe("sub js a?!");
+            obj.setValueForKey("b", "objectValue");
+            expect(obj.storedObjectValue()).toBe("b?!");
+        });
+
         it("reach the inherited accessors after a second replacement", function () {
             var proto = TNSInheritedSwizzleTwice.prototype;
             var original = inheritedDescriptor(proto, "scalarValue");
