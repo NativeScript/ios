@@ -107,11 +107,23 @@ describe("GC finalizer callbacks", function () {
     // A wrapper built for an object whose release still waits for the
     // runtime's thread adopts that release as its own retain. The block below
     // holds the Locker throughout, so the release cannot run in between.
+    function defineTakeoverWithExtends(onDealloc) {
+        return (function (_super) {
+            __extends(TNSApiReleaseTakeoverTS, _super);
+            function TNSApiReleaseTakeoverTS() {
+                return (_super !== null && _super.apply(this, arguments)) || this;
+            }
+            TNSApiReleaseTakeoverTS.prototype.methodCalledInDealloc = onDealloc;
+            return TNSApiReleaseTakeoverTS;
+        })(TNSApi);
+    }
+
     [
         {
             suffix: " (extend)",
             // No retain/release swizzle: natively held instances are not kept.
             keepsWrapper: false,
+            observed: false,
             define: function (onDealloc) {
                 return TNSApi.extend({ methodCalledInDealloc: onDealloc }, { name: "TNSApiReleaseTakeover" });
             }
@@ -119,16 +131,16 @@ describe("GC finalizer callbacks", function () {
         {
             suffix: " (__extends)",
             keepsWrapper: true,
-            define: function (onDealloc) {
-                return (function (_super) {
-                    __extends(TNSApiReleaseTakeoverTS, _super);
-                    function TNSApiReleaseTakeoverTS() {
-                        return (_super !== null && _super.apply(this, arguments)) || this;
-                    }
-                    TNSApiReleaseTakeoverTS.prototype.methodCalledInDealloc = onDealloc;
-                    return TNSApiReleaseTakeoverTS;
-                })(TNSApi);
-            }
+            observed: false,
+            define: defineTakeoverWithExtends
+        },
+        {
+            // The instance's class is then the NSKVONotifying_ subclass of
+            // the JS class.
+            suffix: " (__extends, key-value observed)",
+            keepsWrapper: true,
+            observed: true,
+            define: defineTakeoverWithExtends
         }
     ].forEach(function (variant) {
         it("hands a waiting release to the wrapper that replaces it" + variant.suffix, function (done) {
@@ -137,15 +149,21 @@ describe("GC finalizer callbacks", function () {
                 threads.push(NSThread.isMainThread);
             });
 
+            // Held until the background block, so its wrapper is still the
+            // main thread's when the block releases it.
+            var first = Klass.alloc().init();
+            var observer = NSObject.alloc().init();
+            if (variant.observed) {
+                first.addObserverForKeyPathOptionsContext(observer, "strokeColor", 0, null);
+            }
             var holder = NSMutableArray.alloc().init();
-            (function () {
-                holder.addObject(Klass.alloc().init());
-            })();
+            holder.addObject(first);
 
             var retainCount = -1;
             var queue = dispatch_get_global_queue(qos_class_t.QOS_CLASS_DEFAULT, 0);
             dispatch_async(queue, function () {
-                __releaseNativeCounterpart(holder.objectAtIndex(0));
+                __releaseNativeCounterpart(first);
+                first = null;
                 var again = holder.objectAtIndex(0);
                 again.marker = "kept";
                 // The holder's reference and the adopted one.
@@ -176,6 +194,9 @@ describe("GC finalizer callbacks", function () {
                     expect(threads).toEqual([]);
                     if (variant.keepsWrapper) {
                         expect(holder.objectAtIndex(0).marker).toBe("kept");
+                    }
+                    if (variant.observed) {
+                        holder.objectAtIndex(0).removeObserverForKeyPath(observer, "strokeColor");
                     }
                     holder.removeAllObjects();
                     collectAndWait(3, function () {

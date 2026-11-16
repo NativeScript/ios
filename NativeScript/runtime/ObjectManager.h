@@ -68,13 +68,14 @@ class ObjectManager {
   // the native releases it causes are handed to the runtime's thread. A new
   // Instances entry for an object whose release is still waiting takes that
   // release over as its own retain instead of retaining again; returns whether
-  // it did. Once the entry's retain is settled, call ProtectIfNativelyRetained.
+  // it did. Once the entry holds its reference, call ProtectIfNativelyRetained.
   static bool TakeDeferredRelease(v8::Isolate* isolate, id obj);
   // A class that tracks native retains (ClassBuilder::TracksNativeRetains)
   // protects its wrapper when native code first retains the object past the
   // runtime's own retain. A native retain made while a release waited found no
-  // wrapper to protect; this catches up.
-  static void ProtectIfNativelyRetained(id obj, ObjCDataWrapper* wrapper);
+  // wrapper to protect; this catches up. A surplus reference the caller drops
+  // afterwards goes through -release, which unprotects again.
+  static void ProtectIfNativelyRetained(v8::Isolate* isolate, id obj, ObjCDataWrapper* wrapper);
 
  private:
   static void ReleaseNativeCounterpartCallback(

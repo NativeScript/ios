@@ -8,8 +8,8 @@
 #include "ClassBuilder.h"
 #include "Constants.h"
 #include "DataWrapper.h"
-#include "FFICall.h"
 #include "EventLoop.h"
+#include "FFICall.h"
 #include "Helpers.h"
 #include "Runtime.h"
 
@@ -278,8 +278,7 @@ void ObjectManager::DisposeAllRegistered(Isolate* isolate) {
     state = next;
   }
 
-  // The walk's own releases are inline on the runtime's thread; this catches
-  // any made from another.
+  // A walk that runs off the runtime's thread queues its own releases.
   if (deferred != nullptr) {
     DrainDeferredReleases(deferred);
   }
@@ -378,9 +377,9 @@ bool ObjectManager::TakeDeferredRelease(Isolate* isolate, id obj) {
   return true;
 }
 
-void ObjectManager::ProtectIfNativelyRetained(id obj, ObjCDataWrapper* wrapper) {
-  // Only a class whose -release unprotects again may be protected here.
-  if (ClassBuilder::TracksNativeRetains(object_getClass(obj)) && [obj retainCount] > 1) {
+void ObjectManager::ProtectIfNativelyRetained(Isolate* isolate, id obj, ObjCDataWrapper* wrapper) {
+  // Only a wrapper the class's -release unprotects again may be protected.
+  if (ClassBuilder::TracksNativeRetains(isolate, object_getClass(obj)) && [obj retainCount] > 1) {
     wrapper->GcProtect();
   }
 }
@@ -635,8 +634,9 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
 
     // Release the runtime's strong reference (taken when the object was first
     // wrapped or adopted from an alloc/new/copy return). For instances solely
-    // owned by JS this deallocates immediately; for shared natives (e.g. an
-    // NSNotificationCenter observer token) the remaining owners keep it alive.
+    // owned by JS this deallocates them, on the runtime's thread (at once when
+    // called there); for shared natives (e.g. an NSNotificationCenter observer
+    // token) the remaining owners keep it alive.
     // Calling [data dealloc] here, as this used to do, destroyed objects that
     // were still referenced elsewhere and caused use-after-free crashes.
     // Read before the release below: an adapter claim's -dealloc frees the
