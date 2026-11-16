@@ -1,0 +1,3071 @@
+{
+  "module": "SwiftDemo",
+  "formatVersion": "0.6.0",
+  "platform": {
+    "architecture": "arm64",
+    "vendor": "apple",
+    "operatingSystem": "ios",
+    "environment": "simulator",
+    "minimumVersion": "15.0.0"
+  },
+  "graphFiles": [
+    "SwiftDemo.symbols.json",
+    "SwiftDemo@Swift.symbols.json"
+  ],
+  "topLevel": [
+    "s:9SwiftDemo7GreeterP",
+    "s:9SwiftDemo0B0C",
+    "s:9SwiftDemo5PointV",
+    "s:9SwiftDemo6FlavorO",
+    "s:9SwiftDemo5ShapeP",
+    "s:9SwiftDemo7PolygonC",
+    "s:9SwiftDemo6SquareC",
+    "s:9SwiftDemo13PrecipitationO",
+    "s:9SwiftDemo10ShapeErrorO",
+    "s:9SwiftDemo11MeasurementO",
+    "s:9SwiftDemo4RingV",
+    "s:9SwiftDemo7CounterC",
+    "s:9SwiftDemo6CanvasC",
+    "s:9SwiftDemo6LoaderC",
+    "s:9SwiftDemo16makeDefaultPointAA0E0VyF",
+    "s:9SwiftDemo13defaultFlavorAA0D0Ovp",
+    "s:9SwiftDemo13globalCounterSivp",
+    "s:9SwiftDemo11Coordinatesa",
+    "s:9SwiftDemo11checkedSideyS2dKF",
+    "s:9SwiftDemo8echoInt8ys0D0VADF",
+    "s:9SwiftDemo10echoUInt64ys0D0VADF",
+    "s:9SwiftDemo10largestIntSiyF",
+    "s:9SwiftDemo5shoutySSSgACF",
+    "s:9SwiftDemo7TrackerC"
+  ],
+  "externalTypes": [
+    {
+      "id": "s:SS",
+      "qualifiedName": "Swift.String",
+      "extendedModule": "Swift",
+      "typeKind": "swift.struct",
+      "members": [
+        "s:SS9SwiftDemoE7shoutedSSvp"
+      ]
+    },
+    {
+      "id": "s:Sa",
+      "qualifiedName": "Swift.Array",
+      "extendedModule": "Swift",
+      "typeKind": "swift.struct",
+      "members": [
+        "s:Sa9SwiftDemoAA5PointVRszlE8centroidACyF"
+      ]
+    }
+  ],
+  "externalNames": {
+    "s:SH": "Swift.Hashable",
+    "s:SQ": "Swift.Equatable",
+    "s:SS": "Swift.String",
+    "s:SY": "Swift.RawRepresentable",
+    "s:Sa": "Swift.Array",
+    "s:ScA": "_Concurrency.Actor",
+    "s:s16SendableMetatypeP": "Swift.SendableMetatype",
+    "s:s23CustomStringConvertibleP": "Swift.CustomStringConvertible",
+    "s:s5ErrorP": "Swift.Error",
+    "s:s8CopyableP": "Swift.Copyable",
+    "s:s8SendableP": "Swift.Sendable",
+    "s:s9EscapableP": "Swift.Escapable"
+  },
+  "symbols": [
+    {
+      "id": "s:9SwiftDemo0B0C",
+      "kind": "class",
+      "path": "Demo",
+      "name": "Demo",
+      "access": "public",
+      "declaration": "class Demo",
+      "location": "file://Sources/SwiftDemo/Demo.swift:4:13",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo0B0CACycfc",
+        "s:9SwiftDemo0B0C5greet4nameS2S_tF",
+        "s:9SwiftDemo0B0C5greet4name5timesS2S_SitF",
+        "s:9SwiftDemo0B0C7versionSSvpZ"
+      ],
+      "conformances": [
+        "s:9SwiftDemo7GreeterP"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo0B0C5greet4name5timesS2S_SitF",
+      "kind": "instanceMethod",
+      "path": "Demo.greet(name:times:)",
+      "name": "greet(name:times:)",
+      "access": "public",
+      "declaration": "func greet(name: String, times: Int) -> String",
+      "parameters": [
+        {
+          "label": "name",
+          "internalName": "name",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        },
+        {
+          "label": "times",
+          "internalName": "times",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "extension": {
+        "extendedModule": "SwiftDemo",
+        "typeKind": "swift.class"
+      },
+      "location": "file://Sources/SwiftDemo/Extensions.swift:1:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo0B0C"
+    },
+    {
+      "id": "s:9SwiftDemo0B0C5greet4nameS2S_tF",
+      "kind": "instanceMethod",
+      "path": "Demo.greet(name:)",
+      "name": "greet(name:)",
+      "access": "public",
+      "declaration": "func greet(name: String) -> String",
+      "parameters": [
+        {
+          "label": "name",
+          "internalName": "name",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Demo.swift:6:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo0B0C",
+      "sourceOrigin": "s:9SwiftDemo7GreeterP5greet4nameS2S_tF"
+    },
+    {
+      "id": "s:9SwiftDemo0B0C7versionSSvpZ",
+      "kind": "typeProperty",
+      "path": "Demo.version",
+      "name": "version",
+      "access": "public",
+      "declaration": "static var version: String { get }",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "SwiftDemo",
+        "typeKind": "swift.class"
+      },
+      "location": "file://Sources/SwiftDemo/Extensions.swift:5:22",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo0B0C"
+    },
+    {
+      "id": "s:9SwiftDemo0B0CACycfc",
+      "kind": "initializer",
+      "path": "Demo.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "location": "file://Sources/SwiftDemo/Demo.swift:5:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo0B0C"
+    },
+    {
+      "id": "s:9SwiftDemo10ShapeErrorO",
+      "kind": "enum",
+      "path": "ShapeError",
+      "name": "ShapeError",
+      "access": "public",
+      "declaration": "enum ShapeError",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:54:12",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo10ShapeErrorO11invalidSideyACSdcACmF",
+        "s:9SwiftDemo10ShapeErrorO12tooManySidesyACSi_SitcACmF",
+        "s:9SwiftDemo10ShapeErrorO7unknownyA2CmF",
+        "s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo10ShapeErrorO"
+      ],
+      "conformances": [
+        "s:s16SendableMetatypeP",
+        "s:s5ErrorP",
+        "s:s8SendableP"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo10ShapeErrorO11invalidSideyACSdcACmF",
+      "kind": "enumCase",
+      "path": "ShapeError.invalidSide(_:)",
+      "name": "invalidSide(_:)",
+      "access": "public",
+      "declaration": "case invalidSide(Double)",
+      "parameters": [
+        {
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:55:9",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10ShapeErrorO"
+    },
+    {
+      "id": "s:9SwiftDemo10ShapeErrorO12tooManySidesyACSi_SitcACmF",
+      "kind": "enumCase",
+      "path": "ShapeError.tooManySides(count:limit:)",
+      "name": "tooManySides(count:limit:)",
+      "access": "public",
+      "declaration": "case tooManySides(count: Int, limit: Int)",
+      "parameters": [
+        {
+          "label": "count",
+          "internalName": "count",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "label": "limit",
+          "internalName": "limit",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:56:9",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10ShapeErrorO"
+    },
+    {
+      "id": "s:9SwiftDemo10ShapeErrorO7unknownyA2CmF",
+      "kind": "enumCase",
+      "path": "ShapeError.unknown",
+      "name": "unknown",
+      "access": "public",
+      "declaration": "case unknown",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:57:9",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10ShapeErrorO"
+    },
+    {
+      "id": "s:9SwiftDemo10echoUInt64ys0D0VADF",
+      "kind": "function",
+      "path": "echoUInt64(_:)",
+      "name": "echoUInt64(_:)",
+      "access": "public",
+      "declaration": "func echoUInt64(_ value: UInt64) -> UInt64",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "UInt64",
+            "references": [
+              "s:s6UInt64V"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "UInt64",
+        "references": [
+          "s:s6UInt64V"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:9:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo10largestIntSiyF",
+      "kind": "function",
+      "path": "largestInt()",
+      "name": "largestInt()",
+      "access": "public",
+      "declaration": "func largestInt() -> Int",
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:10:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo11Coordinatesa",
+      "kind": "typeAlias",
+      "path": "Coordinates",
+      "name": "Coordinates",
+      "access": "public",
+      "declaration": "typealias Coordinates = (latitude: Double, longitude: Double)",
+      "aliasedType": {
+        "spelling": "(latitude: Double, longitude: Double)",
+        "references": [
+          "s:Sd",
+          "s:Sd"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Shapes.swift:141:17",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO",
+      "kind": "enum",
+      "path": "Measurement",
+      "name": "Measurement",
+      "access": "public",
+      "declaration": "enum Measurement",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:60:12",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo11MeasurementO6lengthyACSdcACmF",
+        "s:9SwiftDemo11MeasurementO4areayACSd_SdtcACmF",
+        "s:9SwiftDemo11MeasurementO4noneyA2CmF",
+        "s:9SwiftDemo11MeasurementO4UnitV",
+        "s:9SwiftDemo11MeasurementO6isNoneSbvp"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO4UnitV",
+      "kind": "struct",
+      "path": "Measurement.Unit",
+      "name": "Unit",
+      "access": "public",
+      "declaration": "struct Unit",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:65:18",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo11MeasurementO",
+      "members": [
+        "s:9SwiftDemo11MeasurementO4UnitV6symbolSSvp",
+        "s:9SwiftDemo11MeasurementO4UnitV6symbolAESS_tcfc"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO4UnitV6symbolAESS_tcfc",
+      "kind": "initializer",
+      "path": "Measurement.Unit.init(symbol:)",
+      "name": "init(symbol:)",
+      "access": "public",
+      "declaration": "init(symbol: String)",
+      "parameters": [
+        {
+          "label": "symbol",
+          "internalName": "symbol",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:67:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo11MeasurementO4UnitV"
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO4UnitV6symbolSSvp",
+      "kind": "instanceProperty",
+      "path": "Measurement.Unit.symbol",
+      "name": "symbol",
+      "access": "public",
+      "declaration": "var symbol: String",
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:66:19",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo11MeasurementO4UnitV"
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO4areayACSd_SdtcACmF",
+      "kind": "enumCase",
+      "path": "Measurement.area(width:height:)",
+      "name": "area(width:height:)",
+      "access": "public",
+      "declaration": "case area(width: Double, height: Double)",
+      "parameters": [
+        {
+          "label": "width",
+          "internalName": "width",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        },
+        {
+          "label": "height",
+          "internalName": "height",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:62:9",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo11MeasurementO"
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO4noneyA2CmF",
+      "kind": "enumCase",
+      "path": "Measurement.none",
+      "name": "none",
+      "access": "public",
+      "declaration": "case none",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:63:9",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo11MeasurementO"
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO6isNoneSbvp",
+      "kind": "instanceProperty",
+      "path": "Measurement.isNone",
+      "name": "isNone",
+      "access": "public",
+      "declaration": "var isNone: Bool { get }",
+      "valueType": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:70:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo11MeasurementO"
+    },
+    {
+      "id": "s:9SwiftDemo11MeasurementO6lengthyACSdcACmF",
+      "kind": "enumCase",
+      "path": "Measurement.length(_:)",
+      "name": "length(_:)",
+      "access": "public",
+      "declaration": "case length(Double)",
+      "parameters": [
+        {
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:61:9",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo11MeasurementO"
+    },
+    {
+      "id": "s:9SwiftDemo11checkedSideyS2dKF",
+      "kind": "function",
+      "path": "checkedSide(_:)",
+      "name": "checkedSide(_:)",
+      "access": "public",
+      "declaration": "func checkedSide(_ side: Double) throws -> Double",
+      "parameters": [
+        {
+          "internalName": "side",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "throws": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:3:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo13PrecipitationO",
+      "kind": "enum",
+      "path": "Precipitation",
+      "name": "Precipitation",
+      "access": "public",
+      "declaration": "enum Precipitation",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:50:12",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo13PrecipitationO4rainyA2CmF",
+        "s:9SwiftDemo13PrecipitationO4snowyA2CmF",
+        "s:9SwiftDemo13PrecipitationO4noneyA2CmF",
+        "s:9SwiftDemo13PrecipitationO8rawValueACSgSS_tcfc",
+        "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo13PrecipitationO",
+        "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo13PrecipitationO",
+        "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF::SYNTHESIZED::s:9SwiftDemo13PrecipitationO"
+      ],
+      "conformances": [
+        "s:SH",
+        "s:SQ",
+        "s:SY"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo13PrecipitationO4noneyA2CmF",
+      "kind": "enumCase",
+      "path": "Precipitation.none",
+      "name": "none",
+      "access": "public",
+      "declaration": "case none",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:51:21",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo13PrecipitationO"
+    },
+    {
+      "id": "s:9SwiftDemo13PrecipitationO4rainyA2CmF",
+      "kind": "enumCase",
+      "path": "Precipitation.rain",
+      "name": "rain",
+      "access": "public",
+      "declaration": "case rain",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:51:9",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo13PrecipitationO"
+    },
+    {
+      "id": "s:9SwiftDemo13PrecipitationO4snowyA2CmF",
+      "kind": "enumCase",
+      "path": "Precipitation.snow",
+      "name": "snow",
+      "access": "public",
+      "declaration": "case snow",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:51:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo13PrecipitationO"
+    },
+    {
+      "id": "s:9SwiftDemo13PrecipitationO8rawValueACSgSS_tcfc",
+      "kind": "initializer",
+      "path": "Precipitation.init(rawValue:)",
+      "name": "init(rawValue:)",
+      "access": "public",
+      "declaration": "init?(rawValue: String)",
+      "parameters": [
+        {
+          "label": "rawValue",
+          "internalName": "rawValue",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "failable": true,
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo13PrecipitationO",
+      "sourceOrigin": "s:SY8rawValuexSg03RawB0Qz_tcfc"
+    },
+    {
+      "id": "s:9SwiftDemo13defaultFlavorAA0D0Ovp",
+      "kind": "variable",
+      "path": "defaultFlavor",
+      "name": "defaultFlavor",
+      "access": "public",
+      "declaration": "let defaultFlavor: Flavor",
+      "valueType": {
+        "spelling": "Flavor",
+        "references": [
+          "s:9SwiftDemo6FlavorO"
+        ]
+      },
+      "settable": false,
+      "let": true,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:139:11",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo13globalCounterSivp",
+      "kind": "variable",
+      "path": "globalCounter",
+      "name": "globalCounter",
+      "access": "public",
+      "declaration": "var globalCounter: Int",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:140:11",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo16makeDefaultPointAA0E0VyF",
+      "kind": "function",
+      "path": "makeDefaultPoint()",
+      "name": "makeDefaultPoint()",
+      "access": "public",
+      "declaration": "func makeDefaultPoint() -> Point",
+      "returns": {
+        "spelling": "Point",
+        "references": [
+          "s:9SwiftDemo5PointV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Shapes.swift:138:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo4RingV",
+      "kind": "struct",
+      "path": "Ring",
+      "name": "Ring",
+      "access": "public",
+      "declaration": "struct Ring",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:76:14",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo4RingV5innerAA5PointVvp",
+        "s:9SwiftDemo4RingV5outerAA5PointVvp",
+        "s:9SwiftDemo4RingV5inner5outerAcA5PointV_AGtcfc",
+        "s:9SwiftDemo4RingV6expand2byySd_tF",
+        "s:9SwiftDemo4RingV1poiyA2C_ACtFZ"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo4RingV1poiyA2C_ACtFZ",
+      "kind": "operator",
+      "path": "Ring.+(_:_:)",
+      "name": "+(_:_:)",
+      "access": "public",
+      "declaration": "static func + (lhs: Ring, rhs: Ring) -> Ring",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Ring",
+            "references": [
+              "s:9SwiftDemo4RingV"
+            ]
+          }
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Ring",
+            "references": [
+              "s:9SwiftDemo4RingV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Ring",
+        "references": [
+          "s:9SwiftDemo4RingV"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Shapes.swift:90:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo4RingV"
+    },
+    {
+      "id": "s:9SwiftDemo4RingV5inner5outerAcA5PointV_AGtcfc",
+      "kind": "initializer",
+      "path": "Ring.init(inner:outer:)",
+      "name": "init(inner:outer:)",
+      "access": "public",
+      "declaration": "init(inner: Point, outer: Point)",
+      "parameters": [
+        {
+          "label": "inner",
+          "internalName": "inner",
+          "type": {
+            "spelling": "Point",
+            "references": [
+              "s:9SwiftDemo5PointV"
+            ]
+          }
+        },
+        {
+          "label": "outer",
+          "internalName": "outer",
+          "type": {
+            "spelling": "Point",
+            "references": [
+              "s:9SwiftDemo5PointV"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:80:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo4RingV"
+    },
+    {
+      "id": "s:9SwiftDemo4RingV5innerAA5PointVvp",
+      "kind": "instanceProperty",
+      "path": "Ring.inner",
+      "name": "inner",
+      "access": "public",
+      "declaration": "var inner: Point",
+      "valueType": {
+        "spelling": "Point",
+        "references": [
+          "s:9SwiftDemo5PointV"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:77:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo4RingV"
+    },
+    {
+      "id": "s:9SwiftDemo4RingV5outerAA5PointVvp",
+      "kind": "instanceProperty",
+      "path": "Ring.outer",
+      "name": "outer",
+      "access": "public",
+      "declaration": "var outer: Point",
+      "valueType": {
+        "spelling": "Point",
+        "references": [
+          "s:9SwiftDemo5PointV"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:78:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo4RingV"
+    },
+    {
+      "id": "s:9SwiftDemo4RingV6expand2byySd_tF",
+      "kind": "instanceMethod",
+      "path": "Ring.expand(by:)",
+      "name": "expand(by:)",
+      "access": "public",
+      "declaration": "mutating func expand(by delta: Double)",
+      "modifiers": [
+        "mutating"
+      ],
+      "parameters": [
+        {
+          "label": "by",
+          "internalName": "delta",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:85:25",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo4RingV"
+    },
+    {
+      "id": "s:9SwiftDemo5PointV",
+      "kind": "struct",
+      "path": "Point",
+      "name": "Point",
+      "access": "public",
+      "declaration": "struct Point",
+      "location": "file://Sources/SwiftDemo/Demo.swift:9:14",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo5PointV1xSdvp",
+        "s:9SwiftDemo5PointV1ySdvp",
+        "s:9SwiftDemo5PointV1x1yACSd_Sdtcfc",
+        "s:9SwiftDemo5PointV11descriptionSSvp",
+        "s:9SwiftDemo5PointV6lengthSdvp"
+      ],
+      "conformances": [
+        "s:s23CustomStringConvertibleP",
+        "s:s8CopyableP",
+        "s:s9EscapableP"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo5PointV11descriptionSSvp",
+      "kind": "instanceProperty",
+      "path": "Point.description",
+      "name": "description",
+      "access": "public",
+      "declaration": "var description: String { get }",
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "SwiftDemo",
+        "typeKind": "swift.struct"
+      },
+      "location": "file://Sources/SwiftDemo/Extensions.swift:9:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5PointV",
+      "sourceOrigin": "s:s23CustomStringConvertibleP11descriptionSSvp"
+    },
+    {
+      "id": "s:9SwiftDemo5PointV1x1yACSd_Sdtcfc",
+      "kind": "initializer",
+      "path": "Point.init(x:y:)",
+      "name": "init(x:y:)",
+      "access": "public",
+      "declaration": "init(x: Double, y: Double)",
+      "parameters": [
+        {
+          "label": "x",
+          "internalName": "x",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        },
+        {
+          "label": "y",
+          "internalName": "y",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Demo.swift:12:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5PointV"
+    },
+    {
+      "id": "s:9SwiftDemo5PointV1xSdvp",
+      "kind": "instanceProperty",
+      "path": "Point.x",
+      "name": "x",
+      "access": "public",
+      "declaration": "var x: Double",
+      "valueType": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Demo.swift:10:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5PointV"
+    },
+    {
+      "id": "s:9SwiftDemo5PointV1ySdvp",
+      "kind": "instanceProperty",
+      "path": "Point.y",
+      "name": "y",
+      "access": "public",
+      "declaration": "var y: Double",
+      "valueType": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Demo.swift:11:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5PointV"
+    },
+    {
+      "id": "s:9SwiftDemo5PointV6lengthSdvp",
+      "kind": "instanceProperty",
+      "path": "Point.length",
+      "name": "length",
+      "access": "public",
+      "declaration": "var length: Double { get }",
+      "valueType": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "SwiftDemo",
+        "typeKind": "swift.struct"
+      },
+      "location": "file://Sources/SwiftDemo/Extensions.swift:10:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5PointV"
+    },
+    {
+      "id": "s:9SwiftDemo5ShapeP",
+      "kind": "protocol",
+      "path": "Shape",
+      "name": "Shape",
+      "access": "public",
+      "declaration": "protocol Shape : Greeter",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:2:16",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo5ShapeP4areaSdvp",
+        "s:9SwiftDemo5ShapeP5sidesSivpZ"
+      ],
+      "conformances": [
+        "s:9SwiftDemo7GreeterP"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo5ShapeP4areaSdvp",
+      "kind": "instanceProperty",
+      "path": "Shape.area",
+      "name": "area",
+      "access": "public",
+      "declaration": "var area: Double { get }",
+      "protocolRequirement": true,
+      "valueType": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:3:8",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5ShapeP"
+    },
+    {
+      "id": "s:9SwiftDemo5ShapeP5sidesSivpZ",
+      "kind": "typeProperty",
+      "path": "Shape.sides",
+      "name": "sides",
+      "access": "public",
+      "declaration": "static var sides: Int { get }",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "protocolRequirement": true,
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:4:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo5ShapeP"
+    },
+    {
+      "id": "s:9SwiftDemo5shoutySSSgACF",
+      "kind": "function",
+      "path": "shout(_:)",
+      "name": "shout(_:)",
+      "access": "public",
+      "declaration": "func shout(_ name: String?) -> String?",
+      "parameters": [
+        {
+          "internalName": "name",
+          "type": {
+            "spelling": "String?",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String?",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:11:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:9SwiftDemo6CanvasC",
+      "kind": "class",
+      "path": "Canvas",
+      "name": "Canvas",
+      "access": "public",
+      "declaration": "@MainActor final class Canvas",
+      "attributes": [
+        "@MainActor"
+      ],
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:106:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo6CanvasCACycfc",
+        "s:9SwiftDemo6CanvasC4drawyyAA5Shape_pF"
+      ],
+      "conformances": [
+        "s:s8SendableP"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo6CanvasC4drawyyAA5Shape_pF",
+      "kind": "instanceMethod",
+      "path": "Canvas.draw(_:)",
+      "name": "draw(_:)",
+      "access": "public",
+      "declaration": "@MainActor func draw(_ shape: any Shape)",
+      "attributes": [
+        "@MainActor"
+      ],
+      "parameters": [
+        {
+          "internalName": "shape",
+          "type": {
+            "spelling": "any Shape",
+            "references": [
+              "s:9SwiftDemo5ShapeP"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:108:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6CanvasC"
+    },
+    {
+      "id": "s:9SwiftDemo6CanvasCACycfc",
+      "kind": "initializer",
+      "path": "Canvas.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "@MainActor init()",
+      "attributes": [
+        "@MainActor"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:107:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6CanvasC"
+    },
+    {
+      "id": "s:9SwiftDemo6FlavorO",
+      "kind": "enum",
+      "path": "Flavor",
+      "name": "Flavor",
+      "access": "public",
+      "declaration": "enum Flavor",
+      "location": "file://Sources/SwiftDemo/Demo.swift:15:12",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo6FlavorO7vanillayA2CmF",
+        "s:9SwiftDemo6FlavorO9chocolateyA2CmF",
+        "s:9SwiftDemo6FlavorO11descriptionSSvp",
+        "s:9SwiftDemo6FlavorO8rawValueACSgSi_tcfc",
+        "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo6FlavorO",
+        "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo6FlavorO",
+        "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF::SYNTHESIZED::s:9SwiftDemo6FlavorO"
+      ],
+      "conformances": [
+        "s:SH",
+        "s:SQ",
+        "s:SY",
+        "s:s23CustomStringConvertibleP",
+        "s:s8CopyableP",
+        "s:s9EscapableP"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo6FlavorO11descriptionSSvp",
+      "kind": "instanceProperty",
+      "path": "Flavor.description",
+      "name": "description",
+      "access": "public",
+      "declaration": "var description: String { get }",
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "SwiftDemo",
+        "typeKind": "swift.enum"
+      },
+      "location": "file://Sources/SwiftDemo/Extensions.swift:14:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6FlavorO",
+      "sourceOrigin": "s:s23CustomStringConvertibleP11descriptionSSvp"
+    },
+    {
+      "id": "s:9SwiftDemo6FlavorO7vanillayA2CmF",
+      "kind": "enumCase",
+      "path": "Flavor.vanilla",
+      "name": "vanilla",
+      "access": "public",
+      "declaration": "case vanilla",
+      "location": "file://Sources/SwiftDemo/Demo.swift:15:31",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6FlavorO"
+    },
+    {
+      "id": "s:9SwiftDemo6FlavorO8rawValueACSgSi_tcfc",
+      "kind": "initializer",
+      "path": "Flavor.init(rawValue:)",
+      "name": "init(rawValue:)",
+      "access": "public",
+      "declaration": "init?(rawValue: Int)",
+      "parameters": [
+        {
+          "label": "rawValue",
+          "internalName": "rawValue",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "failable": true,
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6FlavorO",
+      "sourceOrigin": "s:SY8rawValuexSg03RawB0Qz_tcfc"
+    },
+    {
+      "id": "s:9SwiftDemo6FlavorO9chocolateyA2CmF",
+      "kind": "enumCase",
+      "path": "Flavor.chocolate",
+      "name": "chocolate",
+      "access": "public",
+      "declaration": "case chocolate",
+      "location": "file://Sources/SwiftDemo/Demo.swift:15:44",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6FlavorO"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC",
+      "kind": "class",
+      "path": "Loader",
+      "name": "Loader",
+      "access": "public",
+      "declaration": "final class Loader",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:111:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo6LoaderCACycfc",
+        "s:9SwiftDemo6LoaderC4load4path10Foundation4DataVSS_tKF",
+        "s:9SwiftDemo6LoaderC5fetch3urlSS10Foundation3URLV_tYaKF",
+        "s:9SwiftDemo6LoaderC4wait7secondsySd_tYaF",
+        "s:9SwiftDemo6LoaderC9transformyxxAA5ShapeRzlF",
+        "s:9SwiftDemo6LoaderC5first2ofxSgSayxG_tlF",
+        "s:9SwiftDemo6LoaderC14withCompletionyyys6ResultOySSAA10ShapeErrorOGcF",
+        "s:9SwiftDemo6LoaderC4eachyyySiXEF",
+        "s:9SwiftDemo6LoaderC6lookup5table3keySiSgSDySSSiG_SStF",
+        "s:9SwiftDemo6LoaderC6updateyyAA5PointVzF",
+        "s:9SwiftDemo6LoaderC10modernOnlyyyF",
+        "s:9SwiftDemo6LoaderC11legacyFetchyyF",
+        "s:9SwiftDemo6LoaderC8oldFetchyyF"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC10modernOnlyyyF",
+      "kind": "instanceMethod",
+      "path": "Loader.modernOnly()",
+      "name": "modernOnly()",
+      "access": "public",
+      "declaration": "func modernOnly()",
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "16.0.0"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:129:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC11legacyFetchyyF",
+      "kind": "instanceMethod",
+      "path": "Loader.legacyFetch()",
+      "name": "legacyFetch()",
+      "access": "public",
+      "declaration": "func legacyFetch()",
+      "availability": [
+        {
+          "domain": "*",
+          "message": "Use fetch(url:) instead",
+          "unconditionallyDeprecated": true
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:132:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC14withCompletionyyys6ResultOySSAA10ShapeErrorOGcF",
+      "kind": "instanceMethod",
+      "path": "Loader.withCompletion(_:)",
+      "name": "withCompletion(_:)",
+      "access": "public",
+      "declaration": "func withCompletion(_ completion: @escaping (Result<String, ShapeError>) -> Void)",
+      "parameters": [
+        {
+          "internalName": "completion",
+          "type": {
+            "spelling": "(Result<String, ShapeError>) -> Void",
+            "references": [
+              "s:s6ResultO",
+              "s:SS",
+              "s:9SwiftDemo10ShapeErrorO",
+              "s:s4Voida"
+            ]
+          },
+          "attributes": [
+            "@escaping"
+          ]
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:121:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC4eachyyySiXEF",
+      "kind": "instanceMethod",
+      "path": "Loader.each(_:)",
+      "name": "each(_:)",
+      "access": "public",
+      "declaration": "func each(_ body: (Int) -> Void)",
+      "parameters": [
+        {
+          "internalName": "body",
+          "type": {
+            "spelling": "(Int) -> Void",
+            "references": [
+              "s:Si",
+              "s:s4Voida"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:122:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC4load4path10Foundation4DataVSS_tKF",
+      "kind": "instanceMethod",
+      "path": "Loader.load(path:)",
+      "name": "load(path:)",
+      "access": "public",
+      "declaration": "func load(path: String) throws -> Data",
+      "parameters": [
+        {
+          "label": "path",
+          "internalName": "path",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Data",
+        "references": [
+          "s:10Foundation4DataV"
+        ]
+      },
+      "throws": true,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:114:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC4wait7secondsySd_tYaF",
+      "kind": "instanceMethod",
+      "path": "Loader.wait(seconds:)",
+      "name": "wait(seconds:)",
+      "access": "public",
+      "declaration": "func wait(seconds: Double) async",
+      "parameters": [
+        {
+          "label": "seconds",
+          "internalName": "seconds",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "async": true,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:116:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC5fetch3urlSS10Foundation3URLV_tYaKF",
+      "kind": "instanceMethod",
+      "path": "Loader.fetch(url:)",
+      "name": "fetch(url:)",
+      "access": "public",
+      "declaration": "func fetch(url: URL) async throws -> String",
+      "parameters": [
+        {
+          "label": "url",
+          "internalName": "url",
+          "type": {
+            "spelling": "URL",
+            "references": [
+              "s:10Foundation3URLV"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "async": true,
+      "throws": true,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:115:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC5first2ofxSgSayxG_tlF",
+      "kind": "instanceMethod",
+      "path": "Loader.first(of:)",
+      "name": "first(of:)",
+      "access": "public",
+      "declaration": "func first<Element>(of items: [Element]) -> Element?",
+      "parameters": [
+        {
+          "label": "of",
+          "internalName": "items",
+          "type": {
+            "spelling": "[Element]",
+            "references": [
+              "s:9SwiftDemo6LoaderC5first2ofxSgSayxG_tlF7ElementL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Element?"
+      },
+      "genericParameters": [
+        {
+          "name": "Element",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:119:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC6lookup5table3keySiSgSDySSSiG_SStF",
+      "kind": "instanceMethod",
+      "path": "Loader.lookup(table:key:)",
+      "name": "lookup(table:key:)",
+      "access": "public",
+      "declaration": "func lookup(table: [String : Int], key: String) -> Int?",
+      "parameters": [
+        {
+          "label": "table",
+          "internalName": "table",
+          "type": {
+            "spelling": "[String : Int]",
+            "references": [
+              "s:SS",
+              "s:Si"
+            ]
+          }
+        },
+        {
+          "label": "key",
+          "internalName": "key",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int?",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Shapes.swift:124:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC6updateyyAA5PointVzF",
+      "kind": "instanceMethod",
+      "path": "Loader.update(_:)",
+      "name": "update(_:)",
+      "access": "public",
+      "declaration": "func update(_ point: inout Point)",
+      "parameters": [
+        {
+          "internalName": "point",
+          "type": {
+            "spelling": "Point",
+            "references": [
+              "s:9SwiftDemo5PointV"
+            ]
+          },
+          "modifier": "inout"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:126:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC8oldFetchyyF",
+      "kind": "instanceMethod",
+      "path": "Loader.oldFetch()",
+      "name": "oldFetch()",
+      "access": "public",
+      "declaration": "func oldFetch()",
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "15.0.0",
+          "deprecated": "17.0.0",
+          "renamed": "fetch(url:)"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:135:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderC9transformyxxAA5ShapeRzlF",
+      "kind": "instanceMethod",
+      "path": "Loader.transform(_:)",
+      "name": "transform(_:)",
+      "access": "public",
+      "declaration": "func transform<T>(_ shape: T) -> T where T : Shape",
+      "parameters": [
+        {
+          "internalName": "shape",
+          "type": {
+            "spelling": "T",
+            "references": [
+              "s:9SwiftDemo6LoaderC9transformyxxAA5ShapeRzlF1TL_xmfp"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "T"
+      },
+      "genericParameters": [
+        {
+          "name": "T",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "T",
+          "rhs": "Shape",
+          "rhsPrecise": "s:9SwiftDemo5ShapeP"
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:118:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6LoaderCACycfc",
+      "kind": "initializer",
+      "path": "Loader.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:112:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6LoaderC"
+    },
+    {
+      "id": "s:9SwiftDemo6SquareC",
+      "kind": "class",
+      "path": "Square",
+      "name": "Square",
+      "access": "public",
+      "declaration": "final class Square",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:34:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo6SquareC4sideSdvp",
+        "s:9SwiftDemo6SquareC4sideACSd_tcfc",
+        "s:9SwiftDemo6SquareC4areaSdvp",
+        "s:9SwiftDemo6SquareC5sidesSivpZ",
+        "s:9SwiftDemo6SquareC5greet4nameS2S_tF",
+        "s:9SwiftDemo6SquareC5scale2byySd_tF"
+      ],
+      "conformances": [
+        "s:9SwiftDemo5ShapeP",
+        "s:9SwiftDemo7GreeterP"
+      ],
+      "superclass": "s:9SwiftDemo7PolygonC"
+    },
+    {
+      "id": "s:9SwiftDemo6SquareC4areaSdvp",
+      "kind": "instanceProperty",
+      "path": "Square.area",
+      "name": "area",
+      "access": "public",
+      "declaration": "var area: Double { get }",
+      "valueType": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:42:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6SquareC",
+      "sourceOrigin": "s:9SwiftDemo5ShapeP4areaSdvp"
+    },
+    {
+      "id": "s:9SwiftDemo6SquareC4sideACSd_tcfc",
+      "kind": "initializer",
+      "path": "Square.init(side:)",
+      "name": "init(side:)",
+      "access": "public",
+      "declaration": "init(side: Double)",
+      "parameters": [
+        {
+          "label": "side",
+          "internalName": "side",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:37:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6SquareC"
+    },
+    {
+      "id": "s:9SwiftDemo6SquareC4sideSdvp",
+      "kind": "instanceProperty",
+      "path": "Square.side",
+      "name": "side",
+      "access": "public",
+      "declaration": "var side: Double",
+      "valueType": {
+        "spelling": "Double",
+        "references": [
+          "s:Sd"
+        ]
+      },
+      "settable": true,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:35:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6SquareC"
+    },
+    {
+      "id": "s:9SwiftDemo6SquareC5greet4nameS2S_tF",
+      "kind": "instanceMethod",
+      "path": "Square.greet(name:)",
+      "name": "greet(name:)",
+      "access": "public",
+      "declaration": "func greet(name: String) -> String",
+      "parameters": [
+        {
+          "label": "name",
+          "internalName": "name",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Shapes.swift:44:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6SquareC",
+      "sourceOrigin": "s:9SwiftDemo7GreeterP5greet4nameS2S_tF"
+    },
+    {
+      "id": "s:9SwiftDemo6SquareC5scale2byySd_tF",
+      "kind": "instanceMethod",
+      "path": "Square.scale(by:)",
+      "name": "scale(by:)",
+      "access": "public",
+      "declaration": "override func scale(by factor: Double)",
+      "modifiers": [
+        "override"
+      ],
+      "parameters": [
+        {
+          "label": "by",
+          "internalName": "factor",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:46:25",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6SquareC",
+      "overrides": "s:9SwiftDemo7PolygonC5scale2byySd_tF"
+    },
+    {
+      "id": "s:9SwiftDemo6SquareC5sidesSivpZ",
+      "kind": "typeProperty",
+      "path": "Square.sides",
+      "name": "sides",
+      "access": "public",
+      "declaration": "static var sides: Int { get }",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:43:22",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6SquareC",
+      "sourceOrigin": "s:9SwiftDemo5ShapeP5sidesSivpZ"
+    },
+    {
+      "id": "s:9SwiftDemo7CounterC",
+      "kind": "actor",
+      "path": "Counter",
+      "name": "Counter",
+      "access": "public",
+      "declaration": "actor Counter",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:95:13",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo7CounterC5valueSivp",
+        "s:9SwiftDemo7CounterCACycfc",
+        "s:9SwiftDemo7CounterC9incrementSiyF",
+        "s:9SwiftDemo7CounterC5labelSSyF",
+        "s:ScA12_ConcurrencyE14assertIsolated_4file4lineySSyXK_s12StaticStringVSutF::SYNTHESIZED::s:9SwiftDemo7CounterC",
+        "s:ScA12_ConcurrencyE14assumeIsolated_4file4lineqd__qd__xYiKXE_s12StaticStringVSutKs8SendableRd__lF::SYNTHESIZED::s:9SwiftDemo7CounterC",
+        "s:ScA12_ConcurrencyE18withSerialExecutoryqd__qd__Scf_pYaqd_0_YKYCXEYaqd_0_YKs5ErrorRd_0_Ri_d__r0_lF::SYNTHESIZED::s:9SwiftDemo7CounterC",
+        "s:ScA12_ConcurrencyE18withSerialExecutoryqd__qd__Scf_pqd_0_YKXEqd_0_YKs5ErrorRd_0_Ri_d__r0_lF::SYNTHESIZED::s:9SwiftDemo7CounterC",
+        "s:ScA12_ConcurrencyE20preconditionIsolated_4file4lineySSyXK_s12StaticStringVSutF::SYNTHESIZED::s:9SwiftDemo7CounterC"
+      ],
+      "conformances": [
+        "s:ScA",
+        "s:s16SendableMetatypeP",
+        "s:s8SendableP"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo7CounterC5labelSSyF",
+      "kind": "instanceMethod",
+      "path": "Counter.label()",
+      "name": "label()",
+      "access": "public",
+      "declaration": "nonisolated func label() -> String",
+      "attributes": [
+        "nonisolated"
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Shapes.swift:102:28",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7CounterC"
+    },
+    {
+      "id": "s:9SwiftDemo7CounterC5valueSivp",
+      "kind": "instanceProperty",
+      "path": "Counter.value",
+      "name": "value",
+      "access": "public",
+      "declaration": "var value: Int { get }",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:96:28",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7CounterC"
+    },
+    {
+      "id": "s:9SwiftDemo7CounterC9incrementSiyF",
+      "kind": "instanceMethod",
+      "path": "Counter.increment()",
+      "name": "increment()",
+      "access": "public",
+      "declaration": "func increment() -> Int",
+      "returns": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Shapes.swift:98:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7CounterC"
+    },
+    {
+      "id": "s:9SwiftDemo7CounterCACycfc",
+      "kind": "initializer",
+      "path": "Counter.init()",
+      "name": "init()",
+      "access": "public",
+      "declaration": "init()",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:97:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7CounterC"
+    },
+    {
+      "id": "s:9SwiftDemo7GreeterP",
+      "kind": "protocol",
+      "path": "Greeter",
+      "name": "Greeter",
+      "access": "public",
+      "declaration": "protocol Greeter",
+      "location": "file://Sources/SwiftDemo/Demo.swift:0:16",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo7GreeterP5greet4nameS2S_tF"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo7GreeterP5greet4nameS2S_tF",
+      "kind": "instanceMethod",
+      "path": "Greeter.greet(name:)",
+      "name": "greet(name:)",
+      "access": "public",
+      "declaration": "func greet(name: String) -> String",
+      "protocolRequirement": true,
+      "parameters": [
+        {
+          "label": "name",
+          "internalName": "name",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Demo.swift:1:9",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7GreeterP"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC",
+      "kind": "class",
+      "path": "Polygon",
+      "name": "Polygon",
+      "access": "open",
+      "declaration": "class Polygon",
+      "location": "file://Sources/SwiftDemo/Shapes.swift:7:11",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo7PolygonC4nameSSvp",
+        "s:9SwiftDemo7PolygonC11vertexCountSivp",
+        "s:9SwiftDemo7PolygonC6sharedACvpZ",
+        "s:9SwiftDemo7PolygonC4name11vertexCountACSS_Sitcfc",
+        "s:9SwiftDemo7PolygonC4nameACSgSS_tcfc",
+        "s:9SwiftDemo7PolygonC5scale2byySd_tF",
+        "s:9SwiftDemo7PolygonC5scale2byySi_tF",
+        "s:9SwiftDemo7PolygonC5scale1x1yySd_SdtF",
+        "s:9SwiftDemo7PolygonC4makeACyFZ",
+        "s:9SwiftDemo7PolygonC8describeySSACSgFZ",
+        "s:9SwiftDemo7PolygonCyAA5PointVSicip"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC11vertexCountSivp",
+      "kind": "instanceProperty",
+      "path": "Polygon.vertexCount",
+      "name": "vertexCount",
+      "access": "public",
+      "declaration": "var vertexCount: Int { get }",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:9:28",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC4makeACyFZ",
+      "kind": "typeMethod",
+      "path": "Polygon.make()",
+      "name": "make()",
+      "access": "public",
+      "declaration": "class func make() -> Polygon",
+      "modifiers": [
+        "class"
+      ],
+      "static": true,
+      "returns": {
+        "spelling": "Polygon",
+        "references": [
+          "s:9SwiftDemo7PolygonC"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Shapes.swift:26:22",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC4name11vertexCountACSS_Sitcfc",
+      "kind": "initializer",
+      "path": "Polygon.init(name:vertexCount:)",
+      "name": "init(name:vertexCount:)",
+      "access": "public",
+      "declaration": "init(name: String, vertexCount: Int)",
+      "parameters": [
+        {
+          "label": "name",
+          "internalName": "name",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        },
+        {
+          "label": "vertexCount",
+          "internalName": "vertexCount",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:12:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC4nameACSgSS_tcfc",
+      "kind": "initializer",
+      "path": "Polygon.init(name:)",
+      "name": "init(name:)",
+      "access": "public",
+      "declaration": "convenience init?(name: String)",
+      "modifiers": [
+        "convenience"
+      ],
+      "parameters": [
+        {
+          "label": "name",
+          "internalName": "name",
+          "type": {
+            "spelling": "String",
+            "references": [
+              "s:SS"
+            ]
+          }
+        }
+      ],
+      "failable": true,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:17:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC4nameSSvp",
+      "kind": "instanceProperty",
+      "path": "Polygon.name",
+      "name": "name",
+      "access": "public",
+      "declaration": "let name: String",
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "let": true,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:8:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC5scale1x1yySd_SdtF",
+      "kind": "instanceMethod",
+      "path": "Polygon.scale(x:y:)",
+      "name": "scale(x:y:)",
+      "access": "public",
+      "declaration": "func scale(x: Double, y: Double)",
+      "parameters": [
+        {
+          "label": "x",
+          "internalName": "x",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        },
+        {
+          "label": "y",
+          "internalName": "y",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:24:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC5scale2byySd_tF",
+      "kind": "instanceMethod",
+      "path": "Polygon.scale(by:)",
+      "name": "scale(by:)",
+      "access": "open",
+      "declaration": "func scale(by factor: Double)",
+      "parameters": [
+        {
+          "label": "by",
+          "internalName": "factor",
+          "type": {
+            "spelling": "Double",
+            "references": [
+              "s:Sd"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:22:14",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC5scale2byySi_tF",
+      "kind": "instanceMethod",
+      "path": "Polygon.scale(by:)",
+      "name": "scale(by:)",
+      "access": "open",
+      "declaration": "func scale(by factor: Int)",
+      "parameters": [
+        {
+          "label": "by",
+          "internalName": "factor",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Shapes.swift:23:14",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC6sharedACvpZ",
+      "kind": "typeProperty",
+      "path": "Polygon.shared",
+      "name": "shared",
+      "access": "public",
+      "declaration": "static let shared: Polygon",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "valueType": {
+        "spelling": "Polygon",
+        "references": [
+          "s:9SwiftDemo7PolygonC"
+        ]
+      },
+      "settable": false,
+      "let": true,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:10:22",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonC8describeySSACSgFZ",
+      "kind": "typeMethod",
+      "path": "Polygon.describe(_:)",
+      "name": "describe(_:)",
+      "access": "public",
+      "declaration": "static func describe(_ polygon: Polygon?) -> String",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "parameters": [
+        {
+          "internalName": "polygon",
+          "type": {
+            "spelling": "Polygon?",
+            "references": [
+              "s:9SwiftDemo7PolygonC"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Shapes.swift:27:23",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC"
+    },
+    {
+      "id": "s:9SwiftDemo7PolygonCyAA5PointVSicip",
+      "kind": "instanceSubscript",
+      "path": "Polygon.subscript(_:)",
+      "name": "subscript(_:)",
+      "access": "public",
+      "declaration": "subscript(index: Int) -> Point { get }",
+      "parameters": [
+        {
+          "internalName": "index",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Point",
+        "references": [
+          "s:9SwiftDemo5PointV"
+        ]
+      },
+      "valueType": {
+        "spelling": "Point",
+        "references": [
+          "s:9SwiftDemo5PointV"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Shapes.swift:29:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7PolygonC"
+    },
+    {
+      "id": "s:9SwiftDemo7TrackerC",
+      "kind": "class",
+      "path": "Tracker",
+      "name": "Tracker",
+      "access": "public",
+      "declaration": "final class Tracker",
+      "modifiers": [
+        "final"
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:13:19",
+      "graph": "SwiftDemo.symbols.json",
+      "members": [
+        "s:9SwiftDemo7TrackerC9liveCountSivpZ",
+        "s:9SwiftDemo7TrackerC2idSivp",
+        "s:9SwiftDemo7TrackerC2idACSi_tcfc",
+        "s:9SwiftDemo7TrackerC4sameACyF"
+      ]
+    },
+    {
+      "id": "s:9SwiftDemo7TrackerC2idACSi_tcfc",
+      "kind": "initializer",
+      "path": "Tracker.init(id:)",
+      "name": "init(id:)",
+      "access": "public",
+      "declaration": "init(id: Int)",
+      "parameters": [
+        {
+          "label": "id",
+          "internalName": "id",
+          "type": {
+            "spelling": "Int",
+            "references": [
+              "s:Si"
+            ]
+          }
+        }
+      ],
+      "location": "file://Sources/SwiftDemo/Values.swift:17:11",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7TrackerC"
+    },
+    {
+      "id": "s:9SwiftDemo7TrackerC2idSivp",
+      "kind": "instanceProperty",
+      "path": "Tracker.id",
+      "name": "id",
+      "access": "public",
+      "declaration": "let id: Int",
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "let": true,
+      "location": "file://Sources/SwiftDemo/Values.swift:15:15",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7TrackerC"
+    },
+    {
+      "id": "s:9SwiftDemo7TrackerC4sameACyF",
+      "kind": "instanceMethod",
+      "path": "Tracker.same()",
+      "name": "same()",
+      "access": "public",
+      "declaration": "func same() -> Tracker",
+      "returns": {
+        "spelling": "Tracker",
+        "references": [
+          "s:9SwiftDemo7TrackerC"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:24:16",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7TrackerC"
+    },
+    {
+      "id": "s:9SwiftDemo7TrackerC9liveCountSivpZ",
+      "kind": "typeProperty",
+      "path": "Tracker.liveCount",
+      "name": "liveCount",
+      "access": "public",
+      "declaration": "static var liveCount: Int { get }",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "location": "file://Sources/SwiftDemo/Values.swift:14:35",
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7TrackerC"
+    },
+    {
+      "id": "s:9SwiftDemo8echoInt8ys0D0VADF",
+      "kind": "function",
+      "path": "echoInt8(_:)",
+      "name": "echoInt8(_:)",
+      "access": "public",
+      "declaration": "func echoInt8(_ value: Int8) -> Int8",
+      "parameters": [
+        {
+          "internalName": "value",
+          "type": {
+            "spelling": "Int8",
+            "references": [
+              "s:s4Int8V"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "Int8",
+        "references": [
+          "s:s4Int8V"
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Values.swift:8:12",
+      "graph": "SwiftDemo.symbols.json"
+    },
+    {
+      "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo13PrecipitationO",
+      "kind": "operator",
+      "path": "Precipitation.!=(_:_:)",
+      "name": "!=(_:_:)",
+      "access": "public",
+      "declaration": "static func != (lhs: borrowing Self, rhs: borrowing Self) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo13PrecipitationO",
+      "sourceOrigin": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ"
+    },
+    {
+      "id": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:9SwiftDemo6FlavorO",
+      "kind": "operator",
+      "path": "Flavor.!=(_:_:)",
+      "name": "!=(_:_:)",
+      "access": "public",
+      "declaration": "static func != (lhs: borrowing Self, rhs: borrowing Self) -> Bool",
+      "modifiers": [
+        "static"
+      ],
+      "static": true,
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "lhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        },
+        {
+          "internalName": "rhs",
+          "type": {
+            "spelling": "Self"
+          },
+          "modifier": "borrowing"
+        }
+      ],
+      "returns": {
+        "spelling": "Bool",
+        "references": [
+          "s:Sb"
+        ]
+      },
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6FlavorO",
+      "sourceOrigin": "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ"
+    },
+    {
+      "id": "s:SS9SwiftDemoE7shoutedSSvp",
+      "kind": "instanceProperty",
+      "path": "String.shouted",
+      "name": "shouted",
+      "access": "public",
+      "declaration": "var shouted: String { get }",
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.struct"
+      },
+      "location": "file://Sources/SwiftDemo/Extensions.swift:18:15",
+      "graph": "SwiftDemo@Swift.symbols.json",
+      "parent": "s:SS"
+    },
+    {
+      "id": "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo13PrecipitationO",
+      "kind": "instanceProperty",
+      "path": "Precipitation.hashValue",
+      "name": "hashValue",
+      "access": "public",
+      "declaration": "var hashValue: Int { get }",
+      "synthesized": true,
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self",
+            "rhs": "Hashable",
+            "rhsPrecise": "s:SH"
+          },
+          {
+            "kind": "conformance",
+            "lhs": "Self.RawValue",
+            "rhs": "Hashable",
+            "rhsPrecise": "s:SH"
+          }
+        ]
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo13PrecipitationO",
+      "sourceOrigin": "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp"
+    },
+    {
+      "id": "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::s:9SwiftDemo6FlavorO",
+      "kind": "instanceProperty",
+      "path": "Flavor.hashValue",
+      "name": "hashValue",
+      "access": "public",
+      "declaration": "var hashValue: Int { get }",
+      "synthesized": true,
+      "valueType": {
+        "spelling": "Int",
+        "references": [
+          "s:Si"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self",
+            "rhs": "Hashable",
+            "rhsPrecise": "s:SH"
+          },
+          {
+            "kind": "conformance",
+            "lhs": "Self.RawValue",
+            "rhs": "Hashable",
+            "rhsPrecise": "s:SH"
+          }
+        ]
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6FlavorO",
+      "sourceOrigin": "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp"
+    },
+    {
+      "id": "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF::SYNTHESIZED::s:9SwiftDemo13PrecipitationO",
+      "kind": "instanceMethod",
+      "path": "Precipitation.hash(into:)",
+      "name": "hash(into:)",
+      "access": "public",
+      "declaration": "func hash(into hasher: inout Hasher)",
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "into",
+          "internalName": "hasher",
+          "type": {
+            "spelling": "Hasher",
+            "references": [
+              "s:s6HasherV"
+            ]
+          },
+          "modifier": "inout"
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "Self",
+          "rhs": "Hashable",
+          "rhsPrecise": "s:SH"
+        },
+        {
+          "kind": "conformance",
+          "lhs": "Self.RawValue",
+          "rhs": "Hashable",
+          "rhsPrecise": "s:SH"
+        }
+      ],
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self",
+            "rhs": "Hashable",
+            "rhsPrecise": "s:SH"
+          },
+          {
+            "kind": "conformance",
+            "lhs": "Self.RawValue",
+            "rhs": "Hashable",
+            "rhsPrecise": "s:SH"
+          }
+        ]
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo13PrecipitationO",
+      "sourceOrigin": "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF"
+    },
+    {
+      "id": "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF::SYNTHESIZED::s:9SwiftDemo6FlavorO",
+      "kind": "instanceMethod",
+      "path": "Flavor.hash(into:)",
+      "name": "hash(into:)",
+      "access": "public",
+      "declaration": "func hash(into hasher: inout Hasher)",
+      "synthesized": true,
+      "parameters": [
+        {
+          "label": "into",
+          "internalName": "hasher",
+          "type": {
+            "spelling": "Hasher",
+            "references": [
+              "s:s6HasherV"
+            ]
+          },
+          "modifier": "inout"
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "Self",
+          "rhs": "Hashable",
+          "rhsPrecise": "s:SH"
+        },
+        {
+          "kind": "conformance",
+          "lhs": "Self.RawValue",
+          "rhs": "Hashable",
+          "rhsPrecise": "s:SH"
+        }
+      ],
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol",
+        "constraints": [
+          {
+            "kind": "conformance",
+            "lhs": "Self",
+            "rhs": "Hashable",
+            "rhsPrecise": "s:SH"
+          },
+          {
+            "kind": "conformance",
+            "lhs": "Self.RawValue",
+            "rhs": "Hashable",
+            "rhsPrecise": "s:SH"
+          }
+        ]
+      },
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo6FlavorO",
+      "sourceOrigin": "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF"
+    },
+    {
+      "id": "s:Sa9SwiftDemoAA5PointVRszlE8centroidACyF",
+      "kind": "instanceMethod",
+      "path": "Array.centroid()",
+      "name": "centroid()",
+      "access": "public",
+      "declaration": "func centroid() -> Point",
+      "returns": {
+        "spelling": "Point",
+        "references": [
+          "s:9SwiftDemo5PointV"
+        ]
+      },
+      "genericParameters": [
+        {
+          "name": "Element",
+          "depth": 0,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "sameType",
+          "lhs": "Element",
+          "rhs": "Point",
+          "rhsPrecise": "s:9SwiftDemo5PointV"
+        }
+      ],
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.struct",
+        "constraints": [
+          {
+            "kind": "sameType",
+            "lhs": "Element",
+            "rhs": "Point",
+            "rhsPrecise": "s:9SwiftDemo5PointV"
+          }
+        ]
+      },
+      "location": "file://Sources/SwiftDemo/Extensions.swift:22:16",
+      "graph": "SwiftDemo@Swift.symbols.json",
+      "parent": "s:Sa"
+    },
+    {
+      "id": "s:ScA12_ConcurrencyE14assertIsolated_4file4lineySSyXK_s12StaticStringVSutF::SYNTHESIZED::s:9SwiftDemo7CounterC",
+      "kind": "instanceMethod",
+      "path": "Counter.assertIsolated(_:file:line:)",
+      "name": "assertIsolated(_:file:line:)",
+      "access": "public",
+      "declaration": "@backDeployed(before: macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0)\nnonisolated func assertIsolated(_ message: @autoclosure () -> String = String(), file: StaticString = #fileID, line: UInt = #line)",
+      "attributes": [
+        "@backDeployed(before: macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0)",
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "message",
+          "type": {
+            "spelling": "() -> String",
+            "references": [
+              "s:SS"
+            ]
+          },
+          "attributes": [
+            "@autoclosure"
+          ],
+          "default": "String()"
+        },
+        {
+          "label": "file",
+          "internalName": "file",
+          "type": {
+            "spelling": "StaticString",
+            "references": [
+              "s:s12StaticStringV"
+            ]
+          },
+          "default": "#fileID"
+        },
+        {
+          "label": "line",
+          "internalName": "line",
+          "type": {
+            "spelling": "UInt",
+            "references": [
+              "s:Su"
+            ]
+          },
+          "default": "#line"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7CounterC",
+      "sourceOrigin": "s:ScA12_ConcurrencyE14assertIsolated_4file4lineySSyXK_s12StaticStringVSutF"
+    },
+    {
+      "id": "s:ScA12_ConcurrencyE14assumeIsolated_4file4lineqd__qd__xYiKXE_s12StaticStringVSutKs8SendableRd__lF::SYNTHESIZED::s:9SwiftDemo7CounterC",
+      "kind": "instanceMethod",
+      "path": "Counter.assumeIsolated(_:file:line:)",
+      "name": "assumeIsolated(_:file:line:)",
+      "access": "public",
+      "declaration": "nonisolated func assumeIsolated<T>(_ operation: (isolated Self) throws -> T, file: StaticString = #fileID, line: UInt = #line) rethrows -> T where T : Sendable",
+      "attributes": [
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "operation",
+          "type": {
+            "spelling": "(isolated Self) throws -> T"
+          }
+        },
+        {
+          "label": "file",
+          "internalName": "file",
+          "type": {
+            "spelling": "StaticString",
+            "references": [
+              "s:s12StaticStringV"
+            ]
+          },
+          "default": "#fileID"
+        },
+        {
+          "label": "line",
+          "internalName": "line",
+          "type": {
+            "spelling": "UInt",
+            "references": [
+              "s:Su"
+            ]
+          },
+          "default": "#line"
+        }
+      ],
+      "returns": {
+        "spelling": "T"
+      },
+      "throws": true,
+      "rethrows": true,
+      "genericParameters": [
+        {
+          "name": "T",
+          "depth": 1,
+          "index": 0
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "T",
+          "rhs": "Sendable",
+          "rhsPrecise": "s:s8SendableP"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7CounterC",
+      "sourceOrigin": "s:ScA12_ConcurrencyE14assumeIsolated_4file4lineqd__qd__xYiKXE_s12StaticStringVSutKs8SendableRd__lF"
+    },
+    {
+      "id": "s:ScA12_ConcurrencyE18withSerialExecutoryqd__qd__Scf_pYaqd_0_YKYCXEYaqd_0_YKs5ErrorRd_0_Ri_d__r0_lF::SYNTHESIZED::s:9SwiftDemo7CounterC",
+      "kind": "instanceMethod",
+      "path": "Counter.withSerialExecutor(_:)",
+      "name": "withSerialExecutor(_:)",
+      "access": "public",
+      "declaration": "nonisolated func withSerialExecutor<T, E>(_ operation: nonisolated(nonsending) (any SerialExecutor) async throws(E) -> T) async throws(E) -> T where E : Error, T : ~Copyable",
+      "attributes": [
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "operation",
+          "type": {
+            "spelling": "nonisolated(nonsending) (any SerialExecutor) async throws(E) -> T",
+            "references": [
+              "s:Scf"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "T"
+      },
+      "async": true,
+      "throws": true,
+      "thrownType": {
+        "spelling": "E"
+      },
+      "genericParameters": [
+        {
+          "name": "T",
+          "depth": 1,
+          "index": 0
+        },
+        {
+          "name": "E",
+          "depth": 1,
+          "index": 1
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "E",
+          "rhs": "Error",
+          "rhsPrecise": "s:s5ErrorP"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7CounterC",
+      "sourceOrigin": "s:ScA12_ConcurrencyE18withSerialExecutoryqd__qd__Scf_pYaqd_0_YKYCXEYaqd_0_YKs5ErrorRd_0_Ri_d__r0_lF"
+    },
+    {
+      "id": "s:ScA12_ConcurrencyE18withSerialExecutoryqd__qd__Scf_pqd_0_YKXEqd_0_YKs5ErrorRd_0_Ri_d__r0_lF::SYNTHESIZED::s:9SwiftDemo7CounterC",
+      "kind": "instanceMethod",
+      "path": "Counter.withSerialExecutor(_:)",
+      "name": "withSerialExecutor(_:)",
+      "access": "public",
+      "declaration": "nonisolated func withSerialExecutor<T, E>(_ operation: (any SerialExecutor) throws(E) -> T) throws(E) -> T where E : Error, T : ~Copyable",
+      "attributes": [
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "operation",
+          "type": {
+            "spelling": "(any SerialExecutor) throws(E) -> T",
+            "references": [
+              "s:Scf"
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "spelling": "T"
+      },
+      "throws": true,
+      "thrownType": {
+        "spelling": "E"
+      },
+      "genericParameters": [
+        {
+          "name": "T",
+          "depth": 1,
+          "index": 0
+        },
+        {
+          "name": "E",
+          "depth": 1,
+          "index": 1
+        }
+      ],
+      "genericConstraints": [
+        {
+          "kind": "conformance",
+          "lhs": "E",
+          "rhs": "Error",
+          "rhsPrecise": "s:s5ErrorP"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7CounterC",
+      "sourceOrigin": "s:ScA12_ConcurrencyE18withSerialExecutoryqd__qd__Scf_pqd_0_YKXEqd_0_YKs5ErrorRd_0_Ri_d__r0_lF"
+    },
+    {
+      "id": "s:ScA12_ConcurrencyE20preconditionIsolated_4file4lineySSyXK_s12StaticStringVSutF::SYNTHESIZED::s:9SwiftDemo7CounterC",
+      "kind": "instanceMethod",
+      "path": "Counter.preconditionIsolated(_:file:line:)",
+      "name": "preconditionIsolated(_:file:line:)",
+      "access": "public",
+      "declaration": "@backDeployed(before: macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0)\nnonisolated func preconditionIsolated(_ message: @autoclosure () -> String = String(), file: StaticString = #fileID, line: UInt = #line)",
+      "attributes": [
+        "@backDeployed(before: macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0)",
+        "nonisolated"
+      ],
+      "synthesized": true,
+      "parameters": [
+        {
+          "internalName": "message",
+          "type": {
+            "spelling": "() -> String",
+            "references": [
+              "s:SS"
+            ]
+          },
+          "attributes": [
+            "@autoclosure"
+          ],
+          "default": "String()"
+        },
+        {
+          "label": "file",
+          "internalName": "file",
+          "type": {
+            "spelling": "StaticString",
+            "references": [
+              "s:s12StaticStringV"
+            ]
+          },
+          "default": "#fileID"
+        },
+        {
+          "label": "line",
+          "internalName": "line",
+          "type": {
+            "spelling": "UInt",
+            "references": [
+              "s:Su"
+            ]
+          },
+          "default": "#line"
+        }
+      ],
+      "extension": {
+        "extendedModule": "_Concurrency",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.15.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "13.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "6.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo7CounterC",
+      "sourceOrigin": "s:ScA12_ConcurrencyE20preconditionIsolated_4file4lineySSyXK_s12StaticStringVSutF"
+    },
+    {
+      "id": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp::SYNTHESIZED::s:9SwiftDemo10ShapeErrorO",
+      "kind": "instanceProperty",
+      "path": "ShapeError.localizedDescription",
+      "name": "localizedDescription",
+      "access": "public",
+      "declaration": "var localizedDescription: String { get }",
+      "synthesized": true,
+      "valueType": {
+        "spelling": "String",
+        "references": [
+          "s:SS"
+        ]
+      },
+      "settable": false,
+      "extension": {
+        "extendedModule": "Swift",
+        "typeKind": "swift.protocol"
+      },
+      "availability": [
+        {
+          "domain": "iOS",
+          "introduced": "8.0.0"
+        },
+        {
+          "domain": "macOS",
+          "introduced": "10.10.0"
+        },
+        {
+          "domain": "tvOS",
+          "introduced": "9.0.0"
+        },
+        {
+          "domain": "watchOS",
+          "introduced": "2.0.0"
+        }
+      ],
+      "graph": "SwiftDemo.symbols.json",
+      "parent": "s:9SwiftDemo10ShapeErrorO",
+      "sourceOrigin": "s:s5ErrorP10FoundationE20localizedDescriptionSSvp"
+    }
+  ]
+}
