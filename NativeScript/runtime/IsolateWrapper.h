@@ -88,7 +88,7 @@ public:
     // Compares isolate ids, not addresses: a disposed isolate's address can be
     // reused by a later isolate. `isolate` must be alive.
     inline bool BelongsTo(v8::Isolate* isolate) const {
-      return gateId_ != -1 && tns::Caches::Get(isolate)->getGateId() == gateId_;
+      return gateId_ != -1 && tns::Caches::GateIdOf(isolate) == gateId_;
     }
 
    private:
