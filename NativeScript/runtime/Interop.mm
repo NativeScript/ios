@@ -45,6 +45,10 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
             // resetting it never touches the finalizer drain's bookkeeping,
             // and a foreign-thread Locker into the block's own isolate is
             // legitimate now that extended class names are worker-scoped.
+            // A thread holding another isolate's Locker is the exception: it
+            // gets here when that isolate was handed this block, and it
+            // deadlocks if this isolate is waiting for that Locker in turn.
+            // Blocks shared between isolates carry that risk.
             //
             // Validity is not the test here: the slot stays reachable after
             // the isolate is invalidated, by JS still running under the Locker
@@ -654,7 +658,8 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       // the JSBlock dispose helper owns the ffi closure and the callback wrapper
       // and only runs once the last reference goes away.
       if (wrapper->OwnsBlock()) {
-        // A native block; the wrapper's own Block_copy keeps it alive.
+        // A native block, or another isolate's JS block; the wrapper's own
+        // Block_copy keeps it alive.
         blockPtr = CFAutorelease(Block_copy(wrapper->Block()));
       } else if (TryRetainJSBlock(static_cast<JSBlock*>(wrapper->Block()))) {
         // Reading the block is safe even when its last release raced ahead:
