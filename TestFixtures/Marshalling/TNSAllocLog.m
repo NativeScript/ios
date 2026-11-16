@@ -302,3 +302,123 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index) {
 }
 
 @end
+
+@implementation TNSAccessorHost
+@end
+
+@implementation TNSAccessorDeallocHost
+
+- (void)dealloc {
+    id value = self.value;
+    (void)value;
+}
+
+@end
+
+static TNSAccessorHost* keptAccessorHost;
+
+@implementation TNSAccessorSwizzleTarget
+@end
+
+@implementation TNSAccessorDriver {
+    TNSAccessorHost* _host;
+    id _lastObservedValue;
+}
+
+- (instancetype)initWithNewHostOf:(Class)cls name:(NSString*)name {
+    self = [super init];
+    if (self) {
+        _host = [[cls alloc] init];
+        _host.name = name;
+    }
+    return self;
+}
+
+- (instancetype)initWithHost:(TNSAccessorHost*)host {
+    self = [super init];
+    if (self) {
+        _host = host;
+    }
+    return self;
+}
+
+- (id)readValue {
+    return _host.value;
+}
+
+- (void)writeValue:(id)value {
+    _host.value = value;
+}
+
+- (TNSAccessorHost*)host {
+    return _host;
+}
+
+- (void)dropHost {
+    _host = nil;
+}
+
+- (void)observeHost {
+    [_host addObserver:self
+            forKeyPath:@"value"
+               options:NSKeyValueObservingOptionNew
+               context:NULL];
+}
+
+- (void)unobserveHost {
+    [_host removeObserver:self forKeyPath:@"value"];
+}
+
+- (id)lastObservedValue {
+    return _lastObservedValue;
+}
+
+- (void)observeValueForKeyPath:(NSString*)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary<NSKeyValueChangeKey, id>*)change
+                       context:(void*)context {
+    _lastObservedValue = [object valueForKey:keyPath];
+}
+
++ (id)valueOfNewHostOf:(Class)cls name:(NSString*)name {
+    TNSAccessorHost* host = [[cls alloc] init];
+    host.name = name;
+    return host.value;
+}
+
++ (void)dropNewHostOf:(Class)cls name:(NSString*)name {
+    TNSAccessorHost* host = [[cls alloc] init];
+    host.name = name;
+}
+
++ (void)keepNewHostOf:(Class)cls name:(NSString*)name {
+    TNSAccessorHost* host = [[cls alloc] init];
+    host.name = name;
+    keptAccessorHost = host;
+}
+
++ (id)readKeptValue {
+    return keptAccessorHost.value;
+}
+
++ (CGRect)readKeptRect {
+    return keptAccessorHost.rect;
+}
+
++ (void)writeKeptValue:(id)value {
+    keptAccessorHost.value = value;
+}
+
++ (id)readSwizzleTargetValue {
+    return [[TNSAccessorSwizzleTarget alloc] init].value;
+}
+
++ (void)writeSwizzleTargetValue:(id)value {
+    [[TNSAccessorSwizzleTarget alloc] init].value = value;
+}
+
++ (void)dropKeptHost {
+    keptAccessorHost = nil;
+}
+
+@end

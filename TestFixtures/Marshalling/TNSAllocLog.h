@@ -127,4 +127,60 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index);
 
 @end
 
+// JS subclasses implement `value`; `name` is state native code sets.
+@interface TNSAccessorHost : TNSAllocLog
+
+@property(nonatomic, strong) id value;
+@property(nonatomic) CGRect rect;
+@property(nonatomic, copy) NSString* name;
+
+@end
+
+// -dealloc reads `value`.
+@interface TNSAccessorDeallocHost : TNSAccessorHost
+
+@end
+
+// Reaches the `value` accessors of the host it keeps through compiled property
+// access only.
+@interface TNSAccessorDriver : NSObject
+
+// Keeps a new instance of `cls`, created natively and named `name`.
+- (instancetype)initWithNewHostOf:(Class)cls name:(NSString*)name;
+- (instancetype)initWithHost:(TNSAccessorHost*)host;
+- (id)readValue;
+- (void)writeValue:(id)value;
+- (TNSAccessorHost*)host;
+- (void)dropHost;
+// Key-value observes the host's `value`, without reading it.
+- (void)observeHost;
+- (void)unobserveHost;
+- (id)lastObservedValue;
+
+// Creates an instance of `cls` named `name`, reads its `value` and drops it.
++ (id)valueOfNewHostOf:(Class)cls name:(NSString*)name;
+// Creates an instance of `cls` named `name` and drops it.
++ (void)dropNewHostOf:(Class)cls name:(NSString*)name;
+
+// A process-wide host, kept until +dropKeptHost.
++ (void)keepNewHostOf:(Class)cls name:(NSString*)name;
++ (id)readKeptValue;
++ (CGRect)readKeptRect;
++ (void)writeKeptValue:(id)value;
++ (void)dropKeptHost;
+
+// Reads and writes `value` on a new TNSAccessorSwizzleTarget.
++ (id)readSwizzleTargetValue;
++ (void)writeSwizzleTargetValue:(id)value;
+
+@end
+
+// Its `value` accessors are replaced on the prototype, by one spec, for the
+// rest of the run.
+@interface TNSAccessorSwizzleTarget : NSObject
+
+@property(nonatomic, strong) id value;
+
+@end
+
 #endif /* TNSAllocLog_h */

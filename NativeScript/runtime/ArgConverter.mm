@@ -1,6 +1,7 @@
 #include "ArgConverter.h"
 #include <Foundation/Foundation.h>
 #include <algorithm>
+#include <optional>
 #include <sstream>
 #include "ClassBuilder.h"
 #include "DictionaryAdapter.h"
@@ -48,23 +49,33 @@ bool InMethodFamily(SEL selector, const char* family) {
   return strncmp(name, family, length) == 0 && (name[length] < 'a' || name[length] > 'z');
 }
 
-// The borrowed wrapper WrapNativeCallbackSelf made for an object in -dealloc
-// is detached once the native call returns: the object is gone afterwards,
-// so a receiver JS kept must read as released.
-struct BorrowedSelfScope {
-  explicit BorrowedSelfScope(Isolate* isolate) : isolate(isolate) {}
-  ~BorrowedSelfScope() {
-    if (wrapper != nullptr && tns::GetValue(isolate, receiver) == wrapper) {
-      tns::SetValue(isolate, receiver, nullptr);
-      delete wrapper;
-    }
-  }
-  Isolate* isolate;
-  Local<Object> receiver;
-  ObjCDataWrapper* wrapper = nullptr;
-};
+bool IsKVOSubclassOf(Class klass, Class base) {
+  static const char prefix[] = "NSKVONotifying_";
+  return class_getSuperclass(klass) == base &&
+         strncmp(class_getName(klass), prefix, sizeof(prefix) - 1) == 0;
+}
 
 }  // namespace
+
+NativeCallbackSelf::NativeCallbackSelf(Local<Context> context, id self)
+    : isolate_(v8::Isolate::GetCurrent()) {
+  auto cache = Caches::Get(isolate_);
+  auto it = cache->Instances.find(self);
+  if (it != cache->Instances.end()) {
+    receiver_ = it->second->Get(isolate_).As<Object>();
+  } else {
+    receiver_ = ArgConverter::WrapNativeCallbackSelf(context, self, &borrowed_);
+  }
+}
+
+// The object is gone once the native call returns, so a borrowed receiver JS
+// kept must read as released.
+NativeCallbackSelf::~NativeCallbackSelf() {
+  if (borrowed_ != nullptr && tns::GetValue(isolate_, receiver_) == borrowed_) {
+    tns::SetValue(isolate_, receiver_, nullptr);
+    delete borrowed_;
+  }
+}
 
 void ArgConverter::Init(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
@@ -405,18 +416,12 @@ void ArgConverter::MethodCallback(ffi_cif* cif, void* retValue, void** argValues
       }
     }
 
-    Local<Object> thiz = context->Global();
-    BorrowedSelfScope borrowedSelf(isolate);
+    // Blocks and C function pointers have no receiver.
+    std::optional<NativeCallbackSelf> receiver;
     if (data->initialParamIndex_ > 1) {
-      id self_ = *static_cast<const id*>(argValues[0]);
-      auto it = cache->Instances.find(self_);
-      if (it != cache->Instances.end()) {
-        thiz = it->second->Get(data->isolateWrapper_.Isolate()).As<Object>();
-      } else {
-        thiz = ArgConverter::WrapNativeCallbackSelf(context, self_, &borrowedSelf.wrapper);
-        borrowedSelf.receiver = thiz;
-      }
+      receiver.emplace(context, *static_cast<const id*>(argValues[0]));
     }
+    Local<Object> thiz = receiver ? receiver->Get() : context->Global();
 
     Local<Value> result;
     Local<v8::Function> callback = poCallback->Get(isolate).As<v8::Function>();
@@ -1019,6 +1024,11 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
   const Meta* meta = FindMeta(klass, typeEncoding);
   if (meta != nullptr) {
     auto it = cache->ClassPrototypes.find(std::string_view(object_getClassName(target)));
+    // A key-value observed object is an instance of a notifying subclass,
+    // which has no prototype of its own.
+    if (it == cache->ClassPrototypes.end() && IsKVOSubclassOf(object_getClass(target), klass)) {
+      it = cache->ClassPrototypes.find(std::string_view(class_getName(klass)));
+    }
     if (it != cache->ClassPrototypes.end()) {
       // for debugging rlv cell handling:
       // NSString* message = [NSString stringWithFormat:@"ArgConverter::CreateJsWrapper FindMeta:
@@ -1071,11 +1081,15 @@ std::shared_ptr<Persistent<Value>> ArgConverter::FindCachedInstance(
   if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
     Class expected = static_cast<ObjCDataWrapper*>(wrapper)->Klass();
     // A KVO-style isa swizzle replaces the class in place but keeps -class
-    // answering the original, so only an address that now belongs to a
-    // different object fails both comparisons. Dropping such an entry turns a
-    // wrapper that would otherwise be handed out with the wrong prototype into
-    // a plain cache miss, which rebuilds it correctly.
-    if (expected != nil && object_getClass(target) != expected && [target class] != expected) {
+    // answering the original, and a wrapper made while the object was
+    // key-value observed recorded the notifying subclass, which the object
+    // leaves when its last observer goes. So only an address that now belongs
+    // to a different object fails all three comparisons. Dropping such an
+    // entry turns a wrapper that would otherwise be handed out with the wrong
+    // prototype into a plain cache miss, which rebuilds it correctly.
+    Class current = object_getClass(target);
+    if (expected != nil && current != expected && [target class] != expected &&
+        !IsKVOSubclassOf(expected, current)) {
       cache->Instances.erase(it);
       return nullptr;
     }

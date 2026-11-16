@@ -166,6 +166,24 @@ class ArgConverter {
                                      void** argValues, void* userData);
 };
 
+// The JS receiver for a native-to-JS callback on `self`: the cached wrapper,
+// or a new one (borrowed and detached on scope exit when `self` is in
+// -dealloc). Live only inside the callback's V8 scopes, and destroyed before
+// anything is @thrown out of the callback.
+class NativeCallbackSelf {
+ public:
+  NativeCallbackSelf(v8::Local<v8::Context> context, id self);
+  ~NativeCallbackSelf();
+  NativeCallbackSelf(const NativeCallbackSelf&) = delete;
+  NativeCallbackSelf& operator=(const NativeCallbackSelf&) = delete;
+  v8::Local<v8::Object> Get() const { return receiver_; }
+
+ private:
+  v8::Isolate* isolate_;
+  v8::Local<v8::Object> receiver_;
+  ObjCDataWrapper* borrowed_ = nullptr;
+};
+
 }  // namespace tns
 
 #endif /* ArgConverter_h */

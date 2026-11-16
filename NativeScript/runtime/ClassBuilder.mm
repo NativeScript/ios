@@ -796,7 +796,7 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
         (getter->IsFunction() || setter->IsFunction())) {
       std::vector<const PropertyMeta*> propertyMetas;
       VisitProperties(methodName, extendedClassMeta, propertyMetas, protocols);
-      ExposeProperties(isolate, extendedClass, propertyMetas, implementationObject, getter, setter);
+      ExposeProperties(isolate, extendedClass, propertyMetas, getter, setter);
       continue;
     }
 
@@ -923,8 +923,7 @@ bool ClassBuilder::ImplementsItself(Class klass, SEL selector) {
 
 void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
                                     std::vector<const PropertyMeta*> propertyMetas,
-                                    Local<Object> implementationObject, Local<Value> getter,
-                                    Local<Value> setter) {
+                                    Local<Value> getter, Local<Value> setter) {
   for (int j = 0; j < propertyMetas.size(); j++) {
     const PropertyMeta* propertyMeta = propertyMetas[j];
     std::string propertyName = propertyMeta->name();
@@ -936,40 +935,42 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
     bool hasSetter = !setter.IsEmpty() && setter->IsFunction() && propertyMeta->hasSetter() &&
                      !ImplementsItself(extendedClass, propertyMeta->setter()->selector());
 
-    std::shared_ptr<Persistent<Object>> poImplementationObject;
-    if (hasGetter || hasSetter) {
-      poImplementationObject = std::make_shared<Persistent<Object>>(isolate, implementationObject);
-    }
-
     if (hasGetter) {
       std::shared_ptr<Persistent<v8::Function>> poGetterFunc =
           std::make_shared<Persistent<v8::Function>>(isolate, getter.As<v8::Function>());
       PropertyCallbackContext* userData =
-          new PropertyCallbackContext(isolate, poGetterFunc, poImplementationObject, propertyMeta);
+          new PropertyCallbackContext(isolate, poGetterFunc, propertyMeta);
 
       FFIMethodCallback getterCallback = [](ffi_cif* cif, void* retValue, void** argValues,
                                             void* userData) {
         PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
-        Isolate* isolate = context->isolate_;
+        Isolate* isolate = context->isolateWrapper_.Isolate();
         // Scopes-before-@throw: a branded escape is captured and @thrown only
         // after every V8 scope in the inner block has destructed.
         NSException* __strong pendingThrow = nil;
         {
+          // Validity is checked before and again after taking the Locker, for
+          // the reasons given in ArgConverter::MethodCallback.
+          IsolatePin pin = context->isolateWrapper_.Pin();
+          if (!pin || !context->isolateWrapper_.IsValid()) {
+            memset(retValue, 0, cif->rtype->size);
+            return;
+          }
           v8::Locker locker(isolate);
+          if (!context->isolateWrapper_.IsValid()) {
+            memset(retValue, 0, cif->rtype->size);
+            return;
+          }
           Isolate::Scope isolate_scope(isolate);
           HandleScope handle_scope(isolate);
           Local<v8::Function> getterFunc = context->callback_->Get(isolate);
           Local<Value> res;
 
-          id thiz = *static_cast<const id*>(argValues[0]);
-          auto cache = Caches::Get(isolate);
-          auto it = cache->Instances.find(thiz);
-          Local<Object> self_ = it != cache->Instances.end()
-                                    ? it->second->Get(isolate).As<Object>()
-                                    : context->implementationObject_->Get(isolate);
           Local<Context> v8Context = Caches::Get(isolate)->GetContext();
+          Context::Scope context_scope(v8Context);
+          NativeCallbackSelf receiver(v8Context, *static_cast<const id*>(argValues[0]));
           TryCatch tc(isolate);
-          if (!getterFunc->Call(v8Context, self_, 0, nullptr).ToLocal(&res)) {
+          if (!getterFunc->Call(v8Context, receiver.Get(), 0, nullptr).ToLocal(&res)) {
             NSException* ex = ArgConverter::HandleBoundaryException(v8Context, tc);
             if (ex != nil) {
               pendingThrow = ex;
@@ -1001,36 +1002,39 @@ void ClassBuilder::ExposeProperties(Isolate* isolate, Class extendedClass,
       std::shared_ptr<Persistent<v8::Function>> poSetterFunc =
           std::make_shared<Persistent<v8::Function>>(isolate, setter.As<v8::Function>());
       PropertyCallbackContext* userData =
-          new PropertyCallbackContext(isolate, poSetterFunc, poImplementationObject, propertyMeta);
+          new PropertyCallbackContext(isolate, poSetterFunc, propertyMeta);
 
       FFIMethodCallback setterCallback = [](ffi_cif* cif, void* retValue, void** argValues,
                                             void* userData) {
         PropertyCallbackContext* context = static_cast<PropertyCallbackContext*>(userData);
-        Isolate* isolate = context->isolate_;
+        Isolate* isolate = context->isolateWrapper_.Isolate();
         NSException* __strong pendingThrow = nil;
         {
+          IsolatePin pin = context->isolateWrapper_.Pin();
+          if (!pin || !context->isolateWrapper_.IsValid()) {
+            return;
+          }
           v8::Locker locker(isolate);
+          if (!context->isolateWrapper_.IsValid()) {
+            return;
+          }
           Isolate::Scope isolate_scope(isolate);
           HandleScope handle_scope(isolate);
           Local<v8::Function> setterFunc = context->callback_->Get(isolate);
           Local<Value> res;
 
-          id thiz = *static_cast<const id*>(argValues[0]);
-          auto cache = Caches::Get(isolate);
-          auto it = cache->Instances.find(thiz);
-          Local<Object> self_ = it != cache->Instances.end()
-                                    ? it->second->Get(isolate).As<Object>()
-                                    : context->implementationObject_->Get(isolate);
+          Local<Context> v8Context = Caches::Get(isolate)->GetContext();
+          Context::Scope context_scope(v8Context);
+          NativeCallbackSelf receiver(v8Context, *static_cast<const id*>(argValues[0]));
 
           uint8_t* argBuffer = (uint8_t*)argValues[2];
           const TypeEncoding* typeEncoding = context->meta_->setter()->encodings()->first()->next();
           BaseCall call(argBuffer);
-          Local<Context> v8Context = Caches::Get(isolate)->GetContext();
           Local<Value> jsWrapper = Interop::GetResult(v8Context, typeEncoding, &call, true);
           Local<Value> params[1] = {jsWrapper};
 
           TryCatch tc(isolate);
-          if (!setterFunc->Call(v8Context, self_, 1, params).ToLocal(&res)) {
+          if (!setterFunc->Call(v8Context, receiver.Get(), 1, params).ToLocal(&res)) {
             NSException* ex = ArgConverter::HandleBoundaryException(v8Context, tc);
             if (ex != nil) {
               pendingThrow = ex;
