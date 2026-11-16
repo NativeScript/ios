@@ -70,9 +70,10 @@ class ObjectManager {
   // release over as its own retain instead of retaining again; returns whether
   // it did. Once the entry's retain is settled, call ProtectIfNativelyRetained.
   static bool TakeDeferredRelease(v8::Isolate* isolate, id obj);
-  // An extended class protects its wrapper when native code first retains the
-  // object past the runtime's own retain. A native retain made while a release
-  // waited found no wrapper to protect; this catches up.
+  // A class that tracks native retains (ClassBuilder::TracksNativeRetains)
+  // protects its wrapper when native code first retains the object past the
+  // runtime's own retain. A native retain made while a release waited found no
+  // wrapper to protect; this catches up.
   static void ProtectIfNativelyRetained(id obj, ObjCDataWrapper* wrapper);
 
  private:

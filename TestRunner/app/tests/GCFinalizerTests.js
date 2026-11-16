@@ -46,21 +46,25 @@ describe("GC finalizer callbacks", function () {
             }
         }, { name: "TNSApiDeallocThread" });
 
-        // Owned only through its wrapper, so its finalizer releases it.
-        (function () {
-            DeallocThread.alloc().init();
-        })();
+        // Owned only through its wrapper, so its finalizer releases it. Held
+        // until the background block, so no collection on the main thread
+        // gets to it first.
+        var keep = DeallocThread.alloc().init();
 
+        var deallocsInBlock = -1;
         var queue = dispatch_get_global_queue(qos_class_t.QOS_CLASS_DEFAULT, 0);
         dispatch_async(queue, function () {
+            keep = null;
             scrubStack();
             __collect();
             __collect();
+            deallocsInBlock = threads.length;
         });
 
         var attempts = 200;
         (function poll() {
             if (threads.length > 0 || --attempts === 0) {
+                expect(deallocsInBlock).toBe(0);
                 expect(threads).toEqual([true]);
                 done();
                 return;
@@ -98,6 +102,89 @@ describe("GC finalizer callbacks", function () {
             }
             setTimeout(poll, 10);
         })();
+    });
+
+    // A wrapper built for an object whose release still waits for the
+    // runtime's thread adopts that release as its own retain. The block below
+    // holds the Locker throughout, so the release cannot run in between.
+    [
+        {
+            suffix: " (extend)",
+            // No retain/release swizzle: natively held instances are not kept.
+            keepsWrapper: false,
+            define: function (onDealloc) {
+                return TNSApi.extend({ methodCalledInDealloc: onDealloc }, { name: "TNSApiReleaseTakeover" });
+            }
+        },
+        {
+            suffix: " (__extends)",
+            keepsWrapper: true,
+            define: function (onDealloc) {
+                return (function (_super) {
+                    __extends(TNSApiReleaseTakeoverTS, _super);
+                    function TNSApiReleaseTakeoverTS() {
+                        return (_super !== null && _super.apply(this, arguments)) || this;
+                    }
+                    TNSApiReleaseTakeoverTS.prototype.methodCalledInDealloc = onDealloc;
+                    return TNSApiReleaseTakeoverTS;
+                })(TNSApi);
+            }
+        }
+    ].forEach(function (variant) {
+        it("hands a waiting release to the wrapper that replaces it" + variant.suffix, function (done) {
+            var threads = [];
+            var Klass = variant.define(function () {
+                threads.push(NSThread.isMainThread);
+            });
+
+            var holder = NSMutableArray.alloc().init();
+            (function () {
+                holder.addObject(Klass.alloc().init());
+            })();
+
+            var retainCount = -1;
+            var queue = dispatch_get_global_queue(qos_class_t.QOS_CLASS_DEFAULT, 0);
+            dispatch_async(queue, function () {
+                __releaseNativeCounterpart(holder.objectAtIndex(0));
+                var again = holder.objectAtIndex(0);
+                again.marker = "kept";
+                // The holder's reference and the adopted one.
+                retainCount = again.retainCount();
+            });
+
+            function collectAndWait(rounds, callback) {
+                scrubStack();
+                __collect();
+                __collect();
+                setTimeout(function () {
+                    if (rounds > 1) {
+                        collectAndWait(rounds - 1, callback);
+                    } else {
+                        callback();
+                    }
+                }, 10);
+            }
+
+            var attempts = 200;
+            (function poll() {
+                if (retainCount === -1 && --attempts > 0) {
+                    setTimeout(poll, 10);
+                    return;
+                }
+                expect(retainCount).toBe(2);
+                collectAndWait(2, function () {
+                    expect(threads).toEqual([]);
+                    if (variant.keepsWrapper) {
+                        expect(holder.objectAtIndex(0).marker).toBe("kept");
+                    }
+                    holder.removeAllObjects();
+                    collectAndWait(3, function () {
+                        expect(threads).toEqual([true]);
+                        done();
+                    });
+                });
+            })();
+        });
     });
 
     // A GcProtected (natively retained) instance is resurrected by its

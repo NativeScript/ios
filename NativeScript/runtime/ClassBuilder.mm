@@ -405,6 +405,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
           release(self, @selector(release));
         });
         class_addMethod(extendedClass, @selector(release), newRelease, "v@:");
+        class_addProtocol(extendedClass, @protocol(TNSRetainTrackedClass));
 
         info.GetReturnValue().SetUndefined();
       }).ToLocalChecked();
@@ -1099,6 +1100,15 @@ Class ClassBuilder::FindNativeClass(Class klass) {
   }
 
   return klass;
+}
+
+bool ClassBuilder::TracksNativeRetains(Class klass) {
+  for (; klass != nil; klass = class_getSuperclass(klass)) {
+    if (class_conformsToProtocol(klass, @protocol(TNSRetainTrackedClass))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 IMP ClassBuilder::FindNotOverridenMethod(Class klass, SEL method) {

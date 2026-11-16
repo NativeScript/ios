@@ -147,6 +147,13 @@ whose release is still queued takes that release over (keeping the retain counts
 classes' swizzle reads exact). Teardown drains the queue inline, since the event loop has stopped
 by then. For a worker, the runtime's thread is the worker's own thread, not the main thread.
 
+While a release is queued the object is alive without a wrapper, where an inline release would
+have deallocated it and zeroed the weak references to it. A native callback reaching it in that
+window (a delegate method through a weak reference) builds a new wrapper, which takes the queued
+release over: the JS override runs on a blank `this`, without the state the collected wrapper
+held, and the object then lives as long as that new wrapper. Only an object that nothing but its
+wrapper owned, collected off the runtime's thread, has this window.
+
 ## Deliberate deviations from upstream's original
 
 - **No `PENDING` state, no `NEAR_DEATH` for finalizers.** 14.9's `NodeState` is 2 bits with all

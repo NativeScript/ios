@@ -12,7 +12,6 @@
 #include "EventLoop.h"
 #include "Helpers.h"
 #include "Runtime.h"
-#include "TNSDerivedClass.h"
 
 using namespace v8;
 using namespace std;
@@ -112,9 +111,9 @@ void UnlinkRegistered(ObjectWeakCallbackState* state) {
 // Objects first wrapped on another thread are still released where the
 // collection runs.
 //
-// Every access holds the isolate's Locker: finalizers and
-// __releaseNativeCounterpart on any thread, and on the runtime's thread the
-// drain task, wrapper creation and teardown. So no other synchronization.
+// Every access holds the isolate's Locker: finalizers,
+// __releaseNativeCounterpart and wrapper creation on any thread, and on the
+// runtime's thread the drain task and teardown. So no other synchronization.
 struct DeferredReleases {
   // Object -> releases it is owed. An object stays alive while it is owed one,
   // so its address cannot be reused by another object meanwhile.
@@ -380,8 +379,8 @@ bool ObjectManager::TakeDeferredRelease(Isolate* isolate, id obj) {
 }
 
 void ObjectManager::ProtectIfNativelyRetained(id obj, ObjCDataWrapper* wrapper) {
-  if (class_conformsToProtocol(object_getClass(obj), @protocol(TNSDerivedClass)) &&
-      [obj retainCount] > 1) {
+  // Only a class whose -release unprotects again may be protected here.
+  if (ClassBuilder::TracksNativeRetains(object_getClass(obj)) && [obj retainCount] > 1) {
     wrapper->GcProtect();
   }
 }

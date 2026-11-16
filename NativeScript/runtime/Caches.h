@@ -118,8 +118,9 @@ class Caches {
     return cache->GetOrCreateState<T>();
   }
 
-  // Teardown only: the existing state, even after InvalidateIsolate, for a
-  // subsystem that must finish work its state still holds. Never creates.
+  // The existing state, even after InvalidateIsolate, for a subsystem that
+  // must finish work its state still holds. Never creates, so a state made on
+  // the isolate's thread can be read from any thread holding the Locker.
   template <typename T>
   static T* ExistingStateFor(v8::Isolate* isolate) {
     auto raw = isolate->GetData(0);

@@ -399,10 +399,10 @@ class UnmanagedTypeWrapper : public BaseDataWrapper {
 class ObjCDataWrapper : public BaseDataWrapper {
  public:
   ObjCDataWrapper(id data, const TypeEncoding* typeEncoding = nullptr)
-      : data_(data),
+      : bornOnRuntimeThread_(OnRuntimeThreadOf(v8::Isolate::TryGetCurrent())),
+        data_(data),
         typeEncoding_(typeEncoding),
-        klass_(object_getClass(data)),
-        bornOnRuntimeThread_(OnRuntimeThreadOf(v8::Isolate::TryGetCurrent())) {}
+        klass_(object_getClass(data)) {}
 
   const WrapperType Type() { return WrapperType::ObjCObject; }
 
@@ -442,11 +442,11 @@ class ObjCDataWrapper : public BaseDataWrapper {
  private:
   bool adapterClaim_ = false;
   bool borrowed_ = false;
+  bool bornOnRuntimeThread_;
   ObjectWeakCallbackState* ownershipState_ = nullptr;
   id data_;
   const tns::TypeEncoding* typeEncoding_;
   Class klass_;
-  bool bornOnRuntimeThread_;
 };
 
 class ObjCClassWrapper : public BaseDataWrapper {
