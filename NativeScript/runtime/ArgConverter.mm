@@ -49,6 +49,12 @@ bool InMethodFamily(SEL selector, const char* family) {
   return strncmp(name, family, length) == 0 && (name[length] < 'a' || name[length] > 'z');
 }
 
+bool IsKVOSubclassOf(Class klass, Class base) {
+  static const char prefix[] = "NSKVONotifying_";
+  return class_getSuperclass(klass) == base &&
+         strncmp(class_getName(klass), prefix, sizeof(prefix) - 1) == 0;
+}
+
 }  // namespace
 
 NativeCallbackSelf::NativeCallbackSelf(Local<Context> context, id self)
@@ -1018,6 +1024,11 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
   const Meta* meta = FindMeta(klass, typeEncoding);
   if (meta != nullptr) {
     auto it = cache->ClassPrototypes.find(std::string_view(object_getClassName(target)));
+    // A key-value observed object is an instance of a notifying subclass,
+    // which has no prototype of its own.
+    if (it == cache->ClassPrototypes.end() && IsKVOSubclassOf(object_getClass(target), klass)) {
+      it = cache->ClassPrototypes.find(std::string_view(class_getName(klass)));
+    }
     if (it != cache->ClassPrototypes.end()) {
       // for debugging rlv cell handling:
       // NSString* message = [NSString stringWithFormat:@"ArgConverter::CreateJsWrapper FindMeta:
@@ -1070,11 +1081,15 @@ std::shared_ptr<Persistent<Value>> ArgConverter::FindCachedInstance(
   if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
     Class expected = static_cast<ObjCDataWrapper*>(wrapper)->Klass();
     // A KVO-style isa swizzle replaces the class in place but keeps -class
-    // answering the original, so only an address that now belongs to a
-    // different object fails both comparisons. Dropping such an entry turns a
-    // wrapper that would otherwise be handed out with the wrong prototype into
-    // a plain cache miss, which rebuilds it correctly.
-    if (expected != nil && object_getClass(target) != expected && [target class] != expected) {
+    // answering the original, and a wrapper made while the object was
+    // key-value observed recorded the notifying subclass, which the object
+    // leaves when its last observer goes. So only an address that now belongs
+    // to a different object fails all three comparisons. Dropping such an
+    // entry turns a wrapper that would otherwise be handed out with the wrong
+    // prototype into a plain cache miss, which rebuilds it correctly.
+    Class current = object_getClass(target);
+    if (expected != nil && current != expected && [target class] != expected &&
+        !IsKVOSubclassOf(expected, current)) {
       cache->Instances.erase(it);
       return nullptr;
     }

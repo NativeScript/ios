@@ -202,6 +202,38 @@ describe("JS accessor receivers", function () {
             def.record.lastThis = null;
         });
 
+        // Key-value observing swaps the instance's class for as long as it is
+        // observed, so the first wrap here happens under the swapped class.
+        it("keeps the wrapper of an instance an accessor call wrapped first while it was key-value observed" + variant.suffix, function (done) {
+            var def = variant.define("Observed");
+            var driver = TNSAccessorDriver.alloc().initWithNewHostOfName(def.Klass.class(), "observed");
+            driver.observeHost();
+            expect(def.record.lastThis).toBeUndefined();
+            expect(driver.readValue()).toBe("name:observed");
+            var receiver = def.record.lastThis;
+            expect(receiver instanceof def.Klass).toBe(true);
+            expect(driver.host()).toBe(receiver);
+            driver.writeValue("observed-value");
+            expect(driver.lastObservedValue()).toBe("observed-value");
+            driver.unobserveHost();
+
+            (function () {
+                var host = driver.host();
+                expect(host).toBe(receiver);
+                expect(host._stored).toBe("observed-value");
+                expect(driver.readValue()).toBe("observed-value");
+                expect(def.record.lastThis).toBe(host);
+            })();
+            receiver = null;
+            def.record.lastThis = null;
+            expectNoSharedState(def);
+            driver.dropHost();
+            settle(3, function () {
+                expect(deallocs()).toBe(1);
+                done();
+            });
+        });
+
         it("reports a receiver kept from a getter run by -dealloc as released" + variant.suffix, function (done) {
             var def = variant.define("Dealloc", TNSAccessorDeallocHost);
             var nameInDealloc;
@@ -326,12 +358,14 @@ describe("JS accessor receivers", function () {
     describe("of a class a worker defined", function () {
         var wt = require("node:worker_threads");
 
-        it("answer nil and store nothing once the worker ended", function (done) {
+        it("answer nil or zeroes and store nothing once the worker ended", function (done) {
             var worker = new wt.Worker("~/tests/jsAccessorReceiverWorker.js");
-            worker.on("message", function (value) {
-                expect(value).toBe("worker:kept");
+            worker.on("message", function (values) {
+                expect(values).toEqual(["worker:kept", 1, 2, 3, 4]);
                 worker.terminate().then(function () {
                     expect(TNSAccessorDriver.readKeptValue()).toBeNull();
+                    var rect = TNSAccessorDriver.readKeptRect();
+                    expect([rect.origin.x, rect.origin.y, rect.size.width, rect.size.height]).toEqual([0, 0, 0, 0]);
                     TNSAccessorDriver.writeKeptValue("after the worker");
                     expect(TNSAccessorDriver.readKeptValue()).toBeNull();
                     TNSAccessorDriver.dropKeptHost();
@@ -343,6 +377,29 @@ describe("JS accessor receivers", function () {
                 fail("worker error: " + error.message);
                 worker.terminate();
                 TNSAccessorDriver.dropKeptHost();
+                done();
+            });
+            worker.postMessage(0);
+        });
+    });
+
+    describe("a worker put on a native class's prototype", function () {
+        var wt = require("node:worker_threads");
+
+        it("answer nil and store nothing once the worker ended", function (done) {
+            var worker = new wt.Worker("~/tests/jsAccessorSwizzleWorker.js");
+            worker.on("message", function (value) {
+                expect(value).toBe("swizzled by the worker");
+                worker.terminate().then(function () {
+                    expect(TNSAccessorDriver.readSwizzleTargetValue()).toBeNull();
+                    TNSAccessorDriver.writeSwizzleTargetValue("after the worker");
+                    expect(TNSAccessorDriver.readSwizzleTargetValue()).toBeNull();
+                    done();
+                });
+            });
+            worker.on("error", function (error) {
+                fail("worker error: " + error.message);
+                worker.terminate();
                 done();
             });
             worker.postMessage(0);

@@ -1450,7 +1450,19 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
       // the inner block's V8 scopes destruct.
       NSException* __strong pendingThrow = nil;
       {
+        // This IMP stays on the native class after the isolate that installed
+        // it is gone. Validity is checked before and again after taking the
+        // Locker, for the reasons given in ArgConverter::MethodCallback.
+        IsolatePin pin = context->isolateWrapper_.Pin();
+        if (!pin || !context->isolateWrapper_.IsValid()) {
+          memset(retValue, 0, cif->rtype->size);
+          return;
+        }
         v8::Locker locker(isolate);
+        if (!context->isolateWrapper_.IsValid()) {
+          memset(retValue, 0, cif->rtype->size);
+          return;
+        }
         Isolate::Scope isolate_scope(isolate);
         HandleScope handle_scope(isolate);
         Local<v8::Function> getterFunc = context->callback_->Get(isolate);
@@ -1516,7 +1528,14 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
       Isolate* isolate = context->isolateWrapper_.Isolate();
       NSException* __strong pendingThrow = nil;
       {
+        IsolatePin pin = context->isolateWrapper_.Pin();
+        if (!pin || !context->isolateWrapper_.IsValid()) {
+          return;
+        }
         v8::Locker locker(isolate);
+        if (!context->isolateWrapper_.IsValid()) {
+          return;
+        }
         Isolate::Scope isolate_scope(isolate);
         HandleScope handle_scope(isolate);
         Local<v8::Function> setterFunc = context->callback_->Get(isolate);

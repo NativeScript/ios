@@ -7,8 +7,12 @@ onmessage = function () {
         },
         set value(value) {
             this._stored = value;
+        },
+        get rect() {
+            return CGRectMake(1, 2, 3, 4);
         }
     }, { name: "JSAccessorReceiverWorkerHost" });
     TNSAccessorDriver.keepNewHostOfName(Host.class(), "kept");
-    postMessage(TNSAccessorDriver.readKeptValue());
+    var rect = TNSAccessorDriver.readKeptRect();
+    postMessage([TNSAccessorDriver.readKeptValue(), rect.origin.x, rect.origin.y, rect.size.width, rect.size.height]);
 };

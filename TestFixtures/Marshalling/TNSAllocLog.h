@@ -121,6 +121,7 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index);
 @interface TNSAccessorHost : TNSAllocLog
 
 @property(nonatomic, strong) id value;
+@property(nonatomic) CGRect rect;
 @property(nonatomic, copy) NSString* name;
 
 @end
@@ -141,6 +142,10 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index);
 - (void)writeValue:(id)value;
 - (TNSAccessorHost*)host;
 - (void)dropHost;
+// Key-value observes the host's `value`, without reading it.
+- (void)observeHost;
+- (void)unobserveHost;
+- (id)lastObservedValue;
 
 // Creates an instance of `cls` named `name`, reads its `value` and drops it.
 + (id)valueOfNewHostOf:(Class)cls name:(NSString*)name;
@@ -150,8 +155,21 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index);
 // A process-wide host, kept until +dropKeptHost.
 + (void)keepNewHostOf:(Class)cls name:(NSString*)name;
 + (id)readKeptValue;
++ (CGRect)readKeptRect;
 + (void)writeKeptValue:(id)value;
 + (void)dropKeptHost;
+
+// Reads and writes `value` on a new TNSAccessorSwizzleTarget.
++ (id)readSwizzleTargetValue;
++ (void)writeSwizzleTargetValue:(id)value;
+
+@end
+
+// Its `value` accessors are replaced on the prototype, by one spec, for the
+// rest of the run.
+@interface TNSAccessorSwizzleTarget : NSObject
+
+@property(nonatomic, strong) id value;
 
 @end
 

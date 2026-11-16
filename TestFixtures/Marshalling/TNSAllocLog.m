@@ -269,8 +269,12 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index) {
 
 static TNSAccessorHost* keptAccessorHost;
 
+@implementation TNSAccessorSwizzleTarget
+@end
+
 @implementation TNSAccessorDriver {
     TNSAccessorHost* _host;
+    id _lastObservedValue;
 }
 
 - (instancetype)initWithNewHostOf:(Class)cls name:(NSString*)name {
@@ -306,6 +310,28 @@ static TNSAccessorHost* keptAccessorHost;
     _host = nil;
 }
 
+- (void)observeHost {
+    [_host addObserver:self
+            forKeyPath:@"value"
+               options:NSKeyValueObservingOptionNew
+               context:NULL];
+}
+
+- (void)unobserveHost {
+    [_host removeObserver:self forKeyPath:@"value"];
+}
+
+- (id)lastObservedValue {
+    return _lastObservedValue;
+}
+
+- (void)observeValueForKeyPath:(NSString*)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary<NSKeyValueChangeKey, id>*)change
+                       context:(void*)context {
+    _lastObservedValue = [object valueForKey:keyPath];
+}
+
 + (id)valueOfNewHostOf:(Class)cls name:(NSString*)name {
     TNSAccessorHost* host = [[cls alloc] init];
     host.name = name;
@@ -327,8 +353,20 @@ static TNSAccessorHost* keptAccessorHost;
     return keptAccessorHost.value;
 }
 
++ (CGRect)readKeptRect {
+    return keptAccessorHost.rect;
+}
+
 + (void)writeKeptValue:(id)value {
     keptAccessorHost.value = value;
+}
+
++ (id)readSwizzleTargetValue {
+    return [[TNSAccessorSwizzleTarget alloc] init].value;
+}
+
++ (void)writeSwizzleTargetValue:(id)value {
+    [[TNSAccessorSwizzleTarget alloc] init].value = value;
 }
 
 + (void)dropKeptHost {
