@@ -2,6 +2,7 @@
 #import <Foundation/Foundation.h>
 #include <malloc/malloc.h>
 #include <notify.h>
+#include <objc/message.h>
 #include <objc/runtime.h>
 #include <v8-profiler.h>
 #include <algorithm>
@@ -76,6 +77,8 @@ struct NativeEntry {
   // No longer the object that was found at this address: freed, or freed and
   // reused, while the probe ran.
   bool changed = false;
+  // No -retainCount the probe can call without messaging: owned from outside.
+  bool countUnknown = false;
   int depth = 0;
   int64_t retainCount = 0;
   int64_t runtimeRetains = 0;
@@ -107,7 +110,7 @@ struct ProbeRun {
     if (entry.changed) {
       return false;
     }
-    if (entry.Immortal() || entry.Unexplained() > 0) {
+    if (entry.countUnknown || entry.Immortal() || entry.Unexplained() > 0) {
       return true;
     }
     return !strict && entry.Unexplained() < 0;
@@ -117,11 +120,7 @@ struct ProbeRun {
 thread_local ProbeRun* activeRun_ = nullptr;
 
 bool IsTaggedPointer(uintptr_t p) {
-#if defined(__arm64__)
-  return (p >> 63) != 0;
-#else
-  return (p & 1) != 0;
-#endif
+  return tns::IsTaggedPointer((__bridge id) reinterpret_cast<void*>(p));
 }
 
 size_t HeapBlockSize(uintptr_t p) {
@@ -272,17 +271,49 @@ bool StillThere(ProbeRun* run, void* object, const NativeEntry& entry) {
   return ObjectClass(run->classes, p, HeapBlockSize(p)) == entry.cls;
 }
 
-int64_t RetainCountOf(ProbeRun* run, void* object, const NativeEntry& entry) {
-  if (entry.block) {
-    return (static_cast<BlockHeader*>(object)->flags & 0xfffe) >> 1;
+// The native class's -retainCount, read from the method lists:
+// class_getInstanceMethod and class_getMethodImplementation run the method
+// resolver, and with it +initialize, when a class lacks the method. Null for
+// a class without one (an NSZombie) or whose one forwards.
+IMP RetainCountImp(Class cls) {
+  // NSTimer.alloc()'s placeholder: its -retainCount can hang.
+  static Class timerPlaceholder = objc_getClass("NSCFTimer");
+  if (cls == timerPlaceholder) {
+    return nullptr;
   }
-  // The class's own implementation: a JS-implemented one cannot run here.
-  IMP& imp = run->retainCountImps[entry.cls];
-  if (imp == nullptr) {
-    imp = ClassBuilder::FindNotOverridenMethod(entry.cls, @selector(retainCount));
+  SEL selector = @selector(retainCount);
+  for (Class c = ClassBuilder::FindNativeClass(cls); c != nil; c = class_getSuperclass(c)) {
+    unsigned int count = 0;
+    Method* methods = class_copyMethodList(c, &count);
+    IMP imp = nullptr;
+    for (unsigned int i = 0; i < count && imp == nullptr; i++) {
+      if (method_getName(methods[i]) == selector) {
+        imp = method_getImplementation(methods[i]);
+      }
+    }
+    free(methods);
+    if (imp != nullptr) {
+      return imp == reinterpret_cast<IMP>(_objc_msgForward) ? nullptr : imp;
+    }
   }
-  return static_cast<int64_t>(
-      reinterpret_cast<NSUInteger (*)(id, SEL)>(imp)((__bridge id)object, @selector(retainCount)));
+  return nullptr;
+}
+
+void ReadRetainCount(ProbeRun* run, void* object, NativeEntry* entry) {
+  if (entry->block) {
+    entry->retainCount = (static_cast<BlockHeader*>(object)->flags & 0xfffe) >> 1;
+    return;
+  }
+  auto found = run->retainCountImps.find(entry->cls);
+  if (found == run->retainCountImps.end()) {
+    found = run->retainCountImps.emplace(entry->cls, RetainCountImp(entry->cls)).first;
+  }
+  if (found->second == nullptr) {
+    entry->countUnknown = true;
+    return;
+  }
+  entry->retainCount = static_cast<int64_t>(reinterpret_cast<NSUInteger (*)(id, SEL)>(
+      found->second)((__bridge id)object, @selector(retainCount)));
 }
 
 void Expand(ProbeRun* run, void* object, NativeEntry* entry) {
@@ -455,7 +486,7 @@ void BuildNativeGraph(Isolate* isolate, ProbeRun* run, const std::shared_ptr<Cac
   }
   for (auto& native : run->natives) {
     if (!native.second.changed && StillThere(run, native.first, native.second)) {
-      native.second.retainCount = RetainCountOf(run, native.first, native.second);
+      ReadRetainCount(run, native.first, &native.second);
     } else {
       native.second.changed = true;
     }
@@ -765,7 +796,8 @@ Local<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool stri
   for (auto& native : run.natives) {
     if (native.second.changed) {
       changed++;
-    } else if (!native.second.Immortal() && native.second.Unexplained() < 0) {
+    } else if (!native.second.countUnknown && !native.second.Immortal() &&
+               native.second.Unexplained() < 0) {
       uncertain++;
     }
   }
@@ -811,7 +843,7 @@ Local<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool stri
                                 HexAddress(found->second) +
                                 ": freed or replaced while the probe ran; its references are "
                                 "as found before");
-      } else if (entry.Unexplained() < 0 && !entry.Immortal()) {
+      } else if (!entry.countUnknown && entry.Unexplained() < 0 && !entry.Immortal()) {
         cycle.reasons.push_back(
             std::string(class_getName(entry.cls)) + " " + HexAddress(found->second) +
             ": retainCount " + std::to_string(entry.retainCount) + " is less than the " +
@@ -915,6 +947,7 @@ Local<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool stri
       set(entry, "address", string(HexAddress(native.first)));
       set(entry, "seed", v8::Boolean::New(isolate, native.second.seed));
       set(entry, "retainCount", number(native.second.retainCount));
+      set(entry, "retainCountUnknown", v8::Boolean::New(isolate, native.second.countUnknown));
       set(entry, "runtimeRetains", number(native.second.runtimeRetains));
       set(entry, "incoming", number(native.second.incoming));
       std::string out;
