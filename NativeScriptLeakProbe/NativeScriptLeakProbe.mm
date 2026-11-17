@@ -1,4 +1,27 @@
-#include "WrapperLifetimeLeaks.h"
+// NativeScriptLeakProbe.framework: finds what the wrapper lifetime modes leak,
+// JS <-> native cycles. Apps embed it in debug builds only; the runtime hands
+// it its state through LeakProbeSPI.h.
+//
+// Heap snapshots carry both heaps: an embedder graph adds a node per native
+// object the runtime wraps or keeps JS state for, and the runtime's own
+// cross-heap edges (wrapper -> object retain, rooted-strong object -> wrapper,
+// canary object -> state, JS block -> callback). Any snapshot gets these,
+// DevTools' included.
+//
+// findLeakCycles() adds the native objects reachable from those through owning
+// references (strong object ivars, collection and block storage) and runs a
+// trial deletion: a native object is a root only while its retain count is not
+// explained by the graph (the runtime's own retain plus incoming owning edges);
+// the global handles that stand for native -> JS edges are not roots. What the
+// marking does not reach and that lies on a cycle is reported.
+//
+// Blind spots: retains made by code without an owning ivar or storage pointer
+// (manual retain/release bookkeeping, C++ members, associated objects) read as
+// external owners, so their cycles are missed rather than misreported. Pointers
+// that do not own (MRC assign ivars, weak storage outside the known weak
+// containers) over-explain a retain count; such objects are "uncertain" and
+// stay roots unless the probe runs strict.
+
 #import <Foundation/Foundation.h>
 #include <dlfcn.h>
 #include <mach/mach.h>
@@ -8,7 +31,9 @@
 #include <objc/runtime.h>
 #include <v8-profiler.h>
 #include <algorithm>
+#include <atomic>
 #include <chrono>
+#include <cstdarg>
 #include <deque>
 #include <map>
 #include <memory>
@@ -18,17 +43,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include "Caches.h"
-#include "ClassBuilder.h"
-#include "DataWrapper.h"
-#include "EventLoop.h"
-#include "Helpers.h"
-#include "Interop.h"
-#include "ObjectManager.h"
-#include "Runtime.h"
-#include "RuntimeConfig.h"
-#include "WrapperLifetime.h"
-#include "WrapperLifetimeCanary.h"
+#include "../NativeScript/runtime/LeakProbeSPI.h"
 
 extern "C" const uintptr_t objc_debug_isa_class_mask;
 
@@ -37,6 +52,46 @@ using namespace v8;
 namespace tns {
 
 namespace {
+
+using leakprobe::Host;
+using leakprobe::Instance;
+using leakprobe::Poster;
+
+const Host* host_ = nullptr;
+
+// The runtime's log, which splits what os_log would truncate.
+__attribute__((format(printf, 1, 2))) void Log(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  va_list copy;
+  va_copy(copy, args);
+  int length = vsnprintf(nullptr, 0, format, copy);
+  va_end(copy);
+  std::string message(length > 0 ? static_cast<size_t>(length) : 0, '\0');
+  vsnprintf(message.data(), message.size() + 1, format, args);
+  va_end(args);
+  host_->log(message.c_str());
+}
+
+Local<v8::String> ToV8String(Isolate* isolate, const std::string& value) {
+  return v8::String::NewFromUtf8(isolate, value.data(), NewStringType::kNormal,
+                                 static_cast<int>(value.size()))
+      .ToLocalChecked();
+}
+
+template <typename Visit>
+bool ForEachInstance(Isolate* isolate, Visit&& visit) {
+  return host_->forEachInstance(isolate, &visit, [](void* context, const Instance& instance) {
+    (*static_cast<std::remove_reference_t<Visit>*>(context))(instance);
+  });
+}
+
+template <typename Visit>
+void ForEachState(Isolate* isolate, Visit&& visit) {
+  host_->forEachCanaryState(isolate, &visit, [](void* context, id object, Local<Object> state) {
+    (*static_cast<std::remove_reference_t<Visit>*>(context))(object, state);
+  });
+}
 
 constexpr const char* kCountsNotification = "org.nativescript.wrapperLifetime.counts";
 constexpr const char* kCyclesNotification = "org.nativescript.wrapperLifetime.findLeakCycles";
@@ -148,8 +203,14 @@ struct ProbeRun {
 
 thread_local ProbeRun* activeRun_ = nullptr;
 
+// A tagged pointer carries its value in the pointer itself: no heap block.
+// Only x86_64 macOS and Mac Catalyst tag the low bit.
 bool IsTaggedPointer(uintptr_t p) {
-  return tns::IsTaggedPointer((__bridge id) reinterpret_cast<void*>(p));
+#if defined(__x86_64__) && (TARGET_OS_OSX || TARGET_OS_MACCATALYST)
+  return (p & 1) != 0;
+#else
+  return (p >> 63) != 0;
+#endif
 }
 
 size_t HeapBlockSize(uintptr_t p) {
@@ -743,7 +804,7 @@ IMP RetainCountImp(Class cls) {
     return nullptr;
   }
   SEL selector = @selector(retainCount);
-  for (Class c = ClassBuilder::FindNativeClass(cls); c != nil; c = class_getSuperclass(c)) {
+  for (Class c = host_->nativeClass(cls); c != nil; c = class_getSuperclass(c)) {
     unsigned int count = 0;
     Method* methods = class_copyMethodList(c, &count);
     IMP imp = nullptr;
@@ -787,7 +848,7 @@ void Expand(ProbeRun* run, void* object, NativeEntry* entry) {
   if (entry->block) {
     // A JS block's fields past the header are runtime bookkeeping that points
     // back at the block; its one reference is the callback (a graph edge).
-    if (size <= sizeof(BlockHeader) || Interop::IsJSBlock(object)) {
+    if (size <= sizeof(BlockHeader) || host_->isJSBlock(object)) {
       return;
     }
     std::vector<Capture> captures;
@@ -872,26 +933,25 @@ bool IsAdapter(Class cls) {
   return false;
 }
 
-// An Instances entry the graph can rely on.
-struct Instance {
+// A wrapper map entry the graph can rely on.
+struct Wrapped {
   Class cls = nil;
   Local<Value> js;
   // A native collection or data adapter backed by a JS object: the adapter
   // holds the JS object strongly, and the JS object does not retain it.
   bool adapter = false;
-  ObjectWeakCallbackState* lifetime = nullptr;
-  // The Instances handle ObjectManager::ReconcileOwnership keeps strong while
-  // native code also retains the object: a wrapper no lifetime mode adopted.
+  bool rootedStrong = false;
+  // The map's handle is the strong one the runtime keeps while native code
+  // also retains the object: a wrapper no lifetime mode adopted.
   bool reconciledStrong = false;
 };
 
 // False for entries whose key must not be dereferenced as the wrapped object:
 // a dead wrapper, a key that is not a live heap object, or an address now
 // holding another object than the one its wrapper was made for.
-bool ReadInstance(Isolate* isolate, const ClassSet& classes, id key,
-                  const std::shared_ptr<Persistent<Value>>& handle, Instance* out) {
-  uintptr_t p = reinterpret_cast<uintptr_t>((__bridge void*)key);
-  if (handle == nullptr || handle->IsEmpty() || IsTaggedPointer(p)) {
+bool ReadInstance(const ClassSet& classes, const Instance& instance, Wrapped* out) {
+  uintptr_t p = reinterpret_cast<uintptr_t>(instance.object);
+  if (instance.wrapper.IsEmpty() || IsTaggedPointer(p)) {
     return false;
   }
   Class cls = ObjectClass(classes, p, HeapBlockSize(p));
@@ -899,38 +959,30 @@ bool ReadInstance(Isolate* isolate, const ClassSet& classes, id key,
     return false;
   }
   out->cls = cls;
-  out->js = handle->Get(isolate);
+  out->js = instance.wrapper;
   if (IsAdapter(cls)) {
     out->adapter = true;
     return true;
   }
-  BaseDataWrapper* data = tns::GetValue(isolate, out->js);
-  if (data == nullptr || data->Type() != WrapperType::ObjCObject) {
+  if (!instance.objc) {
     return false;
   }
-  ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(data);
-  Class made = wrapper->Klass();
+  Class made = instance.wrappedClass;
   // KVO swaps in a subclass of the original while the object is observed and
   // swaps it back afterwards, so either class can be the one it was wrapped as.
-  if (wrapper->Data() != key ||
+  if (instance.wrapped != instance.object ||
       (cls != made && class_getSuperclass(cls) != made && class_getSuperclass(made) != cls)) {
     return false;
   }
-  out->lifetime = wrapper->LifetimeState();
-  ObjectWeakCallbackState* ownership = wrapper->OwnershipState();
-  out->reconciledStrong = ownership != nullptr && !ownership->disposing_ &&
-                          ownership->target_ == handle && !handle->IsWeak();
+  out->rootedStrong = instance.rootedStrong;
+  out->reconciledStrong = instance.reconciledStrong;
   return true;
-}
-
-bool RootedStrong(const Instance& instance) {
-  return instance.lifetime != nullptr && instance.lifetime->lifetimeTracked_ &&
-         instance.lifetime->lifetimeStrong_;
 }
 
 // Reads native memory that other threads may be mutating; acceptable for an
 // on-demand diagnostic, which is why it never runs implicitly.
-void BuildNativeGraph(Isolate* isolate, ProbeRun* run, const std::shared_ptr<Caches>& cache) {
+// False when the isolate is tearing down.
+bool BuildNativeGraph(Isolate* isolate, ProbeRun* run) {
   // Classes are only inspected through the runtime functions, never messaged:
   // a first message runs +initialize, arbitrary code inside the snapshot.
   static Class blockClass = objc_getClass("NSBlock");
@@ -956,18 +1008,21 @@ void BuildNativeGraph(Isolate* isolate, ProbeRun* run, const std::shared_ptr<Cac
     return &run->natives.emplace(object, std::move(entry)).first->second;
   };
 
-  for (auto& entry : cache->Instances) {
-    Instance instance;
-    if (!ReadInstance(isolate, run->classes, entry.first, entry.second, &instance)) {
-      continue;
+  bool valid = ForEachInstance(isolate, [&](const Instance& instance) {
+    Wrapped wrapped;
+    if (!ReadInstance(run->classes, instance, &wrapped)) {
+      return;
     }
-    if (NativeEntry* native = add((__bridge void*)entry.first, instance.cls, 0)) {
+    if (NativeEntry* native = add(instance.object, wrapped.cls, 0)) {
       native->seed = true;
-      native->runtimeRetains = instance.adapter ? 0 : 1;
+      native->runtimeRetains = wrapped.adapter ? 0 : 1;
     }
+  });
+  if (!valid) {
+    return false;
   }
   // The registry lock keeps a stateful object from being freed meanwhile.
-  WrapperLifetimeCanary::ForEachState(isolate, [&](id object, Local<Object>) {
+  ForEachState(isolate, [&](id object, Local<Object>) {
     if (NativeEntry* entry = add((__bridge void*)object, object_getClass(object), 0)) {
       entry->seed = true;
     }
@@ -1009,6 +1064,7 @@ void BuildNativeGraph(Isolate* isolate, ProbeRun* run, const std::shared_ptr<Cac
       native.second.changed = true;
     }
   }
+  return true;
 }
 
 class NativeObjectNode : public EmbedderGraph::Node {
@@ -1031,14 +1087,12 @@ class NativeObjectNode : public EmbedderGraph::Node {
 };
 
 void BuildEmbedderGraph(Isolate* isolate, EmbedderGraph* graph, void*) {
-  std::shared_ptr<Caches> cache = Caches::Get(isolate);
-  if (cache == nullptr || !cache->IsValid()) {
-    return;
-  }
   ProbeRun* run = activeRun_;
   ClassSet ownClasses;
   if (run != nullptr) {
-    BuildNativeGraph(isolate, run, cache);
+    if (!BuildNativeGraph(isolate, run)) {
+      return;
+    }
   } else {
     ownClasses = LoadClasses();
   }
@@ -1069,31 +1123,34 @@ void BuildEmbedderGraph(Isolate* isolate, EmbedderGraph* graph, void*) {
     }
   };
 
-  for (auto& entry : cache->Instances) {
-    Instance instance;
-    if (!ReadInstance(isolate, classes, entry.first, entry.second, &instance)) {
+  bool valid = ForEachInstance(isolate, [&](const Instance& instance) {
+    Wrapped wrapped;
+    if (!ReadInstance(classes, instance, &wrapped)) {
       if (run != nullptr) {
-        auto found = run->natives.find((__bridge void*)entry.first);
+        auto found = run->natives.find(instance.object);
         if (found != run->natives.end() && found->second.seed) {
           found->second.changed = true;
         }
       }
-      continue;
+      return;
     }
-    EmbedderGraph::Node* native = nodeFor((__bridge void*)entry.first, instance.cls);
-    EmbedderGraph::Node* js = graph->V8Node(instance.js);
-    if (instance.adapter) {
+    EmbedderGraph::Node* native = nodeFor(instance.object, wrapped.cls);
+    EmbedderGraph::Node* js = graph->V8Node(wrapped.js);
+    if (wrapped.adapter) {
       graph->AddEdge(native, js, "ns:adapter");
-      modeled(instance.js);
-      continue;
+      modeled(wrapped.js);
+      return;
     }
     graph->AddEdge(js, native, "ns:retain");
-    if (RootedStrong(instance) || instance.reconciledStrong) {
+    if (wrapped.rootedStrong || wrapped.reconciledStrong) {
       graph->AddEdge(native, js, "ns:owned");
-      modeled(instance.js);
+      modeled(wrapped.js);
     }
+  });
+  if (!valid) {
+    return;
   }
-  WrapperLifetimeCanary::ForEachState(isolate, [&](id object, Local<Object> state) {
+  ForEachState(isolate, [&](id object, Local<Object> state) {
     graph->AddEdge(nodeFor((__bridge void*)object, object_getClass(object)),
                    graph->V8Node(state.As<Value>()), "ns:state");
     modeled(state);
@@ -1109,7 +1166,7 @@ void BuildEmbedderGraph(Isolate* isolate, EmbedderGraph* graph, void*) {
     // A JS block's disposal takes the isolate's Locker, which the snapshot
     // holds, so a block found alive stays readable until the snapshot ends.
     if (native.second.block && !native.second.changed) {
-      Local<Value> callback = Interop::JSBlockCallback(isolate, native.first);
+      Local<Value> callback = host_->jsBlockCallback(isolate, native.first);
       if (!callback.IsEmpty()) {
         graph->AddEdge(from, graph->V8Node(callback), "ns:block-callback");
         modeled(callback);
@@ -1339,8 +1396,8 @@ MaybeLocal<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool
   if (globalHandles == nullptr) {
     // Without it the runtime's handles would all read as roots.
     deleteSnapshot();
-    isolate->ThrowException(Exception::Error(tns::ToV8String(
-        isolate, "findLeakCycles: the heap snapshot has no (Global handles) root")));
+    isolate->ThrowException(Exception::Error(
+        ToV8String(isolate, "findLeakCycles: the heap snapshot has no (Global handles) root")));
     return MaybeLocal<Object>();
   }
 
@@ -1492,12 +1549,10 @@ MaybeLocal<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool
   auto t2 = std::chrono::steady_clock::now();
 
   auto set = [&](Local<Object> object, const char* key, Local<Value> value) {
-    object->Set(context, tns::ToV8String(isolate, key), value).FromMaybe(false);
+    object->Set(context, ToV8String(isolate, key), value).FromMaybe(false);
   };
   auto number = [&](double value) { return v8::Number::New(isolate, value).As<Value>(); };
-  auto string = [&](const std::string& value) {
-    return tns::ToV8String(isolate, value).As<Value>();
-  };
+  auto string = [&](const std::string& value) { return ToV8String(isolate, value).As<Value>(); };
 
   Local<v8::Array> cycleArray = v8::Array::New(isolate, static_cast<int>(cycles.size()));
   for (size_t i = 0; i < cycles.size(); i++) {
@@ -1523,8 +1578,8 @@ MaybeLocal<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool
   }
 
   Local<Object> result = Object::New(isolate);
-  set(result, "mode", string(WrapperLifetimeModeName(GetWrapperLifetimeMode())));
-  set(result, "scope", string(WrapperLifetimeScopeName(GetWrapperLifetimeScope())));
+  set(result, "mode", string(host_->lifetimeMode()));
+  set(result, "scope", string(host_->lifetimeScope()));
   set(result, "strict", v8::Boolean::New(isolate, strict));
   set(result, "cycles", cycleArray);
   set(result, "nativeObjects", number(run.natives.size()));
@@ -1589,9 +1644,8 @@ MaybeLocal<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool
       set(entry, "out", string(out));
       set(entry, "root", v8::Boolean::New(isolate, run.Root(native.second)));
       set(entry, "jsBlock",
-          v8::Boolean::New(isolate,
-                           native.second.block && !native.second.changed &&
-                               !Interop::JSBlockCallback(isolate, native.first).IsEmpty()));
+          v8::Boolean::New(isolate, native.second.block && !native.second.changed &&
+                                        !host_->jsBlockCallback(isolate, native.first).IsEmpty()));
       set(entry, "reached", v8::Boolean::New(isolate, node != nullptr && marked.count(node) > 0));
       std::string reachedFrom;
       for (const HeapGraphNode* at = node;
@@ -1623,24 +1677,23 @@ struct ClassCounts {
 
 std::map<std::string, ClassCounts> CountByClass(Isolate* isolate) {
   std::map<std::string, ClassCounts> counts;
-  std::shared_ptr<Caches> cache = Caches::Get(isolate);
-  if (cache == nullptr || !cache->IsValid()) {
-    return counts;
-  }
   HandleScope scope(isolate);
   ClassSet classes = LoadClasses();
-  for (auto& entry : cache->Instances) {
-    Instance instance;
-    if (!ReadInstance(isolate, classes, entry.first, entry.second, &instance)) {
-      continue;
+  bool valid = ForEachInstance(isolate, [&](const Instance& instance) {
+    Wrapped wrapped;
+    if (!ReadInstance(classes, instance, &wrapped)) {
+      return;
     }
-    ClassCounts& count = counts[class_getName(instance.cls)];
+    ClassCounts& count = counts[class_getName(wrapped.cls)];
     count.wrappers++;
-    if (RootedStrong(instance)) {
+    if (wrapped.rootedStrong) {
       count.strong++;
     }
+  });
+  if (!valid) {
+    return {};
   }
-  WrapperLifetimeCanary::ForEachState(isolate, [&](id object, Local<Object>) {
+  ForEachState(isolate, [&](id object, Local<Object>) {
     counts[class_getName(object_getClass(object))].states++;
   });
   return counts;
@@ -1657,10 +1710,10 @@ Local<Object> CountsObject(Isolate* isolate, Local<Context> context,
         {"states", entry.states},
     };
     for (const auto& [key, count] : fields) {
-      value->Set(context, tns::ToV8String(isolate, key), v8::Number::New(isolate, count))
+      value->Set(context, ToV8String(isolate, key), v8::Number::New(isolate, count))
           .FromMaybe(false);
     }
-    result->Set(context, tns::ToV8String(isolate, name), value).FromMaybe(false);
+    result->Set(context, ToV8String(isolate, name), value).FromMaybe(false);
   }
   return result;
 }
@@ -1680,16 +1733,16 @@ void FindLeakCyclesCallback(const FunctionCallbackInfo<Value>& info) {
   std::vector<std::string> inspect;
   if (info.Length() > 0 && !info[0]->IsUndefined()) {
     if (!info[0]->IsObject()) {
-      isolate->ThrowException(Exception::TypeError(tns::ToV8String(
+      isolate->ThrowException(Exception::TypeError(ToV8String(
           isolate, "findLeakCycles expects ({ strict?: boolean, inspect?: string[] })")));
       return;
     }
     Local<Value> value;
-    if (!info[0].As<Object>()->Get(context, tns::ToV8String(isolate, "strict")).ToLocal(&value)) {
+    if (!info[0].As<Object>()->Get(context, ToV8String(isolate, "strict")).ToLocal(&value)) {
       return;
     }
     strict = value->BooleanValue(isolate);
-    if (!info[0].As<Object>()->Get(context, tns::ToV8String(isolate, "inspect")).ToLocal(&value)) {
+    if (!info[0].As<Object>()->Get(context, ToV8String(isolate, "inspect")).ToLocal(&value)) {
       return;
     }
     if (value->IsArray()) {
@@ -1711,32 +1764,44 @@ void FindLeakCyclesCallback(const FunctionCallbackInfo<Value>& info) {
 // ---- Triggers ------------------------------------------------------------
 
 bool TriggersEnabled() {
-  id config = Runtime::GetAppConfigValue("wrapperLifetime");
+  id config = host_->appConfigValue("wrapperLifetime");
   if ([config isKindOfClass:[NSDictionary class]]) {
     id leakProbe = ((NSDictionary*)config)[@"leakProbe"];
     if ([leakProbe isKindOfClass:[NSNumber class]]) {
       return [leakProbe boolValue];
     }
   }
-  return RuntimeConfig.IsDebug;
+  return host_->isDebug();
 }
+
+enum class Trigger : uintptr_t {
+  kMemoryWarning,
+  kCounts,
+  kCycles,
+  kStrictCycles,
+  kInspectCycles,
+};
+
+void RunTrigger(Isolate* isolate, void* trigger);
 
 // Shared with the notification handlers, which run on other threads and may
 // outlive the isolate.
 struct TriggerGate {
   std::mutex mutex;
   bool open = true;
-  Isolate* isolate = nullptr;
-  std::weak_ptr<EventLoop> loop;
+  Poster* poster = nullptr;
 
-  void Post(std::function<void(Isolate*)> task) {
-    std::lock_guard<std::mutex> lock(mutex);
-    std::shared_ptr<EventLoop> eventLoop = loop.lock();
-    if (!open || eventLoop == nullptr) {
-      return;
+  ~TriggerGate() {
+    if (poster != nullptr) {
+      host_->destroyPoster(poster);
     }
-    Isolate* target = isolate;
-    eventLoop->PostInternal([target, task]() { task(target); });
+  }
+
+  void Post(Trigger trigger) {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (open) {
+      host_->post(poster, RunTrigger, reinterpret_cast<void*>(static_cast<uintptr_t>(trigger)));
+    }
   }
 };
 
@@ -1765,40 +1830,37 @@ constexpr int kCountCollections = 3;
 void ReportCounts(Isolate* isolate) {
   for (int i = 0; i < kCountCollections; i++) {
     isolate->LowMemoryNotification();
-    WrapperLifetime::DrainReleases(isolate);
+    host_->drainReleases(isolate);
   }
   Local<Context> context = isolate->GetCurrentContext();
   Local<Object> report = Object::New(isolate);
-  report
-      ->Set(context, tns::ToV8String(isolate, "mode"),
-            tns::ToV8String(isolate, WrapperLifetimeModeName(GetWrapperLifetimeMode())))
+  report->Set(context, ToV8String(isolate, "mode"), ToV8String(isolate, host_->lifetimeMode()))
+      .FromMaybe(false);
+  report->Set(context, ToV8String(isolate, "scope"), ToV8String(isolate, host_->lifetimeScope()))
       .FromMaybe(false);
   report
-      ->Set(context, tns::ToV8String(isolate, "scope"),
-            tns::ToV8String(isolate, WrapperLifetimeScopeName(GetWrapperLifetimeScope())))
-      .FromMaybe(false);
-  report
-      ->Set(context, tns::ToV8String(isolate, "classes"),
+      ->Set(context, ToV8String(isolate, "classes"),
             CountsObject(isolate, context, CountByClass(isolate)))
       .FromMaybe(false);
-  if (ObjectManager::LifetimeStats* stats = ObjectManager::GetLifetimeStats(isolate)) {
+  leakprobe::LifetimeStats stats;
+  if (host_->lifetimeStats(isolate, &stats)) {
     Local<Object> counters = Object::New(isolate);
     const std::pair<const char*, uint64_t> fields[] = {
-        {"resurrections", stats->resurrections},
-        {"collected", stats->collected},
-        {"releasedExplicitly", stats->releasedExplicitly},
-        {"releasedAccesses", stats->releasedAccesses},
-        {"queuedReleases", stats->queuedReleases},
-        {"canaryStates", stats->canaryStates},
-        {"canaryNativeDeaths", stats->canaryNativeDeaths},
+        {"resurrections", stats.resurrections},
+        {"collected", stats.collected},
+        {"releasedExplicitly", stats.releasedExplicitly},
+        {"releasedAccesses", stats.releasedAccesses},
+        {"queuedReleases", stats.queuedReleases},
+        {"canaryStates", stats.canaryStates},
+        {"canaryNativeDeaths", stats.canaryNativeDeaths},
     };
     for (const auto& [key, value] : fields) {
       counters
-          ->Set(context, tns::ToV8String(isolate, key),
+          ->Set(context, ToV8String(isolate, key),
                 v8::Number::New(isolate, static_cast<double>(value)))
           .FromMaybe(false);
     }
-    report->Set(context, tns::ToV8String(isolate, "stats"), counters).FromMaybe(false);
+    report->Set(context, ToV8String(isolate, "stats"), counters).FromMaybe(false);
   }
   std::string path = WriteReport(isolate, context, "counts", report);
   if (path.empty()) {
@@ -1834,16 +1896,13 @@ void ReportCycles(Isolate* isolate, bool strict, const std::vector<std::string>&
   }
   Local<Value> cycles;
   uint32_t count = 0;
-  if (report->Get(context, tns::ToV8String(isolate, "cycles")).ToLocal(&cycles) &&
-      cycles->IsArray()) {
+  if (report->Get(context, ToV8String(isolate, "cycles")).ToLocal(&cycles) && cycles->IsArray()) {
     count = cycles.As<v8::Array>()->Length();
     for (uint32_t i = 0; i < count; i++) {
       Local<Value> cycle, path, uncertain;
       if (cycles.As<v8::Array>()->Get(context, i).ToLocal(&cycle) && cycle->IsObject() &&
-          cycle.As<Object>()->Get(context, tns::ToV8String(isolate, "path")).ToLocal(&path) &&
-          cycle.As<Object>()
-              ->Get(context, tns::ToV8String(isolate, "uncertain"))
-              .ToLocal(&uncertain)) {
+          cycle.As<Object>()->Get(context, ToV8String(isolate, "path")).ToLocal(&path) &&
+          cycle.As<Object>()->Get(context, ToV8String(isolate, "uncertain")).ToLocal(&uncertain)) {
         Log("%s %scycle %u: %s", kLogPrefix, uncertain->BooleanValue(isolate) ? "uncertain " : "",
             i + 1, Utf8(isolate, path).c_str());
       }
@@ -1853,7 +1912,7 @@ void ReportCycles(Isolate* isolate, bool strict, const std::vector<std::string>&
   std::string path = WriteReport(isolate, context, kind, report);
   Local<Value> changed;
   uint32_t changedCount = 0;
-  if (report->Get(context, tns::ToV8String(isolate, "changedNativeObjects")).ToLocal(&changed) &&
+  if (report->Get(context, ToV8String(isolate, "changedNativeObjects")).ToLocal(&changed) &&
       changed->IsNumber()) {
     changedCount = static_cast<uint32_t>(changed.As<v8::Number>()->Value());
   }
@@ -1885,7 +1944,7 @@ struct Triggers {
 };
 
 void OnMemoryWarning(Isolate* isolate) {
-  Triggers* triggers = Caches::StateFor<Triggers>(isolate);
+  Triggers* triggers = static_cast<Triggers*>(host_->isolateState(isolate));
   if (triggers == nullptr) {
     return;
   }
@@ -1917,44 +1976,65 @@ void OnMemoryWarning(Isolate* isolate) {
   triggers->haveLastCounts = true;
 }
 
+void RunTrigger(Isolate* isolate, void* trigger) {
+  switch (static_cast<Trigger>(reinterpret_cast<uintptr_t>(trigger))) {
+    case Trigger::kMemoryWarning:
+      OnMemoryWarning(isolate);
+      break;
+    case Trigger::kCounts:
+      ReportCounts(isolate);
+      break;
+    case Trigger::kCycles:
+      ReportCycles(isolate, false);
+      break;
+    case Trigger::kStrictCycles:
+      ReportCycles(isolate, true);
+      break;
+    case Trigger::kInspectCycles:
+      for (int i = 0; i < kCountCollections; i++) {
+        isolate->LowMemoryNotification();
+        host_->drainReleases(isolate);
+      }
+      ReportCycles(isolate, false, InspectPrefixes());
+      break;
+  }
+}
+
 void InstallTriggers(Isolate* isolate) {
-  Triggers* triggers = Caches::StateFor<Triggers>(isolate);
-  Runtime* runtime = Runtime::GetRuntime(isolate);
-  if (triggers == nullptr || runtime == nullptr) {
+  Poster* poster = host_->createPoster(isolate);
+  if (poster == nullptr) {
     return;
   }
-  triggers->gate->isolate = isolate;
-  triggers->gate->loop = runtime->GetEventLoop();
+  Triggers* triggers = new Triggers();
+  triggers->gate->poster = poster;
+  if (!host_->setIsolateState(isolate, triggers,
+                              [](void* state) { delete static_cast<Triggers*>(state); })) {
+    delete triggers;
+    return;
+  }
   std::shared_ptr<TriggerGate> gate = triggers->gate;
 
-  // By name: the runtime does not link UIKit.
+  // By name: the framework does not link UIKit.
   triggers->memoryWarningObserver = [[[NSNotificationCenter defaultCenter]
       addObserverForName:@"UIApplicationDidReceiveMemoryWarningNotification"
                   object:nil
                    queue:nil
               usingBlock:^(NSNotification*) {
-                gate->Post([](Isolate* target) { OnMemoryWarning(target); });
+                gate->Post(Trigger::kMemoryWarning);
               }] retain];
 
-  const std::pair<const char*, std::function<void(Isolate*)>> handlers[] = {
-      {kCountsNotification, [](Isolate* target) { ReportCounts(target); }},
-      {kCyclesNotification, [](Isolate* target) { ReportCycles(target, false); }},
-      {kStrictCyclesNotification, [](Isolate* target) { ReportCycles(target, true); }},
-      {kInspectCyclesNotification,
-       [](Isolate* target) {
-         for (int i = 0; i < kCountCollections; i++) {
-           target->LowMemoryNotification();
-           WrapperLifetime::DrainReleases(target);
-         }
-         ReportCycles(target, false, InspectPrefixes());
-       }},
+  const std::pair<const char*, Trigger> handlers[] = {
+      {kCountsNotification, Trigger::kCounts},
+      {kCyclesNotification, Trigger::kCycles},
+      {kStrictCyclesNotification, Trigger::kStrictCycles},
+      {kInspectCyclesNotification, Trigger::kInspectCycles},
   };
-  for (const auto& [name, handler] : handlers) {
+  for (const auto& [name, trigger] : handlers) {
     int token = 0;
-    std::function<void(Isolate*)> task = handler;
+    Trigger posted = trigger;
     uint32_t status = notify_register_dispatch(
         name, &token, dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^(int) {
-          gate->Post(task);
+          gate->Post(posted);
         });
     if (status == NOTIFY_STATUS_OK) {
       triggers->notifyTokens.push_back(token);
@@ -1962,25 +2042,45 @@ void InstallTriggers(Isolate* isolate) {
   }
 }
 
-}  // namespace
+// Set by the test suite, to see ns:runtime without the framework.
+std::atomic<bool> declineIsolates_{false};
 
-void WrapperLifetimeLeaks::Init(Isolate* isolate) {
+bool Attach(Isolate* isolate, bool mainIsolate) {
+  if (declineIsolates_.load()) {
+    return false;
+  }
   isolate->GetHeapProfiler()->AddBuildEmbedderGraphCallback(BuildEmbedderGraph, nullptr);
-  std::shared_ptr<Caches> cache = Caches::Get(isolate);
-  if (cache != nullptr && !cache->isWorker && TriggersEnabled()) {
+  if (mainIsolate && TriggersEnabled()) {
     InstallTriggers(isolate);
   }
+  return true;
 }
 
-bool WrapperLifetimeLeaks::RegisterFunctions(Local<Context> context, Local<Object> binding) {
-  Isolate* isolate = v8::Isolate::GetCurrent();
-  Local<v8::Function> counts;
-  Local<v8::Function> cycles;
-  return v8::Function::New(context, GetWrapperClassCountsCallback).ToLocal(&counts) &&
-         v8::Function::New(context, FindLeakCyclesCallback).ToLocal(&cycles) &&
-         binding->Set(context, tns::ToV8String(isolate, "getWrapperClassCounts"), counts)
-             .FromMaybe(false) &&
-         binding->Set(context, tns::ToV8String(isolate, "findLeakCycles"), cycles).FromMaybe(false);
-}
+const leakprobe::Probe kProbe = {
+    .version = leakprobe::kVersion,
+    .size = sizeof(leakprobe::Probe),
+    .attach = Attach,
+    .findLeakCycles = FindLeakCyclesCallback,
+    .getWrapperClassCounts = GetWrapperClassCountsCallback,
+};
+
+}  // namespace
 
 }  // namespace tns
+
+extern "C" __attribute__((visibility("default"))) const tns::leakprobe::Probe*
+NativeScriptLeakProbeConnect(const tns::leakprobe::Host* host) {
+  if (host == nullptr || host->version != tns::leakprobe::kVersion ||
+      host->size != sizeof(tns::leakprobe::Host)) {
+    NSLog(@"NativeScriptLeakProbe: built for another runtime version, not attaching");
+    return nullptr;
+  }
+  tns::host_ = host;
+  return &tns::kProbe;
+}
+
+// Isolates that start while set get no probe, as if the framework were absent.
+extern "C" __attribute__((visibility("default"))) void NativeScriptLeakProbeDeclineIsolates(
+    bool decline) {
+  tns::declineIsolates_.store(decline);
+}

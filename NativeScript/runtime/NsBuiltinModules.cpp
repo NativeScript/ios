@@ -7,6 +7,7 @@
 #include "Console.h"
 #include "Helpers.h"
 #include "Interop.h"
+#include "LeakProbe.h"
 #include "Messaging.h"
 #include "ModuleInternalCallbacks.h"
 #include "ObjectManager.h"
@@ -17,7 +18,6 @@
 #include "URLSearchParamsImpl.h"
 #include "Worker.h"
 #include "WrapperLifetime.h"
-#include "WrapperLifetimeLeaks.h"
 
 using namespace v8;
 
@@ -309,7 +309,7 @@ MaybeLocal<Object> NsRuntimeBinding(Local<Context> context) {
   }
   Interop::RegisterEscapeExceptionFunction(context, binding);
   Interop::RegisterExternalSizeFunctions(context, binding);
-  if (!WrapperLifetimeLeaks::RegisterFunctions(context, binding)) {
+  if (!LeakProbe::RegisterFunctions(context, binding)) {
     return MaybeLocal<Object>();
   }
   return binding;

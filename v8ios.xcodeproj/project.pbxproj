@@ -314,9 +314,9 @@
 		DD6B0F1ACE8AE363C72245E9 /* WrapperLifetime.h in Headers */ = {isa = PBXBuildFile; fileRef = 9E6F52B357F2776D77D71D8A /* WrapperLifetime.h */; };
 		1DE238EF3BDD0EF221E13C44 /* WrapperLifetime.mm in Sources */ = {isa = PBXBuildFile; fileRef = 13A9D13202DBEA9487A90B03 /* WrapperLifetime.mm */; };
 		A0636BA435F52099D6955AC5 /* WrapperLifetimeCanary.h in Headers */ = {isa = PBXBuildFile; fileRef = 06AF90E16F4178A9D3261C14 /* WrapperLifetimeCanary.h */; };
-		ADFC6948A446C61502AEE47F /* WrapperLifetimeLeaks.h in Headers */ = {isa = PBXBuildFile; fileRef = 9E3712759A1FB55EC4BA390B /* WrapperLifetimeLeaks.h */; };
+		ADFC6948A446C61502AEE47F /* LeakProbe.h in Headers */ = {isa = PBXBuildFile; fileRef = 9E3712759A1FB55EC4BA390B /* LeakProbe.h */; };
 		2A9D21FFAFE7419B7E69B585 /* WrapperLifetimeCanary.mm in Sources */ = {isa = PBXBuildFile; fileRef = CB7C1CED65B5F547091F0B28 /* WrapperLifetimeCanary.mm */; };
-		2CA196DC8EB148A2CB3F9C47 /* WrapperLifetimeLeaks.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8ECE36189A0C784BBCDD3B55 /* WrapperLifetimeLeaks.mm */; };
+		2CA196DC8EB148A2CB3F9C47 /* LeakProbe.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8ECE36189A0C784BBCDD3B55 /* LeakProbe.mm */; };
 		C2DDEBB0229EAC8300345BFE /* StringHasher.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB87229EAC8300345BFE /* StringHasher.h */; };
 		C2DDEBB1229EAC8300345BFE /* Caches.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2DDEB88229EAC8300345BFE /* Caches.cpp */; };
 		C2DDEBB2229EAC8300345BFE /* ModuleInternal.h in Headers */ = {isa = PBXBuildFile; fileRef = C2DDEB89229EAC8300345BFE /* ModuleInternal.h */; };
@@ -349,6 +349,11 @@
 		F6191AB629C0FF87003F588F /* utils.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AB429C0FF86003F588F /* utils.h */; };
 		F6191AB729C0FF87003F588F /* utils.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AB529C0FF86003F588F /* utils.mm */; };
 		D3FA1E7A0000000000000004 /* NativeScriptDefaultMetadata.c in Sources */ = {isa = PBXBuildFile; fileRef = D3FA1E7A0000000000000002 /* NativeScriptDefaultMetadata.c */; };
+		A1EA4B0E0000000000000005 /* NativeScriptLeakProbe.mm in Sources */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000002 /* NativeScriptLeakProbe.mm */; };
+		A1EA4B0E0000000000000006 /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
+		A1EA4B0E0000000000000011 /* NativeScriptLeakProbe.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000001 /* NativeScriptLeakProbe.framework */; platformFilters = (ios, xros, ); };
+		A1EA4B0E0000000000000012 /* NativeScriptLeakProbe.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000001 /* NativeScriptLeakProbe.framework */; platformFilters = (ios, xros, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		A1EA4B0E0000000000000014 /* LeakProbeSPI.h in Headers */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000013 /* LeakProbeSPI.h */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -401,6 +406,13 @@
 			remoteGlobalIDString = C2F4CBB222C60BFD0036B56F;
 			remoteInfo = "metadata-generator";
 		};
+		A1EA4B0E000000000000000F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C27E277822202663009C10A3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A1EA4B0E000000000000000B;
+			remoteInfo = NativeScriptLeakProbe;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -431,6 +443,7 @@
 			dstSubfolderSpec = 10;
 			files = (
 				C225378A241A41C500192740 /* TKLiveSync.framework in Embed Frameworks */,
+				A1EA4B0E0000000000000012 /* NativeScriptLeakProbe.framework in Embed Frameworks */,
 				C2C8EE7622CE54EE001F8CEC /* NativeScript.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
@@ -851,8 +864,8 @@
 		13A9D13202DBEA9487A90B03 /* WrapperLifetime.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = WrapperLifetime.mm; sourceTree = "<group>"; };
 		06AF90E16F4178A9D3261C14 /* WrapperLifetimeCanary.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WrapperLifetimeCanary.h; sourceTree = "<group>"; };
 		CB7C1CED65B5F547091F0B28 /* WrapperLifetimeCanary.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = WrapperLifetimeCanary.mm; sourceTree = "<group>"; };
-		9E3712759A1FB55EC4BA390B /* WrapperLifetimeLeaks.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WrapperLifetimeLeaks.h; sourceTree = "<group>"; };
-		8ECE36189A0C784BBCDD3B55 /* WrapperLifetimeLeaks.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = WrapperLifetimeLeaks.mm; sourceTree = "<group>"; };
+		9E3712759A1FB55EC4BA390B /* LeakProbe.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LeakProbe.h; sourceTree = "<group>"; };
+		8ECE36189A0C784BBCDD3B55 /* LeakProbe.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = LeakProbe.mm; sourceTree = "<group>"; };
 		C2DDEB87229EAC8300345BFE /* StringHasher.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringHasher.h; sourceTree = "<group>"; };
 		C2DDEB88229EAC8300345BFE /* Caches.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Caches.cpp; sourceTree = "<group>"; };
 		C2DDEB89229EAC8300345BFE /* ModuleInternal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ModuleInternal.h; sourceTree = "<group>"; };
@@ -891,6 +904,10 @@
 		D3FA1E7A0000000000000001 /* NativeScriptDefaultMetadata.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NativeScriptDefaultMetadata.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D3FA1E7A0000000000000002 /* NativeScriptDefaultMetadata.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = NativeScriptDefaultMetadata.c; sourceTree = "<group>"; };
 		D3FA1E7A0000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1EA4B0E0000000000000001 /* NativeScriptLeakProbe.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NativeScriptLeakProbe.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1EA4B0E0000000000000002 /* NativeScriptLeakProbe.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptLeakProbe.mm; sourceTree = "<group>"; };
+		A1EA4B0E0000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1EA4B0E0000000000000013 /* LeakProbeSPI.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LeakProbeSPI.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -929,6 +946,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C2253789241A41C500192740 /* TKLiveSync.framework in Frameworks */,
+				A1EA4B0E0000000000000011 /* NativeScriptLeakProbe.framework in Frameworks */,
 				C2C8EE7522CE54EE001F8CEC /* NativeScript.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -951,6 +969,14 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1EA4B0E0000000000000008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1EA4B0E0000000000000006 /* NativeScript.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1130,6 +1156,7 @@
 				C29374E3229FC0F60075CB16 /* TestFixtures */,
 				C2A5DFE62328C4B900A91A76 /* TKLiveSync */,
 				D3FA1E7A0000000000000005 /* NativeScriptDefaultMetadata */,
+				A1EA4B0E0000000000000004 /* NativeScriptLeakProbe */,
 				C27E278122202664009C10A3 /* Products */,
 				C2FF3016225203FD00933782 /* Frameworks */,
 			);
@@ -1146,6 +1173,7 @@
 				C23992C7236C2D6E00D2F720 /* TestRunnerTests.xctest */,
 				C2253782241A41C500192740 /* TKLiveSync.framework */,
 				D3FA1E7A0000000000000001 /* NativeScriptDefaultMetadata.framework */,
+				A1EA4B0E0000000000000001 /* NativeScriptLeakProbe.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -1540,8 +1568,9 @@
 				13A9D13202DBEA9487A90B03 /* WrapperLifetime.mm */,
 				06AF90E16F4178A9D3261C14 /* WrapperLifetimeCanary.h */,
 				CB7C1CED65B5F547091F0B28 /* WrapperLifetimeCanary.mm */,
-				9E3712759A1FB55EC4BA390B /* WrapperLifetimeLeaks.h */,
-				8ECE36189A0C784BBCDD3B55 /* WrapperLifetimeLeaks.mm */,
+				9E3712759A1FB55EC4BA390B /* LeakProbe.h */,
+				A1EA4B0E0000000000000013 /* LeakProbeSPI.h */,
+				8ECE36189A0C784BBCDD3B55 /* LeakProbe.mm */,
 				C20AB5E526E1015200E2B41D /* OneByteStringResource.h */,
 				C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */,
 				4A5C201A2E2B000300000002 /* Performance.h */,
@@ -1662,6 +1691,15 @@
 			path = inspector;
 			sourceTree = "<group>";
 		};
+		A1EA4B0E0000000000000004 /* NativeScriptLeakProbe */ = {
+			isa = PBXGroup;
+			children = (
+				A1EA4B0E0000000000000002 /* NativeScriptLeakProbe.mm */,
+				A1EA4B0E0000000000000003 /* Info.plist */,
+			);
+			path = NativeScriptLeakProbe;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -1701,7 +1739,8 @@
 				C2DDEBAC229EAC8300345BFE /* ObjectManager.h in Headers */,
 				DD6B0F1ACE8AE363C72245E9 /* WrapperLifetime.h in Headers */,
 				A0636BA435F52099D6955AC5 /* WrapperLifetimeCanary.h in Headers */,
-				ADFC6948A446C61502AEE47F /* WrapperLifetimeLeaks.h in Headers */,
+				ADFC6948A446C61502AEE47F /* LeakProbe.h in Headers */,
+				A1EA4B0E0000000000000014 /* LeakProbeSPI.h in Headers */,
 				6573B9E7291FE2A700B0ED7C /* jsi.h in Headers */,
 				6573B9E2291FE2A700B0ED7C /* jsi-inl.h in Headers */,
 				C2D21601248AAAD900EDC646 /* Constants.h in Headers */,
@@ -1878,6 +1917,7 @@
 				C293752B229FC4740075CB16 /* PBXTargetDependency */,
 				C2F4CBBC22C61CF20036B56F /* PBXTargetDependency */,
 				C2253788241A41C500192740 /* PBXTargetDependency */,
+				A1EA4B0E0000000000000010 /* PBXTargetDependency */,
 			);
 			name = TestRunner;
 			productName = TestRunner;
@@ -1939,6 +1979,23 @@
 			productReference = D3FA1E7A0000000000000001 /* NativeScriptDefaultMetadata.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		A1EA4B0E000000000000000B /* NativeScriptLeakProbe */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1EA4B0E000000000000000C /* Build configuration list for PBXNativeTarget "NativeScriptLeakProbe" */;
+			buildPhases = (
+				A1EA4B0E0000000000000007 /* Sources */,
+				A1EA4B0E0000000000000008 /* Frameworks */,
+				A1EA4B0E0000000000000009 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NativeScriptLeakProbe;
+			productName = NativeScriptLeakProbe;
+			productReference = A1EA4B0E0000000000000001 /* NativeScriptLeakProbe.framework */;
+			productType = "com.apple.product-type.framework";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1997,6 +2054,7 @@
 				C23992C6236C2D6E00D2F720 /* TestRunnerTests */,
 				C2253781241A41C500192740 /* TKLiveSync */,
 				D3FA1E7A0000000000000006 /* NativeScriptDefaultMetadata */,
+				A1EA4B0E000000000000000B /* NativeScriptLeakProbe */,
 			);
 		};
 /* End PBXProject section */
@@ -2036,6 +2094,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C2DDEB30229EAB3B00345BFE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1EA4B0E0000000000000009 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -2388,7 +2453,7 @@
 				C2DDEBAF229EAC8300345BFE /* ObjectManager.mm in Sources */,
 				1DE238EF3BDD0EF221E13C44 /* WrapperLifetime.mm in Sources */,
 				2A9D21FFAFE7419B7E69B585 /* WrapperLifetimeCanary.mm in Sources */,
-				2CA196DC8EB148A2CB3F9C47 /* WrapperLifetimeLeaks.mm in Sources */,
+				2CA196DC8EB148A2CB3F9C47 /* LeakProbe.mm in Sources */,
 				F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */,
 				A1B2C3D40000000000000004 /* WorkerInspectorClient.mm in Sources */,
 				C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */,
@@ -2473,6 +2538,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1EA4B0E0000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1EA4B0E0000000000000005 /* NativeScriptLeakProbe.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -2526,6 +2599,15 @@
 			isa = PBXTargetDependency;
 			target = C2F4CBB222C60BFD0036B56F /* metadata-generator */;
 			targetProxy = C2F4CBBB22C61CF20036B56F /* PBXContainerItemProxy */;
+		};
+		A1EA4B0E0000000000000010 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilters = (
+				ios,
+				xros,
+			);
+			target = A1EA4B0E000000000000000B /* NativeScriptLeakProbe */;
+			targetProxy = A1EA4B0E000000000000000F /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -3331,6 +3413,119 @@
 			};
 			name = Release;
 		};
+		A1EA4B0E000000000000000D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALLOW_TARGET_PLATFORM_SPECIALIZATION = NO;
+				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
+				CLANG_ENABLE_MODULES = NO;
+				CLANG_ENABLE_OBJC_ARC = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = NO;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				EXCLUDED_ARCHS = "";
+				"EXCLUDED_ARCHS[sdk=xros*]" = x86_64;
+				"EXCLUDED_ARCHS[sdk=xrsimulator*]" = x86_64;
+				GCC_C_LANGUAGE_STANDARD = c11;
+				GCC_PREFIX_HEADER = "NativeScript/NativeScript-Prefix.pch";
+				GCC_INLINES_ARE_PRIVATE_EXTERN = YES;
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = "DEBUG=1";
+				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript/include";
+				INFOPLIST_FILE = NativeScriptLeakProbe/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				OTHER_CFLAGS = (
+					"-fno-rtti",
+					"-Wall",
+					"-Werror",
+					"-Wno-documentation",
+				);
+				OTHER_LDFLAGS = (
+					"-framework",
+					Foundation,
+					"-Wl,-exported_symbol,_NativeScriptLeakProbeConnect",
+					"-Wl,-exported_symbol,_NativeScriptLeakProbeDeclineIsolates",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScriptLeakProbe;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = "";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Debug;
+		};
+		A1EA4B0E000000000000000E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALLOW_TARGET_PLATFORM_SPECIALIZATION = NO;
+				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
+				CLANG_ENABLE_MODULES = NO;
+				CLANG_ENABLE_OBJC_ARC = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = NO;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				EXCLUDED_ARCHS = "";
+				"EXCLUDED_ARCHS[sdk=xros*]" = x86_64;
+				"EXCLUDED_ARCHS[sdk=xrsimulator*]" = x86_64;
+				GCC_C_LANGUAGE_STANDARD = c11;
+				GCC_PREFIX_HEADER = "NativeScript/NativeScript-Prefix.pch";
+				GCC_INLINES_ARE_PRIVATE_EXTERN = YES;
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/NativeScript/include";
+				INFOPLIST_FILE = NativeScriptLeakProbe/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				OTHER_CFLAGS = (
+					"-fno-rtti",
+					"-Wall",
+					"-Werror",
+					"-Wno-documentation",
+				);
+				OTHER_LDFLAGS = (
+					"-framework",
+					Foundation,
+					"-Wl,-exported_symbol,_NativeScriptLeakProbeConnect",
+					"-Wl,-exported_symbol,_NativeScriptLeakProbeDeclineIsolates",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScriptLeakProbe;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = "";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -3411,6 +3606,15 @@
 			buildConfigurations = (
 				D3FA1E7A000000000000000A /* Debug */,
 				D3FA1E7A000000000000000B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1EA4B0E000000000000000C /* Build configuration list for PBXNativeTarget "NativeScriptLeakProbe" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1EA4B0E000000000000000D /* Debug */,
+				A1EA4B0E000000000000000E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
