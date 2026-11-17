@@ -458,18 +458,97 @@ describe("Wrapper lifetime modes", function () {
 
     it("hands back a native object's JS properties on a new wrapper after the old one died", function (done) {
         var owner = NSMutableArray.new();
+        var first;
         (function () {
             var obj = Extended.new();
             obj.tag = "kept";
             owner.addObject(obj);
+            first = new WeakRef(obj);
         })();
         settle(2, function () {
+            if (canary) {
+                expect(first.deref()).toBeUndefined();
+            }
             var obj = owner.objectAtIndex(0);
             if (keepsState) {
                 expect(obj.tag).toBe("kept");
             }
             done();
         });
+    });
+
+    // kNonMasking interceptors only see names the prototype chain lacks: a JS
+    // property shadowing a prototype member is defined on the wrapper itself,
+    // so in canary mode it goes with the wrapper. A documented limit.
+    it("keeps a JS property that shadows a prototype member only while its canary lives", function (done) {
+        var owner = NSMutableArray.new();
+        (function () {
+            var obj = Extended.new();
+            obj.isEqual = function () {
+                return "shadow";
+            };
+            obj.tag = "kept";
+            owner.addObject(obj);
+        })();
+        settle(2, function () {
+            var obj = owner.objectAtIndex(0);
+            if (canary) {
+                expect(obj.tag).toBe("kept");
+                expect(obj.isEqual(obj)).toBe(true);
+            } else if (rooted) {
+                expect(obj.isEqual(obj)).toBe("shadow");
+            }
+            done();
+        });
+    });
+
+    // A JS-implemented dealloc replaces the class's own death hook, so it
+    // reports the death itself, after the JS method ran.
+    it("lets the JS state go when a JS-implemented dealloc ran", function (done) {
+        var N = 8;
+        var seen = [];
+        var WithDealloc = TNSAllocLog.extend({
+            dealloc: function () {
+                seen.push(true);
+                this.super.dealloc();
+            }
+        }, { name: "WrapperLifetimeModesJSDealloc" });
+        var owner = NSMutableArray.new();
+        settle(2, function () {
+            var before = runtime.getWrapperLifetimeStats();
+            (function () {
+                for (var i = 0; i < N; i++) {
+                    var obj = WithDealloc.new();
+                    obj.tag = "state";
+                    owner.addObject(obj);
+                }
+            })();
+            settle(2, function () {
+                owner.removeAllObjects();
+                settle(3, function () {
+                    var after = runtime.getWrapperLifetimeStats();
+                    expect(seen.length).toBe(N);
+                    if (canary) {
+                        expect(after.canaryNativeDeaths - before.canaryNativeDeaths).not.toBeLessThan(N);
+                    }
+                    done();
+                });
+            });
+        });
+    });
+
+    it("iterates an NSArray through an unbound Symbol.iterator outside canary mode", function () {
+        if (canary) {
+            return;
+        }
+        var array = NSArray.arrayWithArray(["a", "b"]);
+        var iterate = array[Symbol.iterator];
+        var iterator = iterate();
+        var values = [];
+        for (var step = iterator.next(); !step.done; step = iterator.next()) {
+            values.push(step.value);
+        }
+        expect(values).toEqual(["a", "b"]);
     });
 
     it("leaves plain objects outside the extended scope without forwarding", function (done) {
@@ -561,7 +640,8 @@ describe("Wrapper lifetime modes", function () {
         if (typeof objc_removeAssociatedObjects !== "function") {
             return;
         }
-        var obj = Extended.new();
+        // Only objects outside JS-extended classes carry the token.
+        var obj = scope === "all" ? TNSAllocLog.new() : Extended.new();
         obj.tag = "first";
         objc_removeAssociatedObjects(obj);
         expect([undefined, "first"]).toContain(obj.tag);

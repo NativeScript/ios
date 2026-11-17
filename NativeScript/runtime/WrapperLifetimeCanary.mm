@@ -31,7 +31,9 @@
 #define NS_CANARY_DEATH_SIGNAL NS_CANARY_DEATH_ASSOCIATION
 #endif
 
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
 extern "C" id objc_initWeakOrNil(id* location, id value);
+#endif
 extern "C" void objc_destroyWeak(id* location);
 
 using namespace v8;
@@ -170,8 +172,15 @@ void ReportDeallocToAllRegistries(void* object) {
   }
 }
 
+// Not a message: a root class without -conformsToProtocol: would crash under
+// scope "all". Walks the superclasses for key-value observing's subclass.
 bool IsExtendedInstance(id object) {
-  return [object_getClass(object) conformsToProtocol:@protocol(TNSDerivedClass)];
+  for (Class cls = object_getClass(object); cls != nil; cls = class_getSuperclass(cls)) {
+    if (class_conformsToProtocol(cls, @protocol(TNSDerivedClass))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
@@ -298,14 +307,12 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
     if (registry == nullptr) {
       return false;
     }
-    if (registry->loop.expired()) {
-      if (Runtime* runtime = Runtime::GetRuntime(isolate)) {
-        registry->loop = runtime->GetEventLoop();
-      }
-    }
     id object = canary->lifetimeTarget_;
     // A JS-extended class's own -dealloc reports its instances' deaths.
     bool extended = IsExtendedInstance(object);
+    // Allocated before the lock: a collection this allocation starts can run
+    // callbacks (the weak sweep's, a finalizer's -dealloc) that take it.
+    Local<Object> freshState = Object::New(isolate, Null(isolate), nullptr, nullptr, 0);
     bool created = false;
     {
       std::lock_guard<std::mutex> lock(registry->mutex);
@@ -320,12 +327,14 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
       if (slot == nullptr) {
         auto record = std::make_shared<CanaryRecord>();
         record->reportsDeath = extended || NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION;
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
         if (!record->reportsDeath && objc_initWeakOrNil(&record->object, object) == nil) {
           // The class refuses weak references.
           registry->records.erase((__bridge void*)object);
           return false;
         }
-        record->state.Reset(isolate, Object::New(isolate, Null(isolate), nullptr, nullptr, 0));
+#endif
+        record->state.Reset(isolate, freshState);
         slot = std::move(record);
         registry->count.fetch_add(1, std::memory_order_relaxed);
         created = true;
@@ -479,8 +488,9 @@ Intercepted Descriptor(Local<v8::Name> property, const PropertyCallbackInfo<Valu
 }
 
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
-// Posts a sweep after each major collection: dead objects' weak references are
-// zeroed by then. Only posts; the GC is no place to reset handles.
+// Posts a sweep when a major collection ends, behind the release drain the
+// collection queued: objects it released are gone by the time the sweep runs.
+// Only posts; the GC is no place to reset handles.
 void PostSweepAfterGC(Isolate* isolate, GCType, GCCallbackFlags) {
   CanaryState* state = Caches::StateFor<CanaryState>(isolate);
   if (state == nullptr || state->registry->count.load(std::memory_order_relaxed) == 0) {
@@ -521,8 +531,7 @@ void WrapperLifetimeCanary::Init(Isolate* isolate) {
     registries_.push_back(state->registry);
   }
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
-  isolate->AddGCPrologueCallback(
-      PostSweepAfterGC, static_cast<GCType>(kGCTypeMarkSweepCompact | kGCTypeIncrementalMarking));
+  isolate->AddGCEpilogueCallback(PostSweepAfterGC, kGCTypeMarkSweepCompact);
 #endif
 }
 
@@ -547,6 +556,18 @@ void WrapperLifetimeCanary::InstallDeallocHook(Class extendedClass) {
                                                                            @selector(dealloc));
   });
   class_addMethod(extendedClass, @selector(dealloc), dealloc, "v@:");
+}
+
+IMP WrapperLifetimeCanary::WrapDealloc(SEL selector, IMP imp) {
+  if (selector != @selector(dealloc) ||
+      GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
+    return imp;
+  }
+  return imp_implementationWithBlock(^(id self) {
+    void* object = (__bridge void*)self;
+    reinterpret_cast<void (*)(id, SEL)>(imp)(self, @selector(dealloc));
+    ReportDeallocToAllRegistries(object);
+  });
 }
 
 void WrapperLifetimeCanary::ConfigureInstanceTemplate(Local<ObjectTemplate> instanceTemplate) {
