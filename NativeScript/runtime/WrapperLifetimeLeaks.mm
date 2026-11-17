@@ -853,6 +853,9 @@ struct Instance {
   // holds the JS object strongly, and the JS object does not retain it.
   bool adapter = false;
   ObjectWeakCallbackState* lifetime = nullptr;
+  // The Instances handle ObjectManager::ReconcileOwnership keeps strong while
+  // native code also retains the object: a wrapper no lifetime mode adopted.
+  bool reconciledStrong = false;
 };
 
 // False for entries whose key must not be dereferenced as the wrapped object:
@@ -887,6 +890,9 @@ bool ReadInstance(Isolate* isolate, const ClassSet& classes, id key,
     return false;
   }
   out->lifetime = wrapper->LifetimeState();
+  ObjectWeakCallbackState* ownership = wrapper->OwnershipState();
+  out->reconciledStrong = ownership != nullptr && !ownership->disposing_ &&
+                          ownership->target_ == handle && !handle->IsWeak();
   return true;
 }
 
@@ -1054,7 +1060,7 @@ void BuildEmbedderGraph(Isolate* isolate, EmbedderGraph* graph, void*) {
       continue;
     }
     graph->AddEdge(js, native, "ns:retain");
-    if (RootedStrong(instance)) {
+    if (RootedStrong(instance) || instance.reconciledStrong) {
       graph->AddEdge(native, js, "ns:owned");
       modeled(instance.js);
     }

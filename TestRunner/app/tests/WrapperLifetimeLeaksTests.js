@@ -23,10 +23,20 @@ describe("Wrapper lifetime leak cycles", function () {
     var SelfHandler = NSBlockOperation.extend({}, { name: "TNSLeakSelfHandler" });
     var WeakHandler = NSBlockOperation.extend({}, { name: "TNSLeakWeakHandler" });
     var WeakMapValue = NSBlockOperation.extend({}, { name: "TNSLeakWeakMapValue" });
+    // A JS initializer that native code (+new) calls on an unwrapped receiver.
+    var InitOwned = NSObject.extend(
+        {
+            init: function () {
+                return this.super.init();
+            },
+        },
+        { name: "TNSLeakInitOwned" }
+    );
 
     // Which shapes leak, per mode: state referencing its own object only under
     // canary, a cycle through a native retain under both new modes, and a JS
-    // block's callback (a strong handle) under every mode.
+    // block's callback or a natively owned wrapper's strong handle under every
+    // mode.
     var leaks = {
         TNSLeakSelfRef: canary,
         TNSLeakClosure: canary,
@@ -38,6 +48,7 @@ describe("Wrapper lifetime leak cycles", function () {
         TNSLeakSelfHandler: true,
         TNSLeakWeakHandler: false,
         TNSLeakWeakMapValue: true,
+        TNSLeakInitOwned: true,
     };
 
     function scrub(n) {
@@ -184,6 +195,14 @@ describe("Wrapper lifetime leak cycles", function () {
                 weakMapValue.addExecutionBlock(handler);
                 meta.set(handler, { owner: weakMapValue });
                 watched.addObject(weakMapValue);
+            })();
+            (function () {
+                // Its wrapper's handle is strong while the list retains it.
+                var initOwned = InitOwned.new();
+                var list = NSMutableArray.new();
+                list.addObject(initOwned);
+                initOwned.list = list;
+                watched.addObject(initOwned);
             })();
             settle(3, function () {
                 reports.default = runtime.findLeakCycles();
