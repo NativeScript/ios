@@ -8,6 +8,7 @@
 // lost with it. Every other value passes through unchanged.
 
 const { unwrap, wrap } = binding;
+const { ObjectDefineProperty, TypeError } = primordials;
 const {
   FinalizationRegistry: NativeFinalizationRegistry,
   WeakMap: NativeWeakMap,
@@ -38,7 +39,7 @@ class WeakMap extends NativeWeakMap {
 
 // V8 ships the upsert proposal; inherited, these would key on the wrapper.
 if (typeof NativeWeakMap.prototype.getOrInsert === "function") {
-  Object.defineProperty(WeakMap.prototype, "getOrInsert", {
+  ObjectDefineProperty(WeakMap.prototype, "getOrInsert", {
     value: function getOrInsert(key, value) {
       return NativeWeakMap.prototype.getOrInsert.call(this, unwrap(key, true), value);
     },
@@ -47,7 +48,7 @@ if (typeof NativeWeakMap.prototype.getOrInsert === "function") {
   });
 }
 if (typeof NativeWeakMap.prototype.getOrInsertComputed === "function") {
-  Object.defineProperty(WeakMap.prototype, "getOrInsertComputed", {
+  ObjectDefineProperty(WeakMap.prototype, "getOrInsertComputed", {
     value: function getOrInsertComputed(key, callbackfn) {
       if (typeof callbackfn !== "function") {
         throw new TypeError("WeakMap.prototype.getOrInsertComputed: callback is not a function");
@@ -102,7 +103,7 @@ class WeakRef extends NativeWeakRef {
 
 // weak-ref.js gave the native prototype a `get` alias of `deref`; inherited
 // as is, it would hand out the lifetime key.
-Object.defineProperty(WeakRef.prototype, "get", {
+ObjectDefineProperty(WeakRef.prototype, "get", {
   value: WeakRef.prototype.deref,
   writable: true,
   configurable: true,
@@ -136,7 +137,7 @@ for (const [name, value] of [
   ["WeakRef", WeakRef],
   ["FinalizationRegistry", FinalizationRegistry],
 ]) {
-  Object.defineProperty(globalThis, name, {
+  ObjectDefineProperty(globalThis, name, {
     value,
     writable: true,
     configurable: true,
