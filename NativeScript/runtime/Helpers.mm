@@ -704,7 +704,8 @@ void tns::ThrowReleasedObject(Isolate* isolate, ReleasedReason reason,
 
 bool tns::ReportReleasedObject(Isolate* isolate, const Local<Value>& val, ReleasedReason reason,
                                const char* operation, bool canThrow) {
-  return ApplyReleasedObjectPolicy(isolate, val, ReleasedReasonMessage(reason), operation, canThrow);
+  return ApplyReleasedObjectPolicy(isolate, val, ReleasedReasonMessage(reason), operation,
+                                   canThrow);
 }
 
 bool tns::WrapperLifetimeWarningsEnabled() {

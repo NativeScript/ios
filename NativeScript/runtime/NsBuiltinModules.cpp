@@ -8,8 +8,8 @@
 #include "Helpers.h"
 #include "Interop.h"
 #include "Messaging.h"
-#include "ObjectManager.h"
 #include "ModuleInternalCallbacks.h"
+#include "ObjectManager.h"
 #include "Runtime.h"
 #include "StructuredSerialization.h"
 #include "TextEncoding.h"
@@ -212,7 +212,8 @@ void GetWrapperLifetimeStatsCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
   Local<Object> result = Object::New(isolate);
-  tns::ObjectManager::LifetimeStats* stats = tns::ObjectManager::GetLifetimeStats(isolate);
+  tns::ObjectManager::LifetimeStats* stats =
+      tns::ObjectManager::GetLifetimeStats(isolate);
   if (stats == nullptr) {
     info.GetReturnValue().Set(result);
     return;
@@ -271,8 +272,9 @@ MaybeLocal<Object> NsRuntimeBinding(Local<Context> context) {
            .FromMaybe(false) ||
       !binding->Set(context, tns::ToV8String(isolate, "getConfig"), getConfig)
            .FromMaybe(false) ||
-      !binding->Set(context, tns::ToV8String(isolate, "getWrapperLifetimeStats"),
-                    getWrapperLifetimeStats)
+      !binding
+           ->Set(context, tns::ToV8String(isolate, "getWrapperLifetimeStats"),
+                 getWrapperLifetimeStats)
            .FromMaybe(false)) {
     return MaybeLocal<Object>();
   }

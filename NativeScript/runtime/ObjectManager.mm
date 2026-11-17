@@ -1,8 +1,12 @@
 #include "ObjectManager.h"
 #include <Block.h>
 #include <CoreFoundation/CoreFoundation.h>
+#include <objc/message.h>
+#include <objc/runtime.h>
 #include <sstream>
+#include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "Caches.h"
 #include "ClassBuilder.h"
@@ -12,11 +16,6 @@
 #include "FFICall.h"
 #include "Helpers.h"
 #include "Runtime.h"
-#include <objc/message.h>
-#include <objc/runtime.h>
-#include <string>
-#include <unordered_set>
-#include <vector>
 
 // Exported by libobjc; not declared in a public header for MRC code.
 extern "C" id objc_initWeak(id* location, id value);
@@ -754,9 +753,9 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
   if (tns::GetValue(isolate, obj) == wrapper) {
     delete wrapper;
     if (type == WrapperType::ObjCObject) {
-      tns::MarkReleased(isolate, obj,
-                        isFinalDisposal ? tns::ReleasedReason::kTeardown
-                                        : tns::ReleasedReason::kCollected);
+      tns::MarkReleased(
+          isolate, obj,
+          isFinalDisposal ? tns::ReleasedReason::kTeardown : tns::ReleasedReason::kCollected);
     } else {
       tns::DeleteValue(isolate, obj);
     }
