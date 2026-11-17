@@ -125,6 +125,9 @@ struct ProbeRun {
   // Global handles that stand for native -> JS edges.
   std::unordered_set<SnapshotObjectId> modeledHandles;
   bool truncated = false;
+  // Where the walk stopped short; cycles past these limits are not seen.
+  uint32_t depthCutOffs = 0;
+  uint32_t storageCutOffs = 0;
 
   bool Root(const NativeEntry& entry) const {
     // A gone object keeps nothing alive.
@@ -287,7 +290,10 @@ bool NonOwningContainer(Class cls) {
 // captures), following nested storage a little way.
 void ScanStorage(const ClassSet& classes, uintptr_t p, size_t size, int depth,
                  const std::string& prefix, std::vector<NativeEdge>* out,
-                 const SlotSkips* skips = nullptr) {
+                 const SlotSkips* skips = nullptr, uint32_t* cutOffs = nullptr) {
+  if (size > kMaxStorageBytes && cutOffs != nullptr) {
+    (*cutOffs)++;
+  }
   size_t limit = std::min(size, kMaxStorageBytes) & ~(sizeof(void*) - 1);
   std::vector<uintptr_t> words(limit / sizeof(void*));
   if (!ReadMemory(p, limit, size, words.data())) {
@@ -310,7 +316,7 @@ void ScanStorage(const ClassSet& classes, uintptr_t p, size_t size, int depth,
     if (Class cls = ObjectClass(classes, value, valueSize)) {
       out->push_back({reinterpret_cast<void*>(value), cls, label});
     } else if (depth < kMaxStorageDepth) {
-      ScanStorage(classes, value, valueSize, depth + 1, label, out, skips);
+      ScanStorage(classes, value, valueSize, depth + 1, label, out, skips, cutOffs);
     }
   }
 }
@@ -772,7 +778,7 @@ void Expand(ProbeRun* run, void* object, NativeEntry* entry) {
     std::vector<Capture> captures;
     if (!OwnedCaptures(p, size, &captures)) {
       ScanStorage(run->classes, p + sizeof(BlockHeader), size - sizeof(BlockHeader), 1, "capture",
-                  &entry->out);
+                  &entry->out, nullptr, &run->storageCutOffs);
       return;
     }
     for (const Capture& capture : captures) {
@@ -788,7 +794,8 @@ void Expand(ProbeRun* run, void* object, NativeEntry* entry) {
       if (Class cls = ObjectClass(run->classes, value, valueSize)) {
         entry->out.push_back({reinterpret_cast<void*>(value), cls, label});
       } else if (capture.byref && !UnretainedByref(value, valueSize)) {
-        ScanStorage(run->classes, value, valueSize, kMaxStorageDepth, label, &entry->out);
+        ScanStorage(run->classes, value, valueSize, kMaxStorageDepth, label, &entry->out, nullptr,
+                    &run->storageCutOffs);
       }
     }
     return;
@@ -798,6 +805,7 @@ void Expand(ProbeRun* run, void* object, NativeEntry* entry) {
     std::vector<uintptr_t> elements;
     bool cut = false;
     if (RingElements(calibration, p, size, kMaxStorageBytes / sizeof(void*), &elements, &cut)) {
+      run->storageCutOffs += cut ? 1 : 0;
       for (size_t i = 0; i < elements.size(); i++) {
         size_t valueSize = HeapBlockSize(elements[i]);
         if (Class cls = valueSize != 0 ? ObjectClass(run->classes, elements[i], valueSize) : nil) {
@@ -815,7 +823,8 @@ void Expand(ProbeRun* run, void* object, NativeEntry* entry) {
         !calibration.layerSkips.empty() && IsKindOf(entry->cls, calibration.layerClass)
             ? &calibration.layerSkips
             : nullptr;
-    ScanStorage(run->classes, p + sizeof(void*), size - sizeof(void*), 0, "", &entry->out, skips);
+    ScanStorage(run->classes, p + sizeof(void*), size - sizeof(void*), 0, "", &entry->out, skips,
+                &run->storageCutOffs);
     return;
   }
   for (const auto& slot : slots) {
@@ -951,6 +960,7 @@ void BuildNativeGraph(Isolate* isolate, ProbeRun* run, const std::shared_ptr<Cac
     queue.pop_front();
     NativeEntry& entry = run->natives[object];
     if (entry.depth >= kMaxNativeDepth) {
+      run->depthCutOffs++;
       continue;
     }
     Expand(run, object, &entry);
@@ -1185,7 +1195,8 @@ struct Cycle {
 
 // The shortest cycle through `start` within unmarked nodes.
 bool FindCycle(Isolate* isolate, const HeapGraphNode* start,
-               const std::unordered_set<const HeapGraphNode*>& marked, std::vector<Hop>* hops) {
+               const std::unordered_set<const HeapGraphNode*>& marked, std::vector<Hop>* hops,
+               bool* tooLong) {
   // A rooted-strong wrapper and its object always form a two-node loop; a
   // leak needs a cycle that leaves through another edge.
   const HeapGraphNode* ownWrapper = nullptr;
@@ -1229,6 +1240,7 @@ bool FindCycle(Isolate* isolate, const HeapGraphNode* start,
       break;
     }
     if (chain.size() >= kMaxCycleLength) {
+      *tooLong = true;
       return false;
     }
   }
@@ -1245,14 +1257,19 @@ bool FindCycle(Isolate* isolate, const HeapGraphNode* start,
 std::string Describe(Isolate* isolate, const std::vector<Hop>& hops, size_t first,
                      bool forSignature) {
   static const std::regex volatileParts("( @[0-9]+)|(0x[0-9a-f]+)");
+  // Element indices and storage offsets move with a collection's contents,
+  // and V8 numbers the edges it names twice ("2 / part of key ...").
+  static const std::regex positions("\\[[0-9]+\\]|\\+[0-9]+|^[0-9]+ / ");
   std::string out;
   for (size_t i = 0; i < hops.size(); i++) {
     const Hop& hop = hops[(first + i) % hops.size()];
     std::string name = NodeName(isolate, hop.node);
+    std::string edge = hop.edge;
     if (forSignature) {
       name = std::regex_replace(name, volatileParts, "");
+      edge = std::regex_replace(std::regex_replace(edge, volatileParts, ""), positions, "#");
     }
-    out += (i == 0 ? "" : " ") + name + " -[" + hop.edge + "]->";
+    out += (i == 0 ? "" : " ") + name + " -[" + edge + "]->";
   }
   const Hop& head = hops[first % hops.size()];
   std::string name = NodeName(isolate, head.node);
@@ -1309,38 +1326,58 @@ MaybeLocal<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool
     return MaybeLocal<Object>();
   }
 
-  std::unordered_set<const HeapGraphNode*> marked{snapshot->GetRoot()};
+  auto nodeOf = [&](void* native) {
+    return snapshot->GetNodeById(profiler->GetObjectId(static_cast<NativeObject>(native)));
+  };
   // How marking reached each node, kept only to explain inspected objects.
   std::unordered_map<const HeapGraphNode*, const HeapGraphEdge*> reachedBy;
-  std::deque<const HeapGraphNode*> queue{snapshot->GetRoot()};
-  while (!queue.empty()) {
-    const HeapGraphNode* node = queue.front();
-    queue.pop_front();
-    ForEachOwningEdge(isolate, node, [&](const HeapGraphEdge* edge) {
-      const HeapGraphNode* to = edge->GetToNode();
-      if (node == globalHandles && modeled.count(to)) {
-        return true;
+  auto mark = [&](const std::vector<const HeapGraphNode*>& extraRoots) {
+    std::unordered_set<const HeapGraphNode*> marked{snapshot->GetRoot()};
+    std::deque<const HeapGraphNode*> queue{snapshot->GetRoot()};
+    for (const HeapGraphNode* root : extraRoots) {
+      if (marked.insert(root).second) {
+        queue.push_back(root);
       }
-      if (marked.insert(to).second) {
-        queue.push_back(to);
-        if (!inspect.empty()) {
-          reachedBy[to] = edge;
+    }
+    reachedBy.clear();
+    while (!queue.empty()) {
+      const HeapGraphNode* node = queue.front();
+      queue.pop_front();
+      ForEachOwningEdge(isolate, node, [&](const HeapGraphEdge* edge) {
+        const HeapGraphNode* to = edge->GetToNode();
+        if (node == globalHandles && modeled.count(to)) {
+          return true;
         }
-      }
-      return true;
-    });
-  }
+        if (marked.insert(to).second) {
+          queue.push_back(to);
+          if (!inspect.empty()) {
+            reachedBy[to] = edge;
+          }
+        }
+        return true;
+      });
+    }
+    return marked;
+  };
 
   std::unordered_map<const HeapGraphNode*, void*> nativeOfNode;
   for (auto& native : run.natives) {
-    if (const HeapGraphNode* node =
-            snapshot->GetNodeById(profiler->GetObjectId(static_cast<NativeObject>(native.first)))) {
+    if (const HeapGraphNode* node = nodeOf(native.first)) {
       nativeOfNode[node] = native.first;
     }
   }
+  // Seeds in a fixed order, so that one heap yields one set of cycles.
+  std::vector<std::pair<std::string, void*>> seeds;
+  for (auto& native : run.natives) {
+    if (native.second.seed) {
+      seeds.push_back({class_getName(native.second.cls), native.first});
+    }
+  }
+  std::sort(seeds.begin(), seeds.end());
 
   std::vector<Cycle> cycles;
   std::unordered_set<const HeapGraphNode*> covered;
+  uint32_t longCycles = 0;
   uint32_t uncertain = 0;
   uint32_t changed = 0;
   for (auto& native : run.natives) {
@@ -1351,71 +1388,89 @@ MaybeLocal<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool
       uncertain++;
     }
   }
-  for (auto& native : run.natives) {
-    if (!native.second.seed) {
-      continue;
-    }
-    const HeapGraphNode* node =
-        snapshot->GetNodeById(profiler->GetObjectId(static_cast<NativeObject>(native.first)));
-    std::vector<Hop> hops;
-    if (node == nullptr || marked.count(node) || covered.count(node) ||
-        !FindCycle(isolate, node, marked, &hops)) {
-      // Unmarked off any cycle: garbage the next collection frees, or held by
-      // a cycle reported through one of its members.
-      continue;
-    }
-    Cycle cycle;
-    cycle.hops = hops;
-    std::unordered_set<void*> seen;
-    for (const Hop& hop : hops) {
-      covered.insert(hop.node);
-      auto found = nativeOfNode.find(hop.node);
-      if (found == nativeOfNode.end()) {
-        // A wrapper on the cycle names its object even when the object itself
-        // is off it.
-        for (int i = 0; i < hop.node->GetChildrenCount(); i++) {
-          const HeapGraphEdge* edge = hop.node->GetChild(i);
-          auto wrapped = nativeOfNode.find(edge->GetToNode());
-          if (wrapped != nativeOfNode.end() && EdgeName(isolate, edge) == "ns:retain" &&
-              seen.insert(wrapped->second).second) {
-            cycle.members.push_back(
-                {class_getName(run.natives[wrapped->second].cls), wrapped->second});
-          }
-        }
+  auto collect = [&](const std::unordered_set<const HeapGraphNode*>& marked) {
+    for (const auto& seed : seeds) {
+      const HeapGraphNode* node = nodeOf(seed.second);
+      std::vector<Hop> hops;
+      bool tooLong = false;
+      if (node == nullptr || marked.count(node) || covered.count(node) ||
+          !FindCycle(isolate, node, marked, &hops, &tooLong)) {
+        // Unmarked off any cycle: garbage the next collection frees, or held by
+        // a cycle reported through one of its members.
+        longCycles += tooLong ? 1 : 0;
         continue;
       }
-      const NativeEntry& entry = run.natives[found->second];
-      if (seen.insert(found->second).second) {
-        cycle.members.push_back({class_getName(entry.cls), found->second});
+      Cycle cycle;
+      cycle.hops = hops;
+      std::unordered_set<void*> seen;
+      for (const Hop& hop : hops) {
+        covered.insert(hop.node);
+        auto found = nativeOfNode.find(hop.node);
+        if (found == nativeOfNode.end()) {
+          // A wrapper on the cycle names its object even when the object itself
+          // is off it.
+          for (int i = 0; i < hop.node->GetChildrenCount(); i++) {
+            const HeapGraphEdge* edge = hop.node->GetChild(i);
+            auto wrapped = nativeOfNode.find(edge->GetToNode());
+            if (wrapped != nativeOfNode.end() && EdgeName(isolate, edge) == "ns:retain" &&
+                seen.insert(wrapped->second).second) {
+              cycle.members.push_back(
+                  {class_getName(run.natives[wrapped->second].cls), wrapped->second});
+            }
+          }
+          continue;
+        }
+        const NativeEntry& entry = run.natives[found->second];
+        if (seen.insert(found->second).second) {
+          cycle.members.push_back({class_getName(entry.cls), found->second});
+        }
+        if (entry.changed) {
+          cycle.reasons.push_back(std::string(class_getName(entry.cls)) + " " +
+                                  HexAddress(found->second) +
+                                  ": freed or replaced while the probe ran; its references are "
+                                  "as found before");
+        } else if (!entry.countUnknown && entry.Unexplained() < 0 && !entry.Immortal()) {
+          cycle.reasons.push_back(
+              std::string(class_getName(entry.cls)) + " " + HexAddress(found->second) +
+              ": retainCount " + std::to_string(entry.retainCount) + " is less than the " +
+              std::to_string(entry.runtimeRetains + entry.incoming) +
+              " retains its graph explains (" + std::to_string(entry.runtimeRetains) +
+              " runtime, " + std::to_string(entry.incoming) +
+              " incoming); some incoming edge does not own");
+        }
       }
-      if (entry.changed) {
-        cycle.reasons.push_back(std::string(class_getName(entry.cls)) + " " +
-                                HexAddress(found->second) +
-                                ": freed or replaced while the probe ran; its references are "
-                                "as found before");
-      } else if (!entry.countUnknown && entry.Unexplained() < 0 && !entry.Immortal()) {
-        cycle.reasons.push_back(
-            std::string(class_getName(entry.cls)) + " " + HexAddress(found->second) +
-            ": retainCount " + std::to_string(entry.retainCount) + " is less than the " +
-            std::to_string(entry.runtimeRetains + entry.incoming) +
-            " retains its graph explains (" + std::to_string(entry.runtimeRetains) + " runtime, " +
-            std::to_string(entry.incoming) + " incoming); some incoming edge does not own");
+      // Canonical rotation, so the same cycle has one signature in every run.
+      size_t first = 0;
+      std::string best;
+      for (size_t i = 0; i < hops.size(); i++) {
+        std::string candidate = Describe(isolate, hops, i, true);
+        if (i == 0 || candidate < best) {
+          best = candidate;
+          first = i;
+        }
+      }
+      cycle.signature = best;
+      cycle.path = Describe(isolate, hops, first, false);
+      cycles.push_back(std::move(cycle));
+    }
+  };
+  if (strict) {
+    // The default run's cycles first: its marking adds the objects only it
+    // treats as owned from outside, so strict reports every default cycle as
+    // the default run finds it, then the uncertain ones through those objects.
+    std::vector<const HeapGraphNode*> defaultRoots;
+    for (auto& native : run.natives) {
+      const NativeEntry& entry = native.second;
+      if (!entry.changed && !entry.countUnknown && !entry.Immortal() && entry.Unexplained() < 0) {
+        if (const HeapGraphNode* node = nodeOf(native.first)) {
+          defaultRoots.push_back(node);
+        }
       }
     }
-    // Canonical rotation, so the same cycle has one signature in every run.
-    size_t first = 0;
-    std::string best;
-    for (size_t i = 0; i < hops.size(); i++) {
-      std::string candidate = Describe(isolate, hops, i, true);
-      if (i == 0 || candidate < best) {
-        best = candidate;
-        first = i;
-      }
-    }
-    cycle.signature = best;
-    cycle.path = Describe(isolate, hops, first, false);
-    cycles.push_back(std::move(cycle));
+    collect(mark(defaultRoots));
   }
+  std::unordered_set<const HeapGraphNode*> marked = mark({});
+  collect(marked);
   auto t2 = std::chrono::steady_clock::now();
 
   auto set = [&](Local<Object> object, const char* key, Local<Value> value) {
@@ -1479,6 +1534,16 @@ MaybeLocal<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool
   }
   set(result, "changed", changedList);
   set(result, "truncated", v8::Boolean::New(isolate, run.truncated));
+  Local<Object> cutOffs = Object::New(isolate);
+  set(cutOffs, "depth", number(run.depthCutOffs));
+  set(cutOffs, "storage", number(run.storageCutOffs));
+  set(cutOffs, "cycleLength", number(longCycles));
+  set(result, "cutOffs", cutOffs);
+  Local<Object> calibrated = Object::New(isolate);
+  set(calibrated, "layer", v8::Boolean::New(isolate, run.calibration->layerClass != nil));
+  set(calibrated, "mutableArray",
+      v8::Boolean::New(isolate, run.calibration->mutableArrayClass != nil));
+  set(result, "calibrated", calibrated);
   if (!inspect.empty()) {
     Local<v8::Array> inspected = v8::Array::New(isolate);
     uint32_t count = 0;
@@ -1490,8 +1555,7 @@ MaybeLocal<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool
       if (!wanted) {
         continue;
       }
-      const HeapGraphNode* node =
-          snapshot->GetNodeById(profiler->GetObjectId(static_cast<NativeObject>(native.first)));
+      const HeapGraphNode* node = nodeOf(native.first);
       Local<Object> entry = Object::New(isolate);
       set(entry, "className", string(name));
       set(entry, "address", string(HexAddress(native.first)));
