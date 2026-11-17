@@ -22,6 +22,7 @@ describe("Wrapper lifetime leak cycles", function () {
     // The operation retains its execution blocks.
     var SelfHandler = NSBlockOperation.extend({}, { name: "TNSLeakSelfHandler" });
     var WeakHandler = NSBlockOperation.extend({}, { name: "TNSLeakWeakHandler" });
+    var WeakMapValue = NSBlockOperation.extend({}, { name: "TNSLeakWeakMapValue" });
 
     // Which shapes leak, per mode: state referencing its own object only under
     // canary, a cycle through a native retain under both new modes, and a JS
@@ -36,6 +37,7 @@ describe("Wrapper lifetime leak cycles", function () {
         TNSLeakUnexplained: false,
         TNSLeakSelfHandler: true,
         TNSLeakWeakHandler: false,
+        TNSLeakWeakMapValue: true,
     };
 
     function scrub(n) {
@@ -107,6 +109,8 @@ describe("Wrapper lifetime leak cycles", function () {
         var hiddenOwner = NSHashTable.hashTableWithOptions(0 /* NSPointerFunctionsStrongMemory */);
         // Weak watchers, to reach the leaked objects again and break their cycles.
         var watched = NSHashTable.weakObjectsHashTable();
+        // Reachable from the roots for the whole describe, like a module-level map.
+        var meta = new WeakMap();
         var reports = {};
 
         beforeAll(function (done) {
@@ -167,6 +171,20 @@ describe("Wrapper lifetime leak cycles", function () {
                     }
                 );
             })();
+            // Shapes below get their own scopes: functions created in one
+            // scope share its context, which would tie their reachability
+            // to every variable the other shapes' closures capture.
+            (function () {
+                // The handler does not close over its operation; the WeakMap
+                // entry keyed by the handler does.
+                var weakMapValue = WeakMapValue.new();
+                var handler = function () {
+                    return 1;
+                };
+                weakMapValue.addExecutionBlock(handler);
+                meta.set(handler, { owner: weakMapValue });
+                watched.addObject(weakMapValue);
+            })();
             settle(3, function () {
                 reports.default = runtime.findLeakCycles();
                 reports.strict = runtime.findLeakCycles({ strict: true });
@@ -185,6 +203,7 @@ describe("Wrapper lifetime leak cycles", function () {
                 }
                 delete o.op;
             });
+            meta = new WeakMap();
             owner.removeAllObjects();
             hiddenOwner.removeAllObjects();
         });

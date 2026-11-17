@@ -625,6 +625,45 @@ bool Strong(const HeapGraphEdge* edge) {
   return edge->GetType() != HeapGraphEdge::kWeak && edge->GetType() != HeapGraphEdge::kShortcut;
 }
 
+// Ephemeron tables hold their keys and values through weak edges.
+bool HasWeakEdges(const HeapGraphNode* node) {
+  for (int i = 0; i < node->GetChildrenCount(); i++) {
+    if (node->GetChild(i)->GetType() == HeapGraphEdge::kWeak) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// V8 records each WeakMap entry as two internal edges to the value, one from
+// the key and one from the table, both named "... pair in WeakMap (table @<id>)"
+// (V8HeapExplorer::ExtractEphemeronHashTableReferences). Only the key's is
+// followed: the table's would keep every value alive while the map is,
+// whatever its key.
+bool EphemeronTableEdge(Isolate* isolate, const HeapGraphNode* table, const HeapGraphEdge* edge) {
+  if (edge->GetType() != HeapGraphEdge::kInternal) {
+    return false;
+  }
+  std::string name = EdgeName(isolate, edge);
+  std::string suffix = " pair in WeakMap (table @" + std::to_string(table->GetId()) + ")";
+  return name.size() > suffix.size() &&
+         name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+// Calls `visit` with the edges of `node` that keep their target alive.
+template <typename Visit>
+void ForEachOwningEdge(Isolate* isolate, const HeapGraphNode* node, Visit&& visit) {
+  bool table = HasWeakEdges(node);
+  for (int i = 0; i < node->GetChildrenCount(); i++) {
+    const HeapGraphEdge* edge = node->GetChild(i);
+    if (Strong(edge) && !(table && EphemeronTableEdge(isolate, node, edge))) {
+      if (!visit(edge)) {
+        return;
+      }
+    }
+  }
+}
+
 const HeapGraphNode* Child(Isolate* isolate, const HeapGraphNode* node, const char* name) {
   for (int i = 0; node != nullptr && i < node->GetChildrenCount(); i++) {
     const HeapGraphNode* child = node->GetChild(i)->GetToNode();
@@ -674,23 +713,22 @@ bool FindCycle(Isolate* isolate, const HeapGraphNode* start,
   while (!queue.empty() && closing == nullptr) {
     const HeapGraphNode* node = queue.front();
     queue.pop_front();
-    for (int i = 0; i < node->GetChildrenCount(); i++) {
-      const HeapGraphEdge* edge = node->GetChild(i);
+    ForEachOwningEdge(isolate, node, [&](const HeapGraphEdge* edge) {
       const HeapGraphNode* to = edge->GetToNode();
-      if (!Strong(edge) || marked.count(to) || (node == ownWrapper && to == start)) {
-        continue;
+      if (marked.count(to) || (node == ownWrapper && to == start)) {
+        return true;
       }
       if (to == start) {
         closing = node;
         closingEdge = edge;
-        break;
+        return false;
       }
-      if (parent.count(to)) {
-        continue;
+      if (!parent.count(to)) {
+        parent[to] = {node, edge};
+        queue.push_back(to);
       }
-      parent[to] = {node, edge};
-      queue.push_back(to);
-    }
+      return true;
+    });
   }
   if (closing == nullptr) {
     return false;
@@ -766,11 +804,10 @@ Local<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool stri
   while (!queue.empty()) {
     const HeapGraphNode* node = queue.front();
     queue.pop_front();
-    for (int i = 0; i < node->GetChildrenCount(); i++) {
-      const HeapGraphEdge* edge = node->GetChild(i);
+    ForEachOwningEdge(isolate, node, [&](const HeapGraphEdge* edge) {
       const HeapGraphNode* to = edge->GetToNode();
-      if (!Strong(edge) || (node == globalHandles && modeled.count(to))) {
-        continue;
+      if (node == globalHandles && modeled.count(to)) {
+        return true;
       }
       if (marked.insert(to).second) {
         queue.push_back(to);
@@ -778,7 +815,8 @@ Local<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool stri
           reachedBy[to] = edge;
         }
       }
-    }
+      return true;
+    });
   }
 
   std::unordered_map<const HeapGraphNode*, void*> nativeOfNode;
