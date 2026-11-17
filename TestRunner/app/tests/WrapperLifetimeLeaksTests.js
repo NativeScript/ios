@@ -5,6 +5,9 @@ describe("Wrapper lifetime leak cycles", function () {
     var mode = runtime.getConfig("wrapperLifetimeMode");
     var rooted = mode === "rooted";
     var canary = mode === "canary";
+    // A plain recognizer's JS state outlives its wrapper only when every
+    // wrapper is in scope; otherwise the edge back to its view dies with it.
+    var gestureCycle = (rooted || canary) && runtime.getConfig("wrapperLifetimeScope") === "all";
 
     // One class per shape, so a report names the shape.
     function shape(name) {
@@ -374,7 +377,7 @@ describe("Wrapper lifetime leak cycles", function () {
             expect(held[0].reached).toBe(true);
             expect(held[0].reachedFrom).toContain("TNSLeakHeldView");
             expect(held[0].out).toContain("_layer");
-            if (rooted || canary) {
+            if (gestureCycle) {
                 var gesture = inspected("TNSLeakGestureView");
                 expect(gesture.length).toBe(1);
                 expect(gesture[0].out).toContain("_gestureRecognizers");
@@ -389,12 +392,12 @@ describe("Wrapper lifetime leak cycles", function () {
         it("reports a cycle through a view's gesture recognizer only when strict, marked uncertain", function () {
             expect(cyclesNaming(reports.default, "TNSLeakGestureView").length).toBe(0);
             var found = cyclesNaming(reports.strict, "TNSLeakGestureView");
-            expect(found.length > 0).toBe(rooted || canary);
+            expect(found.length > 0).toBe(gestureCycle);
             found.forEach(function (cycle) {
                 expect(cycle.uncertain).toBe(true);
                 expect(cycle.reasons.join("\n")).toMatch(/UITapGestureRecognizer 0x[0-9a-f]+: retainCount/);
             });
-            expect(aliveNamed(watched, "TNSLeakGestureView")).toBe(rooted || canary ? 1 : 0);
+            expect(aliveNamed(watched, "TNSLeakGestureView")).toBe(gestureCycle ? 1 : 0);
         });
 
         it("keeps the native side of every reported cycle alive", function () {
