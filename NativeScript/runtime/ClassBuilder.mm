@@ -769,9 +769,9 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
       implementationObject->HasOwnProperty(context, Symbol::GetIterator(isolate)).FromMaybe(false);
   bool inheritsEnumeration = class_respondsToSelector(
       class_getSuperclass(extendedClass), @selector(countByEnumeratingWithState:objects:count:));
-  bool success = (!ownsIterator && inheritsEnumeration) ||
-                 implementationObject->Get(context, Symbol::GetIterator(isolate))
-                     .ToLocal(&symbolIterator);
+  bool success =
+      (!ownsIterator && inheritsEnumeration) ||
+      implementationObject->Get(context, Symbol::GetIterator(isolate)).ToLocal(&symbolIterator);
   tns::Assert(success, isolate);
 
   if (!symbolIterator.IsEmpty() && symbolIterator->IsFunction()) {

@@ -761,7 +761,8 @@ void WrapCallback(const FunctionCallbackInfo<Value>& info) {
   // A live wrapper is handed back as is: building one through ConvertArgument
   // would reset a protocol-typed wrapper's prototype to its class's.
   std::shared_ptr<Caches> cache = Caches::Get(isolate);
-  std::shared_ptr<Persistent<Value>> cached = ArgConverter::FindCachedInstance(isolate, cache, object);
+  std::shared_ptr<Persistent<Value>> cached =
+      ArgConverter::FindCachedInstance(isolate, cache, object);
   if (cached != nullptr && !cached->IsEmpty()) {
     [object release];
     info.GetReturnValue().Set(cached->Get(isolate));

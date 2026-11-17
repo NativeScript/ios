@@ -12,10 +12,10 @@
 #include "ObjectManager.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
+#include "SymbolIterator.h"
 #include "SymbolLoader.h"
 #include "Tasks.h"
 #include "Worker.h"
-#include "SymbolIterator.h"
 #include "WrapperLifetimeCanary.h"
 
 using namespace v8;

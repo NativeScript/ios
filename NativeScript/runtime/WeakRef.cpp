@@ -25,9 +25,10 @@ void WeakRef::Init(Local<Context> context) {
     return;
   }
   Local<Object> binding = Object::New(isolate);
-  success = WrapperLifetimeCanary::RegisterWrapFunctions(context, binding) &&
-            BuiltinLoader::RunBuiltin(context, BuiltinId::kWeakCollections, binding)
-                .ToLocal(&result);
+  success =
+      WrapperLifetimeCanary::RegisterWrapFunctions(context, binding) &&
+      BuiltinLoader::RunBuiltin(context, BuiltinId::kWeakCollections, binding)
+          .ToLocal(&result);
   if (!success && tc.HasCaught()) {
     tns::LogError(isolate, tc);
   }
