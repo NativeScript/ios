@@ -86,13 +86,23 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
           }
         }};
 
+// libclosure's flags layout (Block_private.h): bit 0 is set once the last
+// release has started disposing the block, bits 1-15 hold the refcount, and a
+// saturated refcount latches the block alive.
+static constexpr int32_t kBlockDeallocating = 0x0001;
+static constexpr int32_t kBlockRefcountMask = 0xfffe;
+
 bool Interop::IsJSBlock(const void* block) {
   return static_cast<const JSBlock*>(block)->descriptor == &JSBlock::kJSBlockDescriptor;
 }
 
 Local<Value> Interop::JSBlockCallback(Isolate* isolate, const void* block) {
   const JSBlock* jsBlock = static_cast<const JSBlock*>(block);
-  if (!IsJSBlock(block)) {
+  // Dispose frees the callback wrapper after it releases the Locker, so only
+  // a block not yet disposing is read; one that starts disposing now waits
+  // for the caller's Locker before it touches the wrapper.
+  if (!IsJSBlock(block) ||
+      (__atomic_load_n(&jsBlock->flags, __ATOMIC_ACQUIRE) & kBlockDeallocating) != 0) {
     return Local<Value>();
   }
   MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(jsBlock->userData);
@@ -102,12 +112,6 @@ Local<Value> Interop::JSBlockCallback(Isolate* isolate, const void* block) {
   }
   return wrapper->callback_->Get(isolate);
 }
-
-// libclosure's flags layout (Block_private.h): bit 0 is set once the last
-// release has started disposing the block, bits 1-15 hold the refcount, and a
-// saturated refcount latches the block alive.
-static constexpr int32_t kBlockDeallocating = 0x0001;
-static constexpr int32_t kBlockRefcountMask = 0xfffe;
 
 // libclosure's increment ignores the deallocating bit, so Block_copy would hand
 // out a block whose dispose is already waiting for the isolate's Locker and

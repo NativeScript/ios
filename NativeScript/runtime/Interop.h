@@ -170,8 +170,9 @@ class Interop {
                          v8::Local<v8::Value> arg);
   static id ToObject(v8::Local<v8::Context> context, v8::Local<v8::Value> arg);
   // The JS function `block` calls when CreateBlock built it for this isolate,
-  // held strongly until the block is disposed; empty for any other block.
-  // `block` must be alive.
+  // held strongly until the block is disposed; empty for any other block and
+  // once disposal has started. `block` must be alive, and the caller must
+  // hold the isolate's Locker.
   static v8::Local<v8::Value> JSBlockCallback(v8::Isolate* isolate, const void* block);
   // Whether CreateBlock built `block` (for any isolate). `block` must be alive.
   static bool IsJSBlock(const void* block);

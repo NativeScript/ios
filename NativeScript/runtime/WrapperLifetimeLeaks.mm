@@ -1,5 +1,7 @@
 #include "WrapperLifetimeLeaks.h"
 #import <Foundation/Foundation.h>
+#include <dlfcn.h>
+#include <mach/mach.h>
 #include <malloc/malloc.h>
 #include <notify.h>
 #include <objc/message.h>
@@ -127,16 +129,47 @@ size_t HeapBlockSize(uintptr_t p) {
   if (p == 0 || IsTaggedPointer(p) || (p & (sizeof(void*) - 1)) != 0) {
     return 0;
   }
-  if (malloc_zone_from_ptr(reinterpret_cast<void*>(p)) == nullptr) {
-    return 0;
-  }
   return malloc_size(reinterpret_cast<void*>(p));
 }
 
+// Copies `length` bytes (whole words) at `p`, inside a heap block of
+// `blockSize` bytes that another thread may free meanwhile. A block of a page
+// or more is read with vm_read_overwrite, which fails instead of faulting once
+// its pages are unmapped; smaller blocks sit in malloc regions that stay
+// mapped. Uninstrumented: reading a stale block is expected here.
+__attribute__((no_sanitize("address"))) bool ReadMemory(uintptr_t p, size_t length,
+                                                        size_t blockSize, void* out) {
+  if (blockSize >= vm_page_size) {
+    vm_size_t copied = 0;
+    return vm_read_overwrite(mach_task_self(), p, length, reinterpret_cast<vm_address_t>(out),
+                             &copied) == KERN_SUCCESS &&
+           copied == length;
+  }
+  // Volatile, so the loop does not become a memcpy, which ASan intercepts.
+  const volatile uintptr_t* from = reinterpret_cast<const volatile uintptr_t*>(p);
+  uintptr_t* to = static_cast<uintptr_t*>(out);
+  for (size_t i = 0; i < length / sizeof(uintptr_t); i++) {
+    to[i] = from[i];
+  }
+  return true;
+}
+
+bool ReadWord(uintptr_t p, size_t blockSize, uintptr_t* out) {
+  return ReadMemory(p, sizeof(uintptr_t), blockSize, out);
+}
+
+// Realized classes only, when the runtime can list them: objc_copyClassList
+// realizes every class in the process. A class is realized by the time it has
+// an instance.
 ClassSet LoadClasses() {
+  using CopyClassList = Class* (*)(unsigned int*);
+  static CopyClassList copyClassList = [] {
+    void* realized = dlsym(RTLD_DEFAULT, "objc_copyRealizedClassList");
+    return realized != nullptr ? reinterpret_cast<CopyClassList>(realized) : &objc_copyClassList;
+  }();
   ClassSet classes;
   unsigned int count = 0;
-  Class* list = objc_copyClassList(&count);
+  Class* list = copyClassList(&count);
   for (unsigned int i = 0; i < count; i++) {
     classes.insert(reinterpret_cast<uintptr_t>(list[i]));
   }
@@ -147,12 +180,12 @@ ClassSet LoadClasses() {
 // The class of the object starting at `p`, or nil when the block does not
 // start with the isa of a known class.
 Class ObjectClass(const ClassSet& classes, uintptr_t p, size_t size) {
-  if (size < sizeof(void*)) {
+  uintptr_t isa = 0;
+  if (size < sizeof(void*) || !ReadWord(p, size, &isa)) {
     return nil;
   }
   // The simulator's isa keeps more class bits than objc_debug_isa_class_mask
   // admits; classes allocated at runtime (JS-extended ones) live above it.
-  uintptr_t isa = *reinterpret_cast<uintptr_t*>(p);
   for (uintptr_t mask :
        {objc_debug_isa_class_mask, static_cast<uintptr_t>(0x00007ffffffffff8ULL)}) {
     uintptr_t cls = isa & mask;
@@ -235,9 +268,14 @@ bool NonOwningContainer(Class cls) {
 // captures), following nested storage a little way.
 void ScanStorage(ProbeRun* run, uintptr_t p, size_t size, int depth, const std::string& prefix,
                  std::vector<NativeEdge>* out) {
-  size_t limit = std::min(size, kMaxStorageBytes);
-  for (size_t offset = 0; offset + sizeof(void*) <= limit; offset += sizeof(void*)) {
-    uintptr_t value = *reinterpret_cast<uintptr_t*>(p + offset);
+  size_t limit = std::min(size, kMaxStorageBytes) & ~(sizeof(void*) - 1);
+  std::vector<uintptr_t> words(limit / sizeof(void*));
+  if (!ReadMemory(p, limit, size, words.data())) {
+    return;
+  }
+  for (size_t i = 0; i < words.size(); i++) {
+    size_t offset = i * sizeof(void*);
+    uintptr_t value = words[i];
     if (value == p) {
       continue;
     }
@@ -263,6 +301,12 @@ struct BlockHeader {
   void* invoke;
   void* descriptor;
 };
+
+uint32_t BlockFlags(uintptr_t block, size_t size) {
+  uintptr_t word = 0;
+  ReadWord(block + offsetof(BlockHeader, flags), size, &word);
+  return static_cast<uint32_t>(word);
+}
 
 // Whether `object` still holds the object that was found there. A freed and
 // reused address that holds an object of the same class again passes.
@@ -301,7 +345,8 @@ IMP RetainCountImp(Class cls) {
 
 void ReadRetainCount(ProbeRun* run, void* object, NativeEntry* entry) {
   if (entry->block) {
-    entry->retainCount = (static_cast<BlockHeader*>(object)->flags & 0xfffe) >> 1;
+    entry->retainCount =
+        (BlockFlags(reinterpret_cast<uintptr_t>(object), entry->size) & 0xfffe) >> 1;
     return;
   }
   auto found = run->retainCountImps.find(entry->cls);
@@ -341,7 +386,10 @@ void Expand(ProbeRun* run, void* object, NativeEntry* entry) {
     if (slot.first + sizeof(void*) > size) {
       continue;
     }
-    uintptr_t value = *reinterpret_cast<uintptr_t*>(p + slot.first);
+    uintptr_t value = 0;
+    if (!ReadWord(p + slot.first, size, &value)) {
+      continue;
+    }
     size_t valueSize = HeapBlockSize(value);
     if (Class cls = valueSize != 0 ? ObjectClass(run->classes, value, valueSize) : nil) {
       entry->out.push_back({reinterpret_cast<void*>(value), cls, slot.second});
@@ -772,15 +820,29 @@ std::string Describe(Isolate* isolate, const std::vector<Hop>& hops, size_t firs
 
 // `inspect` lists class-name prefixes whose native objects the report details
 // (retain accounting, root, reached), to explain a missing or unexpected cycle.
-Local<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool strict,
-                             const std::vector<std::string>& inspect = {}) {
+MaybeLocal<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool strict,
+                                  const std::vector<std::string>& inspect = {}) {
   ProbeRun run;
   run.strict = strict;
   auto t0 = std::chrono::steady_clock::now();
   HeapProfiler* profiler = isolate->GetHeapProfiler();
+  // A snapshot leaves V8 assigning ids and tracking object moves until the
+  // ids are cleared. Ids that already existed belong to DevTools or
+  // allocation tracking, and stay.
+  bool hadObjectIds = profiler->GetObjectId(context->Global()) != HeapProfiler::kUnknownObjectId;
   activeRun_ = &run;
   const HeapSnapshot* snapshot = profiler->TakeHeapSnapshot();
   activeRun_ = nullptr;
+  auto deleteSnapshot = [&]() {
+    const_cast<HeapSnapshot*>(snapshot)->Delete();
+    if (profiler->GetSnapshotCount() == 0) {
+      // Frees the strings the snapshot interned.
+      profiler->DeleteAllHeapSnapshots();
+      if (!hadObjectIds) {
+        profiler->ClearObjectIds();
+      }
+    }
+  };
   auto t1 = std::chrono::steady_clock::now();
   for (auto& native : run.natives) {
     if (!native.second.changed && !StillThere(&run, native.first, native.second)) {
@@ -796,6 +858,13 @@ Local<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool stri
   }
   const HeapGraphNode* globalHandles =
       Child(isolate, Child(isolate, snapshot->GetRoot(), "(GC roots)"), "(Global handles)");
+  if (globalHandles == nullptr) {
+    // Without it the runtime's handles would all read as roots.
+    deleteSnapshot();
+    isolate->ThrowException(Exception::Error(tns::ToV8String(
+        isolate, "findLeakCycles: the heap snapshot has no (Global handles) root")));
+    return MaybeLocal<Object>();
+  }
 
   std::unordered_set<const HeapGraphNode*> marked{snapshot->GetRoot()};
   // How marking reached each node, kept only to explain inspected objects.
@@ -995,9 +1064,9 @@ Local<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool stri
       set(entry, "out", string(out));
       set(entry, "root", v8::Boolean::New(isolate, run.Root(native.second)));
       set(entry, "jsBlock",
-          v8::Boolean::New(
-              isolate,
-              native.second.block && !Interop::JSBlockCallback(isolate, native.first).IsEmpty()));
+          v8::Boolean::New(isolate,
+                           native.second.block && !native.second.changed &&
+                               !Interop::JSBlockCallback(isolate, native.first).IsEmpty()));
       set(entry, "reached", v8::Boolean::New(isolate, node != nullptr && marked.count(node) > 0));
       std::string reachedFrom;
       for (const HeapGraphNode* at = node;
@@ -1015,7 +1084,7 @@ Local<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool stri
   set(result, "snapshotNodes", number(snapshot->GetNodesCount()));
   set(result, "snapshotMs", number(std::chrono::duration<double, std::milli>(t1 - t0).count()));
   set(result, "analysisMs", number(std::chrono::duration<double, std::milli>(t2 - t1).count()));
-  const_cast<HeapSnapshot*>(snapshot)->Delete();
+  deleteSnapshot();
   return result;
 }
 
@@ -1108,7 +1177,10 @@ void FindLeakCyclesCallback(const FunctionCallbackInfo<Value>& info) {
       }
     }
   }
-  info.GetReturnValue().Set(FindLeakCycles(isolate, context, strict, inspect));
+  Local<Object> report;
+  if (FindLeakCycles(isolate, context, strict, inspect).ToLocal(&report)) {
+    info.GetReturnValue().Set(report);
+  }
 }
 
 // ---- Triggers ------------------------------------------------------------
@@ -1204,7 +1276,11 @@ void ReportCounts(Isolate* isolate) {
     report->Set(context, tns::ToV8String(isolate, "stats"), counters).FromMaybe(false);
   }
   std::string path = WriteReport(isolate, context, "counts", report);
-  Log("%s class counts written to %s", kLogPrefix, path.c_str());
+  if (path.empty()) {
+    Log("%s could not write the class counts report", kLogPrefix);
+  } else {
+    Log("%s class counts written to %s", kLogPrefix, path.c_str());
+  }
 }
 
 std::vector<std::string> InspectPrefixes() {
@@ -1224,7 +1300,13 @@ std::vector<std::string> InspectPrefixes() {
 
 void ReportCycles(Isolate* isolate, bool strict, const std::vector<std::string>& inspect = {}) {
   Local<Context> context = isolate->GetCurrentContext();
-  Local<Object> report = FindLeakCycles(isolate, context, strict, inspect);
+  TryCatch tryCatch(isolate);
+  Local<Object> report;
+  if (!FindLeakCycles(isolate, context, strict, inspect).ToLocal(&report)) {
+    Log("%s %s", kLogPrefix,
+        tryCatch.HasCaught() ? Utf8(isolate, tryCatch.Exception()).c_str() : "probe failed");
+    return;
+  }
   Local<Value> cycles;
   uint32_t count = 0;
   if (report->Get(context, tns::ToV8String(isolate, "cycles")).ToLocal(&cycles) &&
@@ -1250,8 +1332,9 @@ void ReportCycles(Isolate* isolate, bool strict, const std::vector<std::string>&
       changed->IsNumber()) {
     changedCount = static_cast<uint32_t>(changed.As<v8::Number>()->Value());
   }
-  Log("%s %u leak cycle(s)%s, %u native object(s) freed while probing, report written to %s",
-      kLogPrefix, count, strict ? " (strict)" : "", changedCount, path.c_str());
+  Log("%s %u leak cycle(s)%s, %u native object(s) freed while probing, %s%s", kLogPrefix, count,
+      strict ? " (strict)" : "", changedCount,
+      path.empty() ? "could not write the report" : "report written to ", path.c_str());
 }
 
 struct Triggers {
