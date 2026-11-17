@@ -26,10 +26,9 @@ describe("ns:worker_threads", function () {
         expect(Object.isFrozen(shim)).toBe(true);
     });
 
-    // A utility-priority worker can take several seconds to start on a loaded CI runner.
     it("constructs a worker with the runtime's options", function (done) {
         var worker = new nsWorkerThreads.Worker("./workerResourceLimits/echoWorker.js", {
-            ios: { priority: "utility" },
+            ios: { priority: "userInitiated" },
             resourceLimits: { maxOldGenerationSizeMb: 64 },
         });
         var settled = false;
@@ -49,7 +48,7 @@ describe("ns:worker_threads", function () {
             expect(String(event.message)).toBe("<no worker error>");
             finish();
         };
-    }, 15000);
+    });
 
     it("hands a worker realm its own constructor, not whatever the global names", function (done) {
         var worker = new Worker("./nsWorkerThreadsIdentityWorker.js");
