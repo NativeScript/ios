@@ -7,6 +7,7 @@ _functionReturnsNSRetained
 _functionReturnsUnmanaged
 _functionThrowsException
 _functionWhichReturnsSimpleFunctionPointer
+_functionWhichReturnsObjectFunctionPointer
 _functionWith_BoolPtr
 _functionWith_VoidPtr
 _functionWithBool

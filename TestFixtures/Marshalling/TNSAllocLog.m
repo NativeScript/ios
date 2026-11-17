@@ -20,6 +20,11 @@
     return [self init];
 }
 
++ (void (^)(id))objectSink {
+    return ^(id object) {
+    };
+}
+
 - (void)dealloc {
     TNSLog(@"TNSAllocLog dealloc");
 }
