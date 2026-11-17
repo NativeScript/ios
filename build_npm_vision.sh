@@ -37,7 +37,7 @@ cp -r "./project-template-vision/" "$OUTPUT_DIR/framework"
 if [ "$SPM_MODE" = "embedded" ]; then
   ARTIFACTS_DIR="dist/artifacts"
   LOCAL_SPM_DIR="$OUTPUT_DIR/framework/internal/local-spm"
-  for zip in NativeScript.visionos.xcframework.zip TKLiveSync.visionos.xcframework.zip; do
+  for zip in NativeScript.visionos.xcframework.zip TKLiveSync.visionos.xcframework.zip NativeScriptLeakProbe.visionos.xcframework.zip; do
     if [ ! -f "$ARTIFACTS_DIR/$zip" ]; then
       echo "Missing $ARTIFACTS_DIR/$zip — run ./build_spm_artifacts.sh visionos first." >&2
       exit 1
@@ -47,6 +47,7 @@ if [ "$SPM_MODE" = "embedded" ]; then
   cp "./spm-templates/local-spm-visionos/Package.swift" "$LOCAL_SPM_DIR/"
   cp "$ARTIFACTS_DIR/NativeScript.visionos.xcframework.zip" \
      "$ARTIFACTS_DIR/TKLiveSync.visionos.xcframework.zip" \
+     "$ARTIFACTS_DIR/NativeScriptLeakProbe.visionos.xcframework.zip" \
      "$LOCAL_SPM_DIR/"
   node ./scripts/stamp-template-local-spm.mjs \
     "$OUTPUT_DIR/framework/__PROJECT_NAME__.xcodeproj/project.pbxproj" \
