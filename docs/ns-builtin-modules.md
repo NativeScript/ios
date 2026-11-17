@@ -115,7 +115,7 @@ Config keys:
 |---|---|---|---|
 | `releasedObjectPolicy` | `"report"` \| `"throw"` | process-wide (main-isolate writes only; read live by every isolate) | `"report"` |
 | `debug` | comma-separated category list, e.g. `"esm,fetch"` | process-wide (main-isolate writes only; read live by every isolate) | the `NS_DEBUG` environment variable, or `""` |
-| `wrapperLifetimeWarnings` | `true` \| `false` | process-wide (main-isolate writes only; read live by every isolate) | the app config `"wrapperLifetime": { "warnings": … }`, or on in debug builds |
+| `wrapperLifetimeWarnings` | `true` \| `false` | process-wide (main-isolate writes only; read live by every isolate); no effect in the `"rooted"` mode | the app config `"wrapperLifetime": { "warnings": … }`, or on in debug builds |
 | `wrapperLifetimeMode` | `"resurrecting"` \| `"rooted"` | process-wide, read-only | the app config `"wrapperLifetime": { "mode": … }`, or `"resurrecting"` |
 | `wrapperLifetimeScope` | `"extended"` \| `"all"` | process-wide, read-only | the app config `"wrapperLifetime": { "scope": … }`, or `"extended"` |
 

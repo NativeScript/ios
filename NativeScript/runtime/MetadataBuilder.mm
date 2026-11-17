@@ -1508,7 +1508,7 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
 
         id thiz = *static_cast<const id*>(argValues[0]);
         Local<Context> v8Context = Caches::Get(isolate)->GetContext();
-        Local<Object> self_ = ArgConverter::WrapCallbackSelf(v8Context, thiz, Local<Object>());
+        Local<Object> self_ = ArgConverter::WrapCallbackSelf(v8Context, thiz);
         TryCatch tc(isolate);
         if (!getterFunc->Call(v8Context, self_, 0, nullptr).ToLocal(&res)) {
           NSException* ex = ArgConverter::HandleBoundaryException(v8Context, tc);
@@ -1568,7 +1568,7 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
         Local<Context> v8Context = Caches::Get(isolate)->GetContext();
 
         id thiz = *static_cast<const id*>(argValues[0]);
-        Local<Object> self_ = ArgConverter::WrapCallbackSelf(v8Context, thiz, Local<Object>());
+        Local<Object> self_ = ArgConverter::WrapCallbackSelf(v8Context, thiz);
 
         uint8_t* argBuffer = (uint8_t*)argValues[2];
         const TypeEncoding* typeEncoding = context->meta_->setter()->encodings()->first()->next();
