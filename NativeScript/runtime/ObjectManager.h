@@ -2,6 +2,7 @@
 #define ObjectManager_h
 
 #include <atomic>
+#include <cstdint>
 #include "Common.h"
 
 namespace tns {
@@ -46,7 +47,8 @@ struct ObjectWeakCallbackState {
   // phantom callback, so the wrapper and object are cached here.
   ObjCDataWrapper* lifetimeWrapper_ = nullptr;
   id lifetimeTarget_ = nullptr;
-  std::atomic<int>* runtimeRetains_ = nullptr;
+  // WrapperLifetime's cross-isolate retain counter for lifetimeTarget_.
+  std::atomic<uint64_t>* runtimeRetains_ = nullptr;
   // May be rooted; scanned when a major collection starts.
   bool lifetimeTracked_ = false;
   // The handle is currently strong.

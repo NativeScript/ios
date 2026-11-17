@@ -705,6 +705,7 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
                                    Class klass, const InterfaceMeta* interfaceMeta) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   tns::Assert(klass != nullptr, isolate);
+  WrapperLifetime::DrainAtCallEntry(isolate);
 
   id result = nil;
   // A Caches::Instances entry owns exactly one reference to the object it maps

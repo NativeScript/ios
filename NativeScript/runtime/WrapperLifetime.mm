@@ -80,25 +80,36 @@ struct RootedState {
 // skipped (handles ObjectManager did not register) are not counted, so their
 // retain reads as a native owner: such an object stays rooted in other
 // isolates (a leak, never an early release).
-std::mutex runtimeRetainsMutex_;
-std::unordered_map<void*, std::unique_ptr<std::atomic<int>>> runtimeRetains_;
+//
+// The low 32 bits count retains, the high 32 bits count changes. Every caller
+// takes its native retain before acquiring and drops before releasing, and the
+// scan reads the counter on both sides of -retainCount: a change in between
+// keeps the wrapper strong, so no adopt or release on another thread can make
+// a natively owned object read as unowned.
+constexpr uint64_t kRetainAcquired = (uint64_t{1} << 32) + 1;
+constexpr uint64_t kRetainDropped = (uint64_t{1} << 32) - 1;
 
-std::atomic<int>* AcquireRuntimeRetain(id obj) {
+uint32_t RetainsIn(uint64_t value) { return static_cast<uint32_t>(value); }
+
+std::mutex runtimeRetainsMutex_;
+std::unordered_map<void*, std::unique_ptr<std::atomic<uint64_t>>> runtimeRetains_;
+
+std::atomic<uint64_t>* AcquireRuntimeRetain(id obj) {
   std::lock_guard<std::mutex> lock(runtimeRetainsMutex_);
-  std::unique_ptr<std::atomic<int>>& slot = runtimeRetains_[(__bridge void*)obj];
+  std::unique_ptr<std::atomic<uint64_t>>& slot = runtimeRetains_[(__bridge void*)obj];
   if (slot == nullptr) {
-    slot = std::make_unique<std::atomic<int>>(0);
+    slot = std::make_unique<std::atomic<uint64_t>>(0);
   }
-  slot->fetch_add(1, std::memory_order_relaxed);
+  slot->fetch_add(kRetainAcquired);
   return slot.get();
 }
 
-void DropRuntimeRetain(id obj, std::atomic<int>* counter) {
+void DropRuntimeRetain(id obj, std::atomic<uint64_t>* counter) {
   if (counter == nullptr) {
     return;
   }
   std::lock_guard<std::mutex> lock(runtimeRetainsMutex_);
-  if (counter->fetch_sub(1, std::memory_order_relaxed) == 1) {
+  if (RetainsIn(counter->fetch_add(kRetainDropped)) == 1) {
     auto it = runtimeRetains_.find((__bridge void*)obj);
     if (it != runtimeRetains_.end() && it->second.get() == counter) {
       runtimeRetains_.erase(it);
@@ -231,11 +242,11 @@ void PrologueCallback(Isolate* isolate, GCType, GCCallbackFlags) {
       continue;
     }
     id target = state->lifetimeTarget_;
+    uint64_t before = state->runtimeRetains_ != nullptr ? state->runtimeRetains_->load() : 0;
     NSUInteger count = NativeRetainCount(rooted, target);
-    int runtimeRetains =
-        state->runtimeRetains_ != nullptr ? state->runtimeRetains_->load(std::memory_order_relaxed)
-                                          : 1;
-    bool owned = count >= (NSUIntegerMax >> 1) || count > static_cast<NSUInteger>(runtimeRetains);
+    uint64_t after = state->runtimeRetains_ != nullptr ? state->runtimeRetains_->load() : 0;
+    NSUInteger runtimeRetains = state->runtimeRetains_ != nullptr ? RetainsIn(before) : 1;
+    bool owned = before != after || count >= (NSUIntegerMax >> 1) || count > runtimeRetains;
     if (owned && !state->lifetimeStrong_) {
       PromoteState(state);
       if (stats != nullptr) {
@@ -258,7 +269,7 @@ void ReleaseQueued(const std::shared_ptr<Caches>& cache, ObjectWeakCallbackState
     cache->Instances.erase(it);
   }
   delete state->lifetimeWrapper_;
-  std::atomic<int>* counter = state->runtimeRetains_;
+  std::atomic<uint64_t>* counter = state->runtimeRetains_;
   delete state;
   DropRuntimeRetain(target, counter);
   [target release];
@@ -272,13 +283,15 @@ void ReleaseAll(Isolate* isolate, RootedState* rooted) {
     RootedState* rooted;
     ~Reset() { rooted->draining = false; }
   } reset{rooted};
+  // One state leaves the queue at a time, so a release that throws leaves the
+  // rest queued for the next drain or teardown.
   while (!rooted->releases.empty()) {
-    std::vector<ObjectWeakCallbackState*> batch;
-    batch.swap(rooted->releases);
-    WrapperLifetime::pendingReleaseIsolates_.fetch_sub(1, std::memory_order_relaxed);
-    for (ObjectWeakCallbackState* state : batch) {
-      ReleaseQueued(cache, state);
+    ObjectWeakCallbackState* state = rooted->releases.back();
+    rooted->releases.pop_back();
+    if (rooted->releases.empty()) {
+      WrapperLifetime::pendingReleaseIsolates_.fetch_sub(1, std::memory_order_relaxed);
     }
+    ReleaseQueued(cache, state);
   }
 }
 
@@ -385,12 +398,17 @@ void WrapperLifetime::Forget(Isolate* isolate, ObjectWeakCallbackState* state) {
   }
 }
 
+void WrapperLifetime::DropRetainBeforeDisposal(ObjectWeakCallbackState* state) {
+  DropRuntimeRetain(state->lifetimeTarget_, state->runtimeRetains_);
+  state->runtimeRetains_ = nullptr;
+}
+
 void WrapperLifetime::Retire(Isolate* isolate, ObjectWeakCallbackState* state, bool released) {
   if (state->lifetimeTarget_ == nil) {
     return;
   }
   id target = state->lifetimeTarget_;
-  std::atomic<int>* counter = state->runtimeRetains_;
+  std::atomic<uint64_t>* counter = state->runtimeRetains_;
   state->runtimeRetains_ = nullptr;
   if (!released) {
     // The JS object died during the teardown walk, before DisposeValue could
