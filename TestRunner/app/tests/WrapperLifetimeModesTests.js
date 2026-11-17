@@ -1163,6 +1163,258 @@ describe("Wrapper lifetime modes", function () {
             expect(nativeName.call(obj)).toBe("native2");
         });
 
+        describe("native property setters", function () {
+            function makeTarget() {
+                return (function (_super) {
+                    __extends(Target, _super);
+                    function Target() {
+                        return (_super !== null && _super.apply(this, arguments)) || this;
+                    }
+                    return Target;
+                })(TNSCanaryWriteTarget);
+            }
+
+            function nativeGetter(name) {
+                return Object.getOwnPropertyDescriptor(TNSCanaryWriteTarget.prototype, name).get;
+            }
+
+            var nativeLevel = nativeGetter("level");
+
+            it("run on the receiver, in sloppy and strict mode", function () {
+                var Target = makeTarget();
+                var obj = Target.new();
+                var other = Target.new();
+                obj.tag = "state";
+                var before = stats();
+                obj.level = 3;
+                expect(nativeLevel.call(obj)).toBe(3);
+                (function () {
+                    "use strict";
+                    obj.level = 4;
+                })();
+                expect(nativeLevel.call(obj)).toBe(4);
+                expect(nativeLevel.call(other)).toBe(0);
+                expect(hasOwn(obj, "level")).toBe(false);
+                if (canary) {
+                    expect(stats().canaryInterceptedWrites - before.canaryInterceptedWrites).toBe(2);
+                    expect(stats().canaryStates).toBe(before.canaryStates);
+                }
+            });
+
+            it("propagate what the native setter raises", function () {
+                var obj = makeTarget().new();
+                obj.guarded = 2;
+                var errors = [];
+                try {
+                    obj.guarded = -1;
+                } catch (e) {
+                    errors.push(e);
+                }
+                try {
+                    (function () {
+                        "use strict";
+                        obj.guarded = -2;
+                    })();
+                } catch (e) {
+                    errors.push(e);
+                }
+                expect(errors.length).toBe(2);
+                errors.forEach(function (e) {
+                    expect(e.nativeException instanceof NSException).toBe(true);
+                    expect(e.nativeException.reason).toBe("guarded must not be negative");
+                });
+                expect(obj.guarded).toBe(2);
+                expect(hasOwn(obj, "guarded")).toBe(false);
+                obj.guarded = 5;
+                expect(obj.guarded).toBe(5);
+            });
+
+            it("reject a write to a read-only native property", function () {
+                var obj = makeTarget().new();
+                obj.tag = "state";
+                expect(function () {
+                    obj.fixed = 1;
+                }).toThrowError(/readonly/);
+                expect(function () {
+                    "use strict";
+                    obj.fixed = 1;
+                }).toThrowError(/readonly/);
+                expect(obj.fixed).toBe(0);
+                expect(hasOwn(obj, "fixed")).toBe(false);
+            });
+
+            it("give way to a JS accessor overriding the property, which gets the JS value", function () {
+                var Over = makeTarget();
+                var calls = [];
+                Object.defineProperty(Over.prototype, "level", {
+                    get: function () {
+                        return -1;
+                    },
+                    set: function (value) {
+                        calls.push({ self: this, value: value });
+                    },
+                    configurable: true
+                });
+                var obj = Over.new();
+                var value = { not: "a number" };
+                obj.level = value;
+                expect(calls.length).toBe(1);
+                expect(calls[0].self).toBe(obj);
+                expect(calls[0].value).toBe(value);
+                expect(nativeLevel.call(obj)).toBe(0);
+            });
+
+            it("give way to a JS accessor added to a JS prototype after a native write", function () {
+                var Late = makeTarget();
+                var obj = Late.new();
+                obj.level = 1;
+                expect(nativeLevel.call(obj)).toBe(1);
+                var set = [];
+                Object.defineProperty(Late.prototype, "level", {
+                    set: function (value) {
+                        set.push(this === obj ? value : "wrong this");
+                    },
+                    configurable: true
+                });
+                obj.level = 2;
+                expect(set).toEqual([2]);
+                expect(nativeLevel.call(obj)).toBe(1);
+                delete Late.prototype.level;
+                obj.level = 3;
+                expect(set).toEqual([2]);
+                expect(nativeLevel.call(obj)).toBe(3);
+            });
+
+            it("give way to an accessor defined on the instance", function () {
+                var obj = makeTarget().new();
+                obj.level = 1;
+                var set = [];
+                Object.defineProperty(obj, "level", {
+                    set: function (value) {
+                        set.push(this === obj ? value : "wrong this");
+                    },
+                    configurable: true
+                });
+                obj.level = 2;
+                expect(set).toEqual([2]);
+                expect(nativeLevel.call(obj)).toBe(1);
+                delete obj.level;
+                obj.level = 3;
+                expect(set).toEqual([2]);
+                expect(nativeLevel.call(obj)).toBe(3);
+            });
+
+            it("give way to an accessor redefined on the native prototype after a native write", function () {
+                var proto = TNSCanaryWriteTarget.prototype;
+                var redefine = {
+                    viaDefineProperty: function (name, setter) {
+                        Object.defineProperty(proto, name, { set: setter, configurable: true });
+                    },
+                    viaDefineProperties: function (name, setter) {
+                        var descriptors = {};
+                        descriptors[name] = { set: setter, configurable: true };
+                        Object.defineProperties(proto, descriptors);
+                    },
+                    viaReflect: function (name, setter) {
+                        expect(Reflect.defineProperty(proto, name, { set: setter, configurable: true })).toBe(true);
+                    },
+                    viaDefineSetter: function (name, setter) {
+                        proto.__defineSetter__(name, setter);
+                    }
+                };
+                var obj = makeTarget().new();
+                Object.keys(redefine).forEach(function (name) {
+                    var getter = nativeGetter(name);
+                    obj[name] = 1;
+                    expect(getter.call(obj)).toBe(1);
+                    var set = [];
+                    redefine[name](name, function (value) {
+                        set.push(this === obj ? value : "wrong this");
+                    });
+                    var value = { name: name };
+                    obj[name] = value;
+                    expect(set.length).toBe(1);
+                    expect(set[0]).toBe(value);
+                    expect(hasOwn(obj, name)).toBe(false);
+                });
+            });
+
+            it("follow a native accessor deleted from its prototype and replaced", function () {
+                var proto = TNSCanaryWriteTarget.prototype;
+                var getter = nativeGetter("dropped");
+                var obj = makeTarget().new();
+                obj.dropped = 1;
+                expect(getter.call(obj)).toBe(1);
+                expect(delete proto.dropped).toBe(true);
+                obj.dropped = 2;
+                expect(hasOwn(obj, "dropped")).toBe(true);
+                expect(getter.call(obj)).toBe(1);
+                delete obj.dropped;
+                proto.dropped = "data";
+                obj.dropped = 3;
+                expect(hasOwn(obj, "dropped")).toBe(true);
+                expect(obj.dropped).toBe(3);
+                delete obj.dropped;
+                var set = [];
+                Object.defineProperty(proto, "dropped", {
+                    set: function (value) {
+                        set.push(this === obj ? value : "wrong this");
+                    },
+                    configurable: true
+                });
+                var value = { dropped: true };
+                obj.dropped = value;
+                expect(set.length).toBe(1);
+                expect(set[0]).toBe(value);
+                expect(hasOwn(obj, "dropped")).toBe(false);
+                expect(getter.call(obj)).toBe(1);
+            });
+
+            it("give way to a proxy between the instance and the native prototype", function () {
+                var obj = makeTarget().new();
+                obj.level = 1;
+                var trapped = [];
+                // The target owns `level`, so attribute queries find it at the proxy.
+                var target = Object.create(Object.getPrototypeOf(obj));
+                Object.defineProperty(target, "level", { value: "target", writable: true, configurable: true });
+                var proxy = new Proxy(target, {
+                    set: function (target, key, value, receiver) {
+                        trapped.push({ key: key, value: value, receiver: receiver });
+                        return true;
+                    }
+                });
+                Object.setPrototypeOf(obj, proxy);
+                obj.level = 2;
+                expect(trapped.length).toBe(1);
+                expect(trapped[0].key).toBe("level");
+                expect(trapped[0].value).toBe(2);
+                expect(trapped[0].receiver).toBe(obj);
+                expect(nativeLevel.call(obj)).toBe(1);
+            });
+
+            it("dispatch to a setter override exposed to native code that JS no longer sees", function () {
+                var calls = [];
+                var Exposed = TNSCanaryWriteTarget.extend({
+                    get level() {
+                        return -1;
+                    },
+                    set level(value) {
+                        calls.push(value);
+                    }
+                }, { name: "WrapperLifetimeExposedLevelSetter" });
+                // -setLevel: stays overridden for native callers.
+                expect(delete Exposed.prototype.level).toBe(true);
+                var obj = Exposed.new();
+                obj.tag = "state";
+                obj.level = 3;
+                expect(calls).toEqual([3]);
+                expect(nativeLevel.call(obj)).toBe(0);
+                obj.setValueForKey(5, "level");
+                expect(calls).toEqual([3, 5]);
+                expect(nativeLevel.call(obj)).toBe(0);
+            });
+        });
+
         it("handles writes to JS-extended instances only, under scope extended", function () {
             var Ext = TNSAllocLog.extend({}, { name: "WrapperLifetimeWriteHandlerExt" });
             var before = stats();
