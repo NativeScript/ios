@@ -258,7 +258,13 @@ declare module "ns:runtime" {
    */
   export function getWrapperLifetimeStats(): WrapperLifetimeStats;
 
-  /** Live wrappers per native class name in the calling isolate. */
+  /**
+   * Live wrappers per native class name in the calling isolate.
+   *
+   * @throws {Error} When the app does not embed `NativeScriptLeakProbe.framework`,
+   * which app templates embed in debug builds only; list it in
+   * `NS_SHIP_DEBUG_FRAMEWORKS` to ship it in other builds.
+   */
   export function getWrapperClassCounts(): Record<string, WrapperClassCounts>;
 
   /**
@@ -267,6 +273,10 @@ declare module "ns:runtime" {
    * `"canary"` wrapper lifetime modes leak, and JS blocks whose callback
    * reaches their owner in every mode. Slow (a full snapshot plus a native
    * object graph walk); meant for diagnostics, not production paths.
+   *
+   * @throws {Error} When the app does not embed `NativeScriptLeakProbe.framework`,
+   * which app templates embed in debug builds only; list it in
+   * `NS_SHIP_DEBUG_FRAMEWORKS` to ship it in other builds.
    */
   export function findLeakCycles(options?: LeakCycleOptions): LeakCycleReport;
 }

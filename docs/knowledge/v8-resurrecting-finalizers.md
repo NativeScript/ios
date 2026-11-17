@@ -333,8 +333,9 @@ attributes (the state keeps them read-only, hidden and undeletable) and, once th
 initializer is warm, bypass it entirely (the field stays on the canary and is gone after a
 replacement); `v8::Object::CreateDataProperty` bypasses it the same way.
 
-Both modes leak what resurrection used to break early, so `WrapperLifetimeLeaks.{h,mm}` finds
-JS ↔ native cycles: `ns:runtime`'s `getWrapperClassCounts()` (live wrappers and states per
+Both modes leak what resurrection used to break early, so `NativeScriptLeakProbe.framework`
+(debug builds only; the runtime reaches it through `LeakProbe.{h,mm}` and `LeakProbeSPI.h`)
+finds JS ↔ native cycles: `ns:runtime`'s `getWrapperClassCounts()` (live wrappers and states per
 class) and `findLeakCycles({ strict })`, which builds an embedder graph into a heap snapshot
 (wrapped objects, what they own through strong ivars and collection or block storage, and the
 runtime's cross-heap edges) and runs a trial deletion with `-retainCount` as the outside-owner

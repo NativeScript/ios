@@ -186,6 +186,13 @@ The `"rooted"` and `"canary"` wrapper lifetime modes trade resurrection's early
 releases for leaks: a JS ↔ native cycle that `"resurrecting"` broke by
 releasing a native object under live JS stays alive. Two tools find them.
 
+Both live in `NativeScriptLeakProbe.framework`, which app templates embed in
+debug builds only (it is in `NS_DEBUG_FRAMEWORKS`). Without it, both functions
+throw an `Error` that names the framework, heap snapshots carry no native
+objects, and the triggers below are off, `"leakProbe": true` included. To ship
+it in other builds, add `NativeScriptLeakProbe.framework` to
+`NS_SHIP_DEBUG_FRAMEWORKS` in the app's `build.xcconfig`.
+
 `getWrapperClassCounts()` returns, per native class name, the live
 `wrappers`, the rooted-`strong` ones and the canary `states`. It is cheap;
 compare it before and after repeating a journey to find classes that grow.
@@ -202,8 +209,8 @@ runtime keeps strong), `ns:state` (canary object → state),
 count exceeds the retains found in that graph; everything else is marked from
 the V8 roots, and cycles among what stays unmarked are reported. A `WeakMap`
 value is followed from its key only, not from the map. Every heap snapshot,
-DevTools' included, carries the runtime's edges; only `findLeakCycles` walks
-native memory.
+DevTools' included, carries the runtime's edges while the framework is
+embedded; only `findLeakCycles` walks native memory.
 
 | option | effect |
 |---|---|
@@ -246,8 +253,9 @@ missed rather than misreported:
 - objects whose `-retainCount` cannot be called without messaging the class
   (zombies, classes that forward it, the `NSTimer.alloc()` placeholder).
 
-In debug builds, or with `"wrapperLifetime": { "leakProbe": true }` in the app
-config, the main isolate also:
+When the framework is embedded, in debug builds or with
+`"wrapperLifetime": { "leakProbe": true }` in the app config, the main isolate
+also:
 
 - logs the classes whose live wrappers and states grew since the previous
   memory warning, on each memory warning;
