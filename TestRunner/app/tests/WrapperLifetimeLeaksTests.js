@@ -23,6 +23,8 @@ describe("Wrapper lifetime leak cycles", function () {
     var SelfHandler = NSBlockOperation.extend({}, { name: "TNSLeakSelfHandler" });
     var WeakHandler = NSBlockOperation.extend({}, { name: "TNSLeakWeakHandler" });
     var WeakMapValue = NSBlockOperation.extend({}, { name: "TNSLeakWeakMapValue" });
+    var GestureView = UIView.extend({}, { name: "TNSLeakGestureView" });
+    var HeldView = UIView.extend({}, { name: "TNSLeakHeldView" });
     // A JS initializer that native code (+new) calls on an unwrapped receiver.
     var InitOwned = NSObject.extend(
         {
@@ -122,6 +124,7 @@ describe("Wrapper lifetime leak cycles", function () {
         var watched = NSHashTable.weakObjectsHashTable();
         // Reachable from the roots for the whole describe, like a module-level map.
         var meta = new WeakMap();
+        var heldView = HeldView.new();
         var reports = {};
 
         beforeAll(function (done) {
@@ -197,6 +200,14 @@ describe("Wrapper lifetime leak cycles", function () {
                 watched.addObject(weakMapValue);
             })();
             (function () {
+                // A recognizer's JS state naming the view that owns it.
+                var gestureView = GestureView.new();
+                var recognizer = UITapGestureRecognizer.new();
+                gestureView.addGestureRecognizer(recognizer);
+                recognizer.owner = gestureView;
+                watched.addObject(gestureView);
+            })();
+            (function () {
                 // Its wrapper's handle is strong while the list retains it.
                 var initOwned = InitOwned.new();
                 var list = NSMutableArray.new();
@@ -207,9 +218,10 @@ describe("Wrapper lifetime leak cycles", function () {
             settle(3, function () {
                 reports.default = runtime.findLeakCycles();
                 reports.strict = runtime.findLeakCycles({ strict: true });
+                reports.inspect = runtime.findLeakCycles({ inspect: ["TNSLeak"] });
                 done();
             });
-        });
+        }, 60000);
 
         afterAll(function () {
             watched.allObjects.enumerateObjectsUsingBlock(function (o) {
@@ -221,6 +233,11 @@ describe("Wrapper lifetime leak cycles", function () {
                     delete o.list;
                 }
                 delete o.op;
+                if (o.gestureRecognizers) {
+                    o.gestureRecognizers.enumerateObjectsUsingBlock(function (recognizer) {
+                        delete recognizer.owner;
+                    });
+                }
             });
             meta = new WeakMap();
             owner.removeAllObjects();
@@ -235,6 +252,11 @@ describe("Wrapper lifetime leak cycles", function () {
                 expect(report.truncated).toBe(false);
                 expect(typeof report.changedNativeObjects).toBe("number");
                 expect(Array.isArray(report.changed)).toBe(true);
+                expect(report.cutOffs.cycleLength).toBe(0);
+                expect(typeof report.cutOffs.depth).toBe("number");
+                expect(typeof report.cutOffs.storage).toBe("number");
+                expect(report.calibrated).toEqual({ layer: true, mutableArray: true });
+                expect(report.inspected).toBeUndefined();
             });
             expect(reports.default.strict).toBe(false);
             expect(reports.strict.strict).toBe(true);
@@ -273,6 +295,54 @@ describe("Wrapper lifetime leak cycles", function () {
             reports.strict.cycles.forEach(function (cycle) {
                 if (defaultSignatures.indexOf(cycle.signature) === -1) {
                     expect(cycle.uncertain).toBe(true);
+                }
+            });
+        });
+
+        it("details inspected objects", function () {
+            function inspected(name) {
+                return reports.inspect.inspected.filter(function (entry) {
+                    return entry.className.indexOf(name) !== -1;
+                });
+            }
+            expect(heldView.tag).toBe(0);
+            var held = inspected("TNSLeakHeldView");
+            expect(held.length).toBe(1);
+            // Owned by its wrapper alone, and reachable from JS.
+            expect(held[0].seed).toBe(true);
+            expect(held[0].retainCountUnknown).toBe(false);
+            expect(held[0].retainCount).toBe(held[0].runtimeRetains + held[0].incoming);
+            expect(held[0].root).toBe(false);
+            expect(held[0].reached).toBe(true);
+            expect(held[0].reachedFrom).toContain("TNSLeakHeldView");
+            expect(held[0].out).toContain("_layer");
+            if (rooted || canary) {
+                var gesture = inspected("TNSLeakGestureView");
+                expect(gesture.length).toBe(1);
+                expect(gesture[0].out).toContain("_gestureRecognizers");
+            }
+            expect(inspected("TNSLeakInitOwned")[0].reached).toBe(false);
+            expect(reports.inspect.cycles.length).toBe(reports.default.cycles.length);
+        });
+
+        // UIKit's unretained back pointers to a recognizer (its gesture node,
+        // its recognizer implementation) read as more owners than its retain
+        // count admits, so by default it counts as owned from outside.
+        it("reports a cycle through a view's gesture recognizer only when strict, marked uncertain", function () {
+            expect(cyclesNaming(reports.default, "TNSLeakGestureView").length).toBe(0);
+            var found = cyclesNaming(reports.strict, "TNSLeakGestureView");
+            expect(found.length > 0).toBe(rooted || canary);
+            found.forEach(function (cycle) {
+                expect(cycle.uncertain).toBe(true);
+                expect(cycle.reasons.join("\n")).toMatch(/UITapGestureRecognizer 0x[0-9a-f]+: retainCount/);
+            });
+            expect(aliveNamed(watched, "TNSLeakGestureView")).toBe(rooted || canary ? 1 : 0);
+        });
+
+        it("keeps the native side of every reported cycle alive", function () {
+            Object.keys(leaks).forEach(function (name) {
+                if (leaks[name]) {
+                    expect(name + ": " + aliveNamed(watched, name)).toBe(name + ": 1");
                 }
             });
         });
@@ -339,12 +409,51 @@ describe("Wrapper lifetime leak cycles", function () {
         });
     }, 30000);
 
-    it("logs class counts on a memory warning", function () {
-        expect(function () {
-            NSNotificationCenter.defaultCenter.postNotificationNameObject(
-                "UIApplicationDidReceiveMemoryWarningNotification",
-                null
-            );
-        }).not.toThrow();
-    });
+    it("writes an inspect report when the Darwin notification is posted", function (done) {
+        var held = HeldView.new();
+        var tmp = NSTemporaryDirectory();
+        var files = NSFileManager.defaultManager;
+        var listPath = NSString.stringWithString(tmp).stringByAppendingPathComponent("ns-wrapper-lifetime-inspect.txt");
+        function reportNames() {
+            var names = [];
+            files.contentsOfDirectoryAtPathError(tmp).enumerateObjectsUsingBlock(function (name) {
+                if (String(name).indexOf("ns-wrapper-lifetime-cycles-inspect-") === 0) {
+                    names.push(String(name));
+                }
+            });
+            return names;
+        }
+        var before = reportNames();
+        NSString.stringWithString("TNSLeakHeldView\n").writeToFileAtomicallyEncodingError(listPath, true, NSUTF8StringEncoding);
+        notify_post("org.nativescript.wrapperLifetime.findLeakCycles.inspect");
+        var waited = 0;
+        (function poll() {
+            var added = reportNames().filter(function (name) {
+                return before.indexOf(name) === -1;
+            });
+            if (added.length === 0 && waited < 20000) {
+                waited += 100;
+                setTimeout(poll, 100);
+                return;
+            }
+            // Darwin notifications reach every process: another instance of
+            // this app with the probe on answers too, into the same directory.
+            var entries = [];
+            added.forEach(function (name) {
+                var path = NSString.stringWithString(tmp).stringByAppendingPathComponent(name);
+                var report = JSON.parse(String(NSString.stringWithContentsOfFileEncodingError(path, NSUTF8StringEncoding)));
+                expect(report.mode).toBe(mode);
+                entries = entries.concat(
+                    report.inspected.filter(function (entry) {
+                        return entry.className.indexOf("TNSLeakHeldView") !== -1;
+                    })
+                );
+                files.removeItemAtPathError(path);
+            });
+            expect(entries.length).toBeGreaterThan(0);
+            files.removeItemAtPathError(listPath);
+            expect(held.tag).toBe(0);
+            done();
+        })();
+    }, 30000);
 });
