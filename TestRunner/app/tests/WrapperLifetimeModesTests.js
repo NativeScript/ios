@@ -979,6 +979,190 @@ describe("Wrapper lifetime modes", function () {
         var Host = makeHost();
         var nativeName = Object.getOwnPropertyDescriptor(TNSAccessorHost.prototype, "name").get;
 
+        it("runs the native setter of a native property on the receiver", function () {
+            var obj = Host.new();
+            var other = Host.new();
+            obj.tag = "state";
+            other.name = "other";
+            var before = stats();
+            obj.name = "direct";
+            var after = stats();
+            expect(nativeName.call(obj)).toBe("direct");
+            expect(nativeName.call(other)).toBe("other");
+            expect(hasOwn(obj, "name")).toBe(false);
+            if (canary) {
+                expect(after.canaryInterceptedWrites - before.canaryInterceptedWrites).toBe(1);
+                expect(after.canaryStates).toBe(before.canaryStates);
+            }
+        });
+
+        it("propagates what a native setter throws", function () {
+            var obj = Host.new();
+            obj.tag = "state";
+            // NSObject's `hash` is read-only: its setter throws.
+            expect(function () {
+                obj.hash = 1;
+            }).toThrowError(/readonly/);
+            expect(function () {
+                "use strict";
+                obj.hash = 1;
+            }).toThrowError(/readonly/);
+            expect(hasOwn(obj, "hash")).toBe(false);
+        });
+
+        it("runs a JS accessor's setter with the canary as this", function (done) {
+            var Labeled = makeHost();
+            var receivers = [];
+            Object.defineProperty(Labeled.prototype, "label", {
+                get: function () {
+                    return this._label;
+                },
+                set: function (value) {
+                    receivers.push(this);
+                    this._label = value;
+                },
+                configurable: true
+            });
+            Object.defineProperty(Labeled.prototype, "boom", {
+                set: function () {
+                    throw new RangeError("boom");
+                },
+                configurable: true
+            });
+            rewrap(function () {
+                var obj = Labeled.new();
+                var before = stats();
+                obj.label = "set";
+                expect(receivers.length).toBe(1);
+                expect(receivers[0]).toBe(obj);
+                expect(hasOwn(obj, "label")).toBe(false);
+                expect(hasOwn(obj, "_label")).toBe(true);
+                expect(function () {
+                    obj.boom = 1;
+                }).toThrowError(RangeError);
+                expect(hasOwn(obj, "boom")).toBe(false);
+                if (canary) {
+                    expect(stats().canaryStates).toBe(before.canaryStates + 1);
+                }
+                receivers.length = 0;
+                return obj;
+            }, function (obj) {
+                if (keepsState) {
+                    expect(obj.label).toBe("set");
+                }
+                obj.label = "again";
+                expect(receivers[0]).toBe(obj);
+                expect(obj._label).toBe("again");
+                done();
+            });
+        });
+
+        it("rejects writes to a getter-only accessor and a read-only property", function () {
+            var Fixed = makeHost();
+            Object.defineProperty(Fixed.prototype, "getOnly", {
+                get: function () {
+                    return "get";
+                },
+                configurable: true
+            });
+            Object.defineProperty(Fixed.prototype, "fixed", { value: "fixed", writable: false, configurable: true });
+            var obj = Fixed.new();
+            obj.tag = "state";
+            var before = stats();
+            expect(function () {
+                "use strict";
+                obj.getOnly = 1;
+            }).toThrowError(TypeError);
+            expect(function () {
+                "use strict";
+                obj.fixed = 1;
+            }).toThrowError(TypeError);
+            obj.getOnly = 1;
+            obj.fixed = 1;
+            expect(obj.getOnly).toBe("get");
+            expect(obj.fixed).toBe("fixed");
+            expect(hasOwn(obj, "getOnly")).toBe(false);
+            expect(hasOwn(obj, "fixed")).toBe(false);
+            if (canary) {
+                expect(stats().canaryStates).toBe(before.canaryStates);
+            }
+        });
+
+        it("follows a prototype data property replaced by an accessor and back", function (done) {
+            var Flip = makeHost();
+            var set = [];
+            Flip.prototype.flip = "data";
+            var first = Flip.new();
+            first.flip = "own";
+            expect(hasOwn(first, "flip")).toBe(true);
+            Object.defineProperty(Flip.prototype, "flip", {
+                get: function () {
+                    return "accessor";
+                },
+                set: function (value) {
+                    set.push(value);
+                },
+                configurable: true
+            });
+            var second = Flip.new();
+            second.flip = "through";
+            expect(set).toEqual(["through"]);
+            expect(hasOwn(second, "flip")).toBe(false);
+            first.flip = "own2";
+            expect(first.flip).toBe("own2");
+            expect(set).toEqual(["through"]);
+            Object.defineProperty(Flip.prototype, "flip", { value: "data2", writable: true, configurable: true });
+            rewrap(function () {
+                var third = Flip.new();
+                third.flip = "own3";
+                expect(hasOwn(third, "flip")).toBe(true);
+                expect(set).toEqual(["through"]);
+                return third;
+            }, function (third) {
+                if (keepsState) {
+                    expect(third.flip).toBe("own3");
+                }
+                done();
+            });
+        });
+
+        it("follows a native property shadowed and unshadowed on a JS prototype", function () {
+            var Shadow = makeHost();
+            var obj = Shadow.new();
+            obj.name = "native";
+            Object.defineProperty(Shadow.prototype, "name", { value: "js", writable: true, configurable: true });
+            obj.name = "own";
+            expect(hasOwn(obj, "name")).toBe(true);
+            expect(nativeName.call(obj)).toBe("native");
+            delete obj.name;
+            delete Shadow.prototype.name;
+            obj.name = "native2";
+            expect(hasOwn(obj, "name")).toBe(false);
+            expect(nativeName.call(obj)).toBe("native2");
+        });
+
+        it("follows a prototype chain changed after a write", function () {
+            var obj = Host.new();
+            obj.name = "native";
+            var set = [];
+            var proto = Object.create(Object.getPrototypeOf(obj), {
+                name: {
+                    set: function (value) {
+                        set.push(this === obj ? value : "wrong this");
+                    },
+                    configurable: true
+                }
+            });
+            Object.setPrototypeOf(obj, proto);
+            obj.name = "swapped";
+            expect(set).toEqual(["swapped"]);
+            expect(nativeName.call(obj)).toBe("native");
+            Object.setPrototypeOf(obj, Host.prototype);
+            obj.name = "native2";
+            expect(set).toEqual(["swapped"]);
+            expect(nativeName.call(obj)).toBe("native2");
+        });
+
         it("handles writes to JS-extended instances only, under scope extended", function () {
             var Ext = TNSAllocLog.extend({}, { name: "WrapperLifetimeWriteHandlerExt" });
             var before = stats();

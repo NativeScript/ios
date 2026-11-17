@@ -536,7 +536,7 @@ Local<Object> OwnerOf(Local<Context> context, Local<Object> holder, Local<v8::Na
 // callback for the same reason. The handlers are masking, so they also see
 // names the prototype chain has. After the setter declines, V8 adds a new name
 // to the canary without calling the definer, so the setter itself decides what
-// becomes state.
+// becomes state. V8 calls the setter only when the canary is the receiver.
 Intercepted Setter(Local<v8::Name> property, Local<Value> value,
                    const PropertyCallbackInfo<v8::Boolean>& info) {
   // v8::Object::DefineOwnProperty reaches the setter, not the definer.
@@ -576,6 +576,10 @@ Intercepted Setter(Local<v8::Name> property, Local<Value> value,
     // setter: a native property's (an accessor pair on its class's
     // prototype), a JS one's, or one defined on the canary, which runs with
     // the canary as `this` and so mirrors whatever it writes. None is state.
+    // Calling the setter from here was measured slower than V8's own lookup
+    // after the decline: the API hands a setter out only in a descriptor
+    // object, and keeping one (or a native property's metadata) across
+    // writes needs to know when JS changes a prototype, which V8 never says.
     if ((attributes & ReadOnly) != 0) {
       return Intercepted::kNo;
     }
