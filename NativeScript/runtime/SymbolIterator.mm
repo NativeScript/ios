@@ -11,7 +11,16 @@ void SymbolIterator::Install(Isolate* isolate, Local<ObjectTemplate> prototypeTe
   prototypeTemplate->Set(
       Symbol::GetIterator(isolate),
       FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& args) {
-        Local<Context> context = args.GetIsolate()->GetCurrentContext();
+        Isolate* isolate = args.GetIsolate();
+        // Like Array.prototype[Symbol.iterator], it needs its array as `this`.
+        BaseDataWrapper* wrapper = tns::GetValue(isolate, args.This());
+        if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject ||
+            ![static_cast<ObjCDataWrapper*>(wrapper)->Data() isKindOfClass:[NSArray class]]) {
+          isolate->ThrowException(Exception::TypeError(tns::ToV8String(
+              isolate, "NSArray.prototype[Symbol.iterator] called on a non-NSArray")));
+          return;
+        }
+        Local<Context> context = isolate->GetCurrentContext();
         args.GetReturnValue().Set(CreateIteratorObject(context, args.This()));
       }));
 }

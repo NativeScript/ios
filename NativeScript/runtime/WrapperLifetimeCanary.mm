@@ -660,18 +660,24 @@ void PostSweepAfterGC(Isolate* isolate, GCType, GCCallbackFlags) {
 }
 #endif
 
-// The weak collections' key for a canary's native object: a frozen,
-// null-prototype object that lives exactly as long as the object's state, that
-// is, until the native object is deallocated. The holder itself for anything
-// that is not a canary.
+// unwrap(value, create): the weak collections' key for a canary's native
+// object, a frozen, null-prototype object that lives exactly as long as the
+// object's state, that is, until the native object is deallocated. Lookups pass
+// `create` false and never make one: with no key yet, no entry can be keyed by
+// it. The value itself for anything that is not a canary, a Proxy included (it
+// is a key of its own, as in every other mode).
 void UnwrapCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Value> value = info[0];
+  bool create = info[1]->IsTrue();
   info.GetReturnValue().Set(value);
   CanaryState* canaryState = Caches::StateFor<CanaryState>(isolate);
   Local<Object> state;
-  if (canaryState == nullptr || !value->IsObject() ||
-      !StateForWrite(isolate, value.As<Object>(), &state)) {
+  if (canaryState == nullptr || !value->IsObject() || value->IsProxy()) {
+    return;
+  }
+  if (create ? !StateForWrite(isolate, value.As<Object>(), &state)
+             : !ExistingState(isolate, value.As<Object>(), &state)) {
     return;
   }
   Local<Context> context = isolate->GetCurrentContext();
@@ -679,6 +685,9 @@ void UnwrapCallback(const FunctionCallbackInfo<Value>& info) {
   Local<Value> key;
   if (state->GetPrivate(context, keyOfState).ToLocal(&key) && key->IsObject()) {
     info.GetReturnValue().Set(key);
+    return;
+  }
+  if (!create) {
     return;
   }
   ObjectWeakCallbackState* canary = CanaryOf(isolate, value.As<Object>());
@@ -743,6 +752,15 @@ void WrapCallback(const FunctionCallbackInfo<Value>& info) {
   }
   id object = objc_loadWeakRetained(&record->object);
   if (object == nil) {
+    return;
+  }
+  // A live wrapper is handed back as is: building one through ConvertArgument
+  // would reset a protocol-typed wrapper's prototype to its class's.
+  std::shared_ptr<Caches> cache = Caches::Get(isolate);
+  std::shared_ptr<Persistent<Value>> cached = ArgConverter::FindCachedInstance(isolate, cache, object);
+  if (cached != nullptr && !cached->IsEmpty()) {
+    [object release];
+    info.GetReturnValue().Set(cached->Get(isolate));
     return;
   }
   ObjCDataWrapper* wrapper = new ObjCDataWrapper(object);

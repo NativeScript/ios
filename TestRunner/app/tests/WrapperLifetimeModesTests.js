@@ -493,6 +493,7 @@ describe("Wrapper lifetime modes", function () {
     it("hands back a native object's JS properties on a new wrapper after the old one died", function (done) {
         var owner = NSMutableArray.new();
         var first;
+        var before = runtime.getWrapperLifetimeStats();
         (function () {
             var obj = Extended.new();
             obj.tag = "kept";
@@ -501,7 +502,10 @@ describe("Wrapper lifetime modes", function () {
         })();
         settle(2, function () {
             if (canary) {
-                expect(first.deref()).toBeUndefined();
+                // The old canary died; a WeakRef keys the native object by its
+                // lifetime in this mode, so it hands back the live one.
+                expect(runtime.getWrapperLifetimeStats().queuedReleases).toBeGreaterThan(before.queuedReleases);
+                expect(first.deref().tag).toBe("kept");
             }
             var obj = owner.objectAtIndex(0);
             if (keepsState) {
@@ -788,18 +792,15 @@ describe("Wrapper lifetime modes", function () {
         });
     });
 
-    it("iterates an NSArray through an unbound Symbol.iterator outside canary mode", function () {
-        if (canary) {
-            return;
-        }
+    // Inherited from the NSArray prototype, so like Array's it needs `this`.
+    it("iterates an NSArray through its inherited Symbol.iterator and rejects an unbound call", function () {
         var array = NSArray.arrayWithArray(["a", "b"]);
+        expect(Object.prototype.hasOwnProperty.call(array, Symbol.iterator)).toBe(false);
+        expect(Array.from(array)).toEqual(["a", "b"]);
         var iterate = array[Symbol.iterator];
-        var iterator = iterate();
-        var values = [];
-        for (var step = iterator.next(); !step.done; step = iterator.next()) {
-            values.push(step.value);
-        }
-        expect(values).toEqual(["a", "b"]);
+        expect(function () {
+            iterate();
+        }).toThrowError(TypeError, /non-NSArray/);
     });
 
     it("leaves plain objects outside the extended scope without forwarding", function (done) {

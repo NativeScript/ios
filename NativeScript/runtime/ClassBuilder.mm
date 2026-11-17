@@ -762,9 +762,13 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
 
   Local<v8::Array> propertyNames;
 
+  // Only an iterator the class defines itself: an inherited one (NSArray's,
+  // or a JS superclass's) already backs the superclass's own enumeration.
   Local<Value> symbolIterator;
-  bool success =
-      implementationObject->Get(context, Symbol::GetIterator(isolate)).ToLocal(&symbolIterator);
+  bool ownsIterator =
+      implementationObject->HasOwnProperty(context, Symbol::GetIterator(isolate)).FromMaybe(false);
+  bool success = !ownsIterator || implementationObject->Get(context, Symbol::GetIterator(isolate))
+                                      .ToLocal(&symbolIterator);
   tns::Assert(success, isolate);
 
   if (!symbolIterator.IsEmpty() && symbolIterator->IsFunction()) {

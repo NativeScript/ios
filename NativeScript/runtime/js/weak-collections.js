@@ -15,49 +15,83 @@ const {
   WeakSet: NativeWeakSet,
 } = globalThis;
 
+// unwrap(value, true) makes the key on first use; lookups pass false so they
+// never create state for an object that was never a key.
 class WeakMap extends NativeWeakMap {
   get(key) {
-    return super.get(unwrap(key));
+    return super.get(unwrap(key, false));
   }
 
   set(key, value) {
-    super.set(unwrap(key), value);
+    super.set(unwrap(key, true), value);
     return this;
   }
 
   has(key) {
-    return super.has(unwrap(key));
+    return super.has(unwrap(key, false));
   }
 
   delete(key) {
-    return super.delete(unwrap(key));
+    return super.delete(unwrap(key, false));
   }
+}
+
+// V8 ships the upsert proposal; inherited, these would key on the wrapper.
+if (typeof NativeWeakMap.prototype.getOrInsert === "function") {
+  Object.defineProperty(WeakMap.prototype, "getOrInsert", {
+    value: function getOrInsert(key, value) {
+      return NativeWeakMap.prototype.getOrInsert.call(this, unwrap(key, true), value);
+    },
+    writable: true,
+    configurable: true,
+  });
+}
+if (typeof NativeWeakMap.prototype.getOrInsertComputed === "function") {
+  Object.defineProperty(WeakMap.prototype, "getOrInsertComputed", {
+    value: function getOrInsertComputed(key, callbackfn) {
+      if (typeof callbackfn !== "function") {
+        throw new TypeError("WeakMap.prototype.getOrInsertComputed: callback is not a function");
+      }
+      // The callback sees the key it was given, not the lifetime key.
+      return NativeWeakMap.prototype.getOrInsertComputed.call(this, unwrap(key, true), () =>
+        callbackfn(key),
+      );
+    },
+    writable: true,
+    configurable: true,
+  });
 }
 
 class WeakSet extends NativeWeakSet {
   add(value) {
-    super.add(unwrap(value));
+    super.add(unwrap(value, true));
     return this;
   }
 
   has(value) {
-    return super.has(unwrap(value));
+    return super.has(unwrap(value, false));
   }
 
   delete(value) {
-    return super.delete(unwrap(value));
+    return super.delete(unwrap(value, false));
   }
 }
 
 class WeakRef extends NativeWeakRef {
   constructor(target) {
-    super(unwrap(target));
+    super(unwrap(target, true));
   }
 
   // The live wrapper, a new one if the old one died while the native object
-  // lived, or undefined once the native object is gone.
+  // lived, or undefined once the native object is gone. Like a native WeakRef
+  // target, the wrapper it returns stays alive until the job ends, so a second
+  // deref in the same job sees the same object.
   deref() {
-    return wrap(super.deref());
+    const result = wrap(super.deref());
+    if (typeof result === "object" && result !== null) {
+      new NativeWeakRef(result);
+    }
+    return result;
   }
 }
 
@@ -70,16 +104,20 @@ Object.defineProperty(WeakRef.prototype, "get", {
 });
 
 class FinalizationRegistry extends NativeFinalizationRegistry {
+  constructor(cleanupCallback) {
+    super(cleanupCallback);
+  }
+
   register(target, heldValue, unregisterToken) {
     super.register(
-      unwrap(target),
+      unwrap(target, true),
       heldValue,
-      unregisterToken === undefined ? undefined : unwrap(unregisterToken),
+      unregisterToken === undefined ? undefined : unwrap(unregisterToken, true),
     );
   }
 
   unregister(unregisterToken) {
-    return super.unregister(unwrap(unregisterToken));
+    return super.unregister(unwrap(unregisterToken, false));
   }
 }
 
