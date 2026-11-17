@@ -48,6 +48,10 @@ namespace tns {
 struct CanaryRecord {
   Global<Object> state;
   std::atomic<bool> died{false};
+  // A JS-implemented -dealloc of its object is running (WrapDealloc): the
+  // object's own receiver still reads this record, but an object allocated
+  // at the same address once the original -dealloc frees it must not.
+  std::atomic<bool> dying{false};
   // Something reports this object's deallocation: a JS-extended class's
   // -dealloc, or the associated token. Otherwise only the weak reference below
   // tells, when a sweep reads it.
@@ -152,22 +156,57 @@ void NativeDied(const std::shared_ptr<CanaryRegistry>& registry, void* object) {
 std::mutex registriesMutex_;
 std::vector<std::weak_ptr<CanaryRegistry>> registries_;
 
-void ReportDeallocToAllRegistries(void* object) {
+std::vector<std::shared_ptr<CanaryRegistry>> LiveRegistries() {
   std::vector<std::shared_ptr<CanaryRegistry>> live;
-  {
-    std::lock_guard<std::mutex> lock(registriesMutex_);
-    for (auto it = registries_.begin(); it != registries_.end();) {
-      if (std::shared_ptr<CanaryRegistry> registry = it->lock()) {
-        if (registry->count.load(std::memory_order_relaxed) > 0) {
-          live.push_back(std::move(registry));
-        }
-        ++it;
-      } else {
-        it = registries_.erase(it);
+  std::lock_guard<std::mutex> lock(registriesMutex_);
+  for (auto it = registries_.begin(); it != registries_.end();) {
+    if (std::shared_ptr<CanaryRegistry> registry = it->lock()) {
+      if (registry->count.load(std::memory_order_relaxed) > 0) {
+        live.push_back(std::move(registry));
       }
+      ++it;
+    } else {
+      it = registries_.erase(it);
     }
   }
-  for (const std::shared_ptr<CanaryRegistry>& registry : live) {
+  return live;
+}
+
+void ReportDeallocToAllRegistries(void* object) {
+  for (const std::shared_ptr<CanaryRegistry>& registry : LiveRegistries()) {
+    NativeDied(registry, object);
+  }
+}
+
+using DyingRecords =
+    std::vector<std::pair<std::shared_ptr<CanaryRegistry>, std::shared_ptr<CanaryRecord>>>;
+
+// Before a JS-implemented -dealloc runs: marks the object's records dying in
+// every isolate.
+DyingRecords MarkDying(void* object) {
+  DyingRecords dying;
+  for (std::shared_ptr<CanaryRegistry>& registry : LiveRegistries()) {
+    std::lock_guard<std::mutex> lock(registry->mutex);
+    auto it = registry->records.find(object);
+    if (!registry->closed && it != registry->records.end()) {
+      it->second->dying.store(true, std::memory_order_release);
+      dying.emplace_back(registry, it->second);
+    }
+  }
+  return dying;
+}
+
+// After it returned: retires each record by identity. A record a new object at
+// the address already displaced (RetireIfDead) is gone from the map.
+void ReportDyingRecordsDied(const DyingRecords& dying, void* object) {
+  for (const auto& [registry, record] : dying) {
+    {
+      std::lock_guard<std::mutex> lock(registry->mutex);
+      auto it = registry->records.find(object);
+      if (registry->closed || it == registry->records.end() || it->second != record) {
+        continue;
+      }
+    }
     NativeDied(registry, object);
   }
 }
@@ -277,7 +316,7 @@ bool Usable(const std::shared_ptr<CanaryRecord>& record) {
 // has reached yet is moved out, so an object now at that address starts over.
 void RetireIfDead(CanaryRegistry* registry,
                   std::unordered_map<void*, std::shared_ptr<CanaryRecord>>::iterator it) {
-  if (it->second->ObjectAlive()) {
+  if (it->second->ObjectAlive() && !it->second->dying.load(std::memory_order_acquire)) {
     return;
   }
   it->second->died.store(true, std::memory_order_release);
@@ -286,13 +325,33 @@ void RetireIfDead(CanaryRegistry* registry,
   registry->count.fetch_sub(1, std::memory_order_relaxed);
 }
 
+// The record a receiver lent to JS from -dealloc reads: its object's record,
+// dying or not. Such a receiver is never adopted, so it has no canary state.
+std::shared_ptr<CanaryRecord> BorrowedRecord(Isolate* isolate, Local<Object> holder) {
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, holder);
+  if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject ||
+      !static_cast<ObjCDataWrapper*>(wrapper)->IsBorrowed()) {
+    return nullptr;
+  }
+  CanaryState* state = Caches::StateFor<CanaryState>(isolate);
+  if (state == nullptr || state->registry->count.load(std::memory_order_relaxed) == 0) {
+    return nullptr;
+  }
+  std::lock_guard<std::mutex> lock(state->registry->mutex);
+  auto it = state->registry->records.find(
+      (__bridge void*)static_cast<ObjCDataWrapper*>(wrapper)->Data());
+  return it != state->registry->records.end() ? it->second : nullptr;
+}
+
 // The state object of the holder, if it has one.
 bool ExistingState(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
   ObjectWeakCallbackState* canary = CanaryOf(isolate, holder);
-  if (canary == nullptr || !Usable(canary->canaryRecord_)) {
+  std::shared_ptr<CanaryRecord> record =
+      canary != nullptr ? canary->canaryRecord_ : BorrowedRecord(isolate, holder);
+  if (!Usable(record)) {
     return false;
   }
-  *out = Local<Object>::New(isolate, canary->canaryRecord_->state);
+  *out = Local<Object>::New(isolate, record->state);
   return true;
 }
 
@@ -300,7 +359,8 @@ bool ExistingState(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
 bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
   ObjectWeakCallbackState* canary = CanaryOf(isolate, holder);
   if (canary == nullptr) {
-    return false;
+    // A -dealloc receiver writes to its object's existing state only.
+    return ExistingState(isolate, holder, out);
   }
   if (canary->canaryRecord_ == nullptr || canary->canaryRecord_->died.load(std::memory_order_acquire)) {
     std::shared_ptr<CanaryRegistry> registry = RegistryFor(isolate);
@@ -565,8 +625,9 @@ IMP WrapperLifetimeCanary::WrapDealloc(SEL selector, IMP imp) {
   }
   return imp_implementationWithBlock(^(id self) {
     void* object = (__bridge void*)self;
+    DyingRecords dying = MarkDying(object);
     reinterpret_cast<void (*)(id, SEL)>(imp)(self, @selector(dealloc));
-    ReportDeallocToAllRegistries(object);
+    ReportDyingRecordsDied(dying, object);
   });
 }
 
@@ -591,7 +652,8 @@ std::shared_ptr<CanaryRecord> WrapperLifetimeCanary::Find(Isolate* isolate, id o
   }
   std::shared_ptr<CanaryRecord> record = it->second;
   RetireIfDead(state->registry.get(), it);
-  return record->ObjectAlive() ? record : nullptr;
+  return record->ObjectAlive() && !record->dying.load(std::memory_order_acquire) ? record
+                                                                                 : nullptr;
 }
 
 void WrapperLifetimeCanary::CloseForTeardown(Isolate* isolate) {

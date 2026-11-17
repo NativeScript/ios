@@ -401,7 +401,7 @@ describe("Wrapper lifetime modes", function () {
         var seen = [];
         var WithDealloc = TNSAllocLog.extend({
             dealloc: function () {
-                seen.push(true);
+                seen.push(this.tag);
                 this.super.dealloc();
             }
         }, { name: "WrapperLifetimeModesJSDealloc" });
@@ -421,6 +421,8 @@ describe("Wrapper lifetime modes", function () {
                     var after = runtime.getWrapperLifetimeStats();
                     expect(seen.length).toBe(N);
                     if (canary) {
+                        // The JS dealloc still reads the object's JS state.
+                        expect(seen.filter(function (tag) { return tag === "state"; }).length).toBe(N);
                         expect(after.canaryNativeDeaths - before.canaryNativeDeaths).not.toBeLessThan(N);
                     }
                     done();
