@@ -79,7 +79,12 @@ class WeakSet extends NativeWeakSet {
 
 class WeakRef extends NativeWeakRef {
   constructor(target) {
-    super(unwrap(target, true));
+    const key = unwrap(target, true);
+    super(key);
+    // The target itself, not only its key, stays alive until the job ends.
+    if (key !== target) {
+      new NativeWeakRef(target);
+    }
   }
 
   // The live wrapper, a new one if the old one died while the native object
@@ -109,6 +114,10 @@ class FinalizationRegistry extends NativeFinalizationRegistry {
   }
 
   register(target, heldValue, unregisterToken) {
+    // Checked on the original values: unwrapping would make them differ.
+    if (target === heldValue) {
+      throw new TypeError("FinalizationRegistry.prototype.register: target and holdings must not be same");
+    }
     super.register(
       unwrap(target, true),
       heldValue,

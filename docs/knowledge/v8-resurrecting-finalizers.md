@@ -311,9 +311,8 @@ refusing weak references) by an opaque, frozen key held by its state, so entries
 exactly as long as the native object, and `WeakRef.prototype.deref` returns the live canary, a new
 one, or `undefined` once the object is gone. Lookups never create that key, and a Proxy around a
 native object stays a key of its own. The cost is the other side of the same rooting: a `WeakMap`
-value or a `FinalizationRegistry` held value that references its native key keeps the key, its
-state and so the native object alive for as long as the collection lives, where in the other
-modes the entry would be collectable. Native `#private` fields are branded on the canary and do not carry over. Other
+value that references its native key keeps the key, its state and so the native object alive for
+as long as the map lives, where in the other modes the entry would be collectable. Native `#private` fields are branded on the canary and do not carry over. Other
 limits: `Object.freeze`, `seal` and `preventExtensions` throw on a canary (V8 refuses them on
 objects with interceptors); index-keyed properties are not mirrored and die with the canary;
 a write through an object whose prototype is a canary lands on that object, since

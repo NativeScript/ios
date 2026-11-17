@@ -691,6 +691,10 @@ void UnwrapCallback(const FunctionCallbackInfo<Value>& info) {
     return;
   }
   ObjectWeakCallbackState* canary = CanaryOf(isolate, value.As<Object>());
+  if (canary == nullptr) {
+    // A receiver lent to JS from -dealloc: its object is going away.
+    return;
+  }
   CanaryRecord* record = canary->canaryRecord_.get();
   if (!record->weakSet) {
     if (objc_initWeakOrNil(&record->object, canary->lifetimeTarget_) == nil) {

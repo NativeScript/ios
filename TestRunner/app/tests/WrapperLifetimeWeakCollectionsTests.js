@@ -211,6 +211,39 @@ describe("Weak collections of native objects", function () {
         }
     });
 
+    it("rejects a FinalizationRegistry registration whose target is its held value", function () {
+        var registry = new FinalizationRegistry(function () {});
+        var obj = Extended.new();
+        expect(function () {
+            registry.register(obj, obj);
+        }).toThrowError(TypeError);
+    });
+
+    it("lets a JS dealloc key a weak collection on its receiver", function (done) {
+        var map = new WeakMap();
+        var ran = 0;
+        var Keyed = TNSAllocLog.extend({
+            dealloc: function () {
+                map.set(this, "dying");
+                ran++;
+                this.super.dealloc();
+            }
+        }, { name: "WrapperLifetimeWeakCollectionsDeallocKey" });
+        var owner = NSMutableArray.new();
+        (function () {
+            var obj = Keyed.new();
+            obj.tag = "state";
+            owner.addObject(obj);
+        })();
+        settle(2, function () {
+            owner.removeAllObjects();
+            settle(2, function () {
+                expect(ran).toBe(1);
+                done();
+            });
+        });
+    });
+
     it("keeps working as the standard collections for other keys", function () {
         var key = {};
         var map = new WeakMap([[key, 1]]);
@@ -255,6 +288,21 @@ describe("Weak collections of native objects", function () {
         TNSClearOutput();
         TNSObjCTypes.alloc().init().methodWithNSArray(pair);
         expect(TNSGetOutput()).toBe("firstsecond");
+        TNSClearOutput();
+    });
+
+    // With no native enumeration to inherit, an inherited JS iterator still
+    // backs native enumeration.
+    it("enumerates natively a JS class whose iterator comes from its implementation's prototype", function () {
+        var Iterated = NSObject.extend(Object.create({
+            [Symbol.iterator]: function* () {
+                yield "only";
+            }
+        }), { name: "WrapperLifetimeWeakCollectionsInheritedIterator" });
+        var obj = Iterated.alloc().init();
+        TNSClearOutput();
+        TNSObjCTypes.alloc().init().methodWithNSArray(obj);
+        expect(TNSGetOutput()).toBe("only");
         TNSClearOutput();
     });
 });
