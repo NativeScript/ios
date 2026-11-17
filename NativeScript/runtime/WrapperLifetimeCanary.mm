@@ -356,6 +356,66 @@ std::shared_ptr<CanaryRecord> BorrowedRecord(Isolate* isolate, Local<Object> hol
   return it != state->registry->records.end() ? it->second : nullptr;
 }
 
+// Set while this thread copies properties between a canary and its state, so
+// the canary's definer lets those defines through. Per thread rather than per
+// isolate: the copy runs no JS, so only its own defines reach an interceptor
+// on this thread meanwhile.
+thread_local bool copyingProperties_ = false;
+
+Local<Value> DescriptorField(Isolate* isolate, Local<Context> context, Local<Object> descriptor,
+                             const char* name) {
+  Local<Value> value;
+  return descriptor->Get(context, tns::ToV8String(isolate, name)).ToLocal(&value)
+             ? value
+             : Local<Value>(v8::Undefined(isolate));
+}
+
+// Copies `from`'s own string- and symbol-keyed properties onto `to`, with their
+// attributes; an accessor keeps its functions, which run with whichever object
+// they are reached through as `this`.
+void CopyOwnProperties(Isolate* isolate, Local<Context> context, Local<Object> from,
+                       Local<Object> to) {
+  HandleScope scope(isolate);
+  TryCatch tc(isolate);
+  bool wasCopying = copyingProperties_;
+  copyingProperties_ = true;
+  Local<v8::Array> names;
+  if (from->GetPropertyNames(context, KeyCollectionMode::kOwnOnly, PropertyFilter::ALL_PROPERTIES,
+                             IndexFilter::kSkipIndices, KeyConversionMode::kConvertToString)
+          .ToLocal(&names)) {
+    for (uint32_t i = 0; i < names->Length(); i++) {
+      Local<Value> name;
+      if (!names->Get(context, i).ToLocal(&name) || !name->IsName()) {
+        continue;
+      }
+      Local<v8::Name> key = name.As<v8::Name>();
+      if (!from->HasRealNamedCallbackProperty(context, key).FromMaybe(true)) {
+        PropertyAttribute attributes;
+        Local<Value> value;
+        if (from->GetRealNamedPropertyAttributes(context, key).To(&attributes) &&
+            from->GetRealNamedProperty(context, key).ToLocal(&value)) {
+          (void)to->DefineOwnProperty(context, key, value, attributes);
+        }
+        continue;
+      }
+      Local<Value> descriptorValue;
+      if (!from->GetOwnPropertyDescriptor(context, key).ToLocal(&descriptorValue) ||
+          !descriptorValue->IsObject()) {
+        continue;
+      }
+      Local<Object> descriptor = descriptorValue.As<Object>();
+      PropertyDescriptor accessor(DescriptorField(isolate, context, descriptor, "get"),
+                                  DescriptorField(isolate, context, descriptor, "set"));
+      accessor.set_enumerable(
+          DescriptorField(isolate, context, descriptor, "enumerable")->BooleanValue(isolate));
+      accessor.set_configurable(
+          DescriptorField(isolate, context, descriptor, "configurable")->BooleanValue(isolate));
+      (void)to->DefineProperty(context, key, accessor);
+    }
+  }
+  copyingProperties_ = wasCopying;
+}
+
 // The state object of the holder, if it has one.
 bool ExistingState(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
   ObjectWeakCallbackState* canary = CanaryOf(isolate, holder);
@@ -381,6 +441,9 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
       return false;
     }
     id object = canary->lifetimeTarget_;
+    // The record died under a live canary (its token was removed): the
+    // canary's properties seed the new state.
+    bool replacesDied = canary->canaryRecord_ != nullptr;
     // A JS-extended class's own -dealloc reports its instances' deaths.
     bool extended = IsExtendedInstance(object);
     // Allocated before the lock: a collection this allocation starts can run
@@ -432,6 +495,13 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
       if (ObjectManager::LifetimeStats* stats = ObjectManager::GetLifetimeStats(isolate)) {
         stats->canaryStates++;
       }
+      if (replacesDied) {
+        CopyOwnProperties(isolate, isolate->GetCurrentContext(), holder, freshState);
+      }
+    } else if (Usable(canary->canaryRecord_)) {
+      // Joined state another wrapper of the object wrote: the canary mirrors it.
+      CopyOwnProperties(isolate, isolate->GetCurrentContext(),
+                        Local<Object>::New(isolate, canary->canaryRecord_->state), holder);
     }
   }
   if (!Usable(canary->canaryRecord_)) {
@@ -445,123 +515,102 @@ bool HasOwn(Local<Context> context, Local<Object> state, Local<v8::Name> propert
   return state->HasOwnProperty(context, property).FromMaybe(false);
 }
 
-Intercepted Getter(Local<v8::Name> property, const PropertyCallbackInfo<Value>& info) {
-  Isolate* isolate = info.GetIsolate();
-  Local<Object> state;
-  if (!ExistingState(isolate, info.Holder(), &state)) {
-    return Intercepted::kNo;
+// The object of `holder`'s prototype chain, `holder` included, with a real own
+// `property`, interceptors skipped; empty if there is none.
+Local<Object> OwnerOf(Local<Context> context, Local<Object> holder, Local<v8::Name> property) {
+  Local<Object> object = holder;
+  while (!object->HasRealNamedProperty(context, property).FromMaybe(false)) {
+    Local<Value> prototype = object->GetPrototype();
+    if (!prototype->IsObject()) {
+      return Local<Object>();
+    }
+    object = prototype.As<Object>();
   }
-  Local<Context> context = isolate->GetCurrentContext();
-  if (!HasOwn(context, state, property)) {
-    return Intercepted::kNo;
-  }
-  Local<Value> value;
-  // An accessor defined through the canary runs with the canary as `this`
-  // (interceptors do not see the receiver, only the holder).
-  if (state->Get(context, property, info.Holder()).ToLocal(&value)) {
-    info.GetReturnValue().Set(value);
-  }
-  return Intercepted::kYes;
+  return object;
 }
 
+// The handlers mirror: each copies its write into the state and declines, so
+// V8 also applies it to the canary, where reads find a real own property and
+// never call into C++. There is no getter, query, enumerator or descriptor
+// callback for the same reason. The handlers are masking, so they also see
+// names the prototype chain has. After the setter declines, V8 adds a new name
+// to the canary without calling the definer, so the setter itself decides what
+// becomes state.
 Intercepted Setter(Local<v8::Name> property, Local<Value> value,
                    const PropertyCallbackInfo<v8::Boolean>& info) {
   Isolate* isolate = info.GetIsolate();
-  Local<Object> state;
-  if (!StateForWrite(isolate, info.Holder(), &state)) {
-    return Intercepted::kNo;
+  Local<Object> holder = info.Holder();
+  ObjectWeakCallbackState* canary = CanaryOf(isolate, holder);
+  std::shared_ptr<CanaryRecord> borrowed;
+  if (canary == nullptr) {
+    borrowed = BorrowedRecord(isolate, holder);
+    if (!Usable(borrowed)) {
+      return Intercepted::kNo;
+    }
   }
+  CanaryRecord* record = canary != nullptr ? canary->canaryRecord_.get() : borrowed.get();
   Local<Context> context = isolate->GetCurrentContext();
-  Maybe<bool> result = state->HasRealNamedCallbackProperty(context, property).FromMaybe(false)
-                           ? state->Set(context, property, value, info.Holder())
-                           : state->Set(context, property, value);
-  if (result.IsJust()) {
-    info.GetReturnValue().Set(result.FromJust());
+  if (record != nullptr && !record->died.load(std::memory_order_acquire) &&
+      !record->state.IsEmpty()) {
+    // Own on the state means own on the canary: a rewrite of a JS property.
+    Local<Object> state = Local<Object>::New(isolate, record->state);
+    if (HasOwn(context, state, property)) {
+      if (!state->HasRealNamedCallbackProperty(context, property).FromMaybe(true)) {
+        (void)state->Set(context, property, value);
+      }
+      return Intercepted::kNo;
+    }
   }
-  return Intercepted::kYes;
-}
-
-Intercepted Query(Local<v8::Name> property, const PropertyCallbackInfo<v8::Integer>& info) {
-  Isolate* isolate = info.GetIsolate();
-  Local<Object> state;
-  if (!ExistingState(isolate, info.Holder(), &state)) {
-    return Intercepted::kNo;
-  }
-  Local<Context> context = isolate->GetCurrentContext();
-  if (!HasOwn(context, state, property)) {
-    return Intercepted::kNo;
-  }
+  // Searches the prototype chain too: absent there means a new name.
   PropertyAttribute attributes;
-  if (state->GetPropertyAttributes(context, property).To(&attributes)) {
-    info.GetReturnValue().Set(v8::Integer::New(isolate, attributes));
+  if (holder->GetRealNamedPropertyAttributes(context, property).To(&attributes)) {
+    // V8 rejects a write to a read-only property and runs an accessor's
+    // setter: a native property's (an accessor pair on its class's
+    // prototype), a JS one's, or one defined on the canary, which runs with
+    // the canary as `this` and so mirrors whatever it writes. None is state.
+    if ((attributes & ReadOnly) != 0) {
+      return Intercepted::kNo;
+    }
+    Local<Object> owner = OwnerOf(context, holder, property);
+    if (owner.IsEmpty() || owner->HasRealNamedCallbackProperty(context, property).FromMaybe(true)) {
+      return Intercepted::kNo;
+    }
   }
-  return Intercepted::kYes;
+  Local<Object> state;
+  if (!StateForWrite(isolate, holder, &state)) {
+    return Intercepted::kNo;
+  }
+  if (!HasOwn(context, state, property)) {
+    (void)state->CreateDataProperty(context, property, value);
+  } else if (!state->HasRealNamedCallbackProperty(context, property).FromMaybe(true)) {
+    (void)state->Set(context, property, value);
+  }
+  return Intercepted::kNo;
 }
 
 Intercepted Deleter(Local<v8::Name> property, const PropertyCallbackInfo<v8::Boolean>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Object> state;
-  if (!ExistingState(isolate, info.Holder(), &state)) {
-    return Intercepted::kNo;
+  if (ExistingState(isolate, info.Holder(), &state)) {
+    (void)state->Delete(isolate->GetCurrentContext(), property);
   }
-  Local<Context> context = isolate->GetCurrentContext();
-  if (!HasOwn(context, state, property)) {
-    return Intercepted::kNo;
-  }
-  bool deleted;
-  if (state->Delete(context, property).To(&deleted)) {
-    info.GetReturnValue().Set(deleted);
-  }
-  return Intercepted::kYes;
+  return Intercepted::kNo;
 }
 
-void Enumerator(const PropertyCallbackInfo<v8::Array>& info) {
-  Isolate* isolate = info.GetIsolate();
-  Local<Object> state;
-  if (!ExistingState(isolate, info.Holder(), &state)) {
-    return;
-  }
-  Local<Context> context = isolate->GetCurrentContext();
-  Local<v8::Array> names;
-  if (state
-          ->GetPropertyNames(context, KeyCollectionMode::kOwnOnly, PropertyFilter::ALL_PROPERTIES,
-                             IndexFilter::kSkipIndices)
-          .ToLocal(&names)) {
-    info.GetReturnValue().Set(names);
-  }
-}
-
+// Object.defineProperty, define-semantics class fields and `super.x = v` on a
+// receiver that lacks `x` reach here.
 Intercepted Definer(Local<v8::Name> property, const PropertyDescriptor& descriptor,
                     const PropertyCallbackInfo<v8::Boolean>& info) {
+  if (copyingProperties_) {
+    return Intercepted::kNo;
+  }
   Isolate* isolate = info.GetIsolate();
   Local<Object> state;
-  if (!StateForWrite(isolate, info.Holder(), &state)) {
-    return Intercepted::kNo;
+  if (StateForWrite(isolate, info.Holder(), &state)) {
+    (void)state->DefineProperty(isolate->GetCurrentContext(), property,
+                                const_cast<PropertyDescriptor&>(descriptor));
   }
-  Local<Context> context = isolate->GetCurrentContext();
-  bool defined;
-  if (state->DefineProperty(context, property, const_cast<PropertyDescriptor&>(descriptor))
-          .To(&defined)) {
-    info.GetReturnValue().Set(defined);
-  }
-  return Intercepted::kYes;
-}
-
-Intercepted Descriptor(Local<v8::Name> property, const PropertyCallbackInfo<Value>& info) {
-  Isolate* isolate = info.GetIsolate();
-  Local<Object> state;
-  if (!ExistingState(isolate, info.Holder(), &state)) {
-    return Intercepted::kNo;
-  }
-  Local<Context> context = isolate->GetCurrentContext();
-  if (!HasOwn(context, state, property)) {
-    return Intercepted::kNo;
-  }
-  Local<Value> descriptor;
-  if (state->GetOwnPropertyDescriptor(context, property).ToLocal(&descriptor)) {
-    info.GetReturnValue().Set(descriptor);
-  }
-  return Intercepted::kYes;
+  return Intercepted::kNo;
 }
 
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
@@ -659,8 +708,24 @@ void WrapperLifetimeCanary::ConfigureInstanceTemplate(Local<ObjectTemplate> inst
     return;
   }
   instanceTemplate->SetHandler(NamedPropertyHandlerConfiguration(
-      Getter, Setter, Query, Deleter, Enumerator, Definer, Descriptor, Local<Value>(),
-      PropertyHandlerFlags::kNonMasking));
+      nullptr, Setter, nullptr, Deleter, nullptr, Definer, nullptr, Local<Value>(),
+      PropertyHandlerFlags::kNone));
+}
+
+void WrapperLifetimeCanary::Hydrate(Isolate* isolate, Local<Object> wrapper) {
+  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
+    return;
+  }
+  HandleScope scope(isolate);
+  Local<Object> state;
+  if (!ExistingState(isolate, wrapper, &state)) {
+    return;
+  }
+  Local<Context> context = isolate->GetCurrentContext();
+  if (context.IsEmpty()) {
+    context = Caches::Get(isolate)->GetContext();
+  }
+  CopyOwnProperties(isolate, context, state, wrapper);
 }
 
 std::shared_ptr<CanaryRecord> WrapperLifetimeCanary::Find(Isolate* isolate, id object) {

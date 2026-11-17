@@ -349,6 +349,9 @@ void WrapperLifetime::Adopt(Isolate* isolate, ObjCDataWrapper* wrapper,
     state->lifetimeCanary_ = IsInScope(target);
     if (state->lifetimeCanary_) {
       state->canaryRecord_ = WrapperLifetimeCanary::Find(isolate, target);
+      if (state->canaryRecord_ != nullptr) {
+        WrapperLifetimeCanary::Hydrate(isolate, handle->Get(isolate).As<Object>());
+      }
     }
     MakeWeak(state);
   } else if (IsInScope(target)) {

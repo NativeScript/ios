@@ -54,6 +54,40 @@ describe("Wrapper lifetime modes", function () {
         }, 10);
     }
 
+    // Hands what `make` returns to native code, drops every JS reference to
+    // it, and calls back with the object read back from native code: under
+    // canary mode on a new wrapper.
+    function rewrap(make, callback) {
+        var owner = NSMutableArray.new();
+        var first;
+        (function () {
+            var obj = make();
+            owner.addObject(obj);
+            first = new WeakRef(obj);
+        })();
+        settle(2, function () {
+            if (canary) {
+                expect(first.deref()).toBeUndefined();
+            }
+            callback(owner.objectAtIndex(0));
+        });
+    }
+
+    function hasOwn(obj, name) {
+        return Object.prototype.hasOwnProperty.call(obj, name);
+    }
+
+    var WithMethod = (function (_super) {
+        __extends(WithMethod, _super);
+        function WithMethod() {
+            return (_super !== null && _super.apply(this, arguments)) || this;
+        }
+        WithMethod.prototype.greet = function () {
+            return this.greeting || "greet";
+        };
+        return WithMethod;
+    })(TNSAllocLog);
+
     beforeEach(function () {
         TNSClearOutput();
     });
@@ -428,8 +462,8 @@ describe("Wrapper lifetime modes", function () {
         });
     });
 
-    // Own-property semantics hold whatever the mode: in canary mode the names
-    // live on the state object and the canary's interceptors present them.
+    // Own-property semantics hold whatever the mode: in canary mode every
+    // write also lands on the canary itself.
     it("keeps own-property semantics for JS properties on a native object", function () {
         var obj = Extended.new();
         obj.a = 1;
@@ -477,29 +511,237 @@ describe("Wrapper lifetime modes", function () {
         });
     });
 
-    // kNonMasking interceptors only see names the prototype chain lacks: a JS
-    // property shadowing a prototype member is defined on the wrapper itself,
-    // so in canary mode it goes with the wrapper. A documented limit.
-    it("keeps a JS property that shadows a prototype member only while its canary lives", function (done) {
-        var owner = NSMutableArray.new();
-        (function () {
-            var obj = Extended.new();
+    it("hands back a JS property that shadows a prototype member on a new wrapper", function (done) {
+        rewrap(function () {
+            var obj = WithMethod.new();
             obj.isEqual = function () {
                 return "shadow";
             };
+            // Bound to another object: one bound to `obj` would keep it alive.
+            obj.greet = obj.greet.bind({ greeting: "bound" });
             obj.tag = "kept";
-            owner.addObject(obj);
-        })();
-        settle(2, function () {
-            var obj = owner.objectAtIndex(0);
-            if (canary) {
+            return obj;
+        }, function (obj) {
+            if (keepsState) {
                 expect(obj.tag).toBe("kept");
-                expect(obj.isEqual(obj)).toBe(true);
-            } else if (rooted) {
                 expect(obj.isEqual(obj)).toBe("shadow");
+                expect(obj.greet()).toBe("bound");
+                expect(hasOwn(obj, "greet")).toBe(true);
             }
             done();
         });
+    });
+
+    it("hands back a property defined over a prototype member on a new wrapper", function (done) {
+        rewrap(function () {
+            var obj = WithMethod.new();
+            Object.defineProperty(obj, "isEqual", {
+                value: function () {
+                    return "defined";
+                },
+                writable: true,
+                configurable: true
+            });
+            expect(obj.isEqual(obj)).toBe("defined");
+            return obj;
+        }, function (obj) {
+            if (keepsState) {
+                expect(obj.isEqual(obj)).toBe("defined");
+                var descriptor = Object.getOwnPropertyDescriptor(obj, "isEqual");
+                expect(descriptor.writable).toBe(true);
+                expect(descriptor.enumerable).toBe(false);
+                expect(descriptor.configurable).toBe(true);
+                expect(Object.keys(obj)).toEqual([]);
+            }
+            done();
+        });
+    });
+
+    it("restores the prototype member a deleted shadowing property hid", function (done) {
+        rewrap(function () {
+            var obj = WithMethod.new();
+            obj.greet = function () {
+                return "shadow";
+            };
+            obj.tag = "kept";
+            expect(delete obj.greet).toBe(true);
+            expect(obj.greet()).toBe("greet");
+            return obj;
+        }, function (obj) {
+            expect(hasOwn(obj, "greet")).toBe(false);
+            expect(obj.greet()).toBe("greet");
+            if (keepsState) {
+                expect(obj.tag).toBe("kept");
+            }
+            done();
+        });
+    });
+
+    it("hands back an accessor defined on the instance, running it on the new wrapper", function (done) {
+        rewrap(function () {
+            var obj = Extended.new();
+            Object.defineProperty(obj, "self", {
+                get: function () {
+                    return this;
+                },
+                set: function (value) {
+                    this.written = value;
+                },
+                configurable: true
+            });
+            obj.self = 1;
+            return obj;
+        }, function (obj) {
+            if (keepsState) {
+                expect(obj.self).toBe(obj);
+                expect(obj.written).toBe(1);
+                obj.self = 2;
+                expect(obj.written).toBe(2);
+                var descriptor = Object.getOwnPropertyDescriptor(obj, "self");
+                expect(typeof descriptor.get).toBe("function");
+                expect(typeof descriptor.set).toBe("function");
+                expect(descriptor.enumerable).toBe(false);
+            }
+            done();
+        });
+    });
+
+    it("hands back non-enumerable, read-only and symbol-keyed properties with their attributes", function (done) {
+        var key = Symbol("key");
+        rewrap(function () {
+            var obj = Extended.new();
+            obj.visible = 1;
+            Object.defineProperty(obj, "hidden", { value: 2, writable: true, configurable: true });
+            Object.defineProperty(obj, "fixed", { value: 3, enumerable: true });
+            obj[key] = 4;
+            return obj;
+        }, function (obj) {
+            if (keepsState) {
+                expect(Object.keys(obj)).toEqual(["visible", "fixed"]);
+                expect(Object.getOwnPropertyNames(obj).sort()).toEqual(["fixed", "hidden", "visible"]);
+                expect(obj[key]).toBe(4);
+                expect(Object.getOwnPropertyDescriptor(obj, "hidden")).toEqual({
+                    value: 2, writable: true, enumerable: false, configurable: true
+                });
+                expect(Object.getOwnPropertyDescriptor(obj, "fixed")).toEqual({
+                    value: 3, writable: false, enumerable: true, configurable: false
+                });
+                expect(delete obj.fixed).toBe(false);
+            }
+            done();
+        });
+    });
+
+    function strictAssignThrows(obj, name, value) {
+        "use strict";
+        try {
+            obj[name] = value;
+        } catch (e) {
+            return e instanceof TypeError;
+        }
+        return false;
+    }
+
+    function answerGot() {
+        return "got";
+    }
+
+    // A rejected write is rejected by the wrapper's own property, and the
+    // state keeps the old value. No closure here may capture the wrapper: the
+    // getter stored in the state would keep it alive.
+    it("rejects writes to read-only and getter-only properties", function (done) {
+        rewrap(function () {
+            var obj = Extended.new();
+            Object.defineProperty(obj, "fixed", { value: 1, writable: false, configurable: true });
+            Object.defineProperty(obj, "getterOnly", { get: answerGot, configurable: true });
+            expect(Reflect.set(obj, "fixed", 2)).toBe(false);
+            expect(Reflect.set(obj, "getterOnly", 2)).toBe(false);
+            expect(strictAssignThrows(obj, "fixed", 2)).toBe(true);
+            expect(strictAssignThrows(obj, "getterOnly", 2)).toBe(true);
+            expect(obj.fixed).toBe(1);
+            return obj;
+        }, function (obj) {
+            if (keepsState) {
+                expect(obj.fixed).toBe(1);
+                expect(obj.getterOnly).toBe("got");
+                expect(Reflect.set(obj, "fixed", 2)).toBe(false);
+            }
+            done();
+        });
+    });
+
+    it("runs the native setter of a native property written on a wrapper", function (done) {
+        var Host = (function (_super) {
+            __extends(Host, _super);
+            function Host() {
+                return (_super !== null && _super.apply(this, arguments)) || this;
+            }
+            return Host;
+        })(TNSAccessorHost);
+        rewrap(function () {
+            var obj = Host.new();
+            var before = runtime.getWrapperLifetimeStats();
+            obj.name = "native";
+            expect(hasOwn(obj, "name")).toBe(false);
+            if (canary) {
+                // Not JS state: no state object was made for it.
+                expect(runtime.getWrapperLifetimeStats().canaryStates).toBe(before.canaryStates);
+            }
+            obj.tag = "state";
+            obj.name = "native2";
+            expect(hasOwn(obj, "name")).toBe(false);
+            return obj;
+        }, function (obj) {
+            expect(obj.name).toBe("native2");
+            expect(hasOwn(obj, "name")).toBe(false);
+            if (keepsState) {
+                expect(obj.tag).toBe("state");
+            }
+            done();
+        });
+    });
+
+    it("shadows a native property with a defined one until it is deleted", function (done) {
+        var Host = (function (_super) {
+            __extends(Host, _super);
+            function Host() {
+                return (_super !== null && _super.apply(this, arguments)) || this;
+            }
+            return Host;
+        })(TNSAccessorHost);
+        var nativeName = Object.getOwnPropertyDescriptor(TNSAccessorHost.prototype, "name").get;
+        rewrap(function () {
+            var obj = Host.new();
+            obj.name = "native";
+            Object.defineProperty(obj, "name", { value: "js", writable: true, configurable: true });
+            obj.name = "js2";
+            expect(nativeName.call(obj)).toBe("native");
+            return obj;
+        }, function (obj) {
+            if (keepsState) {
+                expect(hasOwn(obj, "name")).toBe(true);
+                expect(obj.name).toBe("js2");
+            }
+            expect(nativeName.call(obj)).toBe("native");
+            delete obj.name;
+            expect(hasOwn(obj, "name")).toBe(false);
+            expect(obj.name).toBe("native");
+            obj.name = "native3";
+            expect(hasOwn(obj, "name")).toBe(false);
+            expect(nativeName.call(obj)).toBe("native3");
+            done();
+        });
+    });
+
+    // Interceptors see only writes made through the wrapper itself.
+    it("keeps a write through an object inheriting from a wrapper on that object", function () {
+        var obj = Extended.new();
+        var derived = Object.create(obj);
+        derived.tag = "derived";
+        Object.defineProperty(derived, "defined", { value: 1, configurable: true });
+        expect(hasOwn(derived, "tag")).toBe(true);
+        expect("tag" in obj).toBe(false);
+        expect("defined" in obj).toBe(false);
     });
 
     // A JS-implemented dealloc replaces the class's own death hook, so it
@@ -644,19 +886,30 @@ describe("Wrapper lifetime modes", function () {
     });
 
     // Third-party code can strip a live object's associations. Where an
-    // associated token reports native death, the state goes with it; where a
-    // weak-reference sweep does, nothing changes.
-    it("survives a live object's associations being removed", function () {
+    // associated token reports native death, the record goes with it, and the
+    // next write seeds a new state from the canary's own properties.
+    it("survives a live object's associations being removed", function (done) {
         if (typeof objc_removeAssociatedObjects !== "function") {
+            done();
             return;
         }
-        // Only objects outside JS-extended classes carry the token.
-        var obj = scope === "all" ? TNSAllocLog.new() : Extended.new();
-        obj.tag = "first";
-        objc_removeAssociatedObjects(obj);
-        expect([undefined, "first"]).toContain(obj.tag);
-        obj.tag = "second";
-        expect(obj.tag).toBe("second");
+        rewrap(function () {
+            // Only objects outside JS-extended classes carry the token.
+            var obj = scope === "all" ? TNSAllocLog.new() : Extended.new();
+            obj.tag = "first";
+            obj.other = "kept";
+            objc_removeAssociatedObjects(obj);
+            expect(obj.tag).toBe("first");
+            obj.tag = "second";
+            expect(obj.tag).toBe("second");
+            return obj;
+        }, function (obj) {
+            if (keepsState) {
+                expect(obj.tag).toBe("second");
+                expect(obj.other).toBe("kept");
+            }
+            done();
+        });
     });
 
     // V8 refuses to freeze, seal or prevent extensions on an object with
@@ -668,5 +921,43 @@ describe("Wrapper lifetime modes", function () {
         expect(function () {
             Object.freeze(Extended.new());
         }).toThrowError(TypeError);
+        expect(function () {
+            Object.seal(Extended.new());
+        }).toThrowError(TypeError);
+        expect(function () {
+            Object.preventExtensions(Extended.new());
+        }).toThrowError(TypeError);
+    });
+
+    // Named interceptors see neither index keys nor private names: both live
+    // on the canary only.
+    it("drops index-keyed properties and #private brands with a canary", function (done) {
+        var Stamp = (function () {
+            var Base = function (target) {
+                return target;
+            };
+            return class extends Base {
+                #brand = 1;
+                static has(o) {
+                    return #brand in o;
+                }
+            };
+        })();
+        rewrap(function () {
+            var obj = Extended.new();
+            obj[0] = "index";
+            obj.tag = "kept";
+            new Stamp(obj);
+            expect(obj[0]).toBe("index");
+            expect(Stamp.has(obj)).toBe(true);
+            return obj;
+        }, function (obj) {
+            if (canary) {
+                expect(obj.tag).toBe("kept");
+                expect(obj[0]).toBeUndefined();
+                expect(Stamp.has(obj)).toBe(false);
+            }
+            done();
+        });
     });
 });

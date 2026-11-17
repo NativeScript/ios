@@ -260,13 +260,32 @@ native code owns are lost without a warning.
 `"mode": "canary"` (`WrapperLifetimeCanary.{h,mm}`) is the portable variant, the shape Android and
 the Node-API runtimes can implement. A wrapper in scope is a canary: a phantom-weak JS object
 that dies with its JS references, releasing the runtime's retain through the same queue.
-`kNonMasking` named interceptors on the instance templates forward JS properties to a
-null-prototype state object, so prototype members never reach them. The state is rooted from
-its first write until the native object is deallocated; a canary built later for the same
-object forwards to the same state. Instances of JS-extended classes report their own
-deallocation: the runtime gives each extended class a `-dealloc` that tells every isolate's
-registry, then calls the superclass's. For other objects it is a compile-time choice
-(`NS_CANARY_DEATH_SIGNAL` in `WrapperLifetimeCanary.mm`): by default a token associated with the
+A masking named interceptor on the instance templates, with only a setter, a deleter and a
+definer, mirrors JS properties into a null-prototype state object: each callback copies the
+write into the state and declines, so V8 also applies it to the canary. Reads find real own
+properties on the canary and never call into C++, so they cost what they cost on a plain
+object. Being masking, the callbacks also see names the prototype chain has (a class method
+rebound with `this.onTap = this.onTap.bind(this)`, a field called `copy`, any
+`Object.defineProperty` over a prototype name), and those are state like any other. The
+setter classifies the prototype chain itself, because once it declines V8 adds a new name
+to the canary without calling the definer: a name that resolves to an inherited accessor (a
+native property, a JS getter/setter) or a read-only data member is left to V8 and never
+becomes state, so native setters run as before. The state is rooted from its first write
+until the native object is deallocated, and stays the source of truth: a canary built later
+for the same object, or the receiver a JS-implemented `-dealloc` runs with, gets the state's
+properties copied onto it with their attributes and accessors. The costs, measured on a
+Release simulator build: the handler is installed per template, so every write to any ObjC
+wrapper goes through the setter, and V8 looks the name up again after it declines. Under
+`"extended"`, a plain wrapper's expando write takes about 64 ns instead of 17 and a native
+property store about 200 ns instead of 120. On a canary, where the setter also classifies the
+name, an expando write takes about 100 ns and a native property store about 310 ns instead of
+125 (380 instead of 115 four prototypes up). Building a canary for an object with state costs
+about 330 ns per state property. Instances of JS-extended classes report their own
+deallocation: the runtime gives each extended class a `-dealloc` that marks the instance's
+records dying in every isolate, calls the superclass's (which can be a JS one the class
+inherits, whose receiver still reads the state), and then retires them. For other objects it is
+a compile-time choice (`NS_CANARY_DEATH_SIGNAL` in `WrapperLifetimeCanary.mm`): by default a
+token associated with the
 object reports it from its `-dealloc`, immediately and on any thread, but the ObjC runtime aborts
 the process for a class that forbids associated objects, and there is no public query for that;
 the alternative keeps an ObjC weak reference in each record (`objc_initWeakOrNil`, which declines
@@ -280,15 +299,13 @@ canary lives at a time, and anything still referencing the old one would have ke
 What does notice is whatever keys on the canary without keeping it: `WeakMap` keys and `WeakRef`s
 of the old canary, and native `#private` fields, which are branded on it. Other
 limits: `Object.freeze`, `seal` and `preventExtensions` throw on a canary (V8 refuses them on
-objects with interceptors); index-keyed properties are not forwarded and die with the canary;
-so does a property named like anything on the prototype chain (a class method rebound with
-`this.onTap = this.onTap.bind(this)`, a field called `copy` or `toString`, any
-`Object.defineProperty` or define-semantics class field over such a name): a `kNonMasking`
-interceptor is skipped for a name the chain has, so V8 defines it on the canary itself;
-a write through an object whose prototype is a canary lands in the canary's state, since
-interceptors see the holder but not the receiver. Relies on
-V8's own-property lookup through `kNonMasking` interceptors when the prototype has a named
-interceptor (`v8_nonmasking_own_lookup.patch` in v8-buildscripts, crbug 585053531).
+objects with interceptors); index-keyed properties are not mirrored and die with the canary;
+a write through an object whose prototype is a canary lands on that object, since
+interceptors only see writes made through their own object. Class fields need the V8 fixes
+in v8-buildscripts#13: before them, define-semantics fields reach the definer with inverted
+attributes (the state keeps them read-only, hidden and undeletable) and, once their
+initializer is warm, bypass it entirely (the field stays on the canary and is gone after a
+replacement); `v8::Object::CreateDataProperty` bypasses it the same way.
 
 Two facts worth knowing when reasoning about which objects can husk:
 

@@ -24,7 +24,7 @@ enum class WrapperLifetimeMode {
   // Phantom callbacks, no resurrection: the wrapper is a canary that dies with
   // its JS references. JS properties set on it live on a separate state object
   // that stays alive until the native object is deallocated, and a canary
-  // built for the same object later shares it (WrapperLifetimeCanary).
+  // built for the same object later gets them back (WrapperLifetimeCanary).
   kCanary,
 };
 

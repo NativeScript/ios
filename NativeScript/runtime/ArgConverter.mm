@@ -1278,6 +1278,7 @@ Local<Object> ArgConverter::WrapNativeCallbackSelf(Local<Context> context, id se
     wrapper->MarkBorrowed();
     Local<Object> receiver = NewEmptyInstance(context, cache->EmptyObjCtorFunc.get());
     CreateJsWrapper(context, wrapper, receiver);
+    WrapperLifetimeCanary::Hydrate(isolate, receiver);
     *borrowed = wrapper;
     return receiver;
   }

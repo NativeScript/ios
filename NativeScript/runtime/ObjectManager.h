@@ -58,7 +58,7 @@ struct ObjectWeakCallbackState {
   bool lifetimeTracked_ = false;
   // The handle is currently strong.
   bool lifetimeStrong_ = false;
-  // Canary mode: the wrapper forwards JS properties to a state object that
+  // Canary mode: the wrapper mirrors JS properties into a state object that
   // outlives it (WrapperLifetimeCanary), found through this record once the
   // object has state.
   bool lifetimeCanary_ = false;

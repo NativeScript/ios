@@ -12,11 +12,13 @@ struct CanaryRecord;
 // The canary wrapper lifetime mode (WrapperLifetimeMode::kCanary).
 //
 // An ObjC object's wrapper is a canary: a phantom-weak JS object that dies
-// with its JS references, releasing the runtime's retain on the object. JS
-// properties set on a canary are forwarded by kNonMasking named interceptors
-// to a state object, so prototype members (native methods and properties,
-// JS-extended class methods) never reach these handlers. A canary built later
-// for the same object forwards to the same state.
+// with its JS references, releasing the runtime's retain on the object. A
+// masking named interceptor with only a setter, deleter and definer mirrors
+// every JS property written to a canary into a state object and then declines,
+// so the property also lands on the canary and reads never leave V8. Writes to
+// native properties and other inherited accessors are not state. A canary
+// built later for the same object gets the state's properties copied back
+// (Hydrate). The state object is the source of truth.
 //
 // The state object is rooted from its first write until the native object is
 // deallocated. A JS-extended class's own -dealloc reports its instances; for
@@ -57,6 +59,10 @@ class WrapperLifetimeCanary {
   // The record of an object that already has state in this isolate, for a new
   // canary to share. Null otherwise.
   static std::shared_ptr<CanaryRecord> Find(v8::Isolate* isolate, id object);
+
+  // Copies the state of a new canary's object, or of a -dealloc receiver's,
+  // onto that wrapper. No-op without state, or unless the mode is canary.
+  static void Hydrate(v8::Isolate* isolate, v8::Local<v8::Object> wrapper);
 
   // Teardown: lets go of every state object while the isolate is alive. Tokens
   // that outlive the isolate find the registry closed.

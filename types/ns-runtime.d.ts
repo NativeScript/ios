@@ -52,12 +52,14 @@ declare module "ns:runtime" {
      *   weak otherwise; native objects of collected wrappers are released on
      *   the runtime's thread.
      * - `"canary"`: no resurrection. A wrapper in scope dies with its JS
-     *   references; JS properties set on it live on a state object kept until
-     *   the native object is deallocated, and a wrapper built for the object
-     *   later has them again. Weak references to the old wrapper (WeakMap keys,
-     *   WeakRef), native `#private` fields, index-keyed properties and
-     *   properties named like a member of the prototype chain (a rebound class
-     *   method, a field called `copy`) do not carry over.
+     *   references; JS properties set on it, including ones that shadow a
+     *   prototype member (a rebound class method, a field called `copy`), are
+     *   also copied to a state object kept until the native object is
+     *   deallocated, and a wrapper built for the object later gets them back
+     *   with their attributes. Native property writes still reach the native
+     *   setter. Writes cost more than in the other modes; reads do not. Weak
+     *   references to the old wrapper (WeakMap keys, WeakRef), native
+     *   `#private` fields and index-keyed properties do not carry over.
      *   State that references its own object keeps that object alive.
      */
     wrapperLifetimeMode: "resurrecting" | "rooted" | "canary";
