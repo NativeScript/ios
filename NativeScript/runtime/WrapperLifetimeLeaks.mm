@@ -94,10 +94,29 @@ struct NativeEntry {
   bool Immortal() const { return retainCount >= static_cast<int64_t>(NSUIntegerMax >> 1); }
 };
 
+// Storage slots a scan does not follow, by their labels.
+using SlotSkips = std::unordered_set<std::string>;
+
+// Layouts read instead of scanned, measured once on objects the probe builds
+// before its first snapshot. A measurement that does not come out as expected
+// leaves the plain storage scan in place.
+struct Calibration {
+  // CALayer keeps its delegate and its superlayer in its C++ layer, neither
+  // retained: the slots of the delegate and of the link up to the
+  // superlayer's C++ layer, which also reaches the superlayer's delegate.
+  Class layerClass = nil;
+  SlotSkips layerSkips;
+  // __NSArrayM is a ring buffer whose storage keeps pointers to removed
+  // elements: only its live range is read. Offset of its `storage` ivar.
+  Class mutableArrayClass = nil;
+  size_t ringStorage = 0;
+};
+
 // One findLeakCycles call. The snapshot's embedder graph callback runs on the
 // calling thread, inside TakeHeapSnapshot.
 struct ProbeRun {
   bool strict = false;
+  const Calibration* calibration = nullptr;
   ClassSet classes;
   std::unordered_map<Class, std::vector<std::pair<size_t, std::string>>> slots;
   std::unordered_map<Class, bool> typedClasses;
@@ -266,8 +285,9 @@ bool NonOwningContainer(Class cls) {
 
 // Object pointers in a block that is not an object (collection storage, block
 // captures), following nested storage a little way.
-void ScanStorage(ProbeRun* run, uintptr_t p, size_t size, int depth, const std::string& prefix,
-                 std::vector<NativeEdge>* out) {
+void ScanStorage(const ClassSet& classes, uintptr_t p, size_t size, int depth,
+                 const std::string& prefix, std::vector<NativeEdge>* out,
+                 const SlotSkips* skips = nullptr) {
   size_t limit = std::min(size, kMaxStorageBytes) & ~(sizeof(void*) - 1);
   std::vector<uintptr_t> words(limit / sizeof(void*));
   if (!ReadMemory(p, limit, size, words.data())) {
@@ -284,10 +304,13 @@ void ScanStorage(ProbeRun* run, uintptr_t p, size_t size, int depth, const std::
       continue;
     }
     std::string label = prefix + "+" + std::to_string(offset);
-    if (Class cls = ObjectClass(run->classes, value, valueSize)) {
+    if (skips != nullptr && skips->count(label)) {
+      continue;
+    }
+    if (Class cls = ObjectClass(classes, value, valueSize)) {
       out->push_back({reinterpret_cast<void*>(value), cls, label});
     } else if (depth < kMaxStorageDepth) {
-      ScanStorage(run, value, valueSize, depth + 1, label, out);
+      ScanStorage(classes, value, valueSize, depth + 1, label, out, skips);
     }
   }
 }
@@ -306,6 +329,379 @@ uint32_t BlockFlags(uintptr_t block, size_t size) {
   uintptr_t word = 0;
   ReadWord(block + offsetof(BlockHeader, flags), size, &word);
   return static_cast<uint32_t>(word);
+}
+
+// Copies memory that is not a heap block the probe sized, failing instead of
+// faulting when it is not mapped.
+bool ReadMapped(uintptr_t p, size_t length, void* out) {
+  vm_size_t copied = 0;
+  return vm_read_overwrite(mach_task_self(), p, length, reinterpret_cast<vm_address_t>(out),
+                           &copied) == KERN_SUCCESS &&
+         copied == length;
+}
+
+// Block_private.h.
+constexpr uint32_t kBlockHasCopyDispose = 1u << 25;
+constexpr uint32_t kBlockSmallDescriptor = 1u << 22;
+constexpr uint32_t kBlockHasSignature = 1u << 30;
+constexpr uint32_t kBlockHasExtendedLayout = 1u << 31;
+constexpr uint32_t kByrefLayoutMask = 0xfu << 28;
+constexpr uint32_t kByrefLayoutNonObject = 2u << 28;
+constexpr uint32_t kByrefLayoutWeak = 4u << 28;
+constexpr uint32_t kByrefLayoutUnretained = 5u << 28;
+
+struct Capture {
+  size_t offset;
+  bool byref;
+};
+
+// The captures a heap block retains: strong objects and __block variables,
+// read from its extended layout, which also lists __weak and
+// __unsafe_unretained ones. A block without copy/dispose helpers retains
+// nothing. False when the layout cannot be read; every word is then scanned.
+bool OwnedCaptures(uintptr_t block, size_t size, std::vector<Capture>* captures) {
+  uint32_t flags = BlockFlags(block, size);
+  if ((flags & kBlockHasCopyDispose) == 0) {
+    return true;
+  }
+  if ((flags & kBlockSmallDescriptor) != 0 || (flags & kBlockHasSignature) == 0 ||
+      (flags & kBlockHasExtendedLayout) == 0) {
+    return false;
+  }
+  uintptr_t descriptor = 0;
+  // A signed or otherwise unusual descriptor pointer is not decoded.
+  if (!ReadWord(block + offsetof(BlockHeader, descriptor), size, &descriptor) || descriptor == 0 ||
+      (descriptor >> 47) != 0) {
+    return false;
+  }
+  // reserved, size, copy, dispose, signature, layout.
+  uintptr_t fields[6];
+  if (!ReadMapped(descriptor, sizeof fields, fields)) {
+    return false;
+  }
+  uintptr_t layout = fields[5];
+  size_t offset = sizeof(BlockHeader);
+  auto add = [&](size_t count, bool byref) {
+    for (size_t i = 0; i < count; i++, offset += sizeof(void*)) {
+      captures->push_back({offset, byref});
+    }
+  };
+  if (layout == 0) {
+    return false;
+  }
+  if (layout < 0x1000) {
+    // 0xXYZ: X strong words, then Y byref words, then Z weak words.
+    add((layout >> 8) & 0xf, false);
+    add((layout >> 4) & 0xf, true);
+  } else {
+    // Bytes 0xPN, operator P on N + 1 words, up to a 0x00.
+    uint8_t ops[64];
+    uintptr_t pageEnd = (layout | (vm_page_size - 1)) + 1;
+    size_t length = std::min<size_t>(sizeof ops, pageEnd - layout);
+    if (!ReadMapped(layout, length, ops)) {
+      return false;
+    }
+    size_t i = 0;
+    for (; i < length && ops[i] != 0; i++) {
+      size_t count = (ops[i] & 0xf) + 1;
+      switch (ops[i] >> 4) {
+        case 2:  // non-object words
+        case 5:  // weak
+        case 6:  // unretained
+          offset += count * sizeof(void*);
+          break;
+        case 3:
+          add(count, false);
+          break;
+        case 4:
+          add(count, true);
+          break;
+        default:
+          return false;
+      }
+    }
+    if (i == length) {
+      return false;
+    }
+  }
+  return offset <= size;
+}
+
+// A __block variable that its own flags say is not retained.
+bool UnretainedByref(uintptr_t byref, size_t size) {
+  // isa, forwarding, flags.
+  uintptr_t word = 0;
+  if (!ReadWord(byref + 2 * sizeof(void*), size, &word)) {
+    return true;
+  }
+  uint32_t layout = static_cast<uint32_t>(word) & kByrefLayoutMask;
+  return layout == kByrefLayoutNonObject || layout == kByrefLayoutWeak ||
+         layout == kByrefLayoutUnretained;
+}
+
+bool IsKindOf(Class cls, Class base) {
+  for (Class c = cls; c != nil && base != nil; c = class_getSuperclass(c)) {
+    if (c == base) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// __NSArrayM's `storage` ivar, as calibrated.
+struct Ring {
+  uintptr_t list;
+  uint32_t offset;
+  uint32_t size;
+  uint32_t used;
+};
+
+constexpr const char* kRingStorageType =
+    "{?=\"list\"^@\"offset\"I\"size\"I\"state\"(?=\"mutations\"Q\"\"{?=\"muts\"I\"used\"I})}";
+
+// The live elements of a __NSArrayM, in order, at most `limit` of them; false
+// when its storage does not read as a ring.
+bool RingElements(const Calibration& calibration, uintptr_t array, size_t size, size_t limit,
+                  std::vector<uintptr_t>* elements, bool* cut) {
+  uintptr_t words[3];
+  if (calibration.ringStorage + sizeof words > size ||
+      !ReadMemory(array + calibration.ringStorage, sizeof words, size, words)) {
+    return false;
+  }
+  Ring ring{words[0], static_cast<uint32_t>(words[1]), static_cast<uint32_t>(words[1] >> 32),
+            static_cast<uint32_t>(words[2] >> 32)};
+  if (ring.used == 0) {
+    return true;
+  }
+  size_t listSize = HeapBlockSize(ring.list);
+  if (ring.offset >= ring.size || ring.used > ring.size ||
+      listSize < static_cast<size_t>(ring.size) * sizeof(void*)) {
+    return false;
+  }
+  std::vector<uintptr_t> list(std::min<size_t>(ring.size, limit));
+  if (!ReadMemory(ring.list, list.size() * sizeof(void*), listSize, list.data())) {
+    return false;
+  }
+  for (uint32_t i = 0; i < ring.used; i++) {
+    size_t slot = (static_cast<size_t>(ring.offset) + i) % ring.size;
+    if (slot >= list.size()) {
+      *cut = true;
+      continue;
+    }
+    elements->push_back(list[slot]);
+  }
+  return true;
+}
+
+template <typename R = id, typename... Args>
+R Send(id target, const char* selector, Args... args) {
+  return reinterpret_cast<R (*)(id, SEL, Args...)>(objc_msgSend)(target, sel_registerName(selector),
+                                                                 args...);
+}
+
+std::vector<size_t> LabelPath(const std::string& label) {
+  std::vector<size_t> path;
+  for (size_t at = label.find('+'); at != std::string::npos; at = label.find('+', at + 1)) {
+    path.push_back(std::stoul(label.substr(at + 1)));
+  }
+  return path;
+}
+
+std::string PathLabel(const std::vector<size_t>& path, size_t length) {
+  std::string label;
+  for (size_t i = 0; i < length; i++) {
+    label += "+" + std::to_string(path[i]);
+  }
+  return label;
+}
+
+// What the first `length` steps of `path` lead to from `object`, scanned as
+// storage the way Expand does; 0 when a step leaves the heap.
+uintptr_t Resolve(uintptr_t object, const std::vector<size_t>& path, size_t length) {
+  uintptr_t block = object + sizeof(void*);
+  size_t size = HeapBlockSize(object) - sizeof(void*);
+  for (size_t i = 0; i < length; i++) {
+    uintptr_t value = 0;
+    if (path[i] + sizeof(void*) > size || !ReadWord(block + path[i], size, &value)) {
+      return 0;
+    }
+    if (i + 1 == length) {
+      return value;
+    }
+    block = value;
+    size = HeapBlockSize(value);
+    if (size == 0) {
+      return 0;
+    }
+  }
+  return block;
+}
+
+std::vector<NativeEdge> ScanObject(const ClassSet& classes, id object, const SlotSkips* skips) {
+  std::vector<NativeEdge> edges;
+  uintptr_t p = reinterpret_cast<uintptr_t>(object);
+  size_t size = HeapBlockSize(p);
+  if (size > sizeof(void*)) {
+    ScanStorage(classes, p + sizeof(void*), size - sizeof(void*), 0, "", &edges, skips);
+  }
+  return edges;
+}
+
+bool Reaches(const std::vector<NativeEdge>& edges, id target) {
+  return std::any_of(edges.begin(), edges.end(),
+                     [&](const NativeEdge& edge) { return edge.to == (__bridge void*)target; });
+}
+
+// Whether `edges`, or the storage of another object they lead to, hold
+// `target`: sublayers sit in an array the layer owns.
+bool Holds(const ClassSet& classes, id owner, const std::vector<NativeEdge>& edges, id target) {
+  return Reaches(edges, target) ||
+         std::any_of(edges.begin(), edges.end(), [&](const NativeEdge& edge) {
+           return edge.to != (__bridge void*)owner &&
+                  Reaches(ScanObject(classes, (__bridge id)edge.to, nullptr), target);
+         });
+}
+
+void CalibrateLayer(Calibration* calibration) {
+  Class layerClass = objc_getClass("CALayer");
+  Class transaction = objc_getClass("CATransaction");
+  if (layerClass == nil || transaction == nil) {
+    return;
+  }
+  Send<void>(transaction, "begin");
+  Send<void>(transaction, "setDisableActions:", YES);
+  auto newLayer = [&]() { return Send(Send(layerClass, "alloc"), "init"); };
+  id parent = newLayer();
+  id layer = newLayer();
+  id sublayer = newLayer();
+  id mask = newLayer();
+  id parentDelegate = [[NSObject alloc] init];
+  id delegate = [[NSObject alloc] init];
+  Send<void>(parent, "setDelegate:", parentDelegate);
+  Send<void>(layer, "setDelegate:", delegate);
+  Send<void>(parent, "addSublayer:", layer);
+  Send<void>(layer, "addSublayer:", sublayer);
+  Send<void>(layer, "setMask:", mask);
+
+  ClassSet classes = LoadClasses();
+  uintptr_t layerAddress = reinterpret_cast<uintptr_t>(layer);
+  uintptr_t parentAddress = reinterpret_cast<uintptr_t>(parent);
+  SlotSkips skips;
+  bool sawDelegate = false;
+  bool sawParent = false;
+  for (const NativeEdge& edge : ScanObject(classes, layer, nullptr)) {
+    if (edge.to == (__bridge void*)delegate) {
+      sawDelegate = true;
+      skips.insert(edge.label);
+    } else if (edge.to == (__bridge void*)parent) {
+      sawParent = true;
+      // The first step that leaves this layer's storage for the parent's.
+      std::vector<size_t> path = LabelPath(edge.label);
+      std::string skip = edge.label;
+      for (size_t k = 1; k < path.size() && skip == edge.label; k++) {
+        uintptr_t block = Resolve(layerAddress, path, k);
+        for (size_t j = 1; j <= k; j++) {
+          if (block != 0 && block == Resolve(parentAddress, path, j)) {
+            skip = PathLabel(path, k);
+            break;
+          }
+        }
+      }
+      skips.insert(skip);
+    }
+  }
+  bool valid = sawDelegate && sawParent;
+  if (valid) {
+    std::vector<NativeEdge> fromLayer = ScanObject(classes, layer, &skips);
+    std::vector<NativeEdge> fromParent = ScanObject(classes, parent, &skips);
+    std::vector<NativeEdge> fromMask = ScanObject(classes, mask, &skips);
+    valid = !Reaches(fromLayer, delegate) && !Reaches(fromLayer, parent) &&
+            !Reaches(fromLayer, parentDelegate) && Reaches(fromLayer, mask) &&
+            Holds(classes, layer, fromLayer, sublayer) &&
+            Holds(classes, parent, fromParent, layer) && !Reaches(fromParent, parentDelegate) &&
+            !Reaches(fromMask, layer);
+  }
+  if (valid) {
+    calibration->layerClass = layerClass;
+    calibration->layerSkips = std::move(skips);
+  }
+
+  Send<void>(layer, "setMask:", nil);
+  Send<void>(sublayer, "removeFromSuperlayer");
+  Send<void>(layer, "removeFromSuperlayer");
+  Send<void>(layer, "setDelegate:", nil);
+  Send<void>(parent, "setDelegate:", nil);
+  for (id object : {parent, layer, sublayer, mask, parentDelegate, delegate}) {
+    [object release];
+  }
+  Send<void>(transaction, "commit");
+}
+
+void CalibrateRing(Calibration* calibration) {
+  Class arrayClass = objc_getClass("__NSArrayM");
+  Ivar storage = arrayClass != nil ? class_getInstanceVariable(arrayClass, "storage") : nullptr;
+  const char* type = storage != nullptr ? ivar_getTypeEncoding(storage) : nullptr;
+  if (type == nullptr || strcmp(type, kRingStorageType) != 0) {
+    return;
+  }
+  Calibration probe;
+  probe.ringStorage = static_cast<size_t>(ivar_getOffset(storage));
+  std::vector<id> items;
+  for (int i = 0; i < 9; i++) {
+    items.push_back([[NSObject alloc] init]);
+  }
+  // Removed at both ends, and wrapped around by an insertion at the front.
+  NSMutableArray* trimmed = [[NSMutableArray alloc] init];
+  NSMutableArray* wrapped = [[NSMutableArray alloc] init];
+  for (int i = 0; i < 8; i++) {
+    [trimmed addObject:items[i]];
+  }
+  [trimmed removeObjectAtIndex:0];
+  [trimmed removeObjectAtIndex:0];
+  [trimmed removeLastObject];
+  for (int i = 0; i < 4; i++) {
+    [wrapped addObject:items[i]];
+  }
+  [wrapped insertObject:items[8] atIndex:0];
+  auto matches = [&](NSMutableArray* array, std::vector<id> expected) {
+    std::vector<uintptr_t> elements;
+    bool cut = false;
+    uintptr_t p = reinterpret_cast<uintptr_t>(array);
+    if (object_getClass(array) != arrayClass ||
+        !RingElements(probe, p, HeapBlockSize(p), SIZE_MAX, &elements, &cut) ||
+        elements.size() != expected.size()) {
+      return false;
+    }
+    for (size_t i = 0; i < expected.size(); i++) {
+      if (elements[i] != reinterpret_cast<uintptr_t>(expected[i])) {
+        return false;
+      }
+    }
+    return true;
+  };
+  if (matches(trimmed, {items[2], items[3], items[4], items[5], items[6]}) &&
+      matches(wrapped, {items[8], items[0], items[1], items[2], items[3]})) {
+    calibration->mutableArrayClass = arrayClass;
+    calibration->ringStorage = probe.ringStorage;
+  }
+  [trimmed release];
+  [wrapped release];
+  for (id item : items) {
+    [item release];
+  }
+}
+
+// Messages Foundation and QuartzCore classes: must run outside the snapshot.
+const Calibration* GetCalibration() {
+  static Calibration* calibration = [] {
+    Calibration* result = new Calibration();
+    @autoreleasepool {
+      CalibrateLayer(result);
+      CalibrateRing(result);
+    }
+    return result;
+  }();
+  return calibration;
 }
 
 // Whether `object` still holds the object that was found there. A freed and
@@ -370,16 +766,56 @@ void Expand(ProbeRun* run, void* object, NativeEntry* entry) {
   if (entry->block) {
     // A JS block's fields past the header are runtime bookkeeping that points
     // back at the block; its one reference is the callback (a graph edge).
-    if (size > sizeof(BlockHeader) && !Interop::IsJSBlock(object)) {
-      ScanStorage(run, p + sizeof(BlockHeader), size - sizeof(BlockHeader), 1, "capture",
+    if (size <= sizeof(BlockHeader) || Interop::IsJSBlock(object)) {
+      return;
+    }
+    std::vector<Capture> captures;
+    if (!OwnedCaptures(p, size, &captures)) {
+      ScanStorage(run->classes, p + sizeof(BlockHeader), size - sizeof(BlockHeader), 1, "capture",
                   &entry->out);
+      return;
+    }
+    for (const Capture& capture : captures) {
+      uintptr_t value = 0;
+      if (!ReadWord(p + capture.offset, size, &value)) {
+        continue;
+      }
+      size_t valueSize = HeapBlockSize(value);
+      std::string label = "capture+" + std::to_string(capture.offset - sizeof(BlockHeader));
+      if (valueSize == 0) {
+        continue;
+      }
+      if (Class cls = ObjectClass(run->classes, value, valueSize)) {
+        entry->out.push_back({reinterpret_cast<void*>(value), cls, label});
+      } else if (capture.byref && !UnretainedByref(value, valueSize)) {
+        ScanStorage(run->classes, value, valueSize, kMaxStorageDepth, label, &entry->out);
+      }
     }
     return;
+  }
+  const Calibration& calibration = *run->calibration;
+  if (entry->cls == calibration.mutableArrayClass && calibration.mutableArrayClass != nil) {
+    std::vector<uintptr_t> elements;
+    bool cut = false;
+    if (RingElements(calibration, p, size, kMaxStorageBytes / sizeof(void*), &elements, &cut)) {
+      for (size_t i = 0; i < elements.size(); i++) {
+        size_t valueSize = HeapBlockSize(elements[i]);
+        if (Class cls = valueSize != 0 ? ObjectClass(run->classes, elements[i], valueSize) : nil) {
+          entry->out.push_back(
+              {reinterpret_cast<void*>(elements[i]), cls, "[" + std::to_string(i) + "]"});
+        }
+      }
+      return;
+    }
   }
   bool typed = false;
   const auto& slots = OwningSlots(run, entry->cls, &typed);
   if (!typed) {
-    ScanStorage(run, p + sizeof(void*), size - sizeof(void*), 0, "", &entry->out);
+    const SlotSkips* skips =
+        !calibration.layerSkips.empty() && IsKindOf(entry->cls, calibration.layerClass)
+            ? &calibration.layerSkips
+            : nullptr;
+    ScanStorage(run->classes, p + sizeof(void*), size - sizeof(void*), 0, "", &entry->out, skips);
     return;
   }
   for (const auto& slot : slots) {
@@ -568,7 +1004,6 @@ void BuildEmbedderGraph(Isolate* isolate, EmbedderGraph* graph, void*) {
   ProbeRun* run = activeRun_;
   ClassSet ownClasses;
   if (run != nullptr) {
-    run->classes = LoadClasses();
     BuildNativeGraph(isolate, run, cache);
   } else {
     ownClasses = LoadClasses();
@@ -824,7 +1259,9 @@ MaybeLocal<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool
                                   const std::vector<std::string>& inspect = {}) {
   ProbeRun run;
   run.strict = strict;
+  run.calibration = GetCalibration();
   auto t0 = std::chrono::steady_clock::now();
+  run.classes = LoadClasses();
   HeapProfiler* profiler = isolate->GetHeapProfiler();
   // A snapshot leaves V8 assigning ids and tracking object moves until the
   // ids are cleared. Ids that already existed belong to DevTools or
