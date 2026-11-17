@@ -172,12 +172,6 @@ std::vector<std::shared_ptr<CanaryRegistry>> LiveRegistries() {
   return live;
 }
 
-void ReportDeallocToAllRegistries(void* object) {
-  for (const std::shared_ptr<CanaryRegistry>& registry : LiveRegistries()) {
-    NativeDied(registry, object);
-  }
-}
-
 using DyingRecords =
     std::vector<std::pair<std::shared_ptr<CanaryRegistry>, std::shared_ptr<CanaryRecord>>>;
 
@@ -314,15 +308,34 @@ bool Usable(const std::shared_ptr<CanaryRecord>& record) {
 
 // Under the registry mutex: a record whose object is gone but which no sweep
 // has reached yet is moved out, so an object now at that address starts over.
-void RetireIfDead(CanaryRegistry* registry,
+// True when it was; the caller then owes the registry a drain (PostDrain).
+bool RetireIfDead(CanaryRegistry* registry,
                   std::unordered_map<void*, std::shared_ptr<CanaryRecord>>::iterator it) {
   if (it->second->ObjectAlive() && !it->second->dying.load(std::memory_order_acquire)) {
-    return;
+    return false;
   }
   it->second->died.store(true, std::memory_order_release);
   registry->dead.push_back(std::move(it->second));
   registry->records.erase(it);
   registry->count.fetch_sub(1, std::memory_order_relaxed);
+  return true;
+}
+
+// Outside the registry mutex: lets go of retired records' state on the event
+// loop, unless a drain is already on its way.
+void PostDrain(const std::shared_ptr<CanaryRegistry>& registry) {
+  std::shared_ptr<EventLoop> loop = registry->loop.lock();
+  {
+    std::lock_guard<std::mutex> lock(registry->mutex);
+    if (registry->closed || registry->drainPosted || registry->dead.empty() || loop == nullptr) {
+      return;
+    }
+    registry->drainPosted = true;
+  }
+  if (!loop->PostInternal([registry]() { DrainDead(registry); })) {
+    std::lock_guard<std::mutex> lock(registry->mutex);
+    registry->drainPosted = false;
+  }
 }
 
 // The record a receiver lent to JS from -dealloc reads: its object's record,
@@ -374,6 +387,7 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
     // callbacks (the weak sweep's, a finalizer's -dealloc) that take it.
     Local<Object> freshState = Object::New(isolate, Null(isolate), nullptr, nullptr, 0);
     bool created = false;
+    bool retired = false;
     {
       std::lock_guard<std::mutex> lock(registry->mutex);
       if (registry->closed) {
@@ -381,7 +395,7 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
       }
       auto existing = registry->records.find((__bridge void*)object);
       if (existing != registry->records.end()) {
-        RetireIfDead(registry.get(), existing);
+        retired = RetireIfDead(registry.get(), existing);
       }
       std::shared_ptr<CanaryRecord>& slot = registry->records[(__bridge void*)object];
       if (slot == nullptr) {
@@ -400,6 +414,9 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
         created = true;
       }
       canary->canaryRecord_ = slot;
+    }
+    if (retired) {
+      PostDrain(registry);
     }
     if (created) {
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
@@ -553,14 +570,16 @@ Intercepted Descriptor(Local<v8::Name> property, const PropertyCallbackInfo<Valu
 // Only posts; the GC is no place to reset handles.
 void PostSweepAfterGC(Isolate* isolate, GCType, GCCallbackFlags) {
   CanaryState* state = Caches::StateFor<CanaryState>(isolate);
-  if (state == nullptr || state->registry->count.load(std::memory_order_relaxed) == 0) {
+  if (state == nullptr) {
     return;
   }
   std::shared_ptr<CanaryRegistry> registry = state->registry;
   std::shared_ptr<EventLoop> loop = registry->loop.lock();
   {
     std::lock_guard<std::mutex> lock(registry->mutex);
-    if (registry->sweepPosted || loop == nullptr) {
+    // Records already retired wait in `dead` even once none is left in use.
+    if (registry->sweepPosted || loop == nullptr ||
+        (registry->count.load(std::memory_order_relaxed) == 0 && registry->dead.empty())) {
       return;
     }
     registry->sweepPosted = true;
@@ -609,11 +628,15 @@ void WrapperLifetimeCanary::InstallDeallocHook(Class extendedClass) {
     hooked[extendedClass] = true;
   }
   Class superclass = class_getSuperclass(extendedClass);
+  // The records stay dying, not gone, until the superclass's -dealloc returns,
+  // as WrapDealloc keeps them: one implemented in JS reads the state.
   IMP dealloc = imp_implementationWithBlock(^(id self) {
-    ReportDeallocToAllRegistries((__bridge void*)self);
+    void* object = (__bridge void*)self;
+    DyingRecords dying = MarkDying(object);
     struct objc_super super = {.receiver = self, .super_class = superclass};
     reinterpret_cast<void (*)(struct objc_super*, SEL)>(objc_msgSendSuper)(&super,
                                                                            @selector(dealloc));
+    ReportDyingRecordsDied(dying, object);
   });
   class_addMethod(extendedClass, @selector(dealloc), dealloc, "v@:");
 }
@@ -645,15 +668,19 @@ std::shared_ptr<CanaryRecord> WrapperLifetimeCanary::Find(Isolate* isolate, id o
   if (state == nullptr || state->registry->count.load(std::memory_order_relaxed) == 0) {
     return nullptr;
   }
-  std::lock_guard<std::mutex> lock(state->registry->mutex);
-  auto it = state->registry->records.find((__bridge void*)object);
-  if (it == state->registry->records.end()) {
-    return nullptr;
+  {
+    std::lock_guard<std::mutex> lock(state->registry->mutex);
+    auto it = state->registry->records.find((__bridge void*)object);
+    if (it == state->registry->records.end()) {
+      return nullptr;
+    }
+    std::shared_ptr<CanaryRecord> record = it->second;
+    if (!RetireIfDead(state->registry.get(), it)) {
+      return record;
+    }
   }
-  std::shared_ptr<CanaryRecord> record = it->second;
-  RetireIfDead(state->registry.get(), it);
-  return record->ObjectAlive() && !record->dying.load(std::memory_order_acquire) ? record
-                                                                                 : nullptr;
+  PostDrain(state->registry);
+  return nullptr;
 }
 
 void WrapperLifetimeCanary::CloseForTeardown(Isolate* isolate) {

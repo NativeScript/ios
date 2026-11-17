@@ -572,9 +572,12 @@ describe("Wrapper lifetime modes", function () {
         var owner = NSMutableArray.new();
         var before = runtime.getWrapperLifetimeStats();
         var watched;
+        var payload;
         (function () {
             var obj = Extended.new();
             obj.tag = "state";
+            obj.payload = {};
+            payload = new WeakRef(obj.payload);
             owner.addObject(obj);
             watched = watch(obj);
         })();
@@ -586,6 +589,7 @@ describe("Wrapper lifetime modes", function () {
                 if (canary) {
                     expect(after.canaryStates).toBeGreaterThan(before.canaryStates);
                     expect(after.canaryNativeDeaths).toBeGreaterThan(before.canaryNativeDeaths);
+                    expect(payload.deref()).toBeUndefined();
                 }
                 done();
             });
@@ -598,9 +602,12 @@ describe("Wrapper lifetime modes", function () {
         var owner = NSMutableArray.new();
         var before = runtime.getWrapperLifetimeStats();
         var watched;
+        var payload;
         (function () {
             var obj = TNSAllocLog.new();
             obj.tag = "state";
+            obj.payload = {};
+            payload = new WeakRef(obj.payload);
             owner.addObject(obj);
             watched = watch(obj);
         })();
@@ -611,6 +618,7 @@ describe("Wrapper lifetime modes", function () {
                 expect(alive(watched)).toBe(0);
                 if (canary && scope === "all") {
                     expect(after.canaryNativeDeaths).toBeGreaterThan(before.canaryNativeDeaths);
+                    expect(payload.deref()).toBeUndefined();
                 }
                 done();
             });
