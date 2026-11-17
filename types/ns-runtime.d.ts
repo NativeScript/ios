@@ -178,7 +178,7 @@ declare module "ns:runtime" {
     };
     /** Layouts read instead of scanned, as measured in this process. */
     calibrated: {
-      /** `CALayer`'s unretained delegate and superlayer slots are skipped. */
+      /** `CALayer`'s unretained superlayer, and delegate when it has none, are skipped. */
       layer: boolean;
       /** Only the live range of an `NSMutableArray`'s storage is read. */
       mutableArray: boolean;

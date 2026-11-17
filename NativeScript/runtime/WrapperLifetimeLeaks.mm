@@ -104,8 +104,13 @@ struct Calibration {
   // CALayer keeps its delegate and its superlayer in its C++ layer, neither
   // retained: the slots of the delegate and of the link up to the
   // superlayer's C++ layer, which also reaches the superlayer's delegate.
+  // A layer with a superlayer keeps its delegate slot: when the delegate is
+  // its view, that edge is the only one standing for the superview's retain
+  // of the view, which UIKit keeps outside any ivar or storage.
   Class layerClass = nil;
   SlotSkips layerSkips;
+  SlotSkips attachedLayerSkips;
+  std::vector<std::vector<size_t>> superlayerPaths;
   // __NSArrayM is a ring buffer whose storage keeps pointers to removed
   // elements: only its live range is read. Offset of its `storage` ivar.
   Class mutableArrayClass = nil;
@@ -524,8 +529,12 @@ std::string PathLabel(const std::vector<size_t>& path, size_t length) {
 // What the first `length` steps of `path` lead to from `object`, scanned as
 // storage the way Expand does; 0 when a step leaves the heap.
 uintptr_t Resolve(uintptr_t object, const std::vector<size_t>& path, size_t length) {
+  size_t size = HeapBlockSize(object);
+  if (size <= sizeof(void*)) {
+    return 0;
+  }
   uintptr_t block = object + sizeof(void*);
-  size_t size = HeapBlockSize(object) - sizeof(void*);
+  size -= sizeof(void*);
   for (size_t i = 0; i < length; i++) {
     uintptr_t value = 0;
     if (path[i] + sizeof(void*) > size || !ReadWord(block + path[i], size, &value)) {
@@ -593,6 +602,7 @@ void CalibrateLayer(Calibration* calibration) {
   uintptr_t layerAddress = reinterpret_cast<uintptr_t>(layer);
   uintptr_t parentAddress = reinterpret_cast<uintptr_t>(parent);
   SlotSkips skips;
+  SlotSkips links;
   bool sawDelegate = false;
   bool sawParent = false;
   for (const NativeEdge& edge : ScanObject(classes, layer, nullptr)) {
@@ -614,6 +624,7 @@ void CalibrateLayer(Calibration* calibration) {
         }
       }
       skips.insert(skip);
+      links.insert(skip);
     }
   }
   bool valid = sawDelegate && sawParent;
@@ -630,6 +641,10 @@ void CalibrateLayer(Calibration* calibration) {
   if (valid) {
     calibration->layerClass = layerClass;
     calibration->layerSkips = std::move(skips);
+    calibration->attachedLayerSkips = links;
+    for (const std::string& link : links) {
+      calibration->superlayerPaths.push_back(LabelPath(link));
+    }
   }
 
   Send<void>(layer, "setMask:", nil);
@@ -819,10 +834,13 @@ void Expand(ProbeRun* run, void* object, NativeEntry* entry) {
   bool typed = false;
   const auto& slots = OwningSlots(run, entry->cls, &typed);
   if (!typed) {
-    const SlotSkips* skips =
-        !calibration.layerSkips.empty() && IsKindOf(entry->cls, calibration.layerClass)
-            ? &calibration.layerSkips
-            : nullptr;
+    const SlotSkips* skips = nullptr;
+    if (!calibration.layerSkips.empty() && IsKindOf(entry->cls, calibration.layerClass)) {
+      bool attached = std::any_of(
+          calibration.superlayerPaths.begin(), calibration.superlayerPaths.end(),
+          [&](const std::vector<size_t>& path) { return Resolve(p, path, path.size()) != 0; });
+      skips = attached ? &calibration.attachedLayerSkips : &calibration.layerSkips;
+    }
     ScanStorage(run->classes, p + sizeof(void*), size - sizeof(void*), 0, "", &entry->out, skips,
                 &run->storageCutOffs);
     return;

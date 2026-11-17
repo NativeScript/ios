@@ -229,14 +229,17 @@ read up to 64 KB (`storage`), and cycles longer than 64 hops are not reported
 (`cycleLength`). `truncated` means the graph hit its 200,000-object limit.
 Some layouts are read rather than scanned, once measured on objects the
 probe builds before its first snapshot (`calibrated`): `CALayer`'s
-unretained delegate and superlayer, and `NSMutableArray`'s live range.
+unretained superlayer, and its delegate when it has no superlayer, are
+skipped, and only `NSMutableArray`'s live range is read.
 
 What it cannot see, read as owners outside the graph so that their cycles are
 missed rather than misreported:
 
 - references held without an ivar or storage pointer: manual retain/release
-  bookkeeping (UIKit's retain of a view's subviews among them, so a cycle
-  through a view hierarchy is missed), C++ members and associated objects;
+  bookkeeping, C++ members and associated objects. UIKit's retain of a view's
+  subviews is one: where `CALayer` is read as storage (before iOS 26), the
+  view's layer's delegate slot stands for it; on iOS 26 a cycle through a
+  view hierarchy is missed;
 - struct and pointer ivars, and Swift stored properties, of a class that also
   has an object ivar (only its object ivars are read: `CALayer` on iOS 26,
   whose sublayers are held through its C++ layer);
