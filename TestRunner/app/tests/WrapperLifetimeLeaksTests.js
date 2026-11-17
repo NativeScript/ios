@@ -1,4 +1,4 @@
-// ns:runtime's leak diagnostics (WrapperLifetimeLeaks.mm) against cycle shapes
+// ns:runtime's leak diagnostics (NativeScriptLeakProbe.framework) against cycle shapes
 // planted per wrapper lifetime mode.
 describe("Wrapper lifetime leak cycles", function () {
     var runtime = require("ns:runtime");
@@ -114,6 +114,61 @@ describe("Wrapper lifetime leak cycles", function () {
         expect(function () {
             runtime.findLeakCycles(true);
         }).toThrowError(TypeError);
+    });
+
+    describe("in a worker", function () {
+        // Calls both diagnostics in a fresh worker isolate and reports how each ended.
+        function callInWorker(done, check) {
+            var worker = new Worker("~/shared/Workers/EvalWorker.js");
+            worker.onmessage = function (msg) {
+                worker.terminate();
+                TNSLeakProbeDeclineIsolates(false);
+                check(msg.data);
+                done();
+            };
+            worker.onerror = function (error) {
+                worker.terminate();
+                TNSLeakProbeDeclineIsolates(false);
+                fail(error.message);
+                done();
+            };
+            worker.postMessage({
+                eval:
+                    "var runtime = require('ns:runtime');" +
+                    "postMessage(['getWrapperClassCounts', 'findLeakCycles'].map(function (name) {" +
+                    "  try {" +
+                    "    var result = runtime[name]();" +
+                    "    return { name: name, type: typeof result };" +
+                    "  } catch (e) {" +
+                    "    return { name: name, error: e.constructor.name, message: e.message };" +
+                    "  }" +
+                    "}));",
+            });
+        }
+
+        it("serves both diagnostics", function (done) {
+            callInWorker(done, function (results) {
+                results.forEach(function (result) {
+                    expect(result.message).toBeUndefined();
+                    expect(result.type).toBe("object");
+                });
+            });
+        });
+
+        // An isolate the framework declines runs the same stubs as an app
+        // that does not embed it.
+        it("throws, naming the debug-only framework, without NativeScriptLeakProbe.framework", function (done) {
+            expect(TNSLeakProbeDeclineIsolates(true)).toBe(true);
+            callInWorker(done, function (results) {
+                expect(results.length).toBe(2);
+                results.forEach(function (result) {
+                    expect(result.error).toBe("Error");
+                    expect(result.message).toContain(result.name + " needs NativeScriptLeakProbe.framework");
+                    expect(result.message).toContain("only in debug builds by default");
+                    expect(result.message).toContain("NS_SHIP_DEBUG_FRAMEWORKS");
+                });
+            });
+        });
     });
 
     describe("planted shapes", function () {
