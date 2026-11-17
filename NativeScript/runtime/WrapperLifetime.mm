@@ -231,7 +231,14 @@ void MakeWeak(ObjectWeakCallbackState* state) {
 }
 
 // Major-collection scan: root what native code owns, let go of the rest.
-void PrologueCallback(Isolate* isolate, GCType, GCCallbackFlags) {
+// Demotes only at the atomic pause, where the main thread stops until weak
+// processing and young survivors are tenured. At incremental-marking start a
+// demoted wrapper could still be young, and a scavenge before the pause would
+// collect it without another scan, even after native code retained its object
+// without crossing into JS (say by loading a __weak reference). A wrapper
+// native code let go of thus survives one more incremental cycle.
+void PrologueCallback(Isolate* isolate, GCType type, GCCallbackFlags) {
+  const bool demote = type == kGCTypeMarkSweepCompact;
   RootedState* rooted = Caches::StateFor<RootedState>(isolate);
   if (rooted == nullptr) {
     return;
@@ -252,7 +259,7 @@ void PrologueCallback(Isolate* isolate, GCType, GCCallbackFlags) {
       if (stats != nullptr) {
         stats->promotions++;
       }
-    } else if (!owned && state->lifetimeStrong_) {
+    } else if (demote && !owned && state->lifetimeStrong_) {
       MakeWeak(state);
       if (stats != nullptr) {
         stats->demotions++;
