@@ -231,7 +231,13 @@ id Interop::CallInitializer(Local<Context> context, const MethodMeta* methodMeta
 
   Interop::SetValue(call.ArgumentBuffer(0), target);
   Interop::SetValue(call.ArgumentBuffer(1), selector);
-  Interop::SetFFIParams(context, typeEncoding, &call, argsCount, initialParameterIndex, args);
+  try {
+    Interop::SetFFIParams(context, typeEncoding, &call, argsCount, initialParameterIndex, args);
+  } catch (...) {
+    // `target` was allocated for this initializer, which would have consumed it.
+    [target release];
+    throw;
+  }
 
   ffi_call(parametrizedCall->Cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
 
@@ -1919,8 +1925,16 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
       methodCall.typeEncoding_->type == BinaryTypeEncodingType::InstanceTypeEncoding;
   bool marshalToPrimitive = methodCall.isPrimitiveFunction_ || !isInstanceReturnType;
 
-  Interop::SetFFIParams(methodCall.context_, methodCall.typeEncoding_, &call, argsCount,
-                        initialParameterIndex, methodCall.args_);
+  try {
+    Interop::SetFFIParams(methodCall.context_, methodCall.typeEncoding_, &call, argsCount,
+                          initialParameterIndex, methodCall.args_);
+  } catch (...) {
+    // The initializer that would have consumed it never runs.
+    if (methodCall.receiverAllocatedForCall_) {
+      [methodCall.target_ release];
+    }
+    throw;
+  }
 
   if (initialParameterIndex > 1) {
     int consumed = ConsumedObjectArgumentIndex(methodCall.selector_, methodCall.typeEncoding_,

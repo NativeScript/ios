@@ -181,9 +181,10 @@ Controls what happens when JS touches a wrapper whose native counterpart has
 already been released (a state a resurrected object can expose — see the iOS
 runtime's `docs/knowledge/v8-resurrecting-finalizers.md`):
 
-- `"report"` (default): the operation no-ops — reads produce `undefined`,
-  writes are skipped, `toString` yields a `<Pointer: released>`-style
-  placeholder — and a cancelable `releasednativeaccess` event fires on
+- `"report"` (default): the operation no-ops — pointer, reference and struct
+  reads produce `undefined`, writes are skipped, `toString` yields a
+  `<Pointer: released>`-style placeholder — and a cancelable
+  `releasednativeaccess` event fires on
   `globalThis` (`event.error` carries a `ReferenceError` whose stack names the
   touch site; `event.operation` names the API surface, e.g.
   `"struct field assignment"`). Reports are deduplicated per released object.
@@ -191,6 +192,13 @@ runtime's `docs/knowledge/v8-resurrecting-finalizers.md`):
   that handles the report suppresses it with `preventDefault()`.
 - `"throw"`: the touch throws a catchable `ReferenceError` synchronously, and
   no event fires.
+
+Under either policy, calling a method on a released Objective-C object or
+reading one of its native properties throws a `ReferenceError`: there is no
+value to stand in for the result. Native code that receives a released object
+with no JS caller to throw to (the return value of a JS-implemented method,
+an element of a collection native code is reading) gets `nil` or `NSNull` and
+the event fires, under `"throw"` too.
 
 ```js
 const { setConfig } = require("ns:runtime");
