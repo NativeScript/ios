@@ -16,6 +16,7 @@
 #include "SymbolLoader.h"
 #include "Tasks.h"
 #include "Worker.h"
+#include "WrapperLifetime.h"
 #include "WrapperLifetimeCanary.h"
 
 using namespace v8;
@@ -86,6 +87,124 @@ constexpr int kStructFirstViewField = StructWrapper::kFirstViewField;
 // field that is not a struct) above them.
 constexpr int kStructViewSlotShift = 16;
 constexpr int32_t kStructFieldIndexMask = (1 << kStructViewSlotShift) - 1;
+}  // namespace
+
+// The native property setters a native class's prototype was built with, for
+// TrySetNativeProperty. JS can replace one only by defining the name on that
+// prototype, which its definer sees, and a name the prototype's own handlers
+// see defined or assigned is forgotten for good. A deleted accessor needs no
+// such care: the prototype then no longer has the property.
+struct NativeSetters {
+  struct Entry {
+    Global<v8::Name> name;
+    MetadataBuilder::CacheItem<PropertyMeta>* item;
+  };
+
+  // In the order RegisterInstanceProperties installed them: a later accessor
+  // of a name replaces the earlier one on the prototype.
+  std::vector<std::pair<std::string, MetadataBuilder::CacheItem<PropertyMeta>*>> installed;
+  // By the name's identity hash. Names reaching an interceptor are internalized,
+  // so a lookup compares identities.
+  robin_hood::unordered_map<int, std::vector<Entry>> byHash;
+
+  Entry* Find(Local<v8::Name> name) {
+    auto it = byHash.find(name->GetIdentityHash());
+    if (it == byHash.end()) {
+      return nullptr;
+    }
+    for (Entry& entry : it->second) {
+      if (entry.name == name) {
+        return &entry;
+      }
+    }
+    return nullptr;
+  }
+
+  // Moves `installed` into `byHash`, keeping the last accessor of each name.
+  void Index(Isolate* isolate) {
+    for (const auto& [jsName, item] : installed) {
+      Local<v8::Name> name =
+          v8::String::NewFromUtf8(isolate, jsName.c_str(), NewStringType::kInternalized)
+              .ToLocalChecked();
+      MetadataBuilder::CacheItem<PropertyMeta>* setter = item->meta_->hasSetter() ? item : nullptr;
+      if (Entry* entry = Find(name)) {
+        entry->item = setter;
+      } else if (setter != nullptr) {
+        byHash[name->GetIdentityHash()].push_back({Global<v8::Name>(isolate, name), setter});
+      }
+    }
+    installed.clear();
+    installed.shrink_to_fit();
+  }
+
+  void Forget(Isolate* isolate, Local<v8::Name> name) {
+    auto it = byHash.find(name->GetIdentityHash());
+    if (it == byHash.end()) {
+      return;
+    }
+    for (Entry& entry : it->second) {
+      if (entry.name.Get(isolate)->StrictEquals(name)) {
+        entry.item = nullptr;
+      }
+    }
+  }
+};
+
+namespace {
+
+// Per-isolate: each native class prototype carries its NativeSetters under a
+// private key.
+struct NativeSetterState {
+  Global<Private> key;
+  std::vector<std::unique_ptr<NativeSetters>> prototypes;
+};
+
+void PublishNativeSetters(Isolate* isolate, Local<Context> context, Local<Object> prototype,
+                          std::unique_ptr<NativeSetters> setters) {
+  NativeSetterState* state = Caches::StateFor<NativeSetterState>(isolate);
+  if (state == nullptr) {
+    return;
+  }
+  if (state->key.IsEmpty()) {
+    state->key.Reset(isolate, Private::New(isolate, tns::ToV8String(isolate, "nativeSetters")));
+  }
+  setters->Index(isolate);
+  bool marked = false;
+  if (!prototype
+           ->SetPrivate(context, state->key.Get(isolate),
+                        External::New(isolate, setters.get(), v8::kExternalPointerTypeTagDefault))
+           .To(&marked) ||
+      !marked) {
+    return;
+  }
+  state->prototypes.push_back(std::move(setters));
+}
+
+NativeSetters* NativeSettersOf(Isolate* isolate, Local<Context> context, Local<Object> prototype) {
+  NativeSetterState* state = Caches::ExistingStateFor<NativeSetterState>(isolate);
+  if (state == nullptr || state->key.IsEmpty()) {
+    return nullptr;
+  }
+  Local<Value> marker;
+  if (!prototype->GetPrivate(context, state->key.Get(isolate)).ToLocal(&marker) ||
+      !marker->IsExternal()) {
+    return nullptr;
+  }
+  return static_cast<NativeSetters*>(
+      marker.As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+}
+
+// From a native class prototype's own handlers, which see JS define or assign
+// `property` on that prototype.
+void ForgetNativeSetter(Isolate* isolate, Local<Object> prototype, Local<v8::Name> property) {
+  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
+    return;
+  }
+  if (NativeSetters* setters = NativeSettersOf(isolate, isolate->GetCurrentContext(), prototype)) {
+    setters->Forget(isolate, property);
+  }
+}
+
 }  // namespace
 
 void MetadataBuilder::RegisterConstantsOnGlobalObject(Isolate* isolate,
@@ -599,11 +718,15 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
     }
   }
 
+  std::unique_ptr<NativeSetters> setters;
+  if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary) {
+    setters = std::make_unique<NativeSetters>();
+  }
   MetadataBuilder::RegisterInstanceProperties(context, ctorFuncTemplate, meta, meta->name(), pair,
-                                              instanceMembers);
+                                              instanceMembers, setters.get());
   MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, meta, pair, instanceMembers);
   MetadataBuilder::RegisterInstanceProtocols(context, ctorFuncTemplate, meta, meta->name(), pair,
-                                             instanceMembers);
+                                             instanceMembers, setters.get());
   ctorFuncTemplate->PrototypeTemplate()->Set(
       tns::ToV8String(isolate, "toString"),
       FunctionTemplate::New(isolate, MetadataBuilder::ToStringFunctionCallback));
@@ -673,6 +796,9 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
 
   Persistent<Value>* poPrototype = new Persistent<Value>(isolate, prototype);
   cache->Prototypes.emplace(meta, poPrototype);
+  if (setters != nullptr) {
+    PublishNativeSetters(isolate, context, prototype, std::move(setters));
+  }
 
   return ctorFuncTemplate;
 }
@@ -889,7 +1015,7 @@ void MetadataBuilder::RegisterInstanceMethods(
 void MetadataBuilder::RegisterInstanceProperties(
     Local<Context> context, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta,
     const std::string className, KnownUnknownClassPair pair,
-    robin_hood::unordered_map<std::string, uint8_t>& names) {
+    robin_hood::unordered_map<std::string, uint8_t>& names, NativeSetters* setters) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
 
@@ -917,6 +1043,9 @@ void MetadataBuilder::RegisterInstanceProperties(
       Local<FunctionTemplate> setter = FunctionTemplate::New(isolate, PropertySetterCallback, ext);
       proto->SetAccessorProperty(tns::ToV8String(isolate, propMeta->jsName()), getter, setter,
                                  PropertyAttribute::None);
+      if (setters != nullptr) {
+        setters->installed.emplace_back(propMeta->jsName(), item);
+      }
       names.emplace(propertyName, accessors);
     }
   }
@@ -925,11 +1054,11 @@ void MetadataBuilder::RegisterInstanceProperties(
 void MetadataBuilder::RegisterInstanceProtocols(
     Local<Context> context, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta,
     const std::string className, KnownUnknownClassPair pair,
-    robin_hood::unordered_map<std::string, uint8_t>& names) {
+    robin_hood::unordered_map<std::string, uint8_t>& names, NativeSetters* setters) {
   if (meta->type() == MetaType::ProtocolType) {
     MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, meta, pair, names);
     MetadataBuilder::RegisterInstanceProperties(context, ctorFuncTemplate, meta, className, pair,
-                                                names);
+                                                names, setters);
   }
 
   for (auto itProto = meta->protocols->begin(); itProto != meta->protocols->end(); itProto++) {
@@ -938,7 +1067,7 @@ void MetadataBuilder::RegisterInstanceProtocols(
     if (m != nullptr) {
       const BaseClassMeta* protoMeta = static_cast<const BaseClassMeta*>(m);
       MetadataBuilder::RegisterInstanceProtocols(context, ctorFuncTemplate, protoMeta, className,
-                                                 pair, names);
+                                                 pair, names, setters);
     }
   }
 }
@@ -1185,9 +1314,13 @@ void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value>& 
 }
 
 void MetadataBuilder::PropertySetterCallback(const FunctionCallbackInfo<Value>& info) {
-  Isolate* isolate = info.GetIsolate();
   CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(
       info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+  SetNativeProperty(info.GetIsolate(), item, info.This(), info[0]);
+}
+
+void MetadataBuilder::SetNativeProperty(Isolate* isolate, CacheItem<PropertyMeta>* item,
+                                        Local<Object> receiver, Local<Value> value) {
   if (!item->meta_->hasSetter()) {
     Local<Value> error =
         Exception::Error(tns::ToV8String(isolate, "Attempted to assign to readonly property."));
@@ -1195,16 +1328,29 @@ void MetadataBuilder::PropertySetterCallback(const FunctionCallbackInfo<Value>& 
     return;
   }
 
-  Local<Object> receiver = info.This();
   if (!ResolveProxyReceiver(isolate, receiver, "set native property", item->meta_->jsName(),
                             false)) {
     return;
   }
-  Local<Value> value = info[0];
   V8SimpleValueArgs args(value);
   Local<Context> context = isolate->GetCurrentContext();
   MetadataBuilder::InvokeMethod(context, item->meta_->setter(), receiver, args,
                                 item->ResolveClass(), true);
+}
+
+bool MetadataBuilder::TrySetNativeProperty(Isolate* isolate, Local<Context> context,
+                                           Local<Object> owner, Local<v8::Name> property,
+                                           Local<Object> receiver, Local<Value> value) {
+  NativeSetters* setters = NativeSettersOf(isolate, context, owner);
+  if (setters == nullptr) {
+    return false;
+  }
+  NativeSetters::Entry* entry = setters->Find(property);
+  if (entry == nullptr || entry->item == nullptr) {
+    return false;
+  }
+  SetNativeProperty(isolate, entry->item, receiver, value);
+  return true;
 }
 
 void MetadataBuilder::PropertyNameGetterCallback(const FunctionCallbackInfo<Value>& info) {
@@ -1421,6 +1567,7 @@ void ReplaceKeepingOriginal(Class klass, SEL selector, const char* selectorName,
 v8::Intercepted MetadataBuilder::SwizzledInstanceMethodCallback(
     Local<v8::Name> property, Local<Value> value, const PropertyCallbackInfo<v8::Boolean>& info) {
   Isolate* isolate = info.GetIsolate();
+  ForgetNativeSetter(isolate, info.Holder(), property);
   std::string methodName = tns::ToString(isolate, property);
 
   CacheItem<BaseClassMeta>* item = static_cast<CacheItem<BaseClassMeta>*>(
@@ -1466,6 +1613,7 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
     Local<v8::Name> property, const PropertyDescriptor& desc,
     const PropertyCallbackInfo<v8::Boolean>& info) {
   Isolate* isolate = info.GetIsolate();
+  ForgetNativeSetter(isolate, info.Holder(), property);
   std::string propertyName = tns::ToString(isolate, property);
 
   CacheItem<BaseClassMeta>* item = static_cast<CacheItem<BaseClassMeta>*>(
