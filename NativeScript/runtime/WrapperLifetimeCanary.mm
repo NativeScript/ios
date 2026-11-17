@@ -351,8 +351,8 @@ std::shared_ptr<CanaryRecord> BorrowedRecord(Isolate* isolate, Local<Object> hol
     return nullptr;
   }
   std::lock_guard<std::mutex> lock(state->registry->mutex);
-  auto it = state->registry->records.find(
-      (__bridge void*)static_cast<ObjCDataWrapper*>(wrapper)->Data());
+  auto it =
+      state->registry->records.find((__bridge void*)static_cast<ObjCDataWrapper*>(wrapper)->Data());
   return it != state->registry->records.end() ? it->second : nullptr;
 }
 
@@ -435,7 +435,8 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
     // A -dealloc receiver writes to its object's existing state only.
     return ExistingState(isolate, holder, out);
   }
-  if (canary->canaryRecord_ == nullptr || canary->canaryRecord_->died.load(std::memory_order_acquire)) {
+  if (canary->canaryRecord_ == nullptr ||
+      canary->canaryRecord_->died.load(std::memory_order_acquire)) {
     std::shared_ptr<CanaryRegistry> registry = RegistryFor(isolate);
     if (registry == nullptr) {
       return false;
@@ -691,8 +692,7 @@ void WrapperLifetimeCanary::InstallDeallocHook(Class extendedClass) {
 }
 
 IMP WrapperLifetimeCanary::WrapDealloc(SEL selector, IMP imp) {
-  if (selector != @selector(dealloc) ||
-      GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
+  if (selector != @selector(dealloc) || GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
     return imp;
   }
   return imp_implementationWithBlock(^(id self) {
@@ -707,9 +707,9 @@ void WrapperLifetimeCanary::ConfigureInstanceTemplate(Local<ObjectTemplate> inst
   if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
     return;
   }
-  instanceTemplate->SetHandler(NamedPropertyHandlerConfiguration(
-      nullptr, Setter, nullptr, Deleter, nullptr, Definer, nullptr, Local<Value>(),
-      PropertyHandlerFlags::kNone));
+  instanceTemplate->SetHandler(
+      NamedPropertyHandlerConfiguration(nullptr, Setter, nullptr, Deleter, nullptr, Definer,
+                                        nullptr, Local<Value>(), PropertyHandlerFlags::kNone));
 }
 
 void WrapperLifetimeCanary::Hydrate(Isolate* isolate, Local<Object> wrapper) {

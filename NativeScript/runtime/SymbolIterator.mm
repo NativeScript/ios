@@ -15,9 +15,8 @@ void SymbolIterator::Set(Local<Context> context, Local<Value> object) {
   // property lives on the object's state there, which a reference back to the
   // object would keep alive until native death. Elsewhere it keeps `object`, so
   // an unbound call still iterates it.
-  Local<Value> captured = GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary
-                              ? Local<Value>()
-                              : object;
+  Local<Value> captured =
+      GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary ? Local<Value>() : object;
   Local<v8::Function> iterator;
   bool success = v8::Function::New(
                      context,

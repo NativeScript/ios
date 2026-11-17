@@ -2,7 +2,9 @@
 #define WrapperLifetimeCanary_h
 
 #include <objc/runtime.h>
+
 #include <memory>
+
 #include "Common.h"
 
 namespace tns {
@@ -54,7 +56,8 @@ class WrapperLifetimeCanary {
 
   // Installs the forwarding handlers on an ObjC instance template. No-op unless
   // the mode is canary.
-  static void ConfigureInstanceTemplate(v8::Local<v8::ObjectTemplate> instanceTemplate);
+  static void ConfigureInstanceTemplate(
+      v8::Local<v8::ObjectTemplate> instanceTemplate);
 
   // The record of an object that already has state in this isolate, for a new
   // canary to share. Null otherwise.
