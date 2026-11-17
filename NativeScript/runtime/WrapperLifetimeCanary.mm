@@ -357,7 +357,7 @@ std::shared_ptr<CanaryRecord> BorrowedRecord(Isolate* isolate, Local<Object> hol
 }
 
 // Set while this thread copies properties between a canary and its state, so
-// the canary's definer lets those defines through. Per thread rather than per
+// the canary's handlers let those defines through. Per thread rather than per
 // isolate: the copy runs no JS, so only its own defines reach an interceptor
 // on this thread meanwhile.
 thread_local bool copyingProperties_ = false;
@@ -539,6 +539,10 @@ Local<Object> OwnerOf(Local<Context> context, Local<Object> holder, Local<v8::Na
 // becomes state.
 Intercepted Setter(Local<v8::Name> property, Local<Value> value,
                    const PropertyCallbackInfo<v8::Boolean>& info) {
+  // v8::Object::DefineOwnProperty reaches the setter, not the definer.
+  if (copyingProperties_) {
+    return Intercepted::kNo;
+  }
   Isolate* isolate = info.GetIsolate();
   Local<Object> holder = info.Holder();
   ObjectWeakCallbackState* canary = CanaryOf(isolate, holder);
