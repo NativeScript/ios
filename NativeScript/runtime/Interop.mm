@@ -1281,31 +1281,35 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         v8::Function::New(
             context,
             [](const FunctionCallbackInfo<Value>& info) {
-              Local<External> ext = info.Data().As<External>();
-              BlockWrapper* wrapper =
-                  static_cast<BlockWrapper*>(ext->Value(v8::kExternalPointerTypeTagDefault));
-
-              JSBlock* block = static_cast<JSBlock*>(wrapper->Block());
-
-              const TypeEncoding* typeEncoding = wrapper->Encodings();
-              int argsCount = typeEncoding->details.block.signature.count;
-              const TypeEncoding* enc = typeEncoding->details.block.signature.first();
-
-              ParametrizedCall* parametrizedCall = ParametrizedCall::Get(enc, 1, argsCount);
-              FFICall call(parametrizedCall);
-
-              V8FunctionCallbackArgs args(info);
               Isolate* isolate = info.GetIsolate();
-              Local<Context> context = isolate->GetCurrentContext();
-              Interop::SetValue(call.ArgumentBuffer(0), block);
-              Interop::SetFFIParams(context, enc, &call, argsCount, 1, args);
+              try {
+                Local<External> ext = info.Data().As<External>();
+                BlockWrapper* wrapper =
+                    static_cast<BlockWrapper*>(ext->Value(v8::kExternalPointerTypeTagDefault));
 
-              ffi_call(parametrizedCall->Cif, FFI_FN(block->invoke), call.ResultBuffer(),
-                       call.ArgsArray());
+                JSBlock* block = static_cast<JSBlock*>(wrapper->Block());
 
-              Local<Value> result = Interop::GetResult(context, enc, &call, true);
+                const TypeEncoding* typeEncoding = wrapper->Encodings();
+                int argsCount = typeEncoding->details.block.signature.count;
+                const TypeEncoding* enc = typeEncoding->details.block.signature.first();
 
-              info.GetReturnValue().Set(result);
+                ParametrizedCall* parametrizedCall = ParametrizedCall::Get(enc, 1, argsCount);
+                FFICall call(parametrizedCall);
+
+                V8FunctionCallbackArgs args(info);
+                Local<Context> context = isolate->GetCurrentContext();
+                Interop::SetValue(call.ArgumentBuffer(0), block);
+                Interop::SetFFIParams(context, enc, &call, argsCount, 1, args);
+
+                ffi_call(parametrizedCall->Cif, FFI_FN(block->invoke), call.ResultBuffer(),
+                         call.ArgsArray());
+
+                Local<Value> result = Interop::GetResult(context, enc, &call, true);
+
+                info.GetReturnValue().Set(result);
+              } catch (NativeScriptException& ex) {
+                ex.ReThrowToV8(isolate);
+              }
             },
             ext)
             .ToLocal(&callback);
@@ -1345,10 +1349,14 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
               const TypeEncoding* typeEncoding = wrapper->ParametersEncoding();
 
               Local<Context> context = isolate->GetCurrentContext();
-              CMethodCall methodCall(context, functionPointer, typeEncoding, args, false, false);
-              Local<Value> result = Interop::CallFunction(methodCall);
+              try {
+                CMethodCall methodCall(context, functionPointer, typeEncoding, args, false, false);
+                Local<Value> result = Interop::CallFunction(methodCall);
 
-              info.GetReturnValue().Set(result);
+                info.GetReturnValue().Set(result);
+              } catch (NativeScriptException& ex) {
+                ex.ReThrowToV8(isolate);
+              }
             },
             ext)
             .ToLocal(&func);

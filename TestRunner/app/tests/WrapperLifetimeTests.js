@@ -72,6 +72,19 @@ describe("Wrapper lifetime", function () {
             TNSClearOutput();
         });
 
+        it("throws a catchable ReferenceError for a released argument to a native block or function pointer", function () {
+            var released = releasedObject();
+            runtime.setConfig("releasedObjectPolicy", "throw");
+            var sink = TNSAllocLog.objectSink();
+            expect(function () {
+                sink(released);
+            }).toThrowError(ReferenceError, /native argument/);
+            var fn = functionWhichReturnsObjectFunctionPointer();
+            expect(function () {
+                fn(released);
+            }).toThrowError(ReferenceError, /native argument/);
+        });
+
         it("does not read another template's internal field as a released marker", function () {
             var before = stats();
             var url = new URL("https://example.com/path");

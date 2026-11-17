@@ -8,6 +8,13 @@ long long (*functionWhichReturnsSimpleFunctionPointer())(long long) {
     return _simpleFunctionImplementation;
 }
 
+static void _objectFunctionImplementation(id object) {
+}
+
+void (*functionWhichReturnsObjectFunctionPointer())(id) {
+    return _objectFunctionImplementation;
+}
+
 void functionWithSimpleFunctionPointer(int (*f)(int)) {
     int result = f(2);
     TNSLog([NSString stringWithFormat:@"%d", result]);
