@@ -46,8 +46,8 @@ class WrapperLifetimeCanary {
 
   // The IMP to install for `selector` on a JS-extended class: a JS-implemented
   // -dealloc replaces the hook above, so it reports the death itself once the
-  // JS method returns. `imp` unchanged for any other selector, or unless the
-  // mode is canary.
+  // JS method returns; the receiver it runs with reads the object's JS state.
+  // `imp` unchanged for any other selector, or unless the mode is canary.
   static IMP WrapDealloc(SEL selector, IMP imp);
 
   // Installs the forwarding handlers on an ObjC instance template. No-op unless
