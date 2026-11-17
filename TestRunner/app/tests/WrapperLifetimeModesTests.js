@@ -59,15 +59,15 @@ describe("Wrapper lifetime modes", function () {
     // canary mode on a new wrapper.
     function rewrap(make, callback) {
         var owner = NSMutableArray.new();
-        var first;
+        var before = runtime.getWrapperLifetimeStats();
         (function () {
-            var obj = make();
-            owner.addObject(obj);
-            first = new WeakRef(obj);
+            owner.addObject(make());
         })();
         settle(2, function () {
             if (canary) {
-                expect(first.deref()).toBeUndefined();
+                // The first wrapper died. A WeakRef can't show it here: the
+                // weak collections key a native object by its lifetime.
+                expect(runtime.getWrapperLifetimeStats().queuedReleases).toBeGreaterThan(before.queuedReleases);
             }
             callback(owner.objectAtIndex(0));
         });
