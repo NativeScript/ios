@@ -12,7 +12,6 @@
 #include "NSDataAdapter.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
-#include "WrapperLifetime.h"
 #include "OneByteStringResource.h"
 #include "Pointer.h"
 #include "Reference.h"
@@ -21,6 +20,7 @@
 #include "SymbolIterator.h"
 #include "SymbolLoader.h"
 #include "UnmanagedType.h"
+#include "WrapperLifetime.h"
 #include "robin_hood.h"
 
 using namespace v8;

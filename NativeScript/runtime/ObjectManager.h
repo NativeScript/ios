@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <cstdint>
+
 #include "Common.h"
 
 namespace tns {

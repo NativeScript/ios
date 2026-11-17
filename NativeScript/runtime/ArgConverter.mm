@@ -11,9 +11,9 @@
 #include "NSExceptionSupport.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
-#include "WrapperLifetime.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
+#include "WrapperLifetime.h"
 
 using namespace v8;
 using namespace std;

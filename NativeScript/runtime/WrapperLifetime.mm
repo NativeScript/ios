@@ -117,7 +117,6 @@ void DropRuntimeRetain(id obj, std::atomic<uint64_t>* counter) {
   }
 }
 
-
 bool IsBlock(id obj) {
   static Class blockClass = objc_getClass("NSBlock");
   return blockClass != nil && [obj isKindOfClass:blockClass];
@@ -319,8 +318,7 @@ void WrapperLifetime::Init(Isolate* isolate) {
   }
   Caches::StateFor<RootedState>(isolate);
   isolate->AddGCPrologueCallback(
-      PrologueCallback,
-      static_cast<GCType>(kGCTypeMarkSweepCompact | kGCTypeIncrementalMarking));
+      PrologueCallback, static_cast<GCType>(kGCTypeMarkSweepCompact | kGCTypeIncrementalMarking));
 }
 
 void WrapperLifetime::Adopt(Isolate* isolate, ObjCDataWrapper* wrapper,

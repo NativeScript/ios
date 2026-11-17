@@ -438,7 +438,9 @@ class ObjCDataWrapper : public BaseDataWrapper {
   // Registration state of a wrapper adopted by WrapperLifetime; null otherwise.
   // A wrapper has at most one of OwnershipState and LifetimeState.
   ObjectWeakCallbackState* LifetimeState() { return this->lifetimeState_; }
-  void SetLifetimeState(ObjectWeakCallbackState* state) { this->lifetimeState_ = state; }
+  void SetLifetimeState(ObjectWeakCallbackState* state) {
+    this->lifetimeState_ = state;
+  }
 
   // A wrapper that holds no reference to its object (one made for an object
   // already deallocating), so nothing may release on its behalf.
