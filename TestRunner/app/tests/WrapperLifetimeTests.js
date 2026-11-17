@@ -61,6 +61,17 @@ describe("Wrapper lifetime", function () {
             expect(array.count).toBe(0);
         });
 
+        it("releases the receiver allocated for an initializer whose argument throws", function () {
+            var released = releasedObject();
+            runtime.setConfig("releasedObjectPolicy", "throw");
+            TNSClearOutput();
+            expect(function () {
+                TNSAllocLog.alloc().initWithObject(released);
+            }).toThrowError(ReferenceError, /native argument/);
+            expect((TNSGetOutput().match(/TNSAllocLog dealloc/g) || []).length).toBe(1);
+            TNSClearOutput();
+        });
+
         it("does not read another template's internal field as a released marker", function () {
             var before = stats();
             var url = new URL("https://example.com/path");

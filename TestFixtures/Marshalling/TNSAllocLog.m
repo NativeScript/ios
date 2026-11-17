@@ -16,6 +16,10 @@
     return [super init];
 }
 
+- (instancetype)initWithObject:(id)object {
+    return [self init];
+}
+
 - (void)dealloc {
     TNSLog(@"TNSAllocLog dealloc");
 }

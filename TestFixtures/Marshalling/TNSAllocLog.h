@@ -8,6 +8,8 @@
 //- (void)release;
 
 - (instancetype)init;
+// Ignores `object`.
+- (instancetype)initWithObject:(id)object;
 - (void)dealloc;
 
 @end

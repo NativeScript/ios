@@ -175,8 +175,8 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
   }
 
   if (allocKlass != nil) {
-    // The +1 belongs to the initializer invoked below, which consumes it. Nothing
-    // between here and that call may throw, or the reference is lost.
+    // The +1 belongs to the initializer invoked below, which consumes it. If
+    // converting the arguments throws, CallFunction releases it instead.
     target = [allocKlass alloc];
   }
 
