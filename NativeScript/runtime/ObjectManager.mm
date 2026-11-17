@@ -110,15 +110,6 @@ struct WrapperLifetimeState {
   }
 };
 
-bool IsTaggedPointer(id obj) {
-  // Through void*: clang rejects bit tests on ObjC object pointers.
-  uintptr_t bits = reinterpret_cast<uintptr_t>(static_cast<const void*>(obj));
-#if defined(__x86_64__) && (TARGET_OS_OSX || TARGET_OS_MACCATALYST)
-  return (bits & 1) != 0;
-#else
-  return (bits >> 63) != 0;
-#endif
-}
 
 bool ReleasesPendingOnRuntimeThread(Isolate* isolate);
 bool PostStateLostConfirmation(Isolate* isolate);
@@ -835,7 +826,7 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
       // An adopted wrapper (WrapperLifetime) owns its registration whether or not
       // the Instances entry still names it, and its handle may be strong.
       if (adopted->disposing_) {
-        // The teardown walk owns this state and already released the object.
+        // The teardown walk owns this state and releases the object.
         return;
       }
       if (it != cache->Instances.end() && it->second == adopted->target_) {

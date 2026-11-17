@@ -4,6 +4,7 @@
 #include <atomic>
 #include "Common.h"
 #include "DataWrapper.h"
+#include "Helpers.h"
 #include "ObjectManager.h"
 
 namespace tns {
@@ -49,12 +50,20 @@ class WrapperLifetime {
                     const std::shared_ptr<v8::Persistent<v8::Value>>& handle, id target);
 
   // The object crossed the JS/native boundary: native code returned it to JS,
-  // or received it as a receiver or argument. A weak, rootable wrapper becomes
+  // or received it as a receiver, argument, return value of a JS-implemented
+  // member, collection element or reference target. A weak, rootable wrapper becomes
   // strong until the next major collection re-evaluates it.
   static inline void Escape(BaseDataWrapper* wrapper) {
     if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kRooted && wrapper != nullptr &&
         wrapper->Type() == WrapperType::ObjCObject) {
       EscapeSlow(static_cast<ObjCDataWrapper*>(wrapper));
+    }
+  }
+
+  // Escape for the wrapper `value` holds, looked up only in the rooted mode.
+  static inline void EscapeValue(v8::Isolate* isolate, const v8::Local<v8::Value>& value) {
+    if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kRooted) {
+      Escape(tns::GetValue(isolate, value));
     }
   }
 

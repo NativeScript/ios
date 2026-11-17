@@ -6,6 +6,7 @@
 #include "Interop.h"
 #include "ObjectManager.h"
 #include "Pointer.h"
+#include "WrapperLifetime.h"
 
 using namespace v8;
 
@@ -335,6 +336,7 @@ void* Reference::GetWrappedPointer(Local<Context> context,
 
   if (wrappedValue->Type() == WrapperType::ObjCObject) {
     ObjCDataWrapper* dataWrapper = static_cast<ObjCDataWrapper*>(wrappedValue);
+    WrapperLifetime::Escape(dataWrapper);
     id target = dataWrapper->Data();
     void* handle = malloc(sizeof(id));
     *static_cast<id*>(handle) = target;

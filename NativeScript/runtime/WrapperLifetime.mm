@@ -30,7 +30,9 @@ void ReadConfig() {
     return;
   }
   id mode = ((NSDictionary*)config)[@"mode"];
-  if ([mode isKindOfClass:[NSString class]]) {
+  if (mode != nil && ![mode isKindOfClass:[NSString class]]) {
+    Log("NativeScript: wrapperLifetime mode must be a string; using \"resurrecting\".");
+  } else if (mode != nil) {
     if ([mode isEqualToString:@"rooted"]) {
       detail::wrapperLifetimeMode = WrapperLifetimeMode::kRooted;
     } else if (![mode isEqualToString:@"resurrecting"]) {
@@ -39,7 +41,9 @@ void ReadConfig() {
     }
   }
   id scope = ((NSDictionary*)config)[@"scope"];
-  if ([scope isKindOfClass:[NSString class]]) {
+  if (scope != nil && ![scope isKindOfClass:[NSString class]]) {
+    Log("NativeScript: wrapperLifetime scope must be a string; using \"extended\".");
+  } else if (scope != nil) {
     if ([scope isEqualToString:@"all"]) {
       detail::wrapperLifetimeScope = WrapperLifetimeScope::kAll;
     } else if (![scope isEqualToString:@"extended"]) {
@@ -64,17 +68,18 @@ struct RootedState {
   bool draining = false;
   bool drainPosted = false;
   // The first -retainCount implementation that is not JS-implemented, per
-  // class: the scan runs in a GC prologue, where JS may not run.
+  // class (null for timers): the scan runs in a GC prologue, where JS may not
+  // run.
   std::unordered_map<Class, IMP> retainCountImps;
 };
 
 // Retains the runtime holds on an object across every isolate: one per
 // Instances entry. A wrapper is natively owned when the object's retain count
 // exceeds this. Readers in the GC prologue use the cached atomic without the
-// lock; entries are only erased when their count reaches zero. Unadopted
-// entries (skipGCRegistration) are not counted, so their retain reads as a
-// native owner: such an object stays rooted in other isolates (a leak, never an
-// early release).
+// lock; entries are only erased when their count reaches zero. Entries Adopt
+// skipped (handles ObjectManager did not register) are not counted, so their
+// retain reads as a native owner: such an object stays rooted in other
+// isolates (a leak, never an early release).
 std::mutex runtimeRetainsMutex_;
 std::unordered_map<void*, std::unique_ptr<std::atomic<int>>> runtimeRetains_;
 
@@ -101,15 +106,6 @@ void DropRuntimeRetain(id obj, std::atomic<int>* counter) {
   }
 }
 
-bool IsTaggedPointer(id obj) {
-  // Through void*: clang rejects bit tests on ObjC object pointers.
-  uintptr_t bits = reinterpret_cast<uintptr_t>(static_cast<const void*>(obj));
-#if defined(__arm64__)
-  return (bits >> 63) != 0;
-#else
-  return (bits & 1) != 0;
-#endif
-}
 
 bool IsBlock(id obj) {
   static Class blockClass = objc_getClass("NSBlock");
@@ -133,13 +129,30 @@ bool IsRootable(id obj) {
   return false;
 }
 
+bool IsTimerClass(Class cls) {
+  static Class timerClass = objc_getClass("NSTimer");
+  for (Class c = cls; c != nil; c = class_getSuperclass(c)) {
+    if (c == timerClass) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Timers read as 0, as in ObjectManager's ownership checks: the retain count
+// of an uninitialized NSTimer (NSTimer.alloc()) can hang.
 NSUInteger NativeRetainCount(RootedState* state, id obj) {
   Class cls = object_getClass(obj);
-  IMP& imp = state->retainCountImps[cls];
-  if (imp == nullptr) {
-    imp = ClassBuilder::FindNotOverridenMethod(cls, @selector(retainCount));
+  auto found = state->retainCountImps.find(cls);
+  if (found == state->retainCountImps.end()) {
+    IMP imp = IsTimerClass(cls) ? nullptr
+                                : ClassBuilder::FindNotOverridenMethod(cls, @selector(retainCount));
+    found = state->retainCountImps.emplace(cls, imp).first;
   }
-  return reinterpret_cast<NSUInteger (*)(id, SEL)>(imp)(obj, @selector(retainCount));
+  if (found->second == nullptr) {
+    return 0;
+  }
+  return reinterpret_cast<NSUInteger (*)(id, SEL)>(found->second)(obj, @selector(retainCount));
 }
 
 ObjectManager::LifetimeStats* Stats(Isolate* isolate) {
@@ -162,8 +175,13 @@ void ScheduleDrain(Isolate* isolate, RootedState* state) {
   }
   Runtime* runtime = Runtime::GetRuntime(isolate);
   std::shared_ptr<EventLoop> loop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
-  if (loop != nullptr &&
-      loop->PostInternal([isolate]() { WrapperLifetime::DrainReleases(isolate); })) {
+  if (loop != nullptr && loop->PostInternal([isolate]() {
+        // Cleared before anything can return early, or no drain is posted again.
+        if (RootedState* posted = Caches::ExistingStateFor<RootedState>(isolate)) {
+          posted->drainPosted = false;
+        }
+        WrapperLifetime::DrainReleases(isolate);
+      })) {
     state->drainPosted = true;
   }
 }
@@ -279,6 +297,7 @@ void WrapperLifetime::Init(Isolate* isolate) {
   if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kRooted) {
     return;
   }
+  Caches::StateFor<RootedState>(isolate);
   isolate->AddGCPrologueCallback(
       PrologueCallback,
       static_cast<GCType>(kGCTypeMarkSweepCompact | kGCTypeIncrementalMarking));
@@ -291,7 +310,7 @@ void WrapperLifetime::Adopt(Isolate* isolate, ObjCDataWrapper* wrapper,
   }
   RootedState* rooted = Caches::StateFor<RootedState>(isolate);
   if (rooted == nullptr || !handle->IsWeak()) {
-    // Unregistered handles (skipGCRegistration) keep their own lifetime.
+    // Handles ObjectManager did not register keep their own lifetime.
     return;
   }
   ObjectWeakCallbackState* state = handle->ClearWeak<ObjectWeakCallbackState>();

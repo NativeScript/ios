@@ -242,6 +242,35 @@ describe("Wrapper lifetime modes", function () {
         });
     });
 
+    it("reads the native retainCount of a key-value observed object whose JS class implements it", function (done) {
+        var Counting = (function (_super) {
+            __extends(Counting, _super);
+            function Counting() {
+                return (_super !== null && _super.apply(this, arguments)) || this;
+            }
+            Counting.prototype.retainCount = function () {
+                return 1;
+            };
+            return Counting;
+        })(NSObject);
+        var owner = NSMutableArray.new();
+        var observer = NSObject.new();
+        (function () {
+            var obj = Counting.new();
+            obj.addObserverForKeyPathOptionsContext(observer, "description", 0, null);
+            obj.state = 7;
+            owner.addObject(obj);
+        })();
+        settle(2, function () {
+            var obj = owner.objectAtIndex(0);
+            if (rooted) {
+                expect(obj.state).toBe(7);
+            }
+            obj.removeObserverForKeyPath(observer, "description");
+            done();
+        });
+    });
+
     it("lets an explicitly released rooted wrapper go", function (done) {
         var owner = NSMutableArray.new();
         var obj = Extended.new();

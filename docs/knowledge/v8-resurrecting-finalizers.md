@@ -249,7 +249,13 @@ runtime's thread, where JS may run. The extended classes' retain/release swizzle
 installed in this mode. `"scope": "extended"` (default) roots only JS-extended instances;
 `"all"` roots every ObjC wrapper except blocks and tagged pointers, at the cost of keeping
 JS-referencing native cycles alive (ARC rules: break them with a `WeakRef`). Specs:
-`WrapperLifetimeModesTests.js`, run under each mode.
+`WrapperLifetimeModesTests.js`; CI runs the default mode only, so the rooted expectations run
+when the TestRunner app config selects `"mode": "rooted"`.
+
+The state-lost warnings (`wrapperLifetimeWarnings`) watch for resurrecting finalizers and stay
+silent in the rooted mode. Under `"scope": "extended"` there, a plain (not JS-extended) wrapper
+is a phantom handle that a scavenge can collect, so JS properties set on plain objects that
+native code owns are lost without a warning.
 
 Two facts worth knowing when reasoning about which objects can husk:
 

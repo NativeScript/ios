@@ -917,6 +917,7 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
       switch (wrapper->Type()) {
         case WrapperType::ObjCObject: {
           ObjCDataWrapper* wr = static_cast<ObjCDataWrapper*>(wrapper);
+          WrapperLifetime::Escape(wr);
           return wr->Data();
           break;
         }

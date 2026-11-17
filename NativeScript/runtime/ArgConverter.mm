@@ -69,7 +69,7 @@ NativeCallbackSelf::NativeCallbackSelf(Local<Context> context, id self)
   }
   if (it != cache->Instances.end()) {
     receiver_ = it->second->Get(isolate_).As<Object>();
-    WrapperLifetime::Escape(tns::GetValue(isolate_, receiver_));
+    WrapperLifetime::EscapeValue(isolate_, receiver_);
   } else {
     receiver_ = ArgConverter::WrapNativeCallbackSelf(context, self, &borrowed_);
   }
@@ -654,6 +654,7 @@ bool ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
       BaseDataWrapper* baseWrapper = tns::GetValue(isolate, value);
       if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::ObjCObject) {
         ObjCDataWrapper* wrapper = static_cast<ObjCDataWrapper*>(baseWrapper);
+        WrapperLifetime::Escape(wrapper);
         id data = wrapper->Data();
         memset(retValue, 0, sizeof(id));
         *static_cast<id __strong*>(retValue) = data;
@@ -1050,7 +1051,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
     }
     if (it != cache->Instances.end()) {
       receiver = it->second->Get(isolate).As<Object>();
-      WrapperLifetime::Escape(tns::GetValue(isolate, receiver));
+      WrapperLifetime::EscapeValue(isolate, receiver);
     } else {
       std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context);
       receiver = poValue->Get(isolate).As<Object>();
@@ -1157,8 +1158,7 @@ std::shared_ptr<Persistent<Value>> ArgConverter::FindCachedInstance(
   return it->second;
 }
 
-Local<Object> ArgConverter::WrapCallbackSelf(Local<Context> context, id self,
-                                             Local<Object> fallback) {
+Local<Object> ArgConverter::WrapCallbackSelf(Local<Context> context, id self) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   auto cache = Caches::Get(isolate);
   auto it = cache->Instances.find(self);
@@ -1169,11 +1169,8 @@ Local<Object> ArgConverter::WrapCallbackSelf(Local<Context> context, id self,
   }
   if (it != cache->Instances.end()) {
     Local<Object> existing = it->second->Get(isolate).As<Object>();
-    WrapperLifetime::Escape(tns::GetValue(isolate, existing));
+    WrapperLifetime::EscapeValue(isolate, existing);
     return existing;
-  }
-  if (!fallback.IsEmpty()) {
-    return fallback;
   }
   ObjCDataWrapper* wrapper = new ObjCDataWrapper(self);
   Local<Object> result = CreateJsWrapper(context, wrapper, Local<Object>()).As<Object>();
@@ -1369,7 +1366,7 @@ Intercepted ArgConverter::IndexedPropertyGetterCallback(uint32_t index,
   auto it = cache->Instances.find(obj);
   if (it != cache->Instances.end() && !it->second->IsEmpty()) {
     Local<Value> existing = it->second->Get(isolate);
-    WrapperLifetime::Escape(tns::GetValue(isolate, existing));
+    WrapperLifetime::EscapeValue(isolate, existing);
     args.GetReturnValue().Set(existing);
     return v8::Intercepted::kYes;
   }

@@ -1111,11 +1111,16 @@ void ClassBuilder::SuperAccessorGetterCallback(const FunctionCallbackInfo<Value>
 }
 
 Class ClassBuilder::FindNativeClass(Class klass) {
-  while (class_conformsToProtocol(klass, @protocol(TNSDerivedClass))) {
-    klass = class_getSuperclass(klass);
+  // Walks the whole chain: key-value observing puts a subclass that does not
+  // conform below the JS class, and class_conformsToProtocol does not look at
+  // superclasses.
+  Class native = klass;
+  for (Class cls = klass; cls != nil; cls = class_getSuperclass(cls)) {
+    if (class_conformsToProtocol(cls, @protocol(TNSDerivedClass))) {
+      native = class_getSuperclass(cls);
+    }
   }
-
-  return klass;
+  return native;
 }
 
 bool ClassBuilder::TracksNativeRetains(Isolate* isolate, Class klass) {
