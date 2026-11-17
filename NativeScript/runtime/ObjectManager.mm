@@ -461,6 +461,7 @@ void ObjectManager::DisposeAllRegistered(Isolate* isolate) {
 
     std::shared_ptr<Persistent<Value>> handle = state->target_;
     bool released = false;
+    WrapperLifetime::DropRetainBeforeDisposal(state);
     if (handle != nullptr && !handle->IsEmpty()) {
       ObjectManager::DisposeValue(isolate, handle->Get(isolate), true);
       released = true;

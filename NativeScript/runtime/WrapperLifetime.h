@@ -88,6 +88,10 @@ class WrapperLifetime {
   // releases inline on the tearing-down thread.
   static void DrainForTeardown(v8::Isolate* isolate);
 
+  // Teardown: called before DisposeValue releases an adopted wrapper's object,
+  // since the runtime's retain must be dropped before the native one.
+  static void DropRetainBeforeDisposal(ObjectWeakCallbackState* state);
+
   // Teardown (ObjectManager::DisposeAllRegistered) disposes an adopted wrapper;
   // `released` tells whether DisposeValue already released the object.
   static void Retire(v8::Isolate* isolate, ObjectWeakCallbackState* state, bool released);
