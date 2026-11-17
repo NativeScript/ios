@@ -72,7 +72,7 @@ NativeCallbackSelf::NativeCallbackSelf(Local<Context> context, id self)
 // kept must read as released.
 NativeCallbackSelf::~NativeCallbackSelf() {
   if (borrowed_ != nullptr && tns::GetValue(isolate_, receiver_) == borrowed_) {
-    tns::SetValue(isolate_, receiver_, nullptr);
+    tns::MarkReleased(isolate_, receiver_, tns::ReleasedReason::kDeallocated);
     delete borrowed_;
   }
 }
@@ -98,15 +98,8 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
       tns::ReleasedReason releasedReason = tns::GetReleasedReason(receiver);
       if (releasedReason != tns::ReleasedReason::kNone) {
         const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
-        std::string operation = std::string("method '") + jsNameStr + "' receiver";
-        if (tns::ObjectManager::LifetimeStats* stats =
-                tns::ObjectManager::GetLifetimeStats(isolate)) {
-          stats->releasedAccesses++;
-        }
-        std::string message =
-            std::string(tns::ReleasedReasonMessage(releasedReason)) + " (" + operation + ")";
-        throw NativeScriptException(
-            isolate, Exception::ReferenceError(tns::ToV8String(isolate, message)), message);
+        tns::ThrowReleasedObject(isolate, releasedReason,
+                                 std::string("method '") + jsNameStr + "' receiver");
       }
       // During fast view churn like HMR in development, JS objects can outlive their
       // native wrappers briefly. In Debug, throw a catchable JS error instead of crashing.

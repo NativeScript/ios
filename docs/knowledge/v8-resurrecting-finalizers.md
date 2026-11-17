@@ -184,10 +184,13 @@ both JS-unreachable and one references the other, **both** are queued:
 `n1` comes back holding a JS object whose native half is gone. `DisposeValue` does neuter the
 husk (`delete wrapper`, then internal field 0 is overwritten), so it is not a dangling
 `BaseDataWrapper*` — but consumers that read the field without checking, `Pointer.cpp` among
-them, would read it as an `External` and dereference it. ObjC object husks get a
-`tns::ReleasedReason` Smi in the field (`tns::MarkReleased`: collected, released explicitly
-through `__releaseNativeCounterpart`, or teardown); other wrapper types get `Undefined`.
-`tns::GetValue` only reads `External`s, so both read as "no wrapper".
+them, would read it as an `External` and dereference it. ObjC object husks get a per-isolate
+`tns::ReleasedReason` Symbol in the field (`tns::MarkReleased`: collected, released explicitly
+through `__releaseNativeCounterpart`, teardown, or a receiver lent to JS from `-dealloc`);
+other wrapper types get `Undefined`. `tns::GetValue` only reads `External`s, so both read as
+"no wrapper". The reason is matched by identity, not as a number: URL, URLSearchParams,
+URLPattern and MessagePort keep a raw aligned pointer in field 0, which reads back as a Smi
+in builds without pointer compression.
 
 **This is not fixable by deferring the release or by re-checking liveness after the drain.**
 Every queued node is rooted by `IterateFinalizerHandlesAsRoots()` and treated as a strong
@@ -227,7 +230,7 @@ An ObjC object husk reaching native code where an object is expected used to fal
 `DictionaryAdapter` standing in for it (a released `UIColor` reached UIKit as one and raised
 `unrecognized selector`). The `ReleasedReason` marker now catches it on those paths, through
 `tns::ReportReleasedObject()` with the same policy: an argument (`Interop::WriteValue`) becomes
-`nil` or throws; a collection element (`Interop::ToObject`) becomes `NSNull`; a JS-implemented
+`nil` or throws before the call (`tns::ThrowReleasedObject`); a collection element (`Interop::ToObject`) becomes `NSNull`; a JS-implemented
 method's return value (`ArgConverter::SetValue`) becomes `nil` (both report only, since native
 code is on the stack); a method or property call on the husk (`ArgConverter::Invoke`, Proxy
 receivers included) always throws. `ns:runtime`'s `getWrapperLifetimeStats()` counts

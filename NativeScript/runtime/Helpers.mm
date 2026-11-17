@@ -548,6 +548,8 @@ const char* tns::ReleasedReasonMessage(ReleasedReason reason) {
       return "The native object was released by __releaseNativeCounterpart";
     case tns::ReleasedReason::kTeardown:
       return "The native object was released at runtime teardown";
+    case tns::ReleasedReason::kDeallocated:
+      return "The native object was deallocated after lending this receiver to JS from -dealloc";
     case tns::ReleasedReason::kNone:
       break;
   }
@@ -618,11 +620,38 @@ tns::BaseDataWrapper* tns::GetValueOrReport(Isolate* isolate, const Local<Value>
   return nullptr;
 }
 
+namespace {
+
+constexpr int kReleasedReasonCount = static_cast<int>(tns::ReleasedReason::kDeallocated);
+
+struct ReleasedMarkers {
+  v8::Eternal<v8::Symbol> reasons[kReleasedReasonCount];
+};
+
+}  // namespace
+
+void tns::InitReleasedMarkers(Isolate* isolate) {
+  ReleasedMarkers* markers = Caches::StateFor<ReleasedMarkers>(isolate);
+  if (markers == nullptr) {
+    return;
+  }
+  for (int i = 0; i < kReleasedReasonCount; i++) {
+    if (markers->reasons[i].IsEmpty()) {
+      markers->reasons[i].Set(isolate,
+                              v8::Symbol::New(isolate, tns::ToV8String(isolate, "ns:released")));
+    }
+  }
+}
+
 void tns::MarkReleased(Isolate* isolate, const Local<Object>& obj, ReleasedReason reason) {
   Local<Value> target = tns::UnwrapProxy(obj);
-  if (!target.IsEmpty() && target->IsObject() && target.As<Object>()->InternalFieldCount() > 0) {
-    target.As<Object>()->SetInternalField(0,
-                                          v8::Integer::New(isolate, static_cast<int32_t>(reason)));
+  // Read without the validity check: teardown marks after InvalidateIsolate.
+  ReleasedMarkers* markers = Caches::ExistingStateFor<ReleasedMarkers>(isolate);
+  int index = static_cast<int>(reason) - 1;
+  if (markers != nullptr && index >= 0 && index < kReleasedReasonCount &&
+      !markers->reasons[index].IsEmpty() && !target.IsEmpty() && target->IsObject() &&
+      target.As<Object>()->InternalFieldCount() > 0) {
+    target.As<Object>()->SetInternalField(0, markers->reasons[index].Get(isolate));
     return;
   }
   // Wrappers kept in the `metadata` private have no field for the marker; they
@@ -640,10 +669,37 @@ tns::ReleasedReason tns::GetReleasedReason(const Local<Value>& val) {
     return ReleasedReason::kNone;
   }
   Local<Value> field = obj->GetInternalField(0).As<v8::Value>();
-  if (field.IsEmpty() || !field->IsInt32()) {
+  if (field.IsEmpty()) {
     return ReleasedReason::kNone;
   }
-  return static_cast<ReleasedReason>(field.As<v8::Int32>()->Value());
+  if (field->IsObject()) {
+    Local<Object> receiver = SuperAliasReceiver(obj);
+    return receiver.IsEmpty() ? ReleasedReason::kNone : GetReleasedReason(receiver);
+  }
+  if (!field->IsSymbol()) {
+    return ReleasedReason::kNone;
+  }
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  ReleasedMarkers* markers = Caches::ExistingStateFor<ReleasedMarkers>(isolate);
+  if (markers == nullptr) {
+    return ReleasedReason::kNone;
+  }
+  for (int i = 0; i < kReleasedReasonCount; i++) {
+    if (!markers->reasons[i].IsEmpty() && markers->reasons[i].Get(isolate) == field) {
+      return static_cast<ReleasedReason>(i + 1);
+    }
+  }
+  return ReleasedReason::kNone;
+}
+
+void tns::ThrowReleasedObject(Isolate* isolate, ReleasedReason reason,
+                              const std::string& operation) {
+  if (tns::ObjectManager::LifetimeStats* stats = tns::ObjectManager::GetLifetimeStats(isolate)) {
+    stats->releasedAccesses++;
+  }
+  std::string message = std::string(ReleasedReasonMessage(reason)) + " (" + operation + ")";
+  throw NativeScriptException(
+      isolate, v8::Exception::ReferenceError(tns::ToV8String(isolate, message)), message);
 }
 
 bool tns::ReportReleasedObject(Isolate* isolate, const Local<Value>& val, ReleasedReason reason,

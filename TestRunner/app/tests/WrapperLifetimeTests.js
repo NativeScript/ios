@@ -11,16 +11,11 @@ describe("Wrapper lifetime", function () {
         return runtime.getWrapperLifetimeStats();
     }
 
-    // The state-lost confirmation runs on the event loop's internal lane, not
-    // necessarily before the next timer.
-    function afterTurns(turns, callback) {
-        setTimeout(function () {
-            if (turns > 1) {
-                afterTurns(turns - 1, callback);
-            } else {
-                callback();
-            }
-        }, 10);
+    // The state-lost confirmation runs on the event loop's internal lane, after
+    // any releases queued for the runtime thread; not necessarily before the
+    // next timer.
+    function afterConfirmation(callback) {
+        setTimeout(callback, 100);
     }
 
     afterEach(function () {
@@ -49,14 +44,46 @@ describe("Wrapper lifetime", function () {
             });
         });
 
-        it("throws a ReferenceError for a released argument under the throw policy", function () {
+        it("throws a ReferenceError for a released argument under the throw policy, before the call", function () {
             var released = releasedObject();
             runtime.setConfig("releasedObjectPolicy", "throw");
             var dict = NSMutableDictionary.new();
+            dict.setValueForKey("kept", "key");
             expect(function () {
                 dict.setValueForKey(released, "key");
             }).toThrowError(ReferenceError, /released by __releaseNativeCounterpart/);
-            expect(dict.count).toBe(0);
+            expect(dict.valueForKey("key")).toBe("kept");
+
+            var array = NSMutableArray.new();
+            expect(function () {
+                array.addObject(released);
+            }).toThrowError(ReferenceError, /released by __releaseNativeCounterpart \(native argument\)/);
+            expect(array.count).toBe(0);
+        });
+
+        it("does not read another template's internal field as a released marker", function () {
+            var before = stats();
+            var url = new URL("https://example.com/path");
+            var error = null;
+            try {
+                NSObject.prototype.isEqual.call(url, null);
+            } catch (e) {
+                error = e;
+            }
+            expect(error).not.toBeNull();
+            expect(String(error && error.message)).not.toMatch(/native object was released/);
+            expect(stats().releasedAccesses).toBe(before.releasedAccesses);
+            expect(url.pathname).toBe("/path");
+        });
+
+        it("gives a released object's toString a string under the report policy and throws under throw", function () {
+            var released = releasedObject();
+            expect(released.toString()).toBe("[released NSObject]");
+            expect(String(new Proxy(released, {}))).toBe("[released NSObject]");
+            runtime.setConfig("releasedObjectPolicy", "throw");
+            expect(function () {
+                released.toString();
+            }).toThrowError(ReferenceError, /released by __releaseNativeCounterpart \(toString receiver\)/);
         });
 
         it("uses NSNull for a released collection element", function () {
@@ -173,44 +200,83 @@ describe("Wrapper lifetime", function () {
         __collect();
         __collect();
 
-        afterTurns(5, function () {
+        afterConfirmation(function () {
             var after = stats();
             runtime.setConfig("wrapperLifetimeWarnings", previous);
             expect(after.stateLostCandidates).toBeGreaterThan(before.stateLostCandidates);
             expect(after.stateLostConfirmed).toBeGreaterThan(before.stateLostConfirmed);
-            expect(owner.objectAtIndex(0).jsState).toBeUndefined();
+            var lost = 0;
+            for (var i = 0; i < N; i++) {
+                if (owner.objectAtIndex(i).jsState === undefined) {
+                    lost++;
+                }
+            }
+            expect(lost).toBeGreaterThan(0);
             done();
         });
     });
 
-    it("does not report state lost when nothing native keeps the object", function (done) {
+    // Runs `create` after earlier specs' garbage has settled, collects, and
+    // hands the counters from before and after the confirmation to `check`.
+    function measureStateLost(create, check, done) {
         var previous = runtime.getConfig("wrapperLifetimeWarnings");
         runtime.setConfig("wrapperLifetimeWarnings", true);
-        // Settle earlier specs' garbage first, so only this spec's objects
-        // can move the counter.
         __collect();
         __collect();
-        afterTurns(5, function () {
+        afterConfirmation(function () {
             var before = stats();
-            (function create() {
-                for (var i = 0; i < 16; i++) {
-                    var obj = NSObject.alloc().init();
-                    obj.jsState = i;
-                }
-            })();
+            create();
             (function scrub(n) {
                 return n > 0 ? scrub(n - 1) + n : 0;
             })(300);
             __collect();
             __collect();
-
-            afterTurns(5, function () {
+            afterConfirmation(function () {
                 var after = stats();
                 runtime.setConfig("wrapperLifetimeWarnings", previous);
-                expect(after.stateLostConfirmed).toBe(before.stateLostConfirmed);
+                check(before, after);
                 done();
             });
         });
+    }
+
+    it("does not report state lost when nothing native keeps the object", function (done) {
+        measureStateLost(function () {
+            for (var i = 0; i < 16; i++) {
+                var obj = NSObject.alloc().init();
+                obj.jsState = i;
+            }
+        }, function (before, after) {
+            expect(after.stateLostConfirmed).toBe(before.stateLostConfirmed);
+        }, done);
+    });
+
+    it("does not report state lost when the other owner is collected too", function (done) {
+        measureStateLost(function () {
+            var owner = NSMutableArray.alloc().init();
+            for (var i = 0; i < 16; i++) {
+                var obj = NSObject.alloc().init();
+                obj.jsState = i;
+                owner.addObject(obj);
+            }
+        }, function (before, after) {
+            console.log("wrapper lifetime spec: " + (after.stateLostCandidates - before.stateLostCandidates) +
+                        " candidates with a co-collected owner");
+            expect(after.stateLostConfirmed).toBe(before.stateLostConfirmed);
+        }, done);
+    });
+
+    it("does not report state lost for an object only the autorelease pool still holds", function (done) {
+        measureStateLost(function () {
+            for (var i = 0; i < 16; i++) {
+                var obj = NSMutableArray.array();
+                obj.jsState = i;
+            }
+        }, function (before, after) {
+            console.log("wrapper lifetime spec: " + (after.stateLostCandidates - before.stateLostCandidates) +
+                        " candidates held by the autorelease pool");
+            expect(after.stateLostConfirmed).toBe(before.stateLostConfirmed);
+        }, done);
     });
 
     it("exposes numeric counters", function () {

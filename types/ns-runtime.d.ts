@@ -54,11 +54,11 @@ declare module "ns:runtime" {
     collected: number;
     /** Native objects released through `__releaseNativeCounterpart`. */
     releasedExplicitly: number;
-    /** Times JS passed a released wrapper to native code or called a method on it. */
+    /** Times JS passed a released wrapper to native code, called a method on it, or touched a released pointer, reference or struct. */
     releasedAccesses: number;
     /** Collected wrappers with JS properties whose object was still retained elsewhere. */
     stateLostCandidates: number;
-    /** Candidates whose object was still alive a runloop turn later (warnings enabled only). */
+    /** Candidates whose object was still alive a runloop turn later, once queued releases ran (warnings enabled only). */
     stateLostConfirmed: number;
   }
 

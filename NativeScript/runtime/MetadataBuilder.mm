@@ -812,6 +812,19 @@ void MetadataBuilder::ToStringFunctionCallback(const FunctionCallbackInfo<Value>
   }
   BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
 
+  if (wrapper == nullptr) {
+    tns::ReleasedReason releasedReason = tns::GetReleasedReason(thiz);
+    if (releasedReason != tns::ReleasedReason::kNone) {
+      // String coercion (logging, template literals) still gets a string under
+      // the report policy.
+      if (tns::ReportReleasedObject(isolate, thiz, releasedReason, "toString receiver", true)) {
+        std::string name = tns::ToString(isolate, thiz->GetConstructorName());
+        info.GetReturnValue().Set(tns::ToV8String(isolate, "[released " + name + "]"));
+      }
+      return;
+    }
+  }
+
   if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject) {
     info.GetReturnValue().Set(thiz);
     return;

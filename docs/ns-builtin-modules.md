@@ -105,7 +105,7 @@ defined and validated natively; the module surface is a thin frozen wrapper.
 | `getExternalSize(target)` | The size currently charged to `target`, `0` when there is none. |
 | `getWrapperLifetimeStats()` | Wrapper lifetime counters for the calling isolate (see [Wrapper lifetime counters](#wrapper-lifetime-counters)). |
 
-The last three are also members of the global `interop` (see
+`escapeException`, `setExternalSize` and `getExternalSize` are also members of the global `interop` (see
 [The global `interop`](#the-global-interop)); the module and the global hold
 the same function objects.
 
@@ -157,13 +157,17 @@ every build (they only cost an increment on finalizer and error paths):
 | `releasedExplicitly` | native objects released through `__releaseNativeCounterpart` |
 | `releasedAccesses` | times JS passed a released wrapper to native code, used it as a method receiver, or touched a released pointer, reference or struct |
 | `stateLostCandidates` | collected wrappers carrying JS properties whose object was still retained by something else (only while `wrapperLifetimeWarnings` is on) |
-| `stateLostConfirmed` | candidates whose object was still alive a runloop turn later; each class is also reported once in the log |
+| `stateLostConfirmed` | candidates whose object was still alive a runloop turn later, once releases queued for the runtime thread ran; each class is also reported once in the log |
 
 A wrapper whose native object was released keeps its JS identity. Passing it
 to native code follows `releasedObjectPolicy`: under `"report"` the argument
 or return value becomes `nil` (`NSNull` inside a collection) and a
 `releasednativeaccess` event fires; under `"throw"` an argument throws a
-`ReferenceError`. Calling a method on it always throws a `ReferenceError`.
+`ReferenceError`. Calling a method on it always throws a `ReferenceError`;
+`toString()` returns `"[released <class>]"` under `"report"` and throws under
+`"throw"`. An `NSNull` element still breaks native code that expects a typed
+value there (an attributes dictionary holding a released `UIColor`, say); the
+event names the element so the cause can be found.
 
 Remote-module security (`security.allowRemoteModules`,
 `security.remoteModuleAllowlist`) is **not** part of this surface. Those
