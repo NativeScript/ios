@@ -100,6 +100,8 @@ declare module "ns:runtime" {
     canaryStates: number;
     /** `"canary"` only: state objects let go of because their native object was deallocated. */
     canaryNativeDeaths: number;
+    /** `"canary"` only: writes to canaries the runtime's write handler saw. */
+    canaryInterceptedWrites: number;
   }
 
   /**

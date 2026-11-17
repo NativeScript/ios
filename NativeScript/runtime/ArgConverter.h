@@ -64,8 +64,14 @@ class ArgConverter {
       v8::Local<v8::Object> receiver,
       const std::vector<std::string>& additionalProtocols =
           std::vector<std::string>());
+  // `intercepted`: the object carries the canary handlers
+  // (WrapperLifetimeCanary::Intercepts).
   static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyObject(
-      v8::Local<v8::Context> context);
+      v8::Local<v8::Context> context, bool intercepted);
+  // The constructor NewEmptyInstance takes: EmptyObjCtorFunc, or with
+  // `intercepted` its counterpart carrying the canary handlers.
+  static v8::Persistent<v8::Function>* EmptyInstanceFunction(
+      v8::Isolate* isolate, bool intercepted);
   // CreateEmptyObject's object without the ObjectManager registration, for an
   // object whose collection has nothing to dispose.
   static v8::Local<v8::Object> NewEmptyInstance(
@@ -132,14 +138,17 @@ class ArgConverter {
   // caller returns its defined default. Resets `tc` in both cases.
   static id HandleBoundaryException(v8::Local<v8::Context> context,
                                     v8::TryCatch& tc);
+  // `thisIntercepts`: the constructor's instance template carries the canary
+  // handlers (WrapperLifetimeCanary::ConfigureInstanceTemplate). Without them,
+  // a canary gets a new object, returned in place of `this`.
   static void ConstructObject(v8::Local<v8::Context> context,
                               const v8::FunctionCallbackInfo<v8::Value>& info,
-                              Class klass,
-                              const InterfaceMeta* interfaceMeta = nullptr);
+                              Class klass, const InterfaceMeta* interfaceMeta,
+                              bool thisIntercepts);
 
  private:
   static v8::Local<v8::Function> CreateEmptyInstanceFunction(
-      v8::Local<v8::Context> context);
+      v8::Local<v8::Context> context, bool intercepted);
   static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyInstance(
       v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc);
   static void FindMethodOverloads(Class klass, std::string methodName,

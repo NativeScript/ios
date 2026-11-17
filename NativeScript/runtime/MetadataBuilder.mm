@@ -558,7 +558,9 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
 
   ctorFuncTemplate = FunctionTemplate::New(isolate, ClassConstructorCallback, ext);
   ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-  WrapperLifetimeCanary::ConfigureInstanceTemplate(ctorFuncTemplate->InstanceTemplate());
+  if (WrapperLifetimeCanary::NativeInstancesIntercept()) {
+    WrapperLifetimeCanary::ConfigureInstanceTemplate(ctorFuncTemplate->InstanceTemplate());
+  }
   ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, meta->name()));
 
   Local<v8::Function> baseCtorFunc;
@@ -1078,7 +1080,8 @@ void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>
     Class klass = objc_getClass(item->meta_->name());
 
     const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(item->meta_);
-    ArgConverter::ConstructObject(context, info, klass, interfaceMeta);
+    ArgConverter::ConstructObject(context, info, klass, interfaceMeta,
+                                  WrapperLifetimeCanary::NativeInstancesIntercept());
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
   }

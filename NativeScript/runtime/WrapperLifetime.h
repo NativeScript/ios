@@ -58,11 +58,18 @@ class WrapperLifetime {
  public:
   static void Init(v8::Isolate* isolate);
 
+  // Whether `obj`'s wrapper is rooted (rooted mode) or a canary (canary mode):
+  // not a tagged pointer or a block, and under scope "extended" an instance
+  // of a JS-extended class.
+  static bool InScope(id obj);
+
   // A newly wrapped ObjC object: `handle` is its Instances entry, registered by
   // ObjectManager::Register and holding the entry's +1 on `target`.
+  // `intercepted`: the wrapper carries the canary handlers
+  // (WrapperLifetimeCanary::Intercepts).
   static void Adopt(v8::Isolate* isolate, ObjCDataWrapper* wrapper,
                     const std::shared_ptr<v8::Persistent<v8::Value>>& handle,
-                    id target);
+                    id target, bool intercepted);
 
   // The object crossed the JS/native boundary: native code returned it to JS,
   // or received it as a receiver, argument, return value of a JS-implemented

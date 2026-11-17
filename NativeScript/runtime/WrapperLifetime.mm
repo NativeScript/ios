@@ -119,6 +119,8 @@ void DropRuntimeRetain(id obj, std::atomic<uint64_t>* counter) {
   }
 }
 
+// Not a message: it runs on objects in -dealloc, where a JS-implemented one
+// would re-enter JS for the same object.
 bool IsBlock(id obj) {
   static Class blockClass = objc_getClass("NSBlock");
   for (Class cls = object_getClass(obj); cls != nil; cls = class_getSuperclass(cls)) {
@@ -325,8 +327,11 @@ void WrapperLifetime::Init(Isolate* isolate) {
       PrologueCallback, static_cast<GCType>(kGCTypeMarkSweepCompact | kGCTypeIncrementalMarking));
 }
 
+bool WrapperLifetime::InScope(id obj) { return IsInScope(obj); }
+
 void WrapperLifetime::Adopt(Isolate* isolate, ObjCDataWrapper* wrapper,
-                            const std::shared_ptr<Persistent<Value>>& handle, id target) {
+                            const std::shared_ptr<Persistent<Value>>& handle, id target,
+                            bool intercepted) {
   if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kResurrecting || target == nil) {
     return;
   }
@@ -347,6 +352,8 @@ void WrapperLifetime::Adopt(Isolate* isolate, ObjCDataWrapper* wrapper,
   wrapper->SetLifetimeState(state);
   if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary) {
     state->lifetimeCanary_ = IsInScope(target);
+    // A canary without the handlers would lose its JS properties when it dies.
+    tns::Assert(!state->lifetimeCanary_ || intercepted, isolate);
     if (state->lifetimeCanary_) {
       state->canaryRecord_ = WrapperLifetimeCanary::Find(isolate, target);
       if (state->canaryRecord_ != nullptr) {

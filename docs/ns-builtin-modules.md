@@ -166,6 +166,7 @@ every build (they only cost an increment on finalizer and error paths):
 | `queuedReleases` | `"rooted"` and `"canary"`: collected wrappers whose native object was queued for release on the runtime's thread |
 | `canaryStates` | `"canary"` only: state objects created to hold native objects' JS properties |
 | `canaryNativeDeaths` | `"canary"` only: state objects let go of because their native object was deallocated |
+| `canaryInterceptedWrites` | `"canary"` only: writes to canaries the runtime's write handler saw. Other wrappers have no handler |
 
 A wrapper whose native object was released keeps its JS identity. Passing it
 to native code follows `releasedObjectPolicy`: under `"report"` the argument

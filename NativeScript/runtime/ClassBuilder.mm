@@ -179,7 +179,7 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
         info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
     Class klass = item->data_;
 
-    ArgConverter::ConstructObject(context, info, klass);
+    ArgConverter::ConstructObject(context, info, klass, nullptr, true);
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
   }

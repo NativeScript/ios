@@ -68,8 +68,9 @@ struct ObjectWeakCallbackState {
 class ObjectManager {
  public:
   // Per-isolate wrapper lifetime counters. Kept in every build: plain integers
-  // bumped only on cold paths (finalizers, released-object reports), exposed
-  // through ns:runtime's getWrapperLifetimeStats().
+  // bumped on cold paths (finalizers, released-object reports) and by canary
+  // mode's write interceptor, exposed through ns:runtime's
+  // getWrapperLifetimeStats().
   struct LifetimeStats {
     // An ObjC wrapper's finalizer refused disposal because native code still
     // retains its object (IsGcProtected), keeping the wrapper alive.
@@ -95,6 +96,8 @@ class ObjectManager {
     // objects let go of because their native object was deallocated.
     uint64_t canaryStates = 0;
     uint64_t canaryNativeDeaths = 0;
+    // Canary mode: writes the canary handlers saw.
+    uint64_t canaryInterceptedWrites = 0;
   };
   static LifetimeStats* GetLifetimeStats(v8::Isolate* isolate);
 

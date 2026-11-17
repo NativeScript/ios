@@ -960,4 +960,103 @@ describe("Wrapper lifetime modes", function () {
             done();
         });
     });
+
+    describe("write handler", function () {
+        function stats() {
+            return runtime.getWrapperLifetimeStats();
+        }
+
+        function makeHost() {
+            return (function (_super) {
+                __extends(Host, _super);
+                function Host() {
+                    return (_super !== null && _super.apply(this, arguments)) || this;
+                }
+                return Host;
+            })(TNSAccessorHost);
+        }
+
+        var Host = makeHost();
+        var nativeName = Object.getOwnPropertyDescriptor(TNSAccessorHost.prototype, "name").get;
+
+        it("handles writes to JS-extended instances only, under scope extended", function () {
+            var Ext = TNSAllocLog.extend({}, { name: "WrapperLifetimeWriteHandlerExt" });
+            var before = stats();
+            TNSAllocLog.new().tag = 1;
+            new TNSAllocLog().tag = 1;
+            TNSAllocLog.alloc().init().tag = 1;
+            var plain = stats().canaryInterceptedWrites - before.canaryInterceptedWrites;
+            Extended.new().tag = 1;
+            new Ext().tag = 1;
+            Ext.alloc().init().tag = 1;
+            var extended = stats().canaryInterceptedWrites - before.canaryInterceptedWrites - plain;
+            if (canary) {
+                expect(plain).toBe(scope === "all" ? 3 : 0);
+                expect(extended).toBe(3);
+            } else {
+                expect(plain + extended).toBe(0);
+            }
+        });
+
+        it("handles writes to a key-value observed JS-extended instance on a new wrapper", function (done) {
+            var observer = NSObject.new();
+            var before;
+            rewrap(function () {
+                var obj = Host.new();
+                // Observing a key with a setter swaps in the notifying subclass.
+                obj.addObserverForKeyPathOptionsContext(observer, "name", 0, null);
+                obj.tag = "kept";
+                return obj;
+            }, function (obj) {
+                expect(obj.observationInfo).not.toBeNull();
+                if (keepsState) {
+                    expect(obj.tag).toBe("kept");
+                }
+                before = stats();
+                obj.other = "new";
+                if (canary) {
+                    expect(stats().canaryInterceptedWrites - before.canaryInterceptedWrites).toBe(1);
+                }
+                obj.removeObserverForKeyPath(observer, "name");
+                done();
+            });
+        });
+
+        it("gives a native constructor's JS-extended result the write handler", function (done) {
+            var owner = NSMutableArray.new();
+            var handle;
+            var first;
+            (function () {
+                var obj = Extended.new();
+                obj.tag = "kept";
+                owner.addObject(obj);
+                handle = interop.handleof(obj);
+                first = new WeakRef(obj);
+            })();
+            settle(2, function () {
+                var before = stats();
+                var again = new TNSAllocLog(handle);
+                expect(again instanceof TNSAllocLog).toBe(true);
+                if (canary) {
+                    expect(first.deref()).toBeUndefined();
+                    expect(Object.getPrototypeOf(again)).toBe(TNSAllocLog.prototype);
+                }
+                if (keepsState) {
+                    expect(again.tag).toBe("kept");
+                }
+                again.other = "new";
+                if (canary) {
+                    expect(stats().canaryInterceptedWrites - before.canaryInterceptedWrites).toBe(1);
+                }
+                again = null;
+                settle(2, function () {
+                    var obj = owner.objectAtIndex(0);
+                    if (keepsState) {
+                        expect(obj.other).toBe("new");
+                    }
+                    done();
+                });
+            });
+        });
+    });
 });

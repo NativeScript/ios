@@ -55,9 +55,21 @@ class WrapperLifetimeCanary {
   static IMP WrapDealloc(SEL selector, IMP imp);
 
   // Installs the forwarding handlers on an ObjC instance template. No-op unless
-  // the mode is canary.
+  // the mode is canary. Only canaries need them: other wrappers would pay for
+  // every write and gain nothing.
   static void ConfigureInstanceTemplate(
       v8::Local<v8::ObjectTemplate> instanceTemplate);
+
+  // Whether `object`'s wrapper is a canary, so must be built from a template
+  // ConfigureInstanceTemplate configured.
+  static bool Intercepts(id object);
+
+  // Whether a native class constructor's instance template gets the handlers:
+  // under scope "all" its instances are canaries. Under "extended" they are
+  // canaries only when the constructor yields an instance of a JS-extended
+  // class (an existing object adopted from a pointer, or one an initializer
+  // returned instead), which ArgConverter::ConstructObject wraps anew.
+  static bool NativeInstancesIntercept();
 
   // The record of an object that already has state in this isolate, for a new
   // canary to share. Null otherwise.

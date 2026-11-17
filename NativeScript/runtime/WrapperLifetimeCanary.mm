@@ -553,6 +553,9 @@ Intercepted Setter(Local<v8::Name> property, Local<Value> value,
       return Intercepted::kNo;
     }
   }
+  if (ObjectManager::LifetimeStats* stats = ObjectManager::GetLifetimeStats(isolate)) {
+    stats->canaryInterceptedWrites++;
+  }
   CanaryRecord* record = canary != nullptr ? canary->canaryRecord_.get() : borrowed.get();
   Local<Context> context = isolate->GetCurrentContext();
   if (record != nullptr && !record->died.load(std::memory_order_acquire) &&
@@ -714,6 +717,16 @@ void WrapperLifetimeCanary::ConfigureInstanceTemplate(Local<ObjectTemplate> inst
   instanceTemplate->SetHandler(
       NamedPropertyHandlerConfiguration(nullptr, Setter, nullptr, Deleter, nullptr, Definer,
                                         nullptr, Local<Value>(), PropertyHandlerFlags::kNone));
+}
+
+bool WrapperLifetimeCanary::Intercepts(id object) {
+  return GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary &&
+         WrapperLifetime::InScope(object);
+}
+
+bool WrapperLifetimeCanary::NativeInstancesIntercept() {
+  return GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary &&
+         GetWrapperLifetimeScope() == WrapperLifetimeScope::kAll;
 }
 
 void WrapperLifetimeCanary::Hydrate(Isolate* isolate, Local<Object> wrapper) {
