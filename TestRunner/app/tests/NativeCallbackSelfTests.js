@@ -436,11 +436,8 @@ describe("Native callback self wrappers", function () {
             } catch (e) {
                 error = e;
             }
-            if (error !== null) {
-                expect(error.message).toContain("disposed native object");
-            } else {
-                expect(value).toBeUndefined();
-            }
+            expect(value).toBeUndefined();
+            expect(String(error && error.message)).toMatch(/native object was deallocated/);
             saved = null;
             done();
         });

@@ -33,7 +33,7 @@ describe("this.super aliases", function () {
         } catch (e) {
             error = e;
         }
-        expect(error === null ? "<no error>" : String(error.message)).toMatch(/disposed native object|native object was released/);
+        expect(error === null ? "<no error>" : String(error.message)).toMatch(/native object was (released|deallocated)/);
     }
 
     function superGetter(cls) {

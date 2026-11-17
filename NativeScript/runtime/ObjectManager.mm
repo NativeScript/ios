@@ -55,9 +55,9 @@ void ApplyOwnership(ObjectWeakCallbackState* state, bool nativelyOwned) {
   }
 }
 
-// Runs in a GC prologue, where JS may not run, so only a native -retainCount
-// is read. Objects without one read as unowned.
-bool NativelyOwnedWithoutJS(OwnershipTracking* tracking, id obj) {
+// For callers that may not enter JS (the GC prologue, the finalizer drain), so
+// only a native -retainCount is read. Objects without one read as 0.
+NSUInteger RetainCountWithoutJS(OwnershipTracking* tracking, id obj) {
   Class cls = object_getClass(obj);
   IMP imp;
   if (tracking != nullptr) {
@@ -70,7 +70,11 @@ bool NativelyOwnedWithoutJS(OwnershipTracking* tracking, id obj) {
   } else {
     imp = ObjectManager::NativeRetainCountImp(cls);
   }
-  return imp != nullptr && ((NSUInteger (*)(id, SEL))imp)(obj, @selector(retainCount)) > 1;
+  return imp != nullptr ? ((NSUInteger (*)(id, SEL))imp)(obj, @selector(retainCount)) : 0;
+}
+
+bool NativelyOwnedWithoutJS(OwnershipTracking* tracking, id obj) {
+  return RetainCountWithoutJS(tracking, obj) > 1;
 }
 
 bool NativelyOwnedWithoutJS(Isolate* isolate, id obj) {
@@ -91,8 +95,10 @@ void ReconcileOwnershipBeforeGC(Isolate* isolate, GCType, GCCallbackFlags) {
 }
 
 // A finalized wrapper that carried JS properties while something other than
-// the wrapper still retained its object. Confirmed a runloop turn later, so a
-// co-queued owner or a pending autorelease does not produce a warning.
+// the wrapper still retained its object. Confirmed on a later internal task,
+// once the releases a collection on another thread queued for the runtime
+// thread have run, so a co-collected owner does not produce a warning.
+
 struct StateLostCandidate {
   id* weakSlot;
   std::string description;
@@ -104,6 +110,8 @@ struct WrapperLifetimeState {
   ObjectManager::LifetimeStats stats;
   std::vector<StateLostCandidate> candidates;
   bool confirmPosted = false;
+  // Times the pending confirmation stepped behind queued releases.
+  int confirmDeferrals = 0;
   std::unordered_set<std::string> warnedClasses;
 
   ~WrapperLifetimeState() {
@@ -117,24 +125,36 @@ struct WrapperLifetimeState {
 bool IsTaggedPointer(id obj) {
   // Through void*: clang rejects bit tests on ObjC object pointers.
   uintptr_t bits = reinterpret_cast<uintptr_t>(static_cast<const void*>(obj));
-#if defined(__arm64__)
-  return (bits >> 63) != 0;
-#else
+#if defined(__x86_64__) && (TARGET_OS_OSX || TARGET_OS_MACCATALYST)
   return (bits & 1) != 0;
+#else
+  return (bits >> 63) != 0;
 #endif
 }
+
+bool ReleasesPendingOnRuntimeThread(Isolate* isolate);
+bool PostStateLostConfirmation(Isolate* isolate);
 
 void ConfirmStateLost(Isolate* isolate) {
   auto* state = Caches::StateFor<WrapperLifetimeState>(isolate);
   if (state == nullptr) {
     return;
   }
+  // The internal lane is FIFO, so posting again runs after the queued drain.
+  // Bounded, in case collections elsewhere keep queueing releases.
+  if (ReleasesPendingOnRuntimeThread(isolate) && state->confirmDeferrals < 4 &&
+      PostStateLostConfirmation(isolate)) {
+    state->confirmDeferrals++;
+    return;
+  }
   state->confirmPosted = false;
+  state->confirmDeferrals = 0;
   std::vector<StateLostCandidate> candidates;
   candidates.swap(state->candidates);
   for (StateLostCandidate& candidate : candidates) {
     id obj = objc_loadWeakRetained(candidate.weakSlot);
     if (obj != nil) {
+      [obj release];
       state->stats.stateLostConfirmed++;
       if (state->warnedClasses.insert(candidate.className).second) {
         Log("NativeScript: JS properties (%s) set on %s were lost when its JavaScript wrapper was "
@@ -144,7 +164,6 @@ void ConfirmStateLost(Isolate* isolate) {
             "{ \"warnings\": false }.",
             candidate.properties.c_str(), candidate.description.c_str());
       }
-      [obj release];
     }
     objc_destroyWeak(candidate.weakSlot);
     delete candidate.weakSlot;
@@ -156,7 +175,8 @@ void NoteStateLostCandidate(Isolate* isolate, Local<Object> obj, id target) {
   if (IsTaggedPointer(target)) {
     return;
   }
-  NSUInteger count = [target retainCount];
+  NSUInteger count =
+      RetainCountWithoutJS(Caches::ExistingStateFor<OwnershipTracking>(isolate), target);
   if (count <= 1 || count >= (NSUIntegerMax >> 1)) {
     return;
   }
@@ -165,6 +185,17 @@ void NoteStateLostCandidate(Isolate* isolate, Local<Object> obj, id target) {
       !reinterpret_cast<BOOL (*)(id, SEL)>(objc_msgSend)(target, allowsWeak)) {
     return;
   }
+  // The V8 calls below can run a nested collection whose JS releases target,
+  // so it is not touched after them.
+  const char* className = object_getClassName(target);
+  char description[256];
+  snprintf(description, sizeof(description), "<%s: %p>", className, (void*)target);
+  id* slot = new id(nil);
+  objc_initWeak(slot, target);
+  auto discardSlot = [slot]() {
+    objc_destroyWeak(slot);
+    delete slot;
+  };
 
   HandleScope handleScope(isolate);
   TryCatch tryCatch(isolate);
@@ -173,11 +204,13 @@ void NoteStateLostCandidate(Isolate* isolate, Local<Object> obj, id target) {
   if (context.IsEmpty() ||
       !obj->GetOwnPropertyNames(context, PropertyFilter::SKIP_SYMBOLS).ToLocal(&names) ||
       names->Length() == 0) {
+    discardSlot();
     return;
   }
 
   auto* state = Caches::StateFor<WrapperLifetimeState>(isolate);
   if (state == nullptr) {
+    discardSlot();
     return;
   }
   state->stats.stateLostCandidates++;
@@ -198,20 +231,10 @@ void NoteStateLostCandidate(Isolate* isolate, Local<Object> obj, id target) {
     properties += ", ...";
   }
 
-  const char* className = object_getClassName(target);
-  char description[256];
-  snprintf(description, sizeof(description), "<%s: %p>", className, (void*)target);
-
-  id* slot = new id(nil);
-  objc_initWeak(slot, target);
   state->candidates.push_back({slot, description, className, properties});
 
   if (!state->confirmPosted) {
-    Runtime* runtime = Runtime::GetRuntime(isolate);
-    std::shared_ptr<EventLoop> loop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
-    if (loop != nullptr && loop->PostInternal([isolate]() { ConfirmStateLost(isolate); })) {
-      state->confirmPosted = true;
-    }
+    state->confirmPosted = PostStateLostConfirmation(isolate);
   }
 }
 
@@ -315,6 +338,17 @@ void PostDrain(Isolate* isolate, DeferredReleases* pending) {
   });
 }
 
+bool ReleasesPendingOnRuntimeThread(Isolate* isolate) {
+  DeferredReleases* pending = Caches::ExistingStateFor<DeferredReleases>(isolate);
+  return pending != nullptr && pending->drainPosted;
+}
+
+bool PostStateLostConfirmation(Isolate* isolate) {
+  Runtime* runtime = Runtime::GetRuntime(isolate);
+  std::shared_ptr<EventLoop> loop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
+  return loop != nullptr && loop->PostInternal([isolate]() { ConfirmStateLost(isolate); });
+}
+
 void ReleaseOnRuntimeThread(Isolate* isolate, id obj, bool bornOnRuntimeThread) {
   DeferredReleases* pending = DeferralQueue(isolate, bornOnRuntimeThread);
   if (pending == nullptr) {
@@ -344,6 +378,11 @@ void ObjectManager::Init(Isolate* isolate, Local<ObjectTemplate> globalTemplate)
       ReconcileOwnershipBeforeGC,
       static_cast<GCType>(kGCTypeMarkSweepCompact | kGCTypeIncrementalMarking));
   Caches::StateFor<DeferredReleases>(isolate);
+  // Created here so a collection on another thread never allocates them, and
+  // the warnings flag is read from the app config before any finalizer asks.
+  tns::InitReleasedMarkers(isolate);
+  Caches::StateFor<WrapperLifetimeState>(isolate);
+  tns::WrapperLifetimeWarningsEnabled();
 }
 
 std::shared_ptr<Persistent<Value>> ObjectManager::Register(Local<Context> context,
@@ -575,6 +614,9 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
     ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
     if (objcWrapper->OwnershipState() != nullptr &&
         NativelyOwnedWithoutJS(isolate, objcWrapper->Data())) {
+      if (LifetimeStats* stats = GetLifetimeStats(isolate)) {
+        stats->resurrections++;
+      }
       return false;
     }
   }
@@ -763,7 +805,7 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
   ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
   if (objcWrapper->IsBorrowed()) {
     if (tns::GetValue(isolate, value) == wrapper) {
-      tns::SetValue(isolate, value.As<Object>(), nullptr);
+      tns::MarkReleased(isolate, value.As<Object>(), tns::ReleasedReason::kExplicit);
       delete wrapper;
     }
     return;

@@ -829,7 +829,10 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
     // as a DictionaryAdapter standing in for it.
     tns::ReleasedReason releasedReason = tns::GetReleasedReason(obj);
     if (releasedReason != tns::ReleasedReason::kNone) {
-      tns::ReportReleasedObject(isolate, obj, releasedReason, "native argument", true);
+      if (tns::GetReleasedObjectPolicy() == tns::ReleasedObjectPolicy::kThrow) {
+        tns::ThrowReleasedObject(isolate, releasedReason, "native argument");
+      }
+      tns::ReportReleasedObject(isolate, obj, releasedReason, "native argument", false);
       id none = nil;
       Interop::SetValue(dest, none);
       return;
