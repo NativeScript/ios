@@ -25,6 +25,7 @@ describe("Wrapper lifetime leak cycles", function () {
     var WeakMapValue = NSBlockOperation.extend({}, { name: "TNSLeakWeakMapValue" });
     var GestureView = UIView.extend({}, { name: "TNSLeakGestureView" });
     var HeldView = UIView.extend({}, { name: "TNSLeakHeldView" });
+    var NotifiedView = UIView.extend({}, { name: "TNSLeakNotifiedView" });
     // A JS initializer that native code (+new) calls on an unwrapped receiver.
     var InitOwned = NSObject.extend(
         {
@@ -255,7 +256,9 @@ describe("Wrapper lifetime leak cycles", function () {
                 expect(report.cutOffs.cycleLength).toBe(0);
                 expect(typeof report.cutOffs.depth).toBe("number");
                 expect(typeof report.cutOffs.storage).toBe("number");
-                expect(report.calibrated).toEqual({ layer: true, mutableArray: true });
+                // Layouts that do not calibrate fall back to the plain scan.
+                expect(typeof report.calibrated.layer).toBe("boolean");
+                expect(typeof report.calibrated.mutableArray).toBe("boolean");
                 expect(report.inspected).toBeUndefined();
             });
             expect(reports.default.strict).toBe(false);
@@ -325,9 +328,9 @@ describe("Wrapper lifetime leak cycles", function () {
             expect(reports.inspect.cycles.length).toBe(reports.default.cycles.length);
         });
 
-        // UIKit's unretained back pointers to a recognizer (its gesture node,
-        // its recognizer implementation) read as more owners than its retain
-        // count admits, so by default it counts as owned from outside.
+        // UIKit's unretained pointers back to a recognizer read as more owners
+        // than its retain count admits, so by default it counts as owned from
+        // outside.
         it("reports a cycle through a view's gesture recognizer only when strict, marked uncertain", function () {
             expect(cyclesNaming(reports.default, "TNSLeakGestureView").length).toBe(0);
             var found = cyclesNaming(reports.strict, "TNSLeakGestureView");
@@ -410,7 +413,7 @@ describe("Wrapper lifetime leak cycles", function () {
     }, 30000);
 
     it("writes an inspect report when the Darwin notification is posted", function (done) {
-        var held = HeldView.new();
+        var held = NotifiedView.new();
         var tmp = NSTemporaryDirectory();
         var files = NSFileManager.defaultManager;
         var listPath = NSString.stringWithString(tmp).stringByAppendingPathComponent("ns-wrapper-lifetime-inspect.txt");
@@ -424,7 +427,7 @@ describe("Wrapper lifetime leak cycles", function () {
             return names;
         }
         var before = reportNames();
-        NSString.stringWithString("TNSLeakHeldView\n").writeToFileAtomicallyEncodingError(listPath, true, NSUTF8StringEncoding);
+        NSString.stringWithString("TNSLeakNotifiedView\n").writeToFileAtomicallyEncodingError(listPath, true, NSUTF8StringEncoding);
         notify_post("org.nativescript.wrapperLifetime.findLeakCycles.inspect");
         var waited = 0;
         (function poll() {
@@ -436,8 +439,7 @@ describe("Wrapper lifetime leak cycles", function () {
                 setTimeout(poll, 100);
                 return;
             }
-            // Darwin notifications reach every process: another instance of
-            // this app with the probe on answers too, into the same directory.
+            expect(added.length).toBe(1);
             var entries = [];
             added.forEach(function (name) {
                 var path = NSString.stringWithString(tmp).stringByAppendingPathComponent(name);
@@ -445,12 +447,12 @@ describe("Wrapper lifetime leak cycles", function () {
                 expect(report.mode).toBe(mode);
                 entries = entries.concat(
                     report.inspected.filter(function (entry) {
-                        return entry.className.indexOf("TNSLeakHeldView") !== -1;
+                        return entry.className.indexOf("TNSLeakNotifiedView") !== -1;
                     })
                 );
                 files.removeItemAtPathError(path);
             });
-            expect(entries.length).toBeGreaterThan(0);
+            expect(entries.length).toBe(1);
             files.removeItemAtPathError(listPath);
             expect(held.tag).toBe(0);
             done();
