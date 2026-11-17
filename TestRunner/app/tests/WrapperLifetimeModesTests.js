@@ -1476,20 +1476,21 @@ describe("Wrapper lifetime modes", function () {
         it("gives a native constructor's JS-extended result the write handler", function (done) {
             var owner = NSMutableArray.new();
             var handle;
-            var first;
+            var released = stats().queuedReleases;
             (function () {
                 var obj = Extended.new();
                 obj.tag = "kept";
                 owner.addObject(obj);
                 handle = interop.handleof(obj);
-                first = new WeakRef(obj);
             })();
             settle(2, function () {
                 var before = stats();
                 var again = new TNSAllocLog(handle);
                 expect(again instanceof TNSAllocLog).toBe(true);
                 if (canary) {
-                    expect(first.deref()).toBeUndefined();
+                    // The first wrapper died (a WeakRef can't show it: weak
+                    // collections key a native object by its lifetime).
+                    expect(before.queuedReleases).toBeGreaterThan(released);
                     expect(Object.getPrototypeOf(again)).toBe(TNSAllocLog.prototype);
                 }
                 if (keepsState) {
