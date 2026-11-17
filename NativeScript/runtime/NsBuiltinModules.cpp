@@ -8,16 +8,16 @@
 #include "Helpers.h"
 #include "Interop.h"
 #include "Messaging.h"
-#include "ObjectManager.h"
-#include "WrapperLifetime.h"
-#include "WrapperLifetimeLeaks.h"
 #include "ModuleInternalCallbacks.h"
+#include "ObjectManager.h"
 #include "Runtime.h"
 #include "StructuredSerialization.h"
 #include "TextEncoding.h"
 #include "URLImpl.h"
 #include "URLSearchParamsImpl.h"
 #include "Worker.h"
+#include "WrapperLifetime.h"
+#include "WrapperLifetimeLeaks.h"
 
 using namespace v8;
 
@@ -147,8 +147,10 @@ void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
     return;
   }
   if (key == kWrapperLifetimeModeKey || key == kWrapperLifetimeScopeKey) {
-    ThrowTypeError(isolate, "'" + key +
-                                "' is read-only; set \"wrapperLifetime\" in the app config");
+    ThrowTypeError(
+        isolate,
+        "'" + key +
+            "' is read-only; set \"wrapperLifetime\" in the app config");
     return;
   }
   if (key == kWrapperLifetimeWarningsKey) {
@@ -215,13 +217,14 @@ void GetConfigCallback(const FunctionCallbackInfo<Value>& info) {
     return;
   }
   if (key == kWrapperLifetimeModeKey) {
-    info.GetReturnValue().Set(
-        tns::ToV8String(isolate, tns::WrapperLifetimeModeName(tns::GetWrapperLifetimeMode())));
+    info.GetReturnValue().Set(tns::ToV8String(
+        isolate, tns::WrapperLifetimeModeName(tns::GetWrapperLifetimeMode())));
     return;
   }
   if (key == kWrapperLifetimeScopeKey) {
-    info.GetReturnValue().Set(
-        tns::ToV8String(isolate, tns::WrapperLifetimeScopeName(tns::GetWrapperLifetimeScope())));
+    info.GetReturnValue().Set(tns::ToV8String(
+        isolate,
+        tns::WrapperLifetimeScopeName(tns::GetWrapperLifetimeScope())));
     return;
   }
   ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
@@ -232,7 +235,8 @@ void GetWrapperLifetimeStatsCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
   Local<Object> result = Object::New(isolate);
-  tns::ObjectManager::LifetimeStats* stats = tns::ObjectManager::GetLifetimeStats(isolate);
+  tns::ObjectManager::LifetimeStats* stats =
+      tns::ObjectManager::GetLifetimeStats(isolate);
   if (stats == nullptr) {
     info.GetReturnValue().Set(result);
     return;
@@ -297,8 +301,9 @@ MaybeLocal<Object> NsRuntimeBinding(Local<Context> context) {
            .FromMaybe(false) ||
       !binding->Set(context, tns::ToV8String(isolate, "getConfig"), getConfig)
            .FromMaybe(false) ||
-      !binding->Set(context, tns::ToV8String(isolate, "getWrapperLifetimeStats"),
-                    getWrapperLifetimeStats)
+      !binding
+           ->Set(context, tns::ToV8String(isolate, "getWrapperLifetimeStats"),
+                 getWrapperLifetimeStats)
            .FromMaybe(false)) {
     return MaybeLocal<Object>();
   }

@@ -2,8 +2,10 @@
 #define WrapperLifetimeCanary_h
 
 #include <objc/runtime.h>
+
 #include <functional>
 #include <memory>
+
 #include "Common.h"
 
 namespace tns {
@@ -73,7 +75,8 @@ class WrapperLifetimeCanary {
   // Adds `unwrap` (a canary's native object -> its weak-collection key) and
   // `wrap` (key -> live or new canary, or undefined once the object is gone)
   // to `binding`, for the weak-collections builtin. Canary mode only.
-  static bool RegisterWrapFunctions(v8::Local<v8::Context> context, v8::Local<v8::Object> binding);
+  static bool RegisterWrapFunctions(v8::Local<v8::Context> context,
+                                    v8::Local<v8::Object> binding);
 
   // The record of an object that already has state in this isolate, for a new
   // canary to share. Null otherwise.
@@ -91,8 +94,9 @@ class WrapperLifetimeCanary {
   // its state object. Runs under the registry lock, which an object's
   // deallocation also takes: `visit` must not run JS, release objects or reach
   // the registry. The caller provides the HandleScope.
-  static void ForEachState(v8::Isolate* isolate,
-                           const std::function<void(id object, v8::Local<v8::Object> state)>& visit);
+  static void ForEachState(
+      v8::Isolate* isolate,
+      const std::function<void(id object, v8::Local<v8::Object> state)>& visit);
 };
 
 }  // namespace tns
