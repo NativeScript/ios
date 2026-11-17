@@ -122,6 +122,7 @@ declare module "ns:runtime" {
      * Also report cycles through objects whose retain count is lower than the
      * references found to them (some found reference does not own), marked
      * `uncertain`. Off by default: such objects are treated as externally owned.
+     * Every cycle the default run finds on the same heap is reported as well.
      */
     strict?: boolean;
     /** Class-name prefixes whose native objects the report details in `inspected`. */
@@ -129,13 +130,19 @@ declare module "ns:runtime" {
   }
 
   export interface LeakCycle {
-    /** The cycle with addresses and V8 ids removed, rotated canonically: stable across runs. */
+    /**
+     * The cycle rotated canonically, with addresses, V8 ids, element indices and
+     * storage offsets removed: stable across runs.
+     */
     signature: string;
-    /** The cycle as found, starting at a native object. */
+    /** The cycle in the same rotation as `signature`, with those details kept. */
     path: string;
     /** Native objects on the cycle, and the objects of wrappers on it. */
     members: { className: string; address: string }[];
-    /** Only in strict mode: the cycle passes an object whose retains the graph over-explains. */
+    /**
+     * The cycle passes an object freed while the probe ran, or, in strict mode,
+     * one whose retains the graph over-explains; `reasons` names each.
+     */
     uncertain: boolean;
     reasons: string[];
   }
@@ -151,14 +158,31 @@ declare module "ns:runtime" {
     uncertainNativeObjects: number;
     /**
      * Native objects freed (or freed and replaced) by other threads while the
-     * probe ran. They are kept in the graph as found but own nothing, and a
-     * cycle through one is marked `uncertain`.
+     * probe ran. They keep the references found before they changed, are never
+     * treated as owned from outside, and a cycle through one is marked
+     * `uncertain`.
      */
     changedNativeObjects: number;
     /** Up to 50 of them, with the reference that led to each. */
     changed: { className: string; address: string; seed: boolean; depth: number; foundFrom: string }[];
-    /** The native graph hit its size limit; cycles past it are not seen. */
+    /** The native graph hit its 200,000-object limit; cycles past it are not seen. */
     truncated: boolean;
+    /** Where the walk stopped short; cycles past these limits are not seen. */
+    cutOffs: {
+      /** Native objects 8 references from a wrapped one, not expanded. */
+      depth: number;
+      /** Storage blocks read only up to 64 KB. */
+      storage: number;
+      /** Cycles longer than 64 hops, not reported. */
+      cycleLength: number;
+    };
+    /** Layouts read instead of scanned, as measured in this process. */
+    calibrated: {
+      /** `CALayer`'s unretained delegate and superlayer slots are skipped. */
+      layer: boolean;
+      /** Only the live range of an `NSMutableArray`'s storage is read. */
+      mutableArray: boolean;
+    };
     snapshotNodes: number;
     snapshotMs: number;
     analysisMs: number;
@@ -167,6 +191,8 @@ declare module "ns:runtime" {
       address: string;
       seed: boolean;
       retainCount: number;
+      /** No `-retainCount` callable without messaging the class: owned from outside. */
+      retainCountUnknown: boolean;
       runtimeRetains: number;
       incoming: number;
       out: string;
