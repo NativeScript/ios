@@ -55,7 +55,9 @@ declare module "ns:runtime" {
      *   references; JS properties set on it live on a state object kept until
      *   the native object is deallocated, and a wrapper built for the object
      *   later has them again. Weak references to the old wrapper (WeakMap keys,
-     *   WeakRef) and native `#private` fields do not carry over.
+     *   WeakRef), native `#private` fields, index-keyed properties and
+     *   properties named like a member of the prototype chain (a rebound class
+     *   method, a field called `copy`) do not carry over.
      *   State that references its own object keeps that object alive.
      */
     wrapperLifetimeMode: "resurrecting" | "rooted" | "canary";

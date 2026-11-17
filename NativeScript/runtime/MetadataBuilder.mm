@@ -1403,7 +1403,7 @@ void ReplaceKeepingOriginal(Class klass, SEL selector, const char* selectorName,
       !ClassBuilder::ImplementsItself(klass, selector) && class_respondsToSelector(klass, alias);
   Method method = class_getInstanceMethod(klass, inheritsAlias ? alias : selector);
   IMP original = method != nullptr ? method_getImplementation(method) : nullptr;
-  class_replaceMethod(klass, selector, imp, types);
+  class_replaceMethod(klass, selector, WrapperLifetimeCanary::WrapDealloc(selector, imp), types);
   if (original != nullptr) {
     class_addMethod(klass, alias, original, types);
   }

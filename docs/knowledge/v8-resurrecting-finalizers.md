@@ -253,7 +253,7 @@ JS-referencing native cycles alive (ARC rules: break them with a `WeakRef`). Spe
 when the TestRunner app config selects `"mode": "rooted"`.
 
 The state-lost warnings (`wrapperLifetimeWarnings`) watch for resurrecting finalizers and stay
-silent in the rooted mode. Under `"scope": "extended"` there, a plain (not JS-extended) wrapper
+silent in the rooted and canary modes. Under `"scope": "extended"` in the rooted mode, a plain (not JS-extended) wrapper
 is a phantom handle that a scavenge can collect, so JS properties set on plain objects that
 native code owns are lost without a warning.
 
@@ -281,6 +281,10 @@ What does notice is whatever keys on the canary without keeping it: `WeakMap` ke
 of the old canary, and native `#private` fields, which are branded on it. Other
 limits: `Object.freeze`, `seal` and `preventExtensions` throw on a canary (V8 refuses them on
 objects with interceptors); index-keyed properties are not forwarded and die with the canary;
+so does a property named like anything on the prototype chain (a class method rebound with
+`this.onTap = this.onTap.bind(this)`, a field called `copy` or `toString`, any
+`Object.defineProperty` or define-semantics class field over such a name): a `kNonMasking`
+interceptor is skipped for a name the chain has, so V8 defines it on the canary itself;
 a write through an object whose prototype is a canary lands in the canary's state, since
 interceptors see the holder but not the receiver. Relies on
 V8's own-property lookup through `kNonMasking` interceptors when the prototype has a named

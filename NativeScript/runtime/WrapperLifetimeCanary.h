@@ -1,6 +1,7 @@
 #ifndef WrapperLifetimeCanary_h
 #define WrapperLifetimeCanary_h
 
+#include <objc/runtime.h>
 #include <memory>
 #include "Common.h"
 
@@ -21,9 +22,9 @@ struct CanaryRecord;
 // deallocated. A JS-extended class's own -dealloc reports its instances; for
 // other objects an associated token's -dealloc does, or a sweep of weak
 // references after major collections finds it (NS_CANARY_DEATH_SIGNAL in the
-// .mm chooses). It cannot be rooted
-// only once the canary dies instead: a state reachable only through the canary
-// is garbage in the same collection, before any phantom callback runs. The
+// .mm chooses). It cannot be rooted only once the canary dies instead: a state
+// reachable only through the canary is garbage in the same collection, before
+// any phantom callback runs. The
 // cost is that state referencing its own canary (a closure over `this`, a
 // WeakMap value naming the object) keeps the canary, and through its retain the
 // native object, alive. This is the portable contract, the one the Node-API
@@ -42,6 +43,12 @@ class WrapperLifetimeCanary {
   // so their state needs no associated token or weak reference. No-op unless
   // the mode is canary.
   static void InstallDeallocHook(Class extendedClass);
+
+  // The IMP to install for `selector` on a JS-extended class: a JS-implemented
+  // -dealloc replaces the hook above, so it reports the death itself once the
+  // JS method returns. `imp` unchanged for any other selector, or unless the
+  // mode is canary.
+  static IMP WrapDealloc(SEL selector, IMP imp);
 
   // Installs the forwarding handlers on an ObjC instance template. No-op unless
   // the mode is canary.

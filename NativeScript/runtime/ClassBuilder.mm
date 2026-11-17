@@ -742,7 +742,14 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
       IMP methodBody =
           Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
       std::string typeInfo = GetTypeEncoding(typeEncoding, argsCount);
-      tns::Assert(class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str()), isolate);
+      IMP installed = WrapperLifetimeCanary::WrapDealloc(selector, methodBody);
+      if (installed != methodBody) {
+        // Replaces the canary dealloc hook the class already carries.
+        class_replaceMethod(extendedClass, selector, installed, typeInfo.c_str());
+      } else {
+        tns::Assert(class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str()),
+                    isolate);
+      }
     }
   }
 
@@ -849,7 +856,9 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
       IMP methodBody =
           Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
       std::string typeInfo = GetTypeEncoding(typeEncoding, argsCount);
-      class_replaceMethod(extendedClass, selector, methodBody, typeInfo.c_str());
+      class_replaceMethod(extendedClass, selector,
+                          WrapperLifetimeCanary::WrapDealloc(selector, methodBody),
+                          typeInfo.c_str());
     }
   }
 }
