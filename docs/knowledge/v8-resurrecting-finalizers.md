@@ -271,7 +271,8 @@ setter classifies the prototype chain itself, because once it declines V8 adds a
 to the canary without calling the definer: a name that resolves to an inherited accessor (a
 native property, a JS getter/setter) or a read-only data member is left to V8 and never
 becomes state, so native setters run as before. The state is rooted from its first write
-until the native object is deallocated, and stays the source of truth: a canary built later
+until the native object is deallocated (or, with the default death signal below, until its
+token is released), and stays the source of truth: a canary built later
 for the same object, or the receiver a JS-implemented `-dealloc` runs with, gets the state's
 properties copied onto it with their attributes and accessors. The costs, measured on a
 Release simulator build: the handler is installed per template, so every write to any ObjC
@@ -287,11 +288,17 @@ inherits, whose receiver still reads the state), and then retires them. For othe
 a compile-time choice (`NS_CANARY_DEATH_SIGNAL` in `WrapperLifetimeCanary.mm`): by default a
 token associated with the
 object reports it from its `-dealloc`, immediately and on any thread, but the ObjC runtime aborts
-the process for a class that forbids associated objects, and there is no public query for that;
-the alternative keeps an ObjC weak reference in each record (`objc_initWeakOrNil`, which declines
-instead of aborting for classes that refuse weak references) and sweeps the records after every
-major collection, so state lingers until then. With the default, `"scope": "all"` is
-experimental for that reason; `"extended"` attaches no tokens at all. It cannot be
+the process for a class that forbids associated objects, and there is no public query for that.
+Code that calls `objc_removeAssociatedObjects` on a live object releases the token too, which
+retires the state as if the object had died: the next write through the canary starts a new
+state from the canary's properties, but if the canary dies before such a write, a canary built
+later starts without them. The alternative keeps an ObjC weak reference in each record
+(`objc_initWeakOrNil`, which declines instead of aborting for classes that refuse weak
+references) and sweeps the records after every major collection, so state lingers until then.
+An instance of a class that refuses weak references and is not JS-extended gets no state
+under it: its properties live on the canary alone and are gone after a replacement. With the
+default, `"scope": "all"` is experimental because of that abort; `"extended"` attaches no
+tokens at all. It cannot be
 rooted at canary death instead, because a state reachable only through the canary is garbage in
 the same collection. The cost: state that references its own object (a closure over `this`)
 keeps it alive. A canary built after a death is a new object, but `===` cannot tell: only one
