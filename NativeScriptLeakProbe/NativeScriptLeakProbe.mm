@@ -22,7 +22,9 @@
 // external owners, so their cycles are missed rather than misreported. Pointers
 // that do not own (MRC assign ivars, weak storage outside the known weak
 // containers) over-explain a retain count; such objects are "uncertain" and
-// stay roots unless the probe runs strict.
+// stay roots unless the probe runs strict. Other threads keep running: an
+// object the runtime does not retain gets its count read only where that read
+// cannot fault once the object is freed, and stays a root elsewhere.
 
 #import <Foundation/Foundation.h>
 #include <dlfcn.h>
@@ -147,10 +149,14 @@ struct NativeEntry {
   bool block = false;
   // Wrapped by this isolate or holding JS state in it.
   bool seed = false;
+  // Retained for this isolate's wrapper. Only this isolate's thread releases
+  // that retain, and the probe runs on it: the object outlives the probe.
+  bool held = false;
   // No longer the object that was found at this address: freed, or freed and
   // reused, while the probe ran.
   bool changed = false;
-  // No -retainCount the probe can call without messaging: owned from outside.
+  // No retain count the probe can read without messaging the class, or
+  // without the object possibly freed meanwhile: owned from outside.
   bool countUnknown = false;
   int depth = 0;
   int64_t retainCount = 0;
@@ -186,6 +192,10 @@ struct Calibration {
   // elements: only its live range is read. Offset of its `storage` ivar.
   Class mutableArrayClass = nil;
   size_t ringStorage = 0;
+  // CALayer's -retainCount reads a count the layer keeps in its own ivars:
+  // read there directly, which is safe on a layer another thread frees.
+  IMP layerRetainCount = nullptr;
+  size_t layerCountOffset = 0;
 };
 
 // One findLeakCycles call. The snapshot's embedder graph callback runs on the
@@ -812,6 +822,54 @@ void CalibrateRing(Calibration* calibration) {
   }
 }
 
+IMP RetainCountImp(Class cls);
+
+int64_t CallRetainCount(IMP imp, void* object) {
+  return static_cast<int64_t>(
+      reinterpret_cast<NSUInteger (*)(id, SEL)>(imp)((__bridge id)object, @selector(retainCount)));
+}
+
+// The layer's count is the first field of its `_attr` ivar.
+bool ReadLayerCount(const Calibration& calibration, uintptr_t layer, size_t size, int64_t* out) {
+  uintptr_t word = 0;
+  if (calibration.layerCountOffset + sizeof(word) > size ||
+      !ReadWord(layer + calibration.layerCountOffset, size, &word)) {
+    return false;
+  }
+  *out = static_cast<int32_t>(static_cast<uint32_t>(word));
+  return true;
+}
+
+void CalibrateLayerCount(Calibration* calibration) {
+  Class layerClass = objc_getClass("CALayer");
+  Ivar attr = layerClass != nil ? class_getInstanceVariable(layerClass, "_attr") : nullptr;
+  const char* type = attr != nullptr ? ivar_getTypeEncoding(attr) : nullptr;
+  IMP imp = layerClass != nil ? RetainCountImp(layerClass) : nullptr;
+  if (type == nullptr || imp == nullptr ||
+      strncmp(type, "{_CALayerIvars=\"refcount\"i", strlen("{_CALayerIvars=\"refcount\"i")) != 0) {
+    return;
+  }
+  Calibration probe;
+  probe.layerCountOffset = static_cast<size_t>(ivar_getOffset(attr));
+  id layer = Send(Send(layerClass, "alloc"), "init");
+  uintptr_t p = reinterpret_cast<uintptr_t>(layer);
+  size_t size = HeapBlockSize(p);
+  auto matches = [&]() {
+    int64_t count = 0;
+    return ReadLayerCount(probe, p, size, &count) && count == CallRetainCount(imp, layer);
+  };
+  int64_t before = CallRetainCount(imp, layer);
+  bool valid = matches();
+  [layer retain];
+  valid = valid && matches() && CallRetainCount(imp, layer) == before + 1;
+  [layer release];
+  [layer release];
+  if (valid) {
+    calibration->layerRetainCount = imp;
+    calibration->layerCountOffset = probe.layerCountOffset;
+  }
+}
+
 // Messages Foundation and QuartzCore classes: must run outside the snapshot.
 const Calibration* GetCalibration() {
   static Calibration* calibration = [] {
@@ -819,6 +877,7 @@ const Calibration* GetCalibration() {
     @autoreleasepool {
       CalibrateLayer(result);
       CalibrateRing(result);
+      CalibrateLayerCount(result);
     }
     return result;
   }();
@@ -860,22 +919,31 @@ IMP RetainCountImp(Class cls) {
   return nullptr;
 }
 
-void ReadRetainCount(ProbeRun* run, void* object, NativeEntry* entry) {
+// `alive`: something keeps the object from being freed until this returns.
+// Otherwise another thread may free it at any point, and only reads that
+// cannot fault are made.
+void ReadRetainCount(ProbeRun* run, void* object, NativeEntry* entry, bool alive) {
+  uintptr_t p = reinterpret_cast<uintptr_t>(object);
   if (entry->block) {
-    entry->retainCount =
-        (BlockFlags(reinterpret_cast<uintptr_t>(object), entry->size) & 0xfffe) >> 1;
+    entry->retainCount = (BlockFlags(p, entry->size) & 0xfffe) >> 1;
     return;
   }
   auto found = run->retainCountImps.find(entry->cls);
   if (found == run->retainCountImps.end()) {
     found = run->retainCountImps.emplace(entry->cls, RetainCountImp(entry->cls)).first;
   }
-  if (found->second == nullptr) {
+  IMP imp = found->second;
+  // NSObject's reads only the isa word and the side table, by address: on a
+  // freed block, a wrong count rather than a fault, as malloc keeps the
+  // regions of blocks under a page mapped.
+  static IMP rootImp = RetainCountImp(objc_getClass("NSObject"));
+  const Calibration& calibration = *run->calibration;
+  if (imp != nullptr && (alive || (imp == rootImp && entry->size < vm_page_size))) {
+    entry->retainCount = CallRetainCount(imp, object);
+  } else if (imp == nullptr || imp != calibration.layerRetainCount ||
+             !ReadLayerCount(calibration, p, entry->size, &entry->retainCount)) {
     entry->countUnknown = true;
-    return;
   }
-  entry->retainCount = static_cast<int64_t>(reinterpret_cast<NSUInteger (*)(id, SEL)>(
-      found->second)((__bridge id)object, @selector(retainCount)));
 }
 
 void Expand(ProbeRun* run, void* object, NativeEntry* entry) {
@@ -1054,6 +1122,7 @@ bool BuildNativeGraph(Isolate* isolate, ProbeRun* run) {
     }
     if (NativeEntry* native = add(instance.object, wrapped.cls, 0)) {
       native->seed = true;
+      native->held = !wrapped.adapter;
       native->runtimeRetains = wrapped.adapter ? 0 : 1;
     }
   });
@@ -1098,9 +1167,22 @@ bool BuildNativeGraph(Isolate* isolate, ProbeRun* run) {
       }
     }
   }
+  // A stateful object stays allocated while the registry lock is held.
+  std::unordered_set<void*> counted;
+  ForEachState(isolate, [&](id object, Local<Object>) {
+    auto found = run->natives.find((__bridge void*)object);
+    if (found != run->natives.end() && !found->second.changed &&
+        StillThere(run, found->first, found->second)) {
+      ReadRetainCount(run, found->first, &found->second, true);
+      counted.insert(found->first);
+    }
+  });
   for (auto& native : run->natives) {
+    if (counted.count(native.first)) {
+      continue;
+    }
     if (!native.second.changed && StillThere(run, native.first, native.second)) {
-      ReadRetainCount(run, native.first, &native.second);
+      ReadRetainCount(run, native.first, &native.second, native.second.held);
     } else {
       native.second.changed = true;
     }

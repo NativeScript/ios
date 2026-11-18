@@ -253,7 +253,11 @@ missed rather than misreported:
   has an object ivar (only its object ivars are read: `CALayer` on iOS 26,
   whose sublayers are held through its C++ layer);
 - objects whose `-retainCount` cannot be called without messaging the class
-  (zombies, classes that forward it, the `NSTimer.alloc()` placeholder).
+  (zombies, classes that forward it, the `NSTimer.alloc()` placeholder);
+- objects the runtime does not retain whose class overrides `-retainCount`
+  (CF-bridged classes, Swift and dispatch objects, among others; `CALayer`'s
+  count is read from its ivars): another thread could free them while the
+  probe calls it.
 
 When the framework is embedded, in debug builds or with
 `"wrapperLifetime": { "leakProbe": true }` in the app config, the main isolate

@@ -191,7 +191,10 @@ declare module "ns:runtime" {
       address: string;
       seed: boolean;
       retainCount: number;
-      /** No `-retainCount` callable without messaging the class: owned from outside. */
+      /**
+       * No retain count readable without messaging the class, or without the
+       * object possibly being freed meanwhile: owned from outside.
+       */
       retainCountUnknown: boolean;
       runtimeRetains: number;
       incoming: number;
