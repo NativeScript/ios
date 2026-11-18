@@ -71,6 +71,12 @@ class WrapperLifetimeCanary {
   // returned instead), which ArgConverter::ConstructObject wraps anew.
   static bool NativeInstancesIntercept();
 
+  // Adds `unwrap` (a canary's native object -> its weak-collection key) and
+  // `wrap` (key -> live or new canary, or undefined once the object is gone)
+  // to `binding`, for the weak-collections builtin. Canary mode only.
+  static bool RegisterWrapFunctions(v8::Local<v8::Context> context,
+                                    v8::Local<v8::Object> binding);
+
   // The record of an object that already has state in this isolate, for a new
   // canary to share. Null otherwise.
   static std::shared_ptr<CanaryRecord> Find(v8::Isolate* isolate, id object);

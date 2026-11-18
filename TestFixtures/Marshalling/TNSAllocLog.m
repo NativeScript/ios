@@ -1,5 +1,6 @@
 #import "TNSAllocLog.h"
 #import <objc/message.h>
+#import <objc/runtime.h>
 #import "../TNSTestCommon.h"
 
 @implementation TNSAllocLog
@@ -485,6 +486,36 @@ static TNSAccessorHost* keptAccessorHost;
 
 + (void)hookPlaceholder {
   [[NSTimer alloc] tnsCallbackHook];
+}
+
+@end
+
+extern uintptr_t objc_debug_class_rw_data_mask;
+
+// RW_FORBIDS_ASSOCIATED_OBJECTS, in the class_rw_t flags objc_class reaches
+// through `bits`, after isa, superclass and the cache.
+static const uint32_t TNSForbidsAssociatedObjectsFlag = 1u << 20;
+
+static uint32_t* TNSClassRWFlags(Class cls) {
+  uintptr_t bits = ((const uintptr_t*)(__bridge const void*)cls)[4];
+  return (uint32_t*)(bits & objc_debug_class_rw_data_mask);
+}
+
+@implementation TNSAssociationForbidder
+
++ (id)forbiddingInstance {
+  static Class forbidding;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    forbidding = objc_allocateClassPair([NSObject class], "TNSAssociationForbiddingObject", 0);
+    *TNSClassRWFlags(forbidding) |= TNSForbidsAssociatedObjectsFlag;
+    objc_registerClassPair(forbidding);
+  });
+  return [[forbidding alloc] init];
+}
+
++ (BOOL)forbidsAssociatedObjects:(id)object {
+  return (*TNSClassRWFlags(object_getClass(object)) & TNSForbidsAssociatedObjectsFlag) != 0;
 }
 
 @end

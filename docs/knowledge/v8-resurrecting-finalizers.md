@@ -288,23 +288,42 @@ inherits, whose receiver still reads the state), and then retires them. For othe
 a compile-time choice (`NS_CANARY_DEATH_SIGNAL` in `WrapperLifetimeCanary.mm`): by default a
 token associated with the
 object reports it from its `-dealloc`, immediately and on any thread, but the ObjC runtime aborts
-the process for a class that forbids associated objects, and there is no public query for that.
-Code that calls `objc_removeAssociatedObjects` on a live object releases the token too, which
+the process for a class that forbids associated objects (Swift actors, for one), and there is no
+public query for that. The runtime checks the flag `objc_setAssociatedObject` aborts on
+(`RW_FORBIDS_ASSOCIATED_OBJECTS` in the object's class's `class_rw_t`, reached through the
+`objc_debug_class_rw_data_mask` libobjc exports for debuggers) before it attaches a token; an
+object it flags, or whose class it cannot read, gets no state: its JS properties stay on the
+canary and are gone after a replacement, and the weak collections key its wrapper. Code that
+calls `objc_removeAssociatedObjects` on a live object releases the token too, which
 retires the state as if the object had died: the next write through the canary starts a new
 state from the canary's properties, but if the canary dies before such a write, a canary built
-later starts without them. The alternative keeps an ObjC weak reference in each record
+later starts without them. The weak collections' key for the object hangs off that state, so
+what they keyed on the object is lost with it: `WeakMap` and `WeakSet` lookups miss,
+`WeakRef.prototype.deref` returns `undefined`, and once the old key is collected the
+`FinalizationRegistry` cleanup for it runs although the object lives. A JS write through the
+canary starts a new state but no key; the next `set`, `add`, `new WeakRef` or `register` on the
+object makes a new key, and entries keyed on the old one never come back. This stays a
+limitation: `objc_removeAssociatedObjects` removes every client's associations, and Apple
+documents it as not for general use. The alternative keeps an ObjC weak reference in each record
 (`objc_initWeakOrNil`, which declines instead of aborting for classes that refuse weak
 references) and sweeps the records after every major collection, so state lingers until then.
 An instance of a class that refuses weak references and is not JS-extended gets no state
-under it: its properties live on the canary alone and are gone after a replacement. With the
-default, `"scope": "all"` is experimental because of that abort; `"extended"` attaches no
-tokens at all. It cannot be
+under it, in the same way. With the default, `"scope": "all"` stays experimental because that
+check reads private runtime layout; `"extended"` attaches no tokens at all. It cannot be
 rooted at canary death instead, because a state reachable only through the canary is garbage in
 the same collection. The cost: state that references its own object (a closure over `this`)
 keeps it alive. A canary built after a death is a new object, but `===` cannot tell: only one
 canary lives at a time, and anything still referencing the old one would have kept it alive.
-What does notice is whatever keys on the canary without keeping it: `WeakMap` keys and `WeakRef`s
-of the old canary, and native `#private` fields, which are branded on it. Other
+What could notice is whatever keys on the canary without keeping it. The weak collections
+don't: in canary mode a builtin (`js/weak-collections.js`) replaces `WeakMap`, `WeakSet`,
+`WeakRef` and `FinalizationRegistry` with subclasses that key an in-scope native object (a
+canary: not a plain object under `"extended"`, a tagged pointer, a block, or an object of a class
+refusing weak references or forbidding associated objects) by an opaque, frozen key held by its state, so entries and targets live
+exactly as long as the native object, and `WeakRef.prototype.deref` returns the live canary, a new
+one, or `undefined` once the object is gone. Lookups never create that key, and a Proxy around a
+native object stays a key of its own. The cost is the other side of the same rooting: a `WeakMap`
+value that references its native key keeps the key, its state and so the native object alive for
+as long as the map lives, where in the other modes the entry would be collectable. Native `#private` fields are branded on the canary and do not carry over. Other
 limits: `Object.freeze`, `seal` and `preventExtensions` throw on a canary (V8 refuses them on
 objects with interceptors); index-keyed properties are not mirrored and die with the canary;
 a write through an object whose prototype is a canary lands on that object, since

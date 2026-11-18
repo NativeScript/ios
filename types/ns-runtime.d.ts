@@ -57,9 +57,12 @@ declare module "ns:runtime" {
      *   also copied to a state object kept until the native object is
      *   deallocated, and a wrapper built for the object later gets them back
      *   with their attributes. Native property writes still reach the native
-     *   setter. Writes cost more than in the other modes; reads do not. Weak
-     *   references to the old wrapper (WeakMap keys, WeakRef), native
-     *   `#private` fields and index-keyed properties do not carry over.
+     *   setter. Writes cost more than in the other modes; reads do not.
+     *   WeakMap, WeakSet, WeakRef and FinalizationRegistry key such native
+     *   objects by their lifetime in this mode, so they carry over too; a
+     *   WeakMap value that references its own native key keeps that object
+     *   alive while the map lives. Native `#private` fields and index-keyed
+     *   properties do not.
      *   State that references its own object keeps that object alive.
      */
     wrapperLifetimeMode: "resurrecting" | "rooted" | "canary";

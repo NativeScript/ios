@@ -248,4 +248,15 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index);
 
 @end
 
+// Hands out instances of a class made at runtime and flagged the way the ObjC
+// runtime flags Swift actors: objc_setAssociatedObject on one aborts the
+// process.
+@interface TNSAssociationForbidder : NSObject
+
++ (id)forbiddingInstance;
+// Whether the class of `object` carries that flag.
++ (BOOL)forbidsAssociatedObjects:(id)object;
+
+@end
+
 #endif /* TNSAllocLog_h */

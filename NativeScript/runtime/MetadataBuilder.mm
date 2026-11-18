@@ -12,6 +12,7 @@
 #include "ObjectManager.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
+#include "SymbolIterator.h"
 #include "SymbolLoader.h"
 #include "Tasks.h"
 #include "Worker.h"
@@ -606,6 +607,9 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
   ctorFuncTemplate->PrototypeTemplate()->Set(
       tns::ToV8String(isolate, "toString"),
       FunctionTemplate::New(isolate, MetadataBuilder::ToStringFunctionCallback));
+  if (meta->type() == MetaType::Interface && strcmp(meta->name(), "NSArray") == 0) {
+    SymbolIterator::Install(isolate, ctorFuncTemplate->PrototypeTemplate());
+  }
 
   if (meta->type() == MetaType::Interface) {
     const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);

@@ -34,6 +34,10 @@ describe("Wrapper lifetime modes", function () {
         return table.allObjects.count;
     }
 
+    // The engine's WeakRef: in canary mode the global one keys a native object
+    // by its lifetime, so it outlives the wrapper it was given.
+    var WrapperWeakRef = canary ? Object.getPrototypeOf(WeakRef) : WeakRef;
+
     function deallocs() {
         return (TNSGetOutput().match(/TNSAllocLog dealloc/g) || []).length;
     }
@@ -63,7 +67,7 @@ describe("Wrapper lifetime modes", function () {
         (function () {
             var obj = make();
             owner.addObject(obj);
-            first = new WeakRef(obj);
+            first = new WrapperWeakRef(obj);
         })();
         settle(2, function () {
             if (canary) {
@@ -136,7 +140,7 @@ describe("Wrapper lifetime modes", function () {
         });
     });
 
-    it("keeps WeakMap entries and WeakRef targets of natively owned objects when every wrapper is rooted", function (done) {
+    it("keeps WeakMap entries and WeakRef targets of natively owned objects when every wrapper is in scope", function (done) {
         var owner = NSMutableArray.new();
         var map = new WeakMap();
         var ref;
@@ -148,7 +152,7 @@ describe("Wrapper lifetime modes", function () {
         })();
         settle(2, function () {
             var obj = owner.objectAtIndex(0);
-            if (rooted && scope === "all") {
+            if (keepsState && scope === "all") {
                 expect(map.get(obj)).toBe("value");
                 expect(ref.deref()).toBe(obj);
             }
@@ -493,15 +497,21 @@ describe("Wrapper lifetime modes", function () {
     it("hands back a native object's JS properties on a new wrapper after the old one died", function (done) {
         var owner = NSMutableArray.new();
         var first;
+        var firstWrapper;
         (function () {
             var obj = Extended.new();
             obj.tag = "kept";
             owner.addObject(obj);
             first = new WeakRef(obj);
+            firstWrapper = new WrapperWeakRef(obj);
         })();
         settle(2, function () {
             if (canary) {
-                expect(first.deref()).toBeUndefined();
+                expect(WrapperWeakRef).not.toBe(WeakRef);
+                expect(firstWrapper.deref()).toBeUndefined();
+                // The global WeakRef keys the native object, so it hands back
+                // the live one on a new wrapper.
+                expect(first.deref().tag).toBe("kept");
             }
             var obj = owner.objectAtIndex(0);
             if (keepsState) {
@@ -788,18 +798,15 @@ describe("Wrapper lifetime modes", function () {
         });
     });
 
-    it("iterates an NSArray through an unbound Symbol.iterator outside canary mode", function () {
-        if (canary) {
-            return;
-        }
+    // Inherited from the NSArray prototype, so like Array's it needs `this`.
+    it("iterates an NSArray through its inherited Symbol.iterator and rejects an unbound call", function () {
         var array = NSArray.arrayWithArray(["a", "b"]);
+        expect(Object.prototype.hasOwnProperty.call(array, Symbol.iterator)).toBe(false);
+        expect(Array.from(array)).toEqual(["a", "b"]);
         var iterate = array[Symbol.iterator];
-        var iterator = iterate();
-        var values = [];
-        for (var step = iterator.next(); !step.done; step = iterator.next()) {
-            values.push(step.value);
-        }
-        expect(values).toEqual(["a", "b"]);
+        expect(function () {
+            iterate();
+        }).toThrowError(TypeError, /non-NSArray/);
     });
 
     it("leaves plain objects outside the extended scope without forwarding", function (done) {
@@ -1481,14 +1488,16 @@ describe("Wrapper lifetime modes", function () {
                 obj.tag = "kept";
                 owner.addObject(obj);
                 handle = interop.handleof(obj);
-                first = new WeakRef(obj);
+                first = new WrapperWeakRef(obj);
             })();
             settle(2, function () {
+                if (canary) {
+                    expect(first.deref()).toBeUndefined();
+                }
                 var before = stats();
                 var again = new TNSAllocLog(handle);
                 expect(again instanceof TNSAllocLog).toBe(true);
                 if (canary) {
-                    expect(first.deref()).toBeUndefined();
                     expect(Object.getPrototypeOf(again)).toBe(TNSAllocLog.prototype);
                 }
                 if (keepsState) {
