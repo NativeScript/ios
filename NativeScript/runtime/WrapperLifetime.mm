@@ -67,7 +67,7 @@ struct RootedState {
   std::vector<ObjectWeakCallbackState*> releases;
   bool draining = false;
   bool drainPosted = false;
-  // The native -retainCount implementation per class (NativeRetainCountImp):
+  // ObjectManager::NativeRetainCountImp per class:
   // the scan runs in a GC prologue, where JS may not run.
   std::unordered_map<Class, IMP> retainCountImps;
 };
@@ -138,46 +138,12 @@ bool IsRootable(id obj) {
   return false;
 }
 
-// The -retainCount the native class of `cls` answers with, never one JS
-// implements: JS subclasses are skipped, and a class whose -retainCount JS
-// replaced keeps the original under the swizzled-prefixed alias. Read from the
-// method lists of each class, so an alias inherited from a replaced ancestor
-// never hides a native override below it. Null for NSTimer.alloc()'s
-// placeholder, whose -retainCount does not return.
-IMP NativeRetainCountImp(Class cls) {
-  static Class timerPlaceholder = object_getClass([NSTimer alloc]);
-  if (cls == timerPlaceholder) {
-    return nullptr;
-  }
-  SEL selector = @selector(retainCount);
-  static SEL original = sel_registerName((Constants::SwizzledPrefix + "retainCount").c_str());
-  for (Class c = ClassBuilder::FindNativeClass(cls); c != nil; c = class_getSuperclass(c)) {
-    unsigned int count = 0;
-    Method* methods = class_copyMethodList(c, &count);
-    IMP own = nullptr;
-    IMP kept = nullptr;
-    for (unsigned int i = 0; i < count; i++) {
-      SEL name = method_getName(methods[i]);
-      if (name == original) {
-        kept = method_getImplementation(methods[i]);
-      } else if (name == selector) {
-        own = method_getImplementation(methods[i]);
-      }
-    }
-    free(methods);
-    if (kept != nullptr || own != nullptr) {
-      return kept != nullptr ? kept : own;
-    }
-  }
-  return nullptr;
-}
-
 // Classes without a native -retainCount read as 0.
 NSUInteger NativeRetainCount(RootedState* state, id obj) {
   Class cls = object_getClass(obj);
   auto found = state->retainCountImps.find(cls);
   if (found == state->retainCountImps.end()) {
-    found = state->retainCountImps.emplace(cls, NativeRetainCountImp(cls)).first;
+    found = state->retainCountImps.emplace(cls, ObjectManager::NativeRetainCountImp(cls)).first;
   }
   if (found->second == nullptr) {
     return 0;

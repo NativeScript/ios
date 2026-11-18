@@ -116,31 +116,6 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index);
 
 @end
 
-// Declares -retainCount and shares its name with the class adopting it, so
-// assigning TNSReplaceableRetainCountProtocol.prototype.retainCount replaces
-// the method on that class alone, as NSObjectProtocol.prototype does on
-// NSObject.
-@protocol TNSReplaceableRetainCount
-
-- (NSUInteger)retainCount;
-
-@end
-
-@interface TNSReplaceableRetainCount : TNSAllocLog <TNSReplaceableRetainCount>
-
-// Sends -retainCount to `object`.
-+ (NSUInteger)retainCountOf:(id)object;
-
-@end
-
-@interface TNSUninitializedTimer : NSObject
-
-// NSTimer.alloc()'s placeholder, which a JS alloc() call never creates: its
-// -retainCount does not return.
-+ (id)placeholder;
-
-@end
-
 // Implements NSKeyedUnarchiverDelegate: answers the object it is given, or a
 // new TNSAllocLog once `substitutes` is set.
 @interface TNSDecodeDelegate : NSObject <NSKeyedUnarchiverDelegate>
