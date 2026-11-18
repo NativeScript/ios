@@ -25,7 +25,9 @@ enum class WrapperLifetimeMode {
 
 enum class WrapperLifetimeScope {
   // Only JS-extended instances (TNSDerivedClass) are rooted; other wrappers are
-  // weak and die with their JS references.
+  // weak and die with their JS references, except receivers of JS methods
+  // native code calls, which keep the default mode's ownership tracking
+  // (ArgConverter::WrapNativeCallbackSelf).
   kExtended,
   kAll,
 };
@@ -88,6 +90,11 @@ class WrapperLifetime {
       DrainReleases(isolate);
     }
   }
+
+  // Gives an adopted wrapper that is not rooted back to ObjectManager: returns
+  // its registration with the handle strong, for
+  // ObjectManager::ManageOwnership. Null when the mode keeps the wrapper.
+  static ObjectWeakCallbackState* Relinquish(ObjCDataWrapper* wrapper);
 
   // __releaseNativeCounterpart retired this adopted wrapper's registration.
   static void Forget(v8::Isolate* isolate, ObjectWeakCallbackState* state);

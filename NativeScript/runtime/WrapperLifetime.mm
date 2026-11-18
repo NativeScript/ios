@@ -344,6 +344,23 @@ void WrapperLifetime::EscapeSlow(ObjCDataWrapper* wrapper) {
   PromoteState(state);
 }
 
+ObjectWeakCallbackState* WrapperLifetime::Relinquish(ObjCDataWrapper* wrapper) {
+  ObjectWeakCallbackState* state = wrapper->LifetimeState();
+  if (state == nullptr || state->lifetimeTracked_ || state->target_->IsEmpty()) {
+    return nullptr;
+  }
+  if (state->target_->IsWeak()) {
+    state->target_->ClearWeak<ObjectWeakCallbackState>();
+  }
+  state->lifetimeStrong_ = false;
+  DropRuntimeRetain(state->lifetimeTarget_, state->runtimeRetains_);
+  state->runtimeRetains_ = nullptr;
+  state->lifetimeWrapper_ = nullptr;
+  state->lifetimeTarget_ = nil;
+  wrapper->SetLifetimeState(nullptr);
+  return state;
+}
+
 void WrapperLifetime::DrainReleases(Isolate* isolate) {
   RootedState* rooted = Caches::StateFor<RootedState>(isolate);
   if (rooted == nullptr || rooted->releases.empty()) {
