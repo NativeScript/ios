@@ -277,6 +277,13 @@ declare module "ns:runtime" {
    * reaches their owner in every mode. Slow (a full snapshot plus a native
    * object graph walk); meant for diagnostics, not production paths.
    *
+   * What it cannot read counts as owned from outside, so those cycles are
+   * missed rather than misreported: among others, the contents of
+   * `NSHashTable`, `NSMapTable` and `NSPointerArray`. Before iOS 26, UIKit's
+   * gesture environment retains every recognizer attached to a view, so a
+   * cycle through a view's gesture recognizer is not reported, even when
+   * strict (seen on iOS 18.5; iOS 26.3 reports it).
+   *
    * @throws {Error} When the app does not embed `NativeScriptLeakProbe.framework`,
    * which app templates embed in debug builds only; list it in
    * `NS_SHIP_DEBUG_FRAMEWORKS` to ship it in other builds.

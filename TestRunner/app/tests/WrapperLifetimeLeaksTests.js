@@ -8,6 +8,10 @@ describe("Wrapper lifetime leak cycles", function () {
     // A plain recognizer's JS state outlives its wrapper only when every
     // wrapper is in scope; otherwise the edge back to its view dies with it.
     var gestureCycle = (rooted || canary) && runtime.getConfig("wrapperLifetimeScope") === "all";
+    // Before iOS 26, UIKit's gesture environment retains a view's recognizers
+    // while they are attached: a root holds that cycle, so no report names it.
+    var gestureCycleReported =
+        gestureCycle && NSProcessInfo.processInfo.isOperatingSystemAtLeastVersion({ majorVersion: 26, minorVersion: 0, patchVersion: 0 });
 
     // One class per shape, so a report names the shape.
     function shape(name) {
@@ -415,13 +419,13 @@ describe("Wrapper lifetime leak cycles", function () {
             expect(reports.inspect.cycles.length).toBe(reports.default.cycles.length);
         });
 
-        // UIKit's unretained pointers back to a recognizer read as more owners
-        // than its retain count admits, so by default it counts as owned from
-        // outside.
+        // From iOS 26, UIKit's unretained pointers back to a recognizer read as
+        // more owners than its retain count admits, so by default it counts as
+        // owned from outside.
         it("reports a cycle through a view's gesture recognizer only when strict, marked uncertain", function () {
             expect(cyclesNaming(reports.default, "TNSLeakGestureView").length).toBe(0);
             var found = cyclesNaming(reports.strict, "TNSLeakGestureView");
-            expect(found.length > 0).toBe(gestureCycle);
+            expect(found.length > 0).toBe(gestureCycleReported);
             found.forEach(function (cycle) {
                 expect(cycle.uncertain).toBe(true);
                 expect(cycle.reasons.join("\n")).toMatch(/UITapGestureRecognizer 0x[0-9a-f]+: retainCount/);

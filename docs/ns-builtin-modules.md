@@ -257,7 +257,15 @@ missed rather than misreported:
 - objects the runtime does not retain whose class overrides `-retainCount`
   (CF-bridged classes, Swift and dispatch objects, among others; `CALayer`'s
   count is read from its ivars): another thread could free them while the
-  probe calls it.
+  probe calls it;
+- the contents of `NSHashTable`, `NSMapTable` and `NSPointerArray`, whose
+  storage may be weak: what they retain counts as owned from outside.
+
+Some leaks are held from a root rather than by a cycle alone, and are not
+reported even when strict. Before iOS 26, UIKit's gesture environment retains
+every recognizer attached to a view (in an `NSMapTable`), so a cycle through a
+view's gesture recognizer and its JS state is missed: seen on iOS 18.5, while
+iOS 26.3 reports it.
 
 When the framework is embedded, in debug builds or with
 `"wrapperLifetime": { "leakProbe": true }` in the app config, the main isolate
