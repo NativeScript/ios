@@ -129,6 +129,8 @@ class ObjectManager {
   // swizzled-prefixed alias. Null for NSTimer.alloc()'s placeholder, whose
   // -retainCount does not return, and for classes without a -retainCount.
   // Walks method lists, so callers cache the result per class.
+  // Unsupported: a native override that messages [super retainCount] still
+  // reaches a JS replacement on an ancestor, which then runs where JS may not.
   static IMP NativeRetainCountImp(Class cls);
 
  private:
