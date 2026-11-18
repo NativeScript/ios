@@ -322,6 +322,47 @@ describe("Wrapper lifetime modes", function () {
         });
     });
 
+    it("keeps the JS state of a natively owned timer when every wrapper is rooted", function (done) {
+        var owner = NSMutableArray.new();
+        var map = new WeakMap();
+        (function () {
+            var timer = NSTimer.timerWithTimeIntervalTargetSelectorUserInfoRepeats(1000, TNSAllocLog.new(), "description", null, false);
+            timer.state = 5;
+            map.set(timer, "timer");
+            owner.addObject(timer);
+        })();
+        settle(2, function () {
+            var timer = owner.objectAtIndex(0);
+            if (rooted && scope === "all") {
+                expect(timer.state).toBe(5);
+                expect(map.get(timer)).toBe("timer");
+            }
+            timer = null;
+            expect(deallocs()).toBe(0);
+            owner.removeAllObjects();
+            settle(4, function () {
+                if (rooted && scope === "all") {
+                    expect(deallocs()).toBe(1);
+                }
+                done();
+            });
+        });
+    });
+
+    it("scans a wrapper of NSTimer.alloc()'s uninitialized placeholder", function (done) {
+        if (!(rooted && scope === "all")) {
+            done();
+            return;
+        }
+        var placeholder = TNSUninitializedTimer.placeholder();
+        expect(placeholder.isKindOfClass(NSTimer)).toBe(true);
+        placeholder.state = 1;
+        settle(2, function () {
+            expect(placeholder.state).toBe(1);
+            done();
+        });
+    });
+
     it("lets an explicitly released rooted wrapper go", function (done) {
         var owner = NSMutableArray.new();
         var obj = Extended.new();

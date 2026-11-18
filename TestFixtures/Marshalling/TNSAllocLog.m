@@ -300,6 +300,14 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index) {
 
 @end
 
+@implementation TNSUninitializedTimer
+
++ (id)placeholder {
+  return [NSTimer alloc];
+}
+
+@end
+
 @implementation TNSDecodeDelegate
 
 - (id)unarchiver:(NSKeyedUnarchiver*)unarchiver didDecodeObject:(id)object {

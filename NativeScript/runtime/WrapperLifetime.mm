@@ -138,25 +138,15 @@ bool IsRootable(id obj) {
   return false;
 }
 
-bool IsTimerClass(Class cls) {
-  static Class timerClass = objc_getClass("NSTimer");
-  for (Class c = cls; c != nil; c = class_getSuperclass(c)) {
-    if (c == timerClass) {
-      return true;
-    }
-  }
-  return false;
-}
-
 // The -retainCount the native class of `cls` answers with, never one JS
 // implements: JS subclasses are skipped, and a class whose -retainCount JS
 // replaced keeps the original under the swizzled-prefixed alias. Read from the
 // method lists of each class, so an alias inherited from a replaced ancestor
-// never hides a native override below it. Null for timers, as in
-// ObjectManager's ownership checks: the retain count of an uninitialized
-// NSTimer (NSTimer.alloc()) can hang.
+// never hides a native override below it. Null for NSTimer.alloc()'s
+// placeholder, whose -retainCount does not return.
 IMP NativeRetainCountImp(Class cls) {
-  if (IsTimerClass(cls)) {
+  static Class timerPlaceholder = object_getClass([NSTimer alloc]);
+  if (cls == timerPlaceholder) {
     return nullptr;
   }
   SEL selector = @selector(retainCount);

@@ -133,6 +133,14 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index);
 
 @end
 
+@interface TNSUninitializedTimer : NSObject
+
+// NSTimer.alloc()'s placeholder, which a JS alloc() call never creates: its
+// -retainCount does not return.
++ (id)placeholder;
+
+@end
+
 // Implements NSKeyedUnarchiverDelegate: answers the object it is given, or a
 // new TNSAllocLog once `substitutes` is set.
 @interface TNSDecodeDelegate : NSObject <NSKeyedUnarchiverDelegate>
