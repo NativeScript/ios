@@ -92,7 +92,8 @@ global.__JUnitSaveResults = function (text) {
     attemptReport(1);
 };
 
-global.__approot = NSString.stringWithString(NSBundle.mainBundle.bundlePath).stringByResolvingSymlinksInPath;
+// resourcePath, not bundlePath: a Mac Catalyst bundle keeps app/ under Contents/Resources.
+global.__approot = NSString.stringWithString(NSBundle.mainBundle.resourcePath).stringByResolvingSymlinksInPath;
 
 var jasmineBoot = require("../Infrastructure/Jasmine/boot");
 
@@ -214,6 +215,9 @@ require("./WorkerTerminateTests");
 
 // interop.setExternalSize and the runtime's own external memory charges
 require("./ExternalMemoryTests");
+
+// The runtime's launch-time JIT decision on Mac Catalyst
+require("./CatalystJitTests");
 
 // Tests common for all runtimes (git submodule of NativeScript/common-runtime-tests-app).
 require("../shared/index").runAllTests();

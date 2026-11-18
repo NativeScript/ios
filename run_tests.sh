@@ -266,13 +266,17 @@ usage() {
   cat <<EOF
 Usage: $0 [options]
 
-Device selection (default: the single booted simulator, else a prompt):
+Destination (default: the single booted simulator, else a prompt):
   -d, --device <name>     Existing simulator by name (e.g. 'iPhone 16 Pro')
   -u, --udid <udid>       Existing simulator by UDID
       --temp-sim          Create a throwaway ${SIM_PREFIX}* simulator for this run
                           and delete it afterwards
       --keep-sim          Run on ${SIM_PREFIX}<sim-name>, creating and booting it if
                           needed, and leave it booted for later runs
+      --catalyst          Build TestRunner for Mac Catalyst and run the suite on this
+                          Mac (hardened runtime, ad-hoc signed, allow-jit entitlement).
+                          Cannot be combined with any simulator option. Only one
+                          Catalyst run per user at a time: later ones wait for it.
 
 Simulator management (no tests run):
       --create-sim        Create and boot ${SIM_PREFIX}<sim-name>, print its UDID, exit
@@ -294,7 +298,8 @@ Run options:
   -t, --temp-folder       Write results to a random temp folder instead of build/tests/<udid>
   -h, --help              Show this help
 
-Results go to build/tests/<udid> (one simulator can only run one suite at a time).
+Results go to build/tests/<udid> (one simulator can only run one suite at a time),
+or build/tests/catalyst with --catalyst.
 EOF
 }
 
@@ -314,6 +319,7 @@ SIM_DEVICE_TYPE=""
 SIM_RUNTIME=""
 DELETE_TARGET=""
 TEST_FOLDER=""
+CATALYST=0
 
 set_sim_mode() {
   if [ -n "$SIM_MODE" ] && [ "$SIM_MODE" != "$1" ]; then
@@ -360,6 +366,7 @@ while [ $# -gt 0 ]; do
       set_sim_mode "delete-sim"; shift "$OPT_SHIFT" ;;
     --list-sims)   set_sim_mode "list-sims"; shift ;;
     --delete-sims) set_sim_mode "delete-sims"; shift ;;
+    --catalyst)       CATALYST=1; shift ;;
     -a|--asan)        ASAN=1; shift ;;
     -t|--temp-folder) TEMP_FOLDER=1; shift ;;
     -h|--help)        usage; exit 0 ;;
@@ -367,6 +374,25 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+if [ "$CATALYST" -eq 1 ]; then
+  if [ -n "$SIM_MODE" ] || [ -n "$DEVICE_NAME" ] || [ -n "$DEVICE_UDID" ] || [ -n "$SIM_NAME" ] \
+     || [ -n "$SIM_DEVICE_TYPE" ] || [ -n "$SIM_RUNTIME" ]; then
+    die_usage "--catalyst runs on this Mac and cannot be combined with simulator options."
+  fi
+  # TestRunner's Catalyst build is arm64-only (EXCLUDED_ARCHS[sdk=macosx*]).
+  if [ "$(uname -m)" != "arm64" ]; then
+    echo "--catalyst needs an Apple Silicon Mac." >&2
+    exit 1
+  fi
+  # TestRunnerTests is a UI-testing bundle; on macOS its runner must switch the
+  # session into Automation Mode, which otherwise asks for an admin password and
+  # times out unattended. GitHub's macOS runner images come preconfigured.
+  if ! automationmodetool 2>/dev/null | grep -q "DOES NOT REQUIRE"; then
+    echo "--catalyst needs Automation Mode without authentication. Enable it once with:" >&2
+    echo "  sudo automationmodetool enable-automationmode-without-authentication" >&2
+    exit 1
+  fi
+fi
 if [ -n "$SIM_MODE" ] && { [ -n "$DEVICE_NAME" ] || [ -n "$DEVICE_UDID" ]; }; then
   die_usage "--$SIM_MODE cannot be combined with --device or --udid."
 fi
@@ -402,6 +428,12 @@ for devices in json.load(sys.stdin)['devices'].values():
 # always say which simulator was used and whether it still exists.
 finish_run() {
   local status=$?
+  if [ "$CATALYST" -eq 1 ]; then
+    release_catalyst_lock
+    [ -n "$TEST_FOLDER" ] && echo "Test folder: $TEST_FOLDER"
+    echo "Simulator: none (--catalyst ran on this Mac)"
+    exit "$status"
+  fi
   [ -n "$DEVICE_UDID" ] || exit "$status"
   local label disposition
   label=$(sim_label "$DEVICE_UDID")
@@ -425,7 +457,47 @@ finish_run() {
   exit "$status"
 }
 
+# XCUIApplication.launch() terminates any running app with the same bundle
+# identifier, so concurrent Catalyst runs from different checkouts would kill
+# each other's TestRunner. Serialize them per user with flock(2) on fd 9: the
+# kernel drops the lock when this script exits, however it exits, so a lock is
+# never left behind. Bash has no flock builtin and macOS ships no flock(1), so
+# perl takes the lock on the inherited descriptor; it outlives perl because
+# this shell keeps fd 9 open.
+CATALYST_LOCK="${TMPDIR:-/tmp}/ns-test-catalyst.flock"
+CATALYST_LOCK_HELD=0
+
+lock_fd9() {
+  perl -MFcntl=:flock -e 'open(my $fh, ">&=", 9) or die "fd 9: $!\n"; exit(flock($fh, LOCK_EX | ($ARGV[0] ? LOCK_NB : 0)) ? 0 : 1)' "$1"
+}
+
+acquire_catalyst_lock() {
+  exec 9>>"$CATALYST_LOCK"
+  if ! lock_fd9 1; then
+    echo "Another --catalyst run (pid $(cat "$CATALYST_LOCK" 2>/dev/null || echo unknown)) is in progress; waiting for it to finish..." >&2
+    lock_fd9 0 || { echo "Could not lock $CATALYST_LOCK" >&2; exit 1; }
+  fi
+  echo $$ > "$CATALYST_LOCK"
+  CATALYST_LOCK_HELD=1
+}
+
+release_catalyst_lock() {
+  if [ "$CATALYST_LOCK_HELD" -eq 1 ]; then
+    exec 9>&-
+    CATALYST_LOCK_HELD=0
+  fi
+}
+
+if [ "$CATALYST" -eq 1 ]; then
+  SIM_MODE="catalyst"
+fi
+
 case "$SIM_MODE" in
+  catalyst)
+    trap finish_run EXIT
+    trap 'exit 130' INT TERM
+    acquire_catalyst_lock
+    ;;
   list-sims)
     print_temp_sims
     exit $?
@@ -466,13 +538,19 @@ esac
 trap finish_run EXIT
 trap 'exit 130' INT TERM
 
-DESTINATION="platform=iOS Simulator,id=$DEVICE_UDID"
+if [ "$CATALYST" -eq 1 ]; then
+  DESTINATION="platform=macOS,variant=Mac Catalyst,arch=arm64"
+  RESULTS_NAME="catalyst"
+else
+  DESTINATION="platform=iOS Simulator,id=$DEVICE_UDID"
+  RESULTS_NAME="$DEVICE_UDID"
+fi
 
 mkdir -p "$TESTS_ROOT"
 if [ "$TEMP_FOLDER" -eq 1 ]; then
   TEST_FOLDER=$(mktemp -d "$TESTS_ROOT/tmp.XXXXXXXX")
 else
-  TEST_FOLDER="$TESTS_ROOT/$DEVICE_UDID"
+  TEST_FOLDER="$TESTS_ROOT/$RESULTS_NAME"
   rm -rf "$TEST_FOLDER"
   mkdir -p "$TEST_FOLDER"
 fi

@@ -26,12 +26,15 @@ ALL_SLICES=(
   arm64-xros
   arm64-xrsimulator
   x86_64-iphonesimulator
+  arm64-maccatalyst
   x86_64-maccatalyst
 )
 
 IOS_MIN=13.0
 XROS_MIN=2.0
 CATALYST_MIN=13.3
+# The arm64 macabi triple has no deployment targets below 14.0.
+CATALYST_ARM64_MIN=14.0
 
 usage() {
   cat <<EOF
@@ -106,6 +109,9 @@ slice_config() {
       ;;
     x86_64-iphonesimulator)
       echo "iphonesimulator|x86_64-apple-darwin|-arch x86_64 -mios-simulator-version-min=$IOS_MIN"
+      ;;
+    arm64-maccatalyst)
+      echo "macosx|aarch64-apple-darwin|-target arm64-apple-ios$CATALYST_ARM64_MIN-macabi"
       ;;
     x86_64-maccatalyst)
       echo "macosx|x86_64-apple-darwin|-target x86_64-apple-ios$CATALYST_MIN-macabi"
