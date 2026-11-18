@@ -1498,9 +1498,11 @@ describe("Wrapper lifetime modes", function () {
                 if (canary) {
                     expect(stats().canaryInterceptedWrites - before.canaryInterceptedWrites).toBe(1);
                 }
-                again = null;
-                settle(2, function () {
-                    var obj = owner.objectAtIndex(0);
+                rewrap(function () {
+                    var made = again;
+                    again = null;
+                    return made;
+                }, function (obj) {
                     if (keepsState) {
                         expect(obj.other).toBe("new");
                     }
