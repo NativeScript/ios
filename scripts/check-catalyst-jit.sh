@@ -7,10 +7,13 @@
 #   jit-off-in-config           allow-jit, "ios": {"jit": false} -> must run jitless
 #   unsigned-executable-memory  allow-unsigned-executable-memory -> must JIT
 #
-# Some machines (GitHub's macOS runners among them) let a hardened process map
-# JIT memory with no entitlement. The no-entitlement variant can't test the
-# fallback there, so it is skipped when a hardened, unentitled probe binary
-# gets MAP_JIT.
+# Run it locally after a Catalyst build (./run_tests.sh --catalyst, or an
+# xcodebuild build for the Mac Catalyst destination). It isn't a CI step:
+# GitHub's macOS runners let a hardened process map JIT memory with no
+# entitlement, so only the ios.jit override is testable there, and a directly
+# launched app on them misses timer ticks the timer specs count. On such a
+# machine the no-entitlement variant is skipped, because a hardened, unentitled
+# probe binary gets MAP_JIT.
 #
 # The app is launched directly, not through XCUITest, so this needs no
 # Automation Mode. CFFIXED_USER_HOME keeps the junit report TNSSaveResults

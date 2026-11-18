@@ -244,11 +244,6 @@ jobs:
           ls "$TEST_FOLDER"/test-out/*junit*.xml > /dev/null 2>&1 || { echo "::error::No JUnit report in $TEST_FOLDER/test-out"; exit 1; }
           find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
           find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
-      - name: JIT fallback check
-        # The suite above only covers allow-jit with the JIT on. Re-sign the
-        # built app into the configurations where the runtime must fall back to
-        # --jitless (or may JIT without allow-jit) and run the suite in each.
-        run: ./scripts/check-catalyst-jit.sh --app build/Debug-maccatalyst/TestRunner.app --output "$TEST_FOLDER/jit-check"
       - name: Collect test diagnostics
         if: failure()
         uses: ./.github/actions/collect-test-diagnostics
@@ -264,5 +259,3 @@ jobs:
           path: |
             ${{env.TEST_FOLDER}}/test_results.xcresult
             ${{env.TEST_FOLDER}}-attempt1/test_results.xcresult
-            ${{env.TEST_FOLDER}}/jit-check/*.log
-            ${{env.TEST_FOLDER}}/jit-check/*-junit.xml

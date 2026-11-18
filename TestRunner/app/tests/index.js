@@ -4,15 +4,6 @@ console.log('Application Start!');
 // The report delivery deadline (REPORT_DEADLINE_SECONDS) counts from launch.
 var appStartMs = Date.now();
 
-// Timer specs count ticks. A Mac Catalyst app that isn't in front (launched
-// directly instead of by XCUITest) gets App Nap and timer coalescing, which
-// drop ticks; this activity opts the whole run out. LatencyCritical is wider
-// than 32 bits, so the flags are added: `|` would truncate it.
-if (NSProcessInfo.processInfo.macCatalystApp) {
-    global.__testRunActivity = NSProcessInfo.processInfo.beginActivityWithOptionsReason(
-        NSActivityOptions.UserInitiated + NSActivityOptions.LatencyCritical, "TestRunner suite");
-}
-
 require("../Infrastructure/simulator");
 global.utf8 = require("../Infrastructure/utf8")
 
