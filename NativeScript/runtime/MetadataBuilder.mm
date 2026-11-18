@@ -770,6 +770,19 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
   }
   ObjectManager::Register(context, ctorFunc);
 
+  Local<Value> prototypeValue;
+  success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
+  tns::Assert(success, isolate);
+  Local<Object> prototype = prototypeValue.As<Object>();
+
+  Persistent<Value>* poPrototype = new Persistent<Value>(isolate, prototype);
+  cache->Prototypes.emplace(meta, poPrototype);
+  // Before the constructor is exposed: a JS accessor on the global can run
+  // during the Set and redefine prototype members, which must find the tracker.
+  if (setters != nullptr) {
+    PublishNativeSetters(isolate, context, prototype, std::move(setters));
+  }
+
   Local<Object> global = context->Global();
   auto jsNameV8String = tns::ToV8String(isolate, meta->jsName());
   auto maybeSet = global->Set(context, jsNameV8String, ctorFunc);
@@ -788,17 +801,6 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
                                             staticMembers);
   MetadataBuilder::RegisterStaticProtocols(context, ctorFunc, meta, meta->name(), pair,
                                            staticMembers);
-
-  Local<Value> prototypeValue;
-  success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
-  tns::Assert(success, isolate);
-  Local<Object> prototype = prototypeValue.As<Object>();
-
-  Persistent<Value>* poPrototype = new Persistent<Value>(isolate, prototype);
-  cache->Prototypes.emplace(meta, poPrototype);
-  if (setters != nullptr) {
-    PublishNativeSetters(isolate, context, prototype, std::move(setters));
-  }
 
   return ctorFuncTemplate;
 }
