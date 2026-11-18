@@ -283,11 +283,18 @@ void ReleaseAll(Isolate* isolate, RootedState* rooted) {
   rooted->draining = true;
   // A -dealloc can throw an NSException through here.
   struct Reset {
+    Isolate* isolate;
     RootedState* rooted;
-    ~Reset() { rooted->draining = false; }
-  } reset{rooted};
+    ~Reset() {
+      rooted->draining = false;
+      if (!rooted->releases.empty()) {
+        ScheduleDrain(isolate, rooted);
+      }
+    }
+  } reset{isolate, rooted};
   // One state leaves the queue at a time, so a release that throws leaves the
-  // rest queued for the next drain or teardown.
+  // rest queued for the drain the guard posts, or for teardown once the event
+  // loop has stopped.
   while (!rooted->releases.empty()) {
     ObjectWeakCallbackState* state = rooted->releases.back();
     rooted->releases.pop_back();
