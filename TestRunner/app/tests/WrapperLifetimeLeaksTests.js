@@ -16,6 +16,7 @@ describe("Wrapper lifetime leak cycles", function () {
     var SelfRef = shape("TNSLeakSelfRef");
     var Closure = shape("TNSLeakClosure");
     var NativeCycle = shape("TNSLeakNativeCycle");
+    var SelfList = shape("TNSLeakSelfList");
     var BlockCycle = shape("TNSLeakBlockCycle");
     var OwnedSelfRef = shape("TNSLeakOwnedSelfRef");
     var WeakBackRef = shape("TNSLeakWeakBackRef");
@@ -47,6 +48,8 @@ describe("Wrapper lifetime leak cycles", function () {
         TNSLeakSelfRef: canary,
         TNSLeakClosure: canary,
         TNSLeakNativeCycle: rooted || canary,
+        // Only a calibrated list's elements are known to be retained.
+        TNSLeakSelfList: rooted || canary,
         TNSLeakBlockCycle: true,
         TNSLeakOwnedSelfRef: false,
         TNSLeakWeakBackRef: false,
@@ -267,6 +270,15 @@ describe("Wrapper lifetime leak cycles", function () {
                 watched.addObject(gestureView);
             })();
             (function () {
+                // A list that holds itself: that element is one of its retains.
+                var selfList = SelfList.new();
+                var list = NSMutableArray.new();
+                list.addObject(selfList);
+                list.addObject(list);
+                selfList.list = list;
+                watched.addObject(selfList);
+            })();
+            (function () {
                 // Its wrapper's handle is strong while the list retains it.
                 var initOwned = InitOwned.new();
                 var list = NSMutableArray.new();
@@ -278,6 +290,7 @@ describe("Wrapper lifetime leak cycles", function () {
                 reports.default = runtime.findLeakCycles();
                 reports.strict = runtime.findLeakCycles({ strict: true });
                 reports.inspect = runtime.findLeakCycles({ inspect: ["TNSLeak"] });
+                leaks.TNSLeakSelfList = leaks.TNSLeakSelfList && reports.default.calibrated.mutableArray;
                 done();
             });
         }, 60000);

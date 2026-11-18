@@ -125,6 +125,17 @@ struct NativeEdge {
   void* to;
   Class cls;
   std::string label;
+  // Known to retain its target: an ARC strong ivar, a collection element, a
+  // strong block capture. Scanned storage and MRC ivars may not.
+  bool owns = false;
+};
+
+// An object ivar that can own its value.
+struct Slot {
+  size_t offset;
+  std::string name;
+  // In the class's strong ivar layout (ARC), rather than an MRC ivar.
+  bool strong;
 };
 
 struct NativeEntry {
@@ -180,7 +191,7 @@ struct ProbeRun {
   bool strict = false;
   const Calibration* calibration = nullptr;
   ClassSet classes;
-  std::unordered_map<Class, std::vector<std::pair<size_t, std::string>>> slots;
+  std::unordered_map<Class, std::vector<Slot>> slots;
   std::unordered_map<Class, bool> typedClasses;
   std::unordered_map<Class, IMP> retainCountImps;
   std::unordered_map<void*, NativeEntry> natives;
@@ -305,14 +316,13 @@ std::unordered_set<size_t> LayoutWords(const uint8_t* layout, size_t firstWord) 
 // outside the strong layout of a class that has one (ARC __unsafe_unretained).
 // `typed` is false for classes without object ivars, which are scanned as
 // storage instead.
-const std::vector<std::pair<size_t, std::string>>& OwningSlots(ProbeRun* run, Class cls,
-                                                               bool* typed) {
+const std::vector<Slot>& OwningSlots(ProbeRun* run, Class cls, bool* typed) {
   auto known = run->typedClasses.find(cls);
   if (known != run->typedClasses.end()) {
     *typed = known->second;
     return run->slots[cls];
   }
-  std::vector<std::pair<size_t, std::string>> slots;
+  std::vector<Slot> slots;
   bool anyObjectIvar = false;
   for (Class c = cls; c != nil; c = class_getSuperclass(c)) {
     unsigned int count = 0;
@@ -336,7 +346,7 @@ const std::vector<std::pair<size_t, std::string>>& OwningSlots(ProbeRun* run, Cl
       if (weakWords.count(word) || (strong != nullptr && !strongWords.count(word))) {
         continue;
       }
-      slots.push_back({offset, ivar_getName(ivars[i])});
+      slots.push_back({offset, ivar_getName(ivars[i]), strong != nullptr});
     }
     free(ivars);
   }
@@ -870,7 +880,7 @@ void Expand(ProbeRun* run, void* object, NativeEntry* entry) {
         continue;
       }
       if (Class cls = ObjectClass(run->classes, value, valueSize)) {
-        entry->out.push_back({reinterpret_cast<void*>(value), cls, label});
+        entry->out.push_back({reinterpret_cast<void*>(value), cls, label, !capture.byref});
       } else if (capture.byref && !UnretainedByref(value, valueSize)) {
         ScanStorage(run->classes, value, valueSize, kMaxStorageDepth, label, &entry->out, nullptr,
                     &run->storageCutOffs);
@@ -888,7 +898,7 @@ void Expand(ProbeRun* run, void* object, NativeEntry* entry) {
         size_t valueSize = HeapBlockSize(elements[i]);
         if (Class cls = valueSize != 0 ? ObjectClass(run->classes, elements[i], valueSize) : nil) {
           entry->out.push_back(
-              {reinterpret_cast<void*>(elements[i]), cls, "[" + std::to_string(i) + "]"});
+              {reinterpret_cast<void*>(elements[i]), cls, "[" + std::to_string(i) + "]", true});
         }
       }
       return;
@@ -908,17 +918,17 @@ void Expand(ProbeRun* run, void* object, NativeEntry* entry) {
                 &run->storageCutOffs);
     return;
   }
-  for (const auto& slot : slots) {
-    if (slot.first + sizeof(void*) > size) {
+  for (const Slot& slot : slots) {
+    if (slot.offset + sizeof(void*) > size) {
       continue;
     }
     uintptr_t value = 0;
-    if (!ReadWord(p + slot.first, size, &value)) {
+    if (!ReadWord(p + slot.offset, size, &value)) {
       continue;
     }
     size_t valueSize = HeapBlockSize(value);
     if (Class cls = valueSize != 0 ? ObjectClass(run->classes, value, valueSize) : nil) {
-      entry->out.push_back({reinterpret_cast<void*>(value), cls, slot.second});
+      entry->out.push_back({reinterpret_cast<void*>(value), cls, slot.name, slot.strong});
     }
   }
 }
@@ -1039,10 +1049,12 @@ bool BuildNativeGraph(Isolate* isolate, ProbeRun* run) {
       continue;
     }
     Expand(run, object, &entry);
-    // A pointer to itself never owns the object.
-    entry.out.erase(std::remove_if(entry.out.begin(), entry.out.end(),
-                                   [&](const auto& edge) { return edge.to == object; }),
-                    entry.out.end());
+    // A pointer to itself owns the object only where the reference is known
+    // to retain; elsewhere it is bookkeeping or an unretained delegate.
+    entry.out.erase(
+        std::remove_if(entry.out.begin(), entry.out.end(),
+                       [&](const auto& edge) { return edge.to == object && !edge.owns; }),
+        entry.out.end());
     int depth = entry.depth;
     std::vector<NativeEdge> out = entry.out;
     for (const auto& edge : out) {
