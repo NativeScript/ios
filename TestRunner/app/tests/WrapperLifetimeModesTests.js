@@ -1392,7 +1392,7 @@ describe("Wrapper lifetime modes", function () {
                 expect(nativeLevel.call(obj)).toBe(1);
             });
 
-            it("dispatch to a setter override exposed to native code that JS no longer sees", function () {
+            it("write through the native setter when JS no longer sees an override exposed to native code", function () {
                 var calls = [];
                 var Exposed = TNSCanaryWriteTarget.extend({
                     get level() {
@@ -1402,16 +1402,23 @@ describe("Wrapper lifetime modes", function () {
                         calls.push(value);
                     }
                 }, { name: "WrapperLifetimeExposedLevelSetter" });
-                // -setLevel: stays overridden for native callers.
-                expect(delete Exposed.prototype.level).toBe(true);
+                // The accessor lives on the implementation object Exposed.prototype
+                // inherits from. -setLevel: stays overridden for native callers.
+                var implementation = Object.getPrototypeOf(Exposed.prototype);
+                expect(Object.getOwnPropertyDescriptor(implementation, "level")).toBeDefined();
+                expect(delete implementation.level).toBe(true);
+                expect(Exposed.prototype.__lookupSetter__("level")).toBe(Object.getOwnPropertyDescriptor(TNSCanaryWriteTarget.prototype, "level").set);
                 var obj = Exposed.new();
                 obj.tag = "state";
+                // A JS write through the native accessor runs the base -setLevel:;
+                // native callers reach the override.
                 obj.level = 3;
-                expect(calls).toEqual([3]);
-                expect(nativeLevel.call(obj)).toBe(0);
+                expect(calls).toEqual([]);
+                expect(nativeLevel.call(obj)).toBe(3);
+                expect(Object.prototype.hasOwnProperty.call(obj, "level")).toBe(false);
                 obj.setValueForKey(5, "level");
-                expect(calls).toEqual([3, 5]);
-                expect(nativeLevel.call(obj)).toBe(0);
+                expect(calls).toEqual([5]);
+                expect(nativeLevel.call(obj)).toBe(3);
             });
         });
 
