@@ -1393,8 +1393,8 @@ MaybeLocal<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool
       modeled.insert(node);
     }
   }
-  const HeapGraphNode* globalHandles =
-      Child(isolate, Child(isolate, snapshot->GetRoot(), "(GC roots)"), "(Global handles)");
+  const HeapGraphNode* gcRoots = Child(isolate, snapshot->GetRoot(), "(GC roots)");
+  const HeapGraphNode* globalHandles = Child(isolate, gcRoots, "(Global handles)");
   if (globalHandles == nullptr) {
     // Without it the runtime's handles would all read as roots.
     deleteSnapshot();
@@ -1405,6 +1405,21 @@ MaybeLocal<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool
 
   auto nodeOf = [&](void* native) {
     return snapshot->GetNodeById(profiler->GetObjectId(static_cast<NativeObject>(native)));
+  };
+  std::unordered_map<const HeapGraphNode*, void*> nativeOfNode;
+  for (auto& native : run.natives) {
+    if (const HeapGraphNode* node = nodeOf(native.first)) {
+      nativeOfNode[node] = native.first;
+    }
+  }
+  // A native node that was a root when the graph was built has an edge from
+  // (GC roots); an object that changed since keeps nothing alive.
+  auto staleRoot = [&](const HeapGraphNode* from, const HeapGraphNode* to) {
+    if (from != gcRoots) {
+      return false;
+    }
+    auto found = nativeOfNode.find(to);
+    return found != nativeOfNode.end() && run.natives[found->second].changed;
   };
   // How marking reached each node, kept only to explain inspected objects.
   std::unordered_map<const HeapGraphNode*, const HeapGraphEdge*> reachedBy;
@@ -1422,7 +1437,7 @@ MaybeLocal<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool
       queue.pop_front();
       ForEachOwningEdge(isolate, node, [&](const HeapGraphEdge* edge) {
         const HeapGraphNode* to = edge->GetToNode();
-        if (node == globalHandles && modeled.count(to)) {
+        if ((node == globalHandles && modeled.count(to)) || staleRoot(node, to)) {
           return true;
         }
         if (marked.insert(to).second) {
@@ -1437,12 +1452,6 @@ MaybeLocal<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool
     return marked;
   };
 
-  std::unordered_map<const HeapGraphNode*, void*> nativeOfNode;
-  for (auto& native : run.natives) {
-    if (const HeapGraphNode* node = nodeOf(native.first)) {
-      nativeOfNode[node] = native.first;
-    }
-  }
   // Seeds in a fixed order, so that one heap yields one set of cycles.
   std::vector<std::pair<std::string, void*>> seeds;
   for (auto& native : run.natives) {
