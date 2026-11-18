@@ -36,6 +36,7 @@
 #include <v8-profiler.h>
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cstdarg>
 #include <deque>
@@ -1346,6 +1347,17 @@ bool EphemeronTableEdge(Isolate* isolate, const HeapGraphNode* table, const Heap
          name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
+// V8 names each of an entry's two edges "<n> / <description>", n counting the
+// edges that leave its node: only the description is the entry's.
+std::string PairName(const std::string& edgeName) {
+  size_t digits = 0;
+  while (digits < edgeName.size() && isdigit(static_cast<unsigned char>(edgeName[digits]))) {
+    digits++;
+  }
+  return digits > 0 && edgeName.compare(digits, 3, " / ") == 0 ? edgeName.substr(digits + 3)
+                                                               : edgeName;
+}
+
 struct Ephemerons {
   struct Pair {
     std::string name;
@@ -1366,7 +1378,7 @@ struct Ephemerons {
       for (int i = 0; i < table->GetChildrenCount(); i++) {
         const HeapGraphEdge* edge = table->GetChild(i);
         if (EphemeronTableEdge(isolate, table, edge)) {
-          pairs[edge->GetToNode()].push_back({EdgeName(isolate, edge), table});
+          pairs[edge->GetToNode()].push_back({PairName(EdgeName(isolate, edge)), table});
         }
       }
     }
@@ -1381,7 +1393,7 @@ struct Ephemerons {
     if (found == pairs.end()) {
       return nullptr;
     }
-    std::string name = EdgeName(isolate, edge);
+    std::string name = PairName(EdgeName(isolate, edge));
     for (const Pair& pair : found->second) {
       if (pair.name == name) {
         return &pair;
