@@ -276,7 +276,7 @@ Destination (default: the single booted simulator, else a prompt):
       --catalyst          Build TestRunner for Mac Catalyst and run the suite on this
                           Mac (hardened runtime, ad-hoc signed, allow-jit entitlement).
                           Cannot be combined with any simulator option. Only one
-                          Catalyst run per Mac at a time: later ones wait for it.
+                          Catalyst run per user at a time: later ones wait for it.
 
 Simulator management (no tests run):
       --create-sim        Create and boot ${SIM_PREFIX}<sim-name>, print its UDID, exit
@@ -459,32 +459,31 @@ finish_run() {
 
 # XCUIApplication.launch() terminates any running app with the same bundle
 # identifier, so concurrent Catalyst runs from different checkouts would kill
-# each other's TestRunner. Serialize them per user with a mkdir lock.
-CATALYST_LOCK="${TMPDIR:-/tmp}/ns-test-catalyst.lock"
+# each other's TestRunner. Serialize them per user with flock(2) on fd 9: the
+# kernel drops the lock when this script exits, however it exits, so a lock is
+# never left behind. Bash has no flock builtin and macOS ships no flock(1), so
+# perl takes the lock on the inherited descriptor; it outlives perl because
+# this shell keeps fd 9 open.
+CATALYST_LOCK="${TMPDIR:-/tmp}/ns-test-catalyst.flock"
 CATALYST_LOCK_HELD=0
 
+lock_fd9() {
+  perl -MFcntl=:flock -e 'open(my $fh, ">&=", 9) or die "fd 9: $!\n"; exit(flock($fh, LOCK_EX | ($ARGV[0] ? LOCK_NB : 0)) ? 0 : 1)' "$1"
+}
+
 acquire_catalyst_lock() {
-  local waited=0 holder
-  until mkdir "$CATALYST_LOCK" 2>/dev/null; do
-    holder=$(cat "$CATALYST_LOCK/pid" 2>/dev/null)
-    if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
-      echo "Removing stale Catalyst run lock (pid $holder is gone)." >&2
-      rm -rf "$CATALYST_LOCK"
-      continue
-    fi
-    if [ "$waited" -eq 0 ]; then
-      echo "Another --catalyst run (pid ${holder:-unknown}) is in progress; waiting for it to finish..." >&2
-      waited=1
-    fi
-    sleep 10
-  done
-  echo $$ > "$CATALYST_LOCK/pid"
+  exec 9>>"$CATALYST_LOCK"
+  if ! lock_fd9 1; then
+    echo "Another --catalyst run (pid $(cat "$CATALYST_LOCK" 2>/dev/null || echo unknown)) is in progress; waiting for it to finish..." >&2
+    lock_fd9 0 || { echo "Could not lock $CATALYST_LOCK" >&2; exit 1; }
+  fi
+  echo $$ > "$CATALYST_LOCK"
   CATALYST_LOCK_HELD=1
 }
 
 release_catalyst_lock() {
   if [ "$CATALYST_LOCK_HELD" -eq 1 ]; then
-    rm -rf "$CATALYST_LOCK"
+    exec 9>&-
     CATALYST_LOCK_HELD=0
   fi
 }
