@@ -351,8 +351,8 @@
 		D3FA1E7A0000000000000004 /* NativeScriptDefaultMetadata.c in Sources */ = {isa = PBXBuildFile; fileRef = D3FA1E7A0000000000000002 /* NativeScriptDefaultMetadata.c */; };
 		A1EA4B0E0000000000000005 /* NativeScriptLeakProbe.mm in Sources */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000002 /* NativeScriptLeakProbe.mm */; };
 		A1EA4B0E0000000000000006 /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
-		A1EA4B0E0000000000000011 /* NativeScriptLeakProbe.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000001 /* NativeScriptLeakProbe.framework */; platformFilters = (ios, xros, ); };
-		A1EA4B0E0000000000000012 /* NativeScriptLeakProbe.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000001 /* NativeScriptLeakProbe.framework */; platformFilters = (ios, xros, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		A1EA4B0E0000000000000011 /* NativeScriptLeakProbe.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000001 /* NativeScriptLeakProbe.framework */; platformFilters = (ios, maccatalyst, xros, ); };
+		A1EA4B0E0000000000000012 /* NativeScriptLeakProbe.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000001 /* NativeScriptLeakProbe.framework */; platformFilters = (ios, maccatalyst, xros, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A1EA4B0E0000000000000014 /* LeakProbeSPI.h in Headers */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000013 /* LeakProbeSPI.h */; };
 /* End PBXBuildFile section */
 
@@ -2604,6 +2604,7 @@
 			isa = PBXTargetDependency;
 			platformFilters = (
 				ios,
+				maccatalyst,
 				xros,
 			);
 			target = A1EA4B0E000000000000000B /* NativeScriptLeakProbe */;
