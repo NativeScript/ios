@@ -288,17 +288,21 @@ inherits, whose receiver still reads the state), and then retires them. For othe
 a compile-time choice (`NS_CANARY_DEATH_SIGNAL` in `WrapperLifetimeCanary.mm`): by default a
 token associated with the
 object reports it from its `-dealloc`, immediately and on any thread, but the ObjC runtime aborts
-the process for a class that forbids associated objects, and there is no public query for that.
-Code that calls `objc_removeAssociatedObjects` on a live object releases the token too, which
+the process for a class that forbids associated objects (Swift actors, for one), and there is no
+public query for that. The runtime checks the flag `objc_setAssociatedObject` aborts on
+(`RW_FORBIDS_ASSOCIATED_OBJECTS` in the object's class's `class_rw_t`, reached through the
+`objc_debug_class_rw_data_mask` libobjc exports for debuggers) before it attaches a token; an
+object it flags, or whose class it cannot read, gets no state: its JS properties stay on the
+canary and are gone after a replacement, and the weak collections key its wrapper. Code that
+calls `objc_removeAssociatedObjects` on a live object releases the token too, which
 retires the state as if the object had died: the next write through the canary starts a new
 state from the canary's properties, but if the canary dies before such a write, a canary built
 later starts without them. The alternative keeps an ObjC weak reference in each record
 (`objc_initWeakOrNil`, which declines instead of aborting for classes that refuse weak
 references) and sweeps the records after every major collection, so state lingers until then.
 An instance of a class that refuses weak references and is not JS-extended gets no state
-under it: its properties live on the canary alone and are gone after a replacement. With the
-default, `"scope": "all"` is experimental because of that abort; `"extended"` attaches no
-tokens at all. It cannot be
+under it, in the same way. With the default, `"scope": "all"` stays experimental because that
+check reads private runtime layout; `"extended"` attaches no tokens at all. It cannot be
 rooted at canary death instead, because a state reachable only through the canary is garbage in
 the same collection. The cost: state that references its own object (a closure over `this`)
 keeps it alive. A canary built after a death is a new object, but `===` cannot tell: only one
@@ -307,7 +311,7 @@ What could notice is whatever keys on the canary without keeping it. The weak co
 don't: in canary mode a builtin (`js/weak-collections.js`) replaces `WeakMap`, `WeakSet`,
 `WeakRef` and `FinalizationRegistry` with subclasses that key an in-scope native object (a
 canary: not a plain object under `"extended"`, a tagged pointer, a block, or an object of a class
-refusing weak references) by an opaque, frozen key held by its state, so entries and targets live
+refusing weak references or forbidding associated objects) by an opaque, frozen key held by its state, so entries and targets live
 exactly as long as the native object, and `WeakRef.prototype.deref` returns the live canary, a new
 one, or `undefined` once the object is gone. Lookups never create that key, and a Proxy around a
 native object stays a key of its own. The cost is the other side of the same rooting: a `WeakMap`

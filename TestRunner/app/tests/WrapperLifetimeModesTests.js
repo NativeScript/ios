@@ -136,7 +136,7 @@ describe("Wrapper lifetime modes", function () {
         });
     });
 
-    it("keeps WeakMap entries and WeakRef targets of natively owned objects when every wrapper is rooted", function (done) {
+    it("keeps WeakMap entries and WeakRef targets of natively owned objects when every wrapper is in scope", function (done) {
         var owner = NSMutableArray.new();
         var map = new WeakMap();
         var ref;
@@ -148,7 +148,7 @@ describe("Wrapper lifetime modes", function () {
         })();
         settle(2, function () {
             var obj = owner.objectAtIndex(0);
-            if (rooted && scope === "all") {
+            if (keepsState && scope === "all") {
                 expect(map.get(obj)).toBe("value");
                 expect(ref.deref()).toBe(obj);
             }

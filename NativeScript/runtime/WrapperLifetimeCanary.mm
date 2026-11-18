@@ -1,5 +1,6 @@
 #include "WrapperLifetimeCanary.h"
 #import <Foundation/Foundation.h>
+#include <dlfcn.h>
 #include <objc/message.h>
 #include <objc/runtime.h>
 #include <atomic>
@@ -22,10 +23,14 @@
 // their class's own -dealloc (InstallDeallocHook) either way; for others:
 // - ASSOCIATION: a token associated with the object reports it from its
 //   -dealloc, immediately and on any thread. The ObjC runtime aborts the
-//   process for a class that forbids associated objects (no public query).
+//   process for a class that forbids associated objects (Swift actors, for
+//   one) and has no public query for it: ForbidsAssociatedObjects reads the
+//   runtime's private flag instead.
 // - WEAK_SWEEP: each record holds a weak reference to the object, checked by a
-//   sweep after every major collection, so state lingers until then. Classes
-//   that refuse weak references keep their JS properties on the canary.
+//   sweep after every major collection, so state lingers until then.
+// An object the chosen signal cannot watch (a class forbidding associated
+// objects, or refusing weak references) gets no state: its JS properties stay
+// on the canary and the weak collections key its wrapper.
 #define NS_CANARY_DEATH_ASSOCIATION 1
 #define NS_CANARY_DEATH_WEAK_SWEEP 2
 #ifndef NS_CANARY_DEATH_SIGNAL
@@ -220,6 +225,33 @@ bool IsExtendedInstance(id object) {
   }
   return false;
 }
+
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
+// The check objc_setAssociatedObject aborts on: RW_FORBIDS_ASSOCIATED_OBJECTS
+// in the class_rw_t flags of the object's own class, reached through the mask
+// libobjc exports for debuggers. Private layout (objc_class keeps `bits` after
+// isa, superclass and the cache; the flags lead class_rw_t), so anything it
+// cannot read, a missing mask or an unrealized class, counts as forbidding. Not
+// a message, as IsExtendedInstance.
+bool ForbidsAssociatedObjects(id object) {
+  static const uintptr_t* rwDataMask =
+      static_cast<const uintptr_t*>(dlsym(RTLD_DEFAULT, "objc_debug_class_rw_data_mask"));
+  if (rwDataMask == nullptr) {
+    return true;
+  }
+  struct ClassLayout {
+    void* isa;
+    void* superclass;
+    void* cache[2];
+    uintptr_t bits;
+  };
+  const auto* cls = static_cast<const ClassLayout*>((__bridge const void*)object_getClass(object));
+  const auto* flags = reinterpret_cast<const uint32_t*>(cls->bits & *rwDataMask);
+  constexpr uint32_t kRealized = 1u << 31;
+  constexpr uint32_t kForbidsAssociatedObjects = 1u << 20;
+  return flags == nullptr || (*flags & kRealized) == 0 || (*flags & kForbidsAssociatedObjects) != 0;
+}
+#endif
 
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
 // Lets go of the state of every object that was deallocated. Runs as an event
@@ -452,6 +484,11 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
     bool replacesDied = canary->canaryRecord_ != nullptr;
     // A JS-extended class's own -dealloc reports its instances' deaths.
     bool extended = IsExtendedInstance(object);
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
+    if (!extended && ForbidsAssociatedObjects(object)) {
+      return false;
+    }
+#endif
     // Allocated before the lock: a collection this allocation starts can run
     // callbacks (the weak sweep's, a finalizer's -dealloc) that take it.
     Local<Object> freshState = Object::New(isolate, Null(isolate), nullptr, nullptr, 0);

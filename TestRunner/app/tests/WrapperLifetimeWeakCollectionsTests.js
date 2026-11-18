@@ -244,6 +244,31 @@ describe("Weak collections of native objects", function () {
         });
     });
 
+    // Under canary mode such an object gets no state: the token that would
+    // report its deallocation cannot be associated with it.
+    it("keys an object whose class forbids associated objects by its wrapper", function () {
+        var obj = TNSAssociationForbidder.forbiddingInstance();
+        expect(TNSAssociationForbidder.forbidsAssociatedObjects(obj)).toBe(true);
+        var before = runtime.getWrapperLifetimeStats();
+        var map = new WeakMap();
+        map.set(obj, "value");
+        expect(map.get(obj)).toBe("value");
+        var set = new WeakSet();
+        set.add(obj);
+        expect(set.has(obj)).toBe(true);
+        expect(new WeakRef(obj).deref()).toBe(obj);
+        var registry = new FinalizationRegistry(function () {});
+        registry.register(obj, "held", obj);
+        expect(registry.unregister(obj)).toBe(true);
+        obj.tag = "kept";
+        Object.defineProperty(obj, "defined", { value: 1, configurable: true });
+        expect(obj.tag).toBe("kept");
+        expect(obj.defined).toBe(1);
+        if (canary) {
+            expect(runtime.getWrapperLifetimeStats().canaryStates).toBe(before.canaryStates);
+        }
+    });
+
     it("keeps working as the standard collections for other keys", function () {
         var key = {};
         var map = new WeakMap([[key, 1]]);
