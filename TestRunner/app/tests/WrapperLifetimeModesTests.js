@@ -109,15 +109,31 @@ describe("Wrapper lifetime modes", function () {
 
     it("collects objects only JS references", function (done) {
         var N = 16;
+        var watched = NSHashTable.weakObjectsHashTable();
         (function () {
             for (var i = 0; i < N; i++) {
                 var obj = i % 2 === 0 ? Extended.new() : TNSAllocLog.new();
                 obj.state = { i: i };
+                watched.addObject(obj);
             }
         })();
         settle(2, function () {
             expect(deallocs()).toBeGreaterThan(N / 2);
-            done();
+            // Later specs count deallocations from a cleared log, so none of
+            // these objects may outlive this spec. Reading the table retains
+            // the survivors until that read's array is collected, hence the
+            // rounds between reads.
+            (function drain(attempts) {
+                var survivors = watched.allObjects.count;
+                if (survivors === 0 || attempts === 0) {
+                    expect(survivors).toBe(0);
+                    done();
+                    return;
+                }
+                settle(3, function () {
+                    drain(attempts - 1);
+                });
+            })(4);
         });
     });
 
