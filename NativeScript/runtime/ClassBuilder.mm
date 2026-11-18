@@ -13,6 +13,7 @@
 #include "ObjectManager.h"
 #include "Runtime.h"
 #include "TNSDerivedClass.h"
+#include "WrapperLifetime.h"
 
 using namespace v8;
 
@@ -311,78 +312,35 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         class_addMethod(object_getClass(extendedClass), @selector(initialize), newInitialize,
                         "v@:");
 
-        /// We swizzle the retain and release methods for the following reason:
-        /// When we instantiate a native class via a JavaScript call we add it to the object
-        /// instances map thus incrementing the retainCount by 1. Then, when the native object is
-        /// referenced somewhere else its count will become more than 1. Since we want to keep the
-        /// corresponding JavaScript object alive even if it is not used anywhere, we call GcProtect
-        /// on it. Whenever the native object is released so that its retainCount is 1 (the object
-        /// instances map), we unprotect the corresponding JavaScript object in order to make both
-        /// of them destroyable/GC-able. When the JavaScript object is GC-ed we release the native
-        /// counterpart as well.
-        id (*retain)(id, SEL) =
-            (id (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(retain));
-        IMP newRetain = imp_implementationWithBlock(^id(id self) {
-          if (!isolateWrapper.IsValid()) {
-            return retain(self, @selector(retain));
-          }
-          if ([self retainCount] == 1) {
-            auto runtime = Runtime::GetRuntime(isolate);
-            auto runtimeLoop = runtime->RuntimeLoop();
-            void* weakSelf = (__bridge void*)self;
-            auto gcProtect = [isolateWrapper, weakSelf, isolate]() {
-              auto innerCache = isolateWrapper.GetCache();
-              auto it = innerCache->Instances.find((id)weakSelf);
-              if (it != innerCache->Instances.end()) {
-                v8::Locker locker(isolate);
-                Isolate::Scope isolate_scope(isolate);
-                HandleScope handle_scope(isolate);
-                Local<Value> value = it->second->Get(isolate);
-                BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
-                if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
-                  ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-                  if (objcWrapper->OwnershipState() != nullptr) {
-                    ObjectManager::ReconcileOwnership(isolate, objcWrapper);
-                  } else {
-                    objcWrapper->GcProtect();
-                  }
-                }
-              }
-            };
-            // After the retain: reconciling reads the new retain count.
-            id result = retain(self, @selector(retain));
-            if (CFRunLoopGetCurrent() != runtimeLoop) {
-              // bare entry: the closure does its own Locker ceremony, exactly
-              // like the performed block it replaces
-              runtime->GetEventLoop()->PostInternalBare(gcProtect);
-            } else {
-              gcProtect();
+        // The rooted lifetime mode reads native ownership from retain counts
+        // when a major collection starts, so it needs no swizzle.
+        if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kResurrecting) {
+          /// We swizzle the retain and release methods for the following reason:
+          /// When we instantiate a native class via a JavaScript call we add it to the object
+          /// instances map thus incrementing the retainCount by 1. Then, when the native object is
+          /// referenced somewhere else its count will become more than 1. Since we want to keep the
+          /// corresponding JavaScript object alive even if it is not used anywhere, we call
+          /// GcProtect on it. Whenever the native object is released so that its retainCount is 1
+          /// (the object instances map), we unprotect the corresponding JavaScript object in order
+          /// to make both of them destroyable/GC-able. When the JavaScript object is GC-ed we
+          /// release the native counterpart as well.
+          id (*retain)(id, SEL) =
+              (id (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(retain));
+          IMP newRetain = imp_implementationWithBlock(^id(id self) {
+            if (!isolateWrapper.IsValid()) {
+              return retain(self, @selector(retain));
             }
-            return result;
-          }
-
-          return retain(self, @selector(retain));
-        });
-        class_addMethod(extendedClass, @selector(retain), newRetain, "@@:");
-
-        void (*release)(id, SEL) =
-            (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(release));
-        IMP newRelease = imp_implementationWithBlock(^(id self) {
-          if (!isolateWrapper.IsValid()) {
-            release(self, @selector(release));
-            return;
-          }
-
-          if ([self retainCount] == 2) {
-            void* weakSelf = (__bridge void*)self;
-            auto gcUnprotect = [isolateWrapper, weakSelf, isolate]() {
-              auto innerCache = isolateWrapper.GetCache();
-              auto it = innerCache->Instances.find((id)weakSelf);
-              if (it != innerCache->Instances.end()) {
-                v8::Locker locker(isolate);
-                Isolate::Scope isolate_scope(isolate);
-                HandleScope handle_scope(isolate);
-                if (it->second != nullptr) {
+            if ([self retainCount] == 1) {
+              auto runtime = Runtime::GetRuntime(isolate);
+              auto runtimeLoop = runtime->RuntimeLoop();
+              void* weakSelf = (__bridge void*)self;
+              auto gcProtect = [isolateWrapper, weakSelf, isolate]() {
+                auto innerCache = isolateWrapper.GetCache();
+                auto it = innerCache->Instances.find((id)weakSelf);
+                if (it != innerCache->Instances.end()) {
+                  v8::Locker locker(isolate);
+                  Isolate::Scope isolate_scope(isolate);
+                  HandleScope handle_scope(isolate);
                   Local<Value> value = it->second->Get(isolate);
                   BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
                   if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
@@ -390,32 +348,79 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
                     if (objcWrapper->OwnershipState() != nullptr) {
                       ObjectManager::ReconcileOwnership(isolate, objcWrapper);
                     } else {
-                      objcWrapper->GcUnprotect();
+                      objcWrapper->GcProtect();
                     }
                   }
                 }
+              };
+              // After the retain: reconciling reads the new retain count.
+              id result = retain(self, @selector(retain));
+              if (CFRunLoopGetCurrent() != runtimeLoop) {
+                // bare entry: the closure does its own Locker ceremony, exactly
+                // like the performed block it replaces
+                runtime->GetEventLoop()->PostInternalBare(gcProtect);
+              } else {
+                gcProtect();
               }
-            };
-            auto runtime = Runtime::GetRuntime(isolate);
-            auto runtimeLoop = runtime->RuntimeLoop();
-            // After the release: reconciling reads the new retain count, and
-            // the Instances entry still holds the object.
-            release(self, @selector(release));
-            if (CFRunLoopGetCurrent() != runtimeLoop) {
-              // bare entry: the closure does its own Locker ceremony, exactly
-              // like the performed block it replaces
-              runtime->GetEventLoop()->PostInternalBare(gcUnprotect);
-            } else {
-              gcUnprotect();
+              return result;
             }
-            return;
-          }
 
-          release(self, @selector(release));
-        });
-        class_addMethod(extendedClass, @selector(release), newRelease, "v@:");
-        if (auto* tracked = Caches::StateFor<RetainTrackedClasses>(isolate)) {
-          tracked->classes.insert((__bridge void*)extendedClass);
+            return retain(self, @selector(retain));
+          });
+          class_addMethod(extendedClass, @selector(retain), newRetain, "@@:");
+
+          void (*release)(id, SEL) =
+              (void (*)(id, SEL))FindNotOverridenMethod(extendedClass, @selector(release));
+          IMP newRelease = imp_implementationWithBlock(^(id self) {
+            if (!isolateWrapper.IsValid()) {
+              release(self, @selector(release));
+              return;
+            }
+
+            if ([self retainCount] == 2) {
+              void* weakSelf = (__bridge void*)self;
+              auto gcUnprotect = [isolateWrapper, weakSelf, isolate]() {
+                auto innerCache = isolateWrapper.GetCache();
+                auto it = innerCache->Instances.find((id)weakSelf);
+                if (it != innerCache->Instances.end()) {
+                  v8::Locker locker(isolate);
+                  Isolate::Scope isolate_scope(isolate);
+                  HandleScope handle_scope(isolate);
+                  if (it->second != nullptr) {
+                    Local<Value> value = it->second->Get(isolate);
+                    BaseDataWrapper* wrapper = tns::GetValue(isolate, value);
+                    if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
+                      ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+                      if (objcWrapper->OwnershipState() != nullptr) {
+                        ObjectManager::ReconcileOwnership(isolate, objcWrapper);
+                      } else {
+                        objcWrapper->GcUnprotect();
+                      }
+                    }
+                  }
+                }
+              };
+              auto runtime = Runtime::GetRuntime(isolate);
+              auto runtimeLoop = runtime->RuntimeLoop();
+              // After the release: reconciling reads the new retain count, and
+              // the Instances entry still holds the object.
+              release(self, @selector(release));
+              if (CFRunLoopGetCurrent() != runtimeLoop) {
+                // bare entry: the closure does its own Locker ceremony, exactly
+                // like the performed block it replaces
+                runtime->GetEventLoop()->PostInternalBare(gcUnprotect);
+              } else {
+                gcUnprotect();
+              }
+              return;
+            }
+
+            release(self, @selector(release));
+          });
+          class_addMethod(extendedClass, @selector(release), newRelease, "v@:");
+          if (auto* tracked = Caches::StateFor<RetainTrackedClasses>(isolate)) {
+            tracked->classes.insert((__bridge void*)extendedClass);
+          }
         }
 
         info.GetReturnValue().SetUndefined();
@@ -1106,11 +1111,16 @@ void ClassBuilder::SuperAccessorGetterCallback(const FunctionCallbackInfo<Value>
 }
 
 Class ClassBuilder::FindNativeClass(Class klass) {
-  while (class_conformsToProtocol(klass, @protocol(TNSDerivedClass))) {
-    klass = class_getSuperclass(klass);
+  // Walks the whole chain: key-value observing puts a subclass that does not
+  // conform below the JS class, and class_conformsToProtocol does not look at
+  // superclasses.
+  Class native = klass;
+  for (Class cls = klass; cls != nil; cls = class_getSuperclass(cls)) {
+    if (class_conformsToProtocol(cls, @protocol(TNSDerivedClass))) {
+      native = class_getSuperclass(cls);
+    }
   }
-
-  return klass;
+  return native;
 }
 
 bool ClassBuilder::TracksNativeRetains(Isolate* isolate, Class klass) {

@@ -403,6 +403,7 @@ class ObjCDataWrapper : public BaseDataWrapper {
         data_(data),
         typeEncoding_(typeEncoding),
         klass_(object_getClass(data)) {}
+  ~ObjCDataWrapper();
 
   const WrapperType Type() { return WrapperType::ObjCObject; }
 
@@ -434,6 +435,13 @@ class ObjCDataWrapper : public BaseDataWrapper {
   ObjectWeakCallbackState* OwnershipState() { return this->ownershipState_; }
   void SetOwnershipState(ObjectWeakCallbackState* state) { this->ownershipState_ = state; }
 
+  // Registration state of a wrapper adopted by WrapperLifetime; null otherwise.
+  // A wrapper has at most one of OwnershipState and LifetimeState.
+  ObjectWeakCallbackState* LifetimeState() { return this->lifetimeState_; }
+  void SetLifetimeState(ObjectWeakCallbackState* state) {
+    this->lifetimeState_ = state;
+  }
+
   // A wrapper that holds no reference to its object (one made for an object
   // already deallocating), so nothing may release on its behalf.
   bool IsBorrowed() { return this->borrowed_; }
@@ -444,6 +452,7 @@ class ObjCDataWrapper : public BaseDataWrapper {
   bool borrowed_ = false;
   bool bornOnRuntimeThread_;
   ObjectWeakCallbackState* ownershipState_ = nullptr;
+  ObjectWeakCallbackState* lifetimeState_ = nullptr;
   id data_;
   const tns::TypeEncoding* typeEncoding_;
   Class klass_;

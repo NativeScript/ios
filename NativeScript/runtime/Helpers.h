@@ -297,6 +297,20 @@ v8::Local<v8::Context> GetCreationContextOrCurrent(v8::Isolate* isolate,
 void SetValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, BaseDataWrapper* value);
 BaseDataWrapper* GetValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
 
+// A tagged pointer carries its value in the pointer itself: it is never
+// retained, released or deallocated, and its retain count means nothing. Only
+// x86_64 macOS and Mac Catalyst tag the low bit; every iOS target, the x86_64
+// simulator included, tags the high bit.
+inline bool IsTaggedPointer(id obj) {
+  // Through void*: clang rejects bit tests on ObjC object pointers.
+  uintptr_t bits = reinterpret_cast<uintptr_t>(static_cast<const void*>(obj));
+#if defined(__x86_64__) && (TARGET_OS_OSX || TARGET_OS_MACCATALYST)
+  return (bits & 1) != 0;
+#else
+  return (bits >> 63) != 0;
+#endif
+}
+
 // The receiver a `this.super` alias (ClassBuilder::SuperAccessorGetterCallback)
 // stands for, or empty when obj is not one. An alias keeps its receiver in
 // internal field 0 and the string "super" in internal field 1; it owns no

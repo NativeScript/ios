@@ -20,6 +20,7 @@
 #include "SymbolIterator.h"
 #include "SymbolLoader.h"
 #include "UnmanagedType.h"
+#include "WrapperLifetime.h"
 #include "robin_hood.h"
 
 using namespace v8;
@@ -818,6 +819,7 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
         Interop::SetValue(dest, data);
       } else if (wrapper->Type() == WrapperType::ObjCObject) {
         ObjCDataWrapper* objCDataWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+        WrapperLifetime::Escape(objCDataWrapper);
         id data = objCDataWrapper->Data();
         Interop::SetValue(dest, data);
       } else if (wrapper->Type() == WrapperType::ObjCClass) {
@@ -915,6 +917,7 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
       switch (wrapper->Type()) {
         case WrapperType::ObjCObject: {
           ObjCDataWrapper* wr = static_cast<ObjCDataWrapper*>(wrapper);
+          WrapperLifetime::Escape(wr);
           return wr->Data();
           break;
         }

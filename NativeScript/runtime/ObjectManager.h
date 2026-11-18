@@ -3,6 +3,9 @@
 
 #include <objc/objc.h>
 
+#include <atomic>
+#include <cstdint>
+
 #include "Common.h"
 
 namespace tns {
@@ -41,6 +44,18 @@ struct ObjectWeakCallbackState {
   // there would free the state under the frame that owns it. Retirement
   // observes the flag and leaves the handle to that frame.
   bool disposing_ = false;
+
+  // Set when WrapperLifetime adopted this registration (an ObjC object wrapper
+  // under a phantom-callback mode). The JS object is unreadable after its
+  // phantom callback, so the wrapper and object are cached here.
+  ObjCDataWrapper* lifetimeWrapper_ = nullptr;
+  id lifetimeTarget_ = nullptr;
+  // WrapperLifetime's cross-isolate retain counter for lifetimeTarget_.
+  std::atomic<uint64_t>* runtimeRetains_ = nullptr;
+  // May be rooted; scanned when a major collection starts.
+  bool lifetimeTracked_ = false;
+  // The handle is currently strong.
+  bool lifetimeStrong_ = false;
 };
 
 class ObjectManager {
@@ -63,6 +78,12 @@ class ObjectManager {
     // still alive a runloop turn later (see WrapperLifetimeWarningsEnabled).
     uint64_t stateLostCandidates = 0;
     uint64_t stateLostConfirmed = 0;
+    // Rooted mode (WrapperLifetime): wrappers made strong because native code
+    // owns their object, made weak because it no longer does, and dead
+    // wrappers whose object was queued for release.
+    uint64_t promotions = 0;
+    uint64_t demotions = 0;
+    uint64_t queuedReleases = 0;
   };
   static LifetimeStats* GetLifetimeStats(v8::Isolate* isolate);
 
@@ -86,6 +107,8 @@ class ObjectManager {
   // Requires the isolate locked and entered, on any thread.
   static void ReconcileOwnership(v8::Isolate* isolate,
                                  ObjCDataWrapper* wrapper);
+  // Removes a registration from the teardown list.
+  static void Unlink(ObjectWeakCallbackState* state);
 
   // A collection can run on any thread that holds the isolate's Locker, but
   // the native releases it causes are handed to the runtime's thread. A new
@@ -106,6 +129,8 @@ class ObjectManager {
   // swizzled-prefixed alias. Null for NSTimer.alloc()'s placeholder, whose
   // -retainCount does not return, and for classes without a -retainCount.
   // Walks method lists, so callers cache the result per class.
+  // Unsupported: a native override that messages [super retainCount] still
+  // reaches a JS replacement on an ancestor, which then runs where JS may not.
   static IMP NativeRetainCountImp(Class cls);
 
  private:

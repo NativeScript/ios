@@ -1,4 +1,15 @@
 describe("GC finalizer callbacks", function () {
+    // Under the rooted wrapper lifetime mode, a dead wrapper's object is
+    // released from a queue drained on entry to native calls, and a natively
+    // retained object only becomes collectable once its holder's release ran.
+    // Under the resurrecting mode the extra rounds change nothing.
+    function collectAndDrain() {
+        for (var round = 0; round < 3; round++) {
+            __collect();
+            NSObject.new();
+        }
+    }
+
     // A finalizer callback runs from V8's GC epilogue. Since 14.9,
     // Heap::CollectGarbage holds a DisallowJavascriptExecution across the whole
     // collection, so entering JS from one is a GRACEFUL_FATAL that aborts the
@@ -29,7 +40,7 @@ describe("GC finalizer callbacks", function () {
         for (var i = 0; i < 200000; i++) {
             sink += i % 7;
         }
-        __collect();
+        collectAndDrain();
 
         expect(sink).toBeGreaterThan(0);
         expect(calls).toBe(1);
@@ -75,7 +86,10 @@ describe("GC finalizer callbacks", function () {
 
     // An object that first reached JS on a background thread has no tie to the
     // runtime's thread, so its release stays with the collection that ran there.
+    // The rooted and canary lifetime modes release through a queue drained on
+    // the runtime's thread instead.
     it("releases a background-born object where the background collection runs", function (done) {
+        var resurrecting = require("ns:runtime").getConfig("wrapperLifetimeMode") === "resurrecting";
         var threads = [];
         var DeallocThread = TNSApi.extend({
             methodCalledInDealloc: function () {
@@ -96,7 +110,7 @@ describe("GC finalizer callbacks", function () {
         var attempts = 200;
         (function poll() {
             if (threads.length > 0 || --attempts === 0) {
-                expect(threads).toEqual([false]);
+                expect(threads).toEqual([!resurrecting]);
                 done();
                 return;
             }
@@ -473,8 +487,7 @@ describe("GC finalizer callbacks", function () {
         })();
 
         scrubStack();
-        __collect();
-        __collect();
+        collectAndDrain();
 
         expect(retired).toBeGreaterThan(0);
         expect(keepAlive.count).toBe(8);
