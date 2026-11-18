@@ -34,6 +34,10 @@ describe("Wrapper lifetime modes", function () {
         return table.allObjects.count;
     }
 
+    // The engine's WeakRef: in canary mode the global one keys a native object
+    // by its lifetime, so it outlives the wrapper it was given.
+    var WrapperWeakRef = canary ? Object.getPrototypeOf(WeakRef) : WeakRef;
+
     function deallocs() {
         return (TNSGetOutput().match(/TNSAllocLog dealloc/g) || []).length;
     }
@@ -59,15 +63,15 @@ describe("Wrapper lifetime modes", function () {
     // canary mode on a new wrapper.
     function rewrap(make, callback) {
         var owner = NSMutableArray.new();
-        var before = runtime.getWrapperLifetimeStats();
+        var first;
         (function () {
-            owner.addObject(make());
+            var obj = make();
+            owner.addObject(obj);
+            first = new WrapperWeakRef(obj);
         })();
         settle(2, function () {
             if (canary) {
-                // The first wrapper died. A WeakRef can't show it here: the
-                // weak collections key a native object by its lifetime.
-                expect(runtime.getWrapperLifetimeStats().queuedReleases).toBeGreaterThan(before.queuedReleases);
+                expect(first.deref()).toBeUndefined();
             }
             callback(owner.objectAtIndex(0));
         });
@@ -493,18 +497,20 @@ describe("Wrapper lifetime modes", function () {
     it("hands back a native object's JS properties on a new wrapper after the old one died", function (done) {
         var owner = NSMutableArray.new();
         var first;
-        var before = runtime.getWrapperLifetimeStats();
+        var firstWrapper;
         (function () {
             var obj = Extended.new();
             obj.tag = "kept";
             owner.addObject(obj);
             first = new WeakRef(obj);
+            firstWrapper = new WrapperWeakRef(obj);
         })();
         settle(2, function () {
             if (canary) {
-                // The old canary died; a WeakRef keys the native object by its
-                // lifetime in this mode, so it hands back the live one.
-                expect(runtime.getWrapperLifetimeStats().queuedReleases).toBeGreaterThan(before.queuedReleases);
+                expect(WrapperWeakRef).not.toBe(WeakRef);
+                expect(firstWrapper.deref()).toBeUndefined();
+                // The global WeakRef keys the native object, so it hands back
+                // the live one on a new wrapper.
                 expect(first.deref().tag).toBe("kept");
             }
             var obj = owner.objectAtIndex(0);
@@ -1476,21 +1482,22 @@ describe("Wrapper lifetime modes", function () {
         it("gives a native constructor's JS-extended result the write handler", function (done) {
             var owner = NSMutableArray.new();
             var handle;
-            var released = stats().queuedReleases;
+            var first;
             (function () {
                 var obj = Extended.new();
                 obj.tag = "kept";
                 owner.addObject(obj);
                 handle = interop.handleof(obj);
+                first = new WrapperWeakRef(obj);
             })();
             settle(2, function () {
+                if (canary) {
+                    expect(first.deref()).toBeUndefined();
+                }
                 var before = stats();
                 var again = new TNSAllocLog(handle);
                 expect(again instanceof TNSAllocLog).toBe(true);
                 if (canary) {
-                    // The first wrapper died (a WeakRef can't show it: weak
-                    // collections key a native object by its lifetime).
-                    expect(before.queuedReleases).toBeGreaterThan(released);
                     expect(Object.getPrototypeOf(again)).toBe(TNSAllocLog.prototype);
                 }
                 if (keepsState) {

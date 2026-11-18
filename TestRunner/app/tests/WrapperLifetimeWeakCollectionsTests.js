@@ -5,6 +5,8 @@
 describe("Weak collections of native objects", function () {
     var runtime = require("ns:runtime");
     var canary = runtime.getConfig("wrapperLifetimeMode") === "canary";
+    // The engine's WeakRef, which keys the wrapper itself.
+    var WrapperWeakRef = canary ? Object.getPrototypeOf(WeakRef) : WeakRef;
 
     var Extended = (function (_super) {
         __extends(Extended, _super);
@@ -35,16 +37,17 @@ describe("Weak collections of native objects", function () {
     it("keeps a WeakMap entry for a native object across a wrapper change", function (done) {
         var owner = NSMutableArray.new();
         var map = new WeakMap();
-        var before = runtime.getWrapperLifetimeStats();
+        var first;
         (function () {
             var obj = Extended.new();
             map.set(obj, "value");
             owner.addObject(obj);
+            first = new WrapperWeakRef(obj);
         })();
         settle(2, function () {
             if (canary) {
                 // The first wrapper died; the entry belongs to the native object.
-                expect(runtime.getWrapperLifetimeStats().queuedReleases).toBeGreaterThan(before.queuedReleases);
+                expect(first.deref()).toBeUndefined();
             }
             var obj = owner.objectAtIndex(0);
             expect(map.get(obj)).toBe("value");
