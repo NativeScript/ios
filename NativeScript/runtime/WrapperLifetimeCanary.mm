@@ -968,8 +968,10 @@ void WrapperLifetimeCanary::ForEachState(
   }
   for (auto& entry : state->registry->records) {
     const std::shared_ptr<CanaryRecord>& record = entry.second;
+    // A dying record's object may already be freed: its superclass's
+    // -dealloc runs outside this lock, before the record is retired.
     if (record->state.IsEmpty() || record->died.load(std::memory_order_acquire) ||
-        !record->ObjectAlive()) {
+        record->dying.load(std::memory_order_acquire) || !record->ObjectAlive()) {
       continue;
     }
     visit((__bridge id)entry.first, record->state.Get(isolate));

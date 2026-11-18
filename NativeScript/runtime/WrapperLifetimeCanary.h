@@ -92,8 +92,11 @@ class WrapperLifetimeCanary {
 
   // Calls `visit` with each live object that has state in this isolate, and
   // its state object. Runs under the registry lock, which an object's
-  // deallocation also takes: `visit` must not run JS, release objects or reach
-  // the registry. The caller provides the HandleScope.
+  // deallocation takes before its memory is freed, so each object stays
+  // readable until `visit` returns; under the weak-sweep death signal (a build
+  // option) that holds only for JS-extended classes. `visit` must not run JS,
+  // release objects or reach the registry. The caller provides the
+  // HandleScope.
   static void ForEachState(
       v8::Isolate* isolate,
       const std::function<void(id object, v8::Local<v8::Object> state)>& visit);
