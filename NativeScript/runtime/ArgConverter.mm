@@ -1344,7 +1344,8 @@ Local<Object> ArgConverter::WrapNativeCallbackSelf(Local<Context> context, id se
   // Native code usually still holds the object (it is mid-initialization or
   // owned by whoever called in), and its JS state must outlive this call: the
   // handle stays strong until the Instances entry is the object's only owner.
-  // A wrapper a lifetime mode roots keeps the mode's own lifetime instead.
+  // A wrapper a lifetime mode roots or makes a canary keeps the mode's own
+  // lifetime instead.
   if (wrapper->LifetimeState() != nullptr) {
     if (ObjectWeakCallbackState* state = WrapperLifetime::Relinquish(wrapper)) {
       ObjectManager::ManageOwnership(isolate, wrapper, state);

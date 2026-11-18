@@ -382,7 +382,8 @@ void WrapperLifetime::EscapeSlow(ObjCDataWrapper* wrapper) {
 
 ObjectWeakCallbackState* WrapperLifetime::Relinquish(ObjCDataWrapper* wrapper) {
   ObjectWeakCallbackState* state = wrapper->LifetimeState();
-  if (state == nullptr || state->lifetimeTracked_ || state->target_->IsEmpty()) {
+  if (state == nullptr || state->lifetimeTracked_ || state->lifetimeCanary_ ||
+      state->target_->IsEmpty()) {
     return nullptr;
   }
   if (state->target_->IsWeak()) {

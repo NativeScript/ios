@@ -103,8 +103,8 @@ class WrapperLifetime {
     }
   }
 
-  // Gives an adopted wrapper that is not rooted back to ObjectManager: returns
-  // its registration with the handle strong, for
+  // Gives an adopted wrapper that is neither rooted nor a canary back to
+  // ObjectManager: returns its registration with the handle strong, for
   // ObjectManager::ManageOwnership. Null when the mode keeps the wrapper.
   static ObjectWeakCallbackState* Relinquish(ObjCDataWrapper* wrapper);
 
