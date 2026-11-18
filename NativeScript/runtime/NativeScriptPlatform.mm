@@ -1,4 +1,5 @@
 #include "NativeScriptPlatform.h"
+#include "Helpers.h"
 
 using namespace v8;
 
@@ -148,8 +149,14 @@ double NativeScriptPlatform::CurrentClockTimeMillisecondsHighResolution() {
   return default_->CurrentClockTimeMillisecondsHighResolution();
 }
 
+// V8 calls this after printing a fatal error (failed CHECK, fatal OOM, flag error) to stderr.
+// The default printer names frames by exported symbols only, which the release framework's
+// stripped symbol table makes wrong, and gives nothing to decode them with.
 Platform::StackTracePrinter NativeScriptPlatform::GetStackTracePrinter() {
-  return default_->GetStackTracePrinter();
+  return []() {
+    Log(@"V8 fatal error (message on stderr). Native stack trace:");
+    tns::LogBacktrace();
+  };
 }
 
 TracingController* NativeScriptPlatform::GetTracingController() {

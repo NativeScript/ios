@@ -1,10 +1,18 @@
 # Native stack traces
 
-The runtime prints a native stack trace when an assertion fails
-(`====== Assertion failed ======`), when it logs an uncaught JavaScript error
-(`Native stack trace:`), and on a fatal Node-API error. This page explains how
-to read those traces and how to turn them into exact function names, file names
-and line numbers.
+The runtime prints a native stack trace in these cases:
+
+- an assertion fails (`====== Assertion failed ======`)
+- it logs an uncaught JavaScript error (`Native stack trace:`)
+- a Node-API fatal error
+- a V8 fatal error, such as a failed `CHECK`, a fatal out-of-memory or an
+  invalid V8 flag (`V8 fatal error (message on stderr). Native stack trace:`).
+  V8 writes the error message itself to stderr, while the trace goes to the
+  unified log like the runtime's other output. In Xcode's console both appear
+  together; in Console.app or `log stream` only the trace appears.
+
+This page explains how to read those traces and how to turn them into exact
+function names, file names and line numbers.
 
 ## What a trace looks like
 
@@ -54,6 +62,11 @@ has its own UUID, shown in the `Binary images:` line.
   - `ios-arm64NativeScript.framework.dSYM.zip`: iPhone and iPad devices
   - `ios-arm64_x86_64-simulatorNativeScript.framework.dSYM.zip`: iOS simulators
   - `ios-arm64-maccatalystNativeScript.framework.dSYM.zip`: Mac Catalyst
+  - `xros-arm64NativeScript.framework.dSYM.zip`: Apple Vision Pro
+  - `xros-arm64-simulatorNativeScript.framework.dSYM.zip`: visionOS simulators
+
+  visionOS is built only for versioned releases, so `next` builds have no
+  `xros-*` dSYMs.
 
   Each zip unpacks to a dSYM with the same prefix, for example
   `ios-arm64NativeScript.framework.dSYM`. The commands below call it

@@ -1004,7 +1004,8 @@ void tns::LogBacktrace(int skip) {
   for (int i = skip; i < nFrames; i++) {
     Dl_info info;
     if (!dladdr(callstack[i], &info) || info.dli_fbase == nullptr || info.dli_fname == nullptr) {
-      snprintf(buf, sizeof(buf), "%-3d %*p %s\n", i, addressWidth, callstack[i], symbols[i]);
+      snprintf(buf, sizeof(buf), "%-3d %*p %s\n", i, addressWidth, callstack[i],
+               symbols != nullptr ? symbols[i] : "");
       Log(@"%s", buf);
       continue;
     }
