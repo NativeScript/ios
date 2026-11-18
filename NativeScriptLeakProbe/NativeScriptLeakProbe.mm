@@ -202,6 +202,16 @@ struct Calibration {
 // One findLeakCycles call. The snapshot's embedder graph callback runs on the
 // calling thread, inside TakeHeapSnapshot.
 struct ProbeRun {
+  ProbeRun() = default;
+  ProbeRun(const ProbeRun&) = delete;
+  ProbeRun& operator=(const ProbeRun&) = delete;
+  // After the snapshot: a last release can run JS.
+  ~ProbeRun() {
+    for (id object : retained) {
+      [object release];
+    }
+  }
+
   bool strict = false;
   const Calibration* calibration = nullptr;
   ClassSet classes;
@@ -209,6 +219,8 @@ struct ProbeRun {
   std::unordered_map<Class, bool> typedClasses;
   std::unordered_map<Class, IMP> retainCountImps;
   std::unordered_map<void*, NativeEntry> natives;
+  // The stateful objects ForEachState handed over, one reference each.
+  std::vector<id> retained;
   // Global handles that stand for native -> JS edges.
   std::unordered_set<SnapshotObjectId> modeledHandles;
   bool truncated = false;
@@ -1130,8 +1142,9 @@ bool BuildNativeGraph(Isolate* isolate, ProbeRun* run) {
   if (!valid) {
     return false;
   }
-  // The registry lock keeps a stateful object from being freed meanwhile.
+  size_t firstRetained = run->retained.size();
   ForEachState(isolate, [&](id object, Local<Object>) {
+    run->retained.push_back(object);
     if (NativeEntry* entry = add((__bridge void*)object, object_getClass(object), 0)) {
       entry->seed = true;
     }
@@ -1168,16 +1181,19 @@ bool BuildNativeGraph(Isolate* isolate, ProbeRun* run) {
       }
     }
   }
-  // A stateful object stays allocated while the registry lock is held.
+  // The run's reference keeps a stateful object allocated, and is not one of
+  // the retains the count is compared with.
   std::unordered_set<void*> counted;
-  ForEachState(isolate, [&](id object, Local<Object>) {
-    auto found = run->natives.find((__bridge void*)object);
+  for (size_t i = firstRetained; i < run->retained.size(); i++) {
+    auto found = run->natives.find((__bridge void*)run->retained[i]);
     if (found != run->natives.end() && !found->second.changed &&
-        StillThere(run, found->first, found->second)) {
+        StillThere(run, found->first, found->second) && counted.insert(found->first).second) {
       ReadRetainCount(run, found->first, &found->second, true);
-      counted.insert(found->first);
+      if (!found->second.countUnknown) {
+        found->second.retainCount--;
+      }
     }
-  });
+  }
   for (auto& native : run->natives) {
     if (counted.count(native.first)) {
       continue;
@@ -1278,6 +1294,12 @@ void BuildEmbedderGraph(Isolate* isolate, EmbedderGraph* graph, void*) {
     graph->AddEdge(nodeFor((__bridge void*)object, object_getClass(object)),
                    graph->V8Node(state.As<Value>()), "ns:state");
     modeled(state);
+    // Released once the snapshot ends: a last release can run JS.
+    if (run != nullptr) {
+      run->retained.push_back(object);
+    } else {
+      [object autorelease];
+    }
   });
   if (run == nullptr) {
     return;
@@ -1913,6 +1935,7 @@ std::map<std::string, ClassCounts> CountByClass(Isolate* isolate) {
   }
   ForEachState(isolate, [&](id object, Local<Object>) {
     counts[class_getName(object_getClass(object))].states++;
+    [object release];
   });
   return counts;
 }

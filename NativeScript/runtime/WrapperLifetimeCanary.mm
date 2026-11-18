@@ -962,19 +962,48 @@ void WrapperLifetimeCanary::ForEachState(
   if (state == nullptr || state->registry->count.load(std::memory_order_relaxed) == 0) {
     return;
   }
-  std::lock_guard<std::mutex> lock(state->registry->mutex);
-  if (state->registry->closed) {
-    return;
-  }
-  for (auto& entry : state->registry->records) {
-    const std::shared_ptr<CanaryRecord>& record = entry.second;
-    // A dying record's object may already be freed: its superclass's
-    // -dealloc runs outside this lock, before the record is retired.
-    if (record->state.IsEmpty() || record->died.load(std::memory_order_acquire) ||
-        record->dying.load(std::memory_order_acquire) || !record->ObjectAlive()) {
-      continue;
+  std::vector<std::pair<id, std::shared_ptr<CanaryRecord>>> live;
+  {
+    std::lock_guard<std::mutex> lock(state->registry->mutex);
+    if (state->registry->closed) {
+      return;
     }
-    visit((__bridge id)entry.first, record->state.Get(isolate));
+    live.reserve(state->registry->records.size());
+    for (auto& entry : state->registry->records) {
+      const std::shared_ptr<CanaryRecord>& record = entry.second;
+      // A dying record's object may already be freed: its superclass's
+      // -dealloc runs outside this lock, before the record is retired.
+      if (record->state.IsEmpty() || record->died.load(std::memory_order_acquire) ||
+          record->dying.load(std::memory_order_acquire) || !record->ObjectAlive()) {
+        continue;
+      }
+      // Only a weak load retains an object whose -dealloc may have started.
+      // A record without a weak slot is one whose object's deallocation takes
+      // this lock before freeing it, so it is readable here.
+      id object = nil;
+      if (record->weakSet) {
+        object = objc_loadWeakRetained(&record->object);
+      } else {
+        id weak = nil;
+        if (objc_initWeakOrNil(&weak, (__bridge id)entry.first) != nil) {
+          object = objc_loadWeakRetained(&weak);
+        }
+        objc_destroyWeak(&weak);
+      }
+      if (object != nil) {
+        live.emplace_back(object, record);
+      }
+    }
+  }
+  // Read before any visit, whose release can run JS. Only this thread resets
+  // state handles.
+  std::vector<Local<Object>> states;
+  states.reserve(live.size());
+  for (const auto& entry : live) {
+    states.push_back(entry.second->state.Get(isolate));
+  }
+  for (size_t i = 0; i < live.size(); i++) {
+    visit(live[i].first, states[i]);
   }
 }
 

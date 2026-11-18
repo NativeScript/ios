@@ -91,11 +91,10 @@ class WrapperLifetimeCanary {
   static void CloseForTeardown(v8::Isolate* isolate);
 
   // Calls `visit` with each live object that has state in this isolate, and
-  // its state object. Runs under the registry lock, which an object's
-  // deallocation takes before its memory is freed, so each object stays
-  // readable until `visit` returns; under the weak-sweep death signal (a build
-  // option) that holds only for JS-extended classes. `visit` must not run JS,
-  // release objects or reach the registry. The caller provides the
+  // its state object, outside the registry lock. Each object comes retained,
+  // and `visit` takes over that reference: its last release can run the
+  // object's -dealloc, JS included. Skips objects whose deallocation started
+  // and those whose class refuses weak references. The caller provides the
   // HandleScope.
   static void ForEachState(
       v8::Isolate* isolate,

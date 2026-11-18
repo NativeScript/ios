@@ -23,7 +23,7 @@
 namespace tns {
 namespace leakprobe {
 
-constexpr uint32_t kVersion = 1;
+constexpr uint32_t kVersion = 2;
 
 constexpr const char* kConnectSymbol = "NativeScriptLeakProbeConnect";
 
@@ -70,8 +70,8 @@ struct Host {
   bool (*forEachInstance)(v8::Isolate* isolate, void* context,
                           void (*visit)(void* context,
                                         const Instance& instance));
-  // `visit` runs under a lock the object's deallocation also takes: it must
-  // not run JS, release objects or call back into the runtime.
+  // Each object comes retained, and `visit` takes over that reference. Its
+  // last release can run JS: not inside a heap snapshot.
   void (*forEachCanaryState)(v8::Isolate* isolate, void* context,
                              void (*visit)(void* context, id object,
                                            v8::Local<v8::Object> state));
