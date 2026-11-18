@@ -269,9 +269,14 @@ rebound with `this.onTap = this.onTap.bind(this)`, a field called `copy`, any
 `Object.defineProperty` over a prototype name), and those are state like any other. The
 setter classifies the prototype chain itself, because once it declines V8 adds a new name
 to the canary without calling the definer: a name that resolves to an inherited accessor (a
-native property, a JS getter/setter) or a read-only data member is left to V8 and never
-becomes state, so native setters run as before. The state is rooted from its first write
-until the native object is deallocated (or, with the default death signal below, until its
+native property, a JS getter/setter) or a read-only data member never becomes state. When the
+first object on the chain with the name is a native class prototype that still records a
+native setter for it, the handler runs that setter itself
+(`MetadataBuilder::TrySetNativeProperty`, the same code as the accessor's setter callback).
+Everything else is left to V8: a JS accessor, a read-only member, a native property without a
+setter, and a name JS assigned or defined on that prototype, which its own setter and definer
+interceptors forget for good. The state is rooted from its first write until the native
+object is deallocated (or, with the default death signal below, until its
 token is released), and stays the source of truth: a canary built later
 for the same object, or the receiver a JS-implemented `-dealloc` runs with, gets the state's
 properties copied onto it with their attributes and accessors. The costs, measured on a
@@ -279,8 +284,11 @@ Release simulator build: the handler is installed per template, so every write t
 wrapper goes through the setter, and V8 looks the name up again after it declines. Under
 `"extended"`, a plain wrapper's expando write takes about 64 ns instead of 17 and a native
 property store about 200 ns instead of 120. On a canary, where the setter also classifies the
-name, an expando write takes about 100 ns and a native property store about 310 ns instead of
-125 (380 instead of 115 four prototypes up). Building a canary for an object with state costs
+name, an expando write takes about 100 ns. A native property store took about 310 ns instead
+of 125 (380 instead of 115 four prototypes up) while the handler left it to V8; running the
+setter from the handler brings it from about 324 to 289 ns two prototypes up and from 396 to
+324 for a `UIButton` `tag` four up (323 to 292 and 392 to 334 under `"all"`, where a plain
+`UIButton`'s goes from 322 to 266). Building a canary for an object with state costs
 about 330 ns per state property. Instances of JS-extended classes report their own
 deallocation: the runtime gives each extended class a `-dealloc` that marks the instance's
 records dying in every isolate, calls the superclass's (which can be a JS one the class
@@ -314,7 +322,10 @@ rooted at canary death instead, because a state reachable only through the canar
 the same collection. The cost: state that references its own object (a closure over `this`)
 keeps it alive. A canary built after a death is a new object, but `===` cannot tell: only one
 canary lives at a time, and anything still referencing the old one would have kept it alive.
-What could notice is whatever keys on the canary without keeping it. The weak collections
+An explicit release is different: `__releaseNativeCounterpart` drops the object's
+`Caches::Instances` entry but not its state, so if the object lives on, the next native return
+of it builds a new canary with the state's properties while JS can still hold the released
+one, and `===` tells them apart. What could notice is whatever keys on the canary without keeping it. The weak collections
 don't: in canary mode a builtin (`js/weak-collections.js`) replaces `WeakMap`, `WeakSet`,
 `WeakRef` and `FinalizationRegistry` with subclasses that key an in-scope native object (a
 canary: not a plain object under `"extended"`, a tagged pointer, a block, or an object of a class
