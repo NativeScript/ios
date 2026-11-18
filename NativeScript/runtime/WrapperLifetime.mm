@@ -118,7 +118,12 @@ void DropRuntimeRetain(id obj, std::atomic<uint64_t>* counter) {
 
 bool IsBlock(id obj) {
   static Class blockClass = objc_getClass("NSBlock");
-  return blockClass != nil && [obj isKindOfClass:blockClass];
+  for (Class cls = object_getClass(obj); cls != nil; cls = class_getSuperclass(cls)) {
+    if (cls == blockClass) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool IsRootable(id obj) {
