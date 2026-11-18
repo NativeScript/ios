@@ -7,6 +7,11 @@
 #   jit-off-in-config           allow-jit, "ios": {"jit": false} -> must run jitless
 #   unsigned-executable-memory  allow-unsigned-executable-memory -> must JIT
 #
+# Some machines (GitHub's macOS runners among them) let a hardened process map
+# JIT memory with no entitlement. The no-entitlement variant can't test the
+# fallback there, so it is skipped when a hardened, unentitled probe binary
+# gets MAP_JIT.
+#
 # The app is launched directly, not through XCUITest, so this needs no
 # Automation Mode. CFFIXED_USER_HOME keeps the junit report TNSSaveResults
 # writes to ~/Documents inside the output folder.
@@ -153,8 +158,45 @@ run_variant() {
   echo "$name: $tests specs, 0 failures"
 }
 
+notice() {
+  if [ -n "${GITHUB_ACTIONS:-}" ]; then
+    echo "::notice::$1"
+  else
+    echo "$1"
+  fi
+}
+
+# Exits 0 when a hardened, ad-hoc signed binary with no entitlements can map
+# JIT memory, i.e. this machine doesn't enforce the hardened runtime's JIT rule.
+jit_unrestricted() {
+  local dir="$OUTPUT/map-jit-probe"
+  rm -rf "$dir" && mkdir -p "$dir" || return 2
+  printf '%s\n' \
+    '#include <sys/mman.h>' \
+    'int main(void) {' \
+    '  void *p = mmap(0, 16384, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANON | MAP_JIT, -1, 0);' \
+    '  return p == MAP_FAILED;' \
+    '}' > "$dir/probe.c"
+  xcrun clang -o "$dir/probe" "$dir/probe.c" || return 2
+  codesign --force --options runtime --sign - "$dir/probe" 2>/dev/null || return 2
+  "$dir/probe"
+}
+
 FAILED=()
-run_variant no-jit-entitlement jitless "" || FAILED+=(no-jit-entitlement)
+probe_status=0
+jit_unrestricted || probe_status=$?
+case "$probe_status" in
+  0)
+    notice "Skipping no-jit-entitlement: this machine lets hardened processes map JIT memory without an entitlement, so the fallback can't be exercised here, and unsigned-executable-memory passes regardless of the entitlement."
+    ;;
+  1)
+    run_variant no-jit-entitlement jitless "" || FAILED+=(no-jit-entitlement)
+    ;;
+  *)
+    echo "Could not build the MAP_JIT probe" >&2
+    FAILED+=(map-jit-probe)
+    ;;
+esac
 run_variant jit-off-in-config jitless false allow-jit || FAILED+=(jit-off-in-config)
 run_variant unsigned-executable-memory jit "" allow-unsigned-executable-memory || FAILED+=(unsigned-executable-memory)
 
