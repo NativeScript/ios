@@ -174,6 +174,9 @@ jobs:
           detailed_summary: true
       - name: Validate Test Results
         run: |
+          # JS spec results only reach CI through these reports, and xargs runs
+          # nothing on empty input, so a missing report must fail here.
+          ls "$TEST_FOLDER"/test-out/*junit*.xml > /dev/null 2>&1 || { echo "::error::No JUnit report in $TEST_FOLDER/test-out"; exit 1; }
           find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
           find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
       - name: Collect test diagnostics
@@ -221,17 +224,31 @@ jobs:
           # run_tests.sh empties its results folder, so move the failed
           # attempt's bundle out of it first.
           on_retry_command: rm -rf $TEST_FOLDER-attempt1; mv $TEST_FOLDER $TEST_FOLDER-attempt1 2>/dev/null || true
+      - name: Extract test results
+        if: ${{ !cancelled() }}
+        run: |
+          if [ -d "$TEST_FOLDER/test_results.xcresult" ]; then
+            ./scripts/export-test-attachments.sh --result "$TEST_FOLDER/test_results.xcresult" --output "$TEST_FOLDER/test-out"
+          fi
       - name: Test report summary
         if: ${{ !cancelled() }}
-        uses: mikepenz/action-junit-report@a9170d5795813c01ab4901ffb045b52bab4ab09d # v6.5.0
+        uses: mikepenz/action-junit-report@6ef3fdcfcd5f0b5d14df3e659ef19b8c6820f93d # v6.6.1
         with:
           report_paths: build/tests/catalyst/test-out/*junit*.xml
           annotate_only: true
           detailed_summary: true
       - name: Validate Test Results
         run: |
+          # JS spec results only reach CI through these reports, and xargs runs
+          # nothing on empty input, so a missing report must fail here.
+          ls "$TEST_FOLDER"/test-out/*junit*.xml > /dev/null 2>&1 || { echo "::error::No JUnit report in $TEST_FOLDER/test-out"; exit 1; }
           find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
           find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
+      - name: JIT fallback check
+        # The suite above only covers allow-jit with the JIT on. Re-sign the
+        # built app into the configurations where the runtime must fall back to
+        # --jitless (or may JIT without allow-jit) and run the suite in each.
+        run: ./scripts/check-catalyst-jit.sh --app build/Debug-maccatalyst/TestRunner.app --output "$TEST_FOLDER/jit-check"
       - name: Collect test diagnostics
         if: failure()
         uses: ./.github/actions/collect-test-diagnostics
@@ -241,9 +258,11 @@ jobs:
           host-process-log: "true"
       - name: Archive Test Result Data
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results-catalyst
           path: |
             ${{env.TEST_FOLDER}}/test_results.xcresult
             ${{env.TEST_FOLDER}}-attempt1/test_results.xcresult
+            ${{env.TEST_FOLDER}}/jit-check/*.log
+            ${{env.TEST_FOLDER}}/jit-check/*-junit.xml
