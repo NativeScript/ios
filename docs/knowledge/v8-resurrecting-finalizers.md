@@ -297,7 +297,14 @@ canary and are gone after a replacement, and the weak collections key its wrappe
 calls `objc_removeAssociatedObjects` on a live object releases the token too, which
 retires the state as if the object had died: the next write through the canary starts a new
 state from the canary's properties, but if the canary dies before such a write, a canary built
-later starts without them. The alternative keeps an ObjC weak reference in each record
+later starts without them. The weak collections' key for the object hangs off that state, so
+what they keyed on the object is lost with it: `WeakMap` and `WeakSet` lookups miss,
+`WeakRef.prototype.deref` returns `undefined`, and once the old key is collected the
+`FinalizationRegistry` cleanup for it runs although the object lives. A JS write through the
+canary starts a new state but no key; the next `set`, `add`, `new WeakRef` or `register` on the
+object makes a new key, and entries keyed on the old one never come back. This stays a
+limitation: `objc_removeAssociatedObjects` removes every client's associations, and Apple
+documents it as not for general use. The alternative keeps an ObjC weak reference in each record
 (`objc_initWeakOrNil`, which declines instead of aborting for classes that refuse weak
 references) and sweeps the records after every major collection, so state lingers until then.
 An instance of a class that refuses weak references and is not JS-extended gets no state
