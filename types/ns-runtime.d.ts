@@ -171,7 +171,7 @@ declare module "ns:runtime" {
     cutOffs: {
       /** Native objects 8 references from a wrapped one, not expanded. */
       depth: number;
-      /** Storage blocks read only up to 64 KB. */
+      /** Storage blocks read only up to 64 KB, and one object's storage up to 256 KB in all. */
       storage: number;
       /** Cycles longer than 64 hops, not reported. */
       cycleLength: number;

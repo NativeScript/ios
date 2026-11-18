@@ -109,6 +109,9 @@ constexpr size_t kMaxNativeObjects = 200000;
 constexpr int kMaxNativeDepth = 8;
 constexpr size_t kMaxStorageBytes = 64 * 1024;
 constexpr int kMaxStorageDepth = 2;
+// Words one scan reads across the storage it follows: nested blocks can be
+// shared, so the depth limit alone does not bound it.
+constexpr size_t kMaxScanWords = 4 * kMaxStorageBytes / sizeof(void*);
 constexpr size_t kMaxCycleLength = 64;
 constexpr size_t kMemoryWarningTopClasses = 10;
 constexpr uint32_t kMaxChangedListed = 50;
@@ -364,19 +367,31 @@ bool NonOwningContainer(Class cls) {
   return cls != nil && (cls == hashTable || cls == mapTable || cls == pointerArray);
 }
 
-// Object pointers in a block that is not an object (collection storage, block
-// captures), following nested storage a little way.
-void ScanStorage(const ClassSet& classes, uintptr_t p, size_t size, int depth,
-                 const std::string& prefix, std::vector<NativeEdge>* out,
-                 const SlotSkips* skips = nullptr, uint32_t* cutOffs = nullptr) {
-  if (size > kMaxStorageBytes && cutOffs != nullptr) {
-    (*cutOffs)++;
+struct StorageScan {
+  const ClassSet& classes;
+  const SlotSkips* skips;
+  std::vector<NativeEdge>* out;
+  size_t wordsLeft = kMaxScanWords;
+  bool exhausted = false;
+  uint32_t cutOffs = 0;
+};
+
+void ScanBlock(StorageScan* scan, uintptr_t p, size_t size, int depth, const std::string& prefix) {
+  if (size > kMaxStorageBytes) {
+    scan->cutOffs++;
   }
-  size_t limit = std::min(size, kMaxStorageBytes) & ~(sizeof(void*) - 1);
-  std::vector<uintptr_t> words(limit / sizeof(void*));
-  if (!ReadMemory(p, limit, size, words.data())) {
+  size_t count = (std::min(size, kMaxStorageBytes) & ~(sizeof(void*) - 1)) / sizeof(void*);
+  if (count > scan->wordsLeft) {
+    count = scan->wordsLeft;
+    scan->exhausted = true;
+  }
+  scan->wordsLeft -= count;
+  std::vector<uintptr_t> words(count);
+  if (count == 0 || !ReadMemory(p, count * sizeof(void*), size, words.data())) {
     return;
   }
+  const ClassSet& classes = scan->classes;
+  const SlotSkips* skips = scan->skips;
   for (size_t i = 0; i < words.size(); i++) {
     size_t offset = i * sizeof(void*);
     uintptr_t value = words[i];
@@ -392,10 +407,22 @@ void ScanStorage(const ClassSet& classes, uintptr_t p, size_t size, int depth,
       continue;
     }
     if (Class cls = ObjectClass(classes, value, valueSize)) {
-      out->push_back({reinterpret_cast<void*>(value), cls, label});
+      scan->out->push_back({reinterpret_cast<void*>(value), cls, label});
     } else if (depth < kMaxStorageDepth) {
-      ScanStorage(classes, value, valueSize, depth + 1, label, out, skips, cutOffs);
+      ScanBlock(scan, value, valueSize, depth + 1, label);
     }
+  }
+}
+
+// Object pointers in a block that is not an object (collection storage, block
+// captures), following nested storage a little way.
+void ScanStorage(const ClassSet& classes, uintptr_t p, size_t size, int depth,
+                 const std::string& prefix, std::vector<NativeEdge>* out,
+                 const SlotSkips* skips = nullptr, uint32_t* cutOffs = nullptr) {
+  StorageScan scan{classes, skips, out};
+  ScanBlock(&scan, p, size, depth, prefix);
+  if (cutOffs != nullptr) {
+    *cutOffs += scan.cutOffs + (scan.exhausted ? 1 : 0);
   }
 }
 

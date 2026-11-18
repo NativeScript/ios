@@ -233,8 +233,9 @@ The walk reads object ivars by their type (strong ones only), scans the
 memory of objects without object ivars, and of collections and blocks, as
 storage, and stops at some limits, which `cutOffs` counts: native objects 8
 references from a wrapped one are not expanded (`depth`), a storage block is
-read up to 64 KB (`storage`), and cycles longer than 64 hops are not reported
-(`cycleLength`). `truncated` means the graph hit its 200,000-object limit.
+read up to 64 KB and one object's storage up to 256 KB in all (`storage`),
+and cycles longer than 64 hops are not reported (`cycleLength`). `truncated`
+means the graph hit its 200,000-object limit.
 Some layouts are read rather than scanned, once measured on objects the
 probe builds before its first snapshot (`calibrated`): `CALayer`'s
 unretained superlayer, and its delegate when it has no superlayer, are
