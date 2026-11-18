@@ -470,7 +470,18 @@ describe("Wrapper lifetime leak cycles", function () {
         });
     }, 30000);
 
+    // As the probe decides: the app config's "leakProbe", else a debug build.
+    function triggersEnabled() {
+        var path = NSBundle.mainBundle.resourcePath + "/app/package.json";
+        var config = JSON.parse(String(NSString.stringWithContentsOfFileEncodingError(path, NSUTF8StringEncoding)));
+        var leakProbe = config.wrapperLifetime && config.wrapperLifetime.leakProbe;
+        return typeof leakProbe === "boolean" ? leakProbe : TNSIsConfigurationDebug();
+    }
+
     it("writes an inspect report when the Darwin notification is posted", function (done) {
+        if (!triggersEnabled()) {
+            pending("the probe answers notifications only in debug builds or with leakProbe set");
+        }
         var held = NotifiedView.new();
         var tmp = NSTemporaryDirectory();
         var files = NSFileManager.defaultManager;
