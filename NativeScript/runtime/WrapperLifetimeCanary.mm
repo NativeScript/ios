@@ -117,8 +117,12 @@ void DrainDead(const std::shared_ptr<CanaryRegistry>& registry) {
   }
 }
 
-// From a reporter's -dealloc, on whichever thread deallocates the object.
-void NativeDied(const std::shared_ptr<CanaryRegistry>& registry, void* object) {
+// From a reporter's -dealloc, on whichever thread deallocates the object. With
+// `expected`, retires the object's record only while it is still that one:
+// once the object is freed, another thread can install a new object's record
+// at the address, so the comparison must stay under the same lock as the erase.
+void NativeDied(const std::shared_ptr<CanaryRegistry>& registry, void* object,
+                const CanaryRecord* expected = nullptr) {
   if (registry->count.load(std::memory_order_relaxed) == 0) {
     return;
   }
@@ -129,7 +133,7 @@ void NativeDied(const std::shared_ptr<CanaryRegistry>& registry, void* object) {
       return;
     }
     auto it = registry->records.find(object);
-    if (it == registry->records.end()) {
+    if (it == registry->records.end() || (expected != nullptr && it->second.get() != expected)) {
       return;
     }
     // Erased now, inside the object's -dealloc: an object later allocated at
@@ -190,18 +194,13 @@ DyingRecords MarkDying(void* object) {
   return dying;
 }
 
-// After it returned: retires each record by identity. A record a new object at
-// the address already displaced (RetireIfDead) is gone from the map.
+// After it returned, with `object` freed: retires each record by identity. A
+// record a new object at the address already displaced (RetireIfDead) is gone
+// from the map. `dying` keeps each record alive, so no new record can share
+// its address.
 void ReportDyingRecordsDied(const DyingRecords& dying, void* object) {
   for (const auto& [registry, record] : dying) {
-    {
-      std::lock_guard<std::mutex> lock(registry->mutex);
-      auto it = registry->records.find(object);
-      if (registry->closed || it == registry->records.end() || it->second != record) {
-        continue;
-      }
-    }
-    NativeDied(registry, object);
+    NativeDied(registry, object, record.get());
   }
 }
 
