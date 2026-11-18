@@ -210,7 +210,8 @@ count exceeds the retains found in that graph; everything else is marked from
 the V8 roots, and cycles among what stays unmarked are reported. A `WeakMap`
 value is followed from its key only, not from the map. Every heap snapshot,
 DevTools' included, carries the runtime's edges while the framework is
-embedded; only `findLeakCycles` walks native memory.
+embedded, except `ns:block-callback`: only `findLeakCycles` walks native
+memory, which is where it finds JS blocks.
 
 | option | effect |
 |---|---|

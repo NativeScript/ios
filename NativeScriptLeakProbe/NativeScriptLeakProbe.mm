@@ -5,8 +5,10 @@
 // Heap snapshots carry both heaps: an embedder graph adds a node per native
 // object the runtime wraps or keeps JS state for, and the runtime's own
 // cross-heap edges (wrapper -> object retain, rooted-strong object -> wrapper,
-// canary object -> state, JS block -> callback). Any snapshot gets these,
-// DevTools' included.
+// canary object -> state, adapter -> JS object). Any snapshot gets these,
+// DevTools' included. JS block -> callback edges are added by findLeakCycles()
+// only: the runtime keeps no list of its JS blocks, and never wraps one made
+// for the same isolate, so only its native walk finds them.
 //
 // findLeakCycles() adds the native objects reachable from those through owning
 // references (strong object ivars, collection and block storage) and runs a
