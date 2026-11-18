@@ -183,4 +183,49 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index);
 
 @end
 
+// Declares -retainCount and shares its name with the class adopting it, so
+// assigning TNSReplaceableRetainCountProtocol.prototype.retainCount replaces
+// the method on that class alone, as NSObjectProtocol.prototype does on
+// NSObject.
+@protocol TNSReplaceableRetainCount
+
+- (NSUInteger)retainCount;
+
+@end
+
+@interface TNSReplaceableRetainCount : TNSAllocLog <TNSReplaceableRetainCount>
+
+// Sends -retainCount to `object`.
++ (NSUInteger)retainCountOf:(id)object;
+
+// Adds a new instance to `owner`, then sends it -retainCount, so a JS
+// replacement of -retainCount is what first hands the instance to JS.
++ (void)addNewInstanceTo:(NSMutableArray*)owner;
+
+@end
+
+// Only these fixtures send -tnsCallbackHook, so a JS replacement of it runs
+// for their timers alone.
+@interface NSTimer (TNSCallbackHook)
+
+- (void)tnsCallbackHook;
+
+// Adds an unscheduled timer targeting a new TNSAllocLog to `owner`, then
+// sends it -tnsCallbackHook, so a JS replacement of the hook is what first
+// hands the timer to JS.
++ (void)tnsAddHookedTimerTo:(NSMutableArray*)owner;
+
+@end
+
+@interface TNSUninitializedTimer : NSObject
+
+// NSTimer.alloc()'s placeholder, which a JS alloc() call never creates: its
+// -retainCount does not return.
++ (id)placeholder;
+
+// Sends -tnsCallbackHook to the placeholder.
++ (void)hookPlaceholder;
+
+@end
+
 #endif /* TNSAllocLog_h */

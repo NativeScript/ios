@@ -157,6 +157,87 @@ describe("Native callback self wrappers", function () {
         });
     });
 
+    // Ownership checks run in a GC prologue, where JS may not run. The
+    // replacement stays installed for the rest of the run, on a class no other
+    // spec uses.
+    it("never calls a JS replacement of retainCount to decide whether native code owns an object", function (done) {
+        var calls = 0;
+        var proto = TNSReplaceableRetainCountProtocol.prototype;
+        var original = proto.retainCount;
+        proto.retainCount = function () {
+            calls++;
+            return original.call(this);
+        };
+        var owner = NSMutableArray.new();
+        TNSReplaceableRetainCount.addNewInstanceTo(owner);
+        expect(calls).toBe(1);
+        (function () {
+            var obj = owner.objectAtIndex(0);
+            obj.state = 3;
+            expect(TNSReplaceableRetainCount.retainCountOf(obj)).toBeGreaterThan(1);
+            expect(calls).toBe(2);
+        })();
+        settle(2, function () {
+            expect(calls).toBe(2);
+            expect(owner.objectAtIndex(0).state).toBe(3);
+            owner.removeAllObjects();
+            settle(3, function () {
+                expect(calls).toBe(2);
+                expect(deallocs()).toBe(1);
+                done();
+            });
+        });
+    });
+
+    // The hook stays replaced for the rest of the run; only fixtures send it.
+    var timerHook = { installed: false, run: null };
+
+    function hookTimers(run) {
+        if (!timerHook.installed) {
+            timerHook.installed = true;
+            NSTimer.prototype.tnsCallbackHook = function () {
+                timerHook.run(this);
+            };
+        }
+        timerHook.run = run;
+    }
+
+    it("keeps the JS state of a natively owned timer whose JS method created its wrapper, then frees it once", function (done) {
+        var owner = NSMutableArray.new();
+        var map = new WeakMap();
+        hookTimers(function (timer) {
+            timer.state = 5;
+            map.set(timer, "timer");
+        });
+        NSTimer.tnsAddHookedTimerTo(owner);
+        settle(3, function () {
+            var timer = owner.objectAtIndex(0);
+            expect(timer.state).toBe(5);
+            expect(map.get(timer)).toBe("timer");
+            timer = null;
+            expect(deallocs()).toBe(0);
+            owner.removeAllObjects();
+            settle(3, function () {
+                expect(deallocs()).toBe(1);
+                done();
+            });
+        });
+    });
+
+    it("checks who owns NSTimer.alloc()'s placeholder without sending it retainCount", function (done) {
+        hookTimers(function (timer) {
+            timer.state = 1;
+        });
+        TNSUninitializedTimer.hookPlaceholder();
+        var placeholder = TNSUninitializedTimer.placeholder();
+        expect(placeholder.isKindOfClass(NSTimer)).toBe(true);
+        expect(placeholder.state).toBe(1);
+        settle(2, function () {
+            expect(placeholder.state).toBe(1);
+            done();
+        });
+    });
+
     it("does not release an instance method's owned return that is its receiver", function (done) {
         var obj = TNSAllocLog.alloc().init();
         var same = obj.awakeAfterUsingCoder(null);
