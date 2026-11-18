@@ -21,13 +21,18 @@ enum class WrapperLifetimeMode {
   // Phantom callbacks, no resurrection: a wrapper is a strong root while
   // something other than the runtime retains its object, weak otherwise.
   kRooted,
+  // Phantom callbacks, no resurrection: the wrapper is a canary that dies with
+  // its JS references. JS properties set on it live on a separate state object
+  // that stays alive until the native object is deallocated, and a canary
+  // built for the same object later gets them back (WrapperLifetimeCanary).
+  kCanary,
 };
 
 enum class WrapperLifetimeScope {
-  // Only JS-extended instances (TNSDerivedClass) are rooted; other wrappers are
-  // weak and die with their JS references, except receivers of JS methods
-  // native code calls, which keep the default mode's ownership tracking
-  // (ArgConverter::WrapNativeCallbackSelf).
+  // Only JS-extended instances (TNSDerivedClass) are rooted, or canaries;
+  // other wrappers are weak and die with their JS references, except receivers
+  // of JS methods native code calls, which keep the default mode's ownership
+  // tracking (ArgConverter::WrapNativeCallbackSelf).
   kExtended,
   kAll,
 };
@@ -53,11 +58,18 @@ class WrapperLifetime {
  public:
   static void Init(v8::Isolate* isolate);
 
+  // Whether `obj`'s wrapper is rooted (rooted mode) or a canary (canary mode):
+  // not a tagged pointer or a block, and under scope "extended" an instance
+  // of a JS-extended class.
+  static bool InScope(id obj);
+
   // A newly wrapped ObjC object: `handle` is its Instances entry, registered by
   // ObjectManager::Register and holding the entry's +1 on `target`.
+  // `intercepted`: the wrapper carries the canary handlers
+  // (WrapperLifetimeCanary::Intercepts).
   static void Adopt(v8::Isolate* isolate, ObjCDataWrapper* wrapper,
                     const std::shared_ptr<v8::Persistent<v8::Value>>& handle,
-                    id target);
+                    id target, bool intercepted);
 
   // The object crossed the JS/native boundary: native code returned it to JS,
   // or received it as a receiver, argument, return value of a JS-implemented
@@ -91,8 +103,8 @@ class WrapperLifetime {
     }
   }
 
-  // Gives an adopted wrapper that is not rooted back to ObjectManager: returns
-  // its registration with the handle strong, for
+  // Gives an adopted wrapper that is neither rooted nor a canary back to
+  // ObjectManager: returns its registration with the handle strong, for
   // ObjectManager::ManageOwnership. Null when the mode keeps the wrapper.
   static ObjectWeakCallbackState* Relinquish(ObjCDataWrapper* wrapper);
 

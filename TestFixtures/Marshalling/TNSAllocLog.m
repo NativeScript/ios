@@ -316,6 +316,19 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index) {
 @implementation TNSAccessorHost
 @end
 
+@implementation TNSCanaryWriteTarget
+
+- (void)setGuarded:(NSInteger)guarded {
+    if (guarded < 0) {
+        @throw [NSException exceptionWithName:NSInvalidArgumentException
+                                       reason:@"guarded must not be negative"
+                                     userInfo:nil];
+    }
+    _guarded = guarded;
+}
+
+@end
+
 @implementation TNSAccessorDeallocHost
 
 - (void)dealloc {

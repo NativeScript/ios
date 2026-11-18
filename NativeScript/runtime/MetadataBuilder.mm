@@ -15,6 +15,7 @@
 #include "SymbolLoader.h"
 #include "Tasks.h"
 #include "Worker.h"
+#include "WrapperLifetimeCanary.h"
 
 using namespace v8;
 
@@ -557,6 +558,9 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
 
   ctorFuncTemplate = FunctionTemplate::New(isolate, ClassConstructorCallback, ext);
   ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+  if (WrapperLifetimeCanary::NativeInstancesIntercept()) {
+    WrapperLifetimeCanary::ConfigureInstanceTemplate(ctorFuncTemplate->InstanceTemplate());
+  }
   ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, meta->name()));
 
   Local<v8::Function> baseCtorFunc;
@@ -1076,7 +1080,8 @@ void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>
     Class klass = objc_getClass(item->meta_->name());
 
     const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(item->meta_);
-    ArgConverter::ConstructObject(context, info, klass, interfaceMeta);
+    ArgConverter::ConstructObject(context, info, klass, interfaceMeta,
+                                  WrapperLifetimeCanary::NativeInstancesIntercept());
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
   }
@@ -1401,7 +1406,7 @@ void ReplaceKeepingOriginal(Class klass, SEL selector, const char* selectorName,
       !ClassBuilder::ImplementsItself(klass, selector) && class_respondsToSelector(klass, alias);
   Method method = class_getInstanceMethod(klass, inheritsAlias ? alias : selector);
   IMP original = method != nullptr ? method_getImplementation(method) : nullptr;
-  class_replaceMethod(klass, selector, imp, types);
+  class_replaceMethod(klass, selector, WrapperLifetimeCanary::WrapDealloc(selector, imp), types);
   if (original != nullptr) {
     class_addMethod(klass, alias, original, types);
   }

@@ -13,6 +13,7 @@
 #include "Helpers.h"
 #include "Runtime.h"
 #import "TNSDerivedClass.h"
+#include "WrapperLifetimeCanary.h"
 
 using namespace v8;
 
@@ -35,6 +36,8 @@ void ReadConfig() {
   } else if (mode != nil) {
     if ([mode isEqualToString:@"rooted"]) {
       detail::wrapperLifetimeMode = WrapperLifetimeMode::kRooted;
+    } else if ([mode isEqualToString:@"canary"]) {
+      detail::wrapperLifetimeMode = WrapperLifetimeMode::kCanary;
     } else if (![mode isEqualToString:@"resurrecting"]) {
       Log("NativeScript: unknown wrapperLifetime mode \"%s\"; using \"resurrecting\".",
           [mode UTF8String]);
@@ -116,6 +119,8 @@ void DropRuntimeRetain(id obj, std::atomic<uint64_t>* counter) {
   }
 }
 
+// Not a message: it runs on objects in -dealloc, where a JS-implemented one
+// would re-enter JS for the same object.
 bool IsBlock(id obj) {
   static Class blockClass = objc_getClass("NSBlock");
   for (Class cls = object_getClass(obj); cls != nil; cls = class_getSuperclass(cls)) {
@@ -126,7 +131,8 @@ bool IsBlock(id obj) {
   return false;
 }
 
-bool IsRootable(id obj) {
+// Rooted (rooted mode) or a canary (canary mode).
+bool IsInScope(id obj) {
   if (IsTaggedPointer(obj) || IsBlock(obj)) {
     return false;
   }
@@ -277,11 +283,18 @@ void ReleaseAll(Isolate* isolate, RootedState* rooted) {
   rooted->draining = true;
   // A -dealloc can throw an NSException through here.
   struct Reset {
+    Isolate* isolate;
     RootedState* rooted;
-    ~Reset() { rooted->draining = false; }
-  } reset{rooted};
+    ~Reset() {
+      rooted->draining = false;
+      if (!rooted->releases.empty()) {
+        ScheduleDrain(isolate, rooted);
+      }
+    }
+  } reset{isolate, rooted};
   // One state leaves the queue at a time, so a release that throws leaves the
-  // rest queued for the next drain or teardown.
+  // rest queued for the drain the guard posts, or for teardown once the event
+  // loop has stopped.
   while (!rooted->releases.empty()) {
     ObjectWeakCallbackState* state = rooted->releases.back();
     rooted->releases.pop_back();
@@ -295,7 +308,15 @@ void ReleaseAll(Isolate* isolate, RootedState* rooted) {
 }  // namespace
 
 const char* WrapperLifetimeModeName(WrapperLifetimeMode mode) {
-  return mode == WrapperLifetimeMode::kRooted ? "rooted" : "resurrecting";
+  switch (mode) {
+    case WrapperLifetimeMode::kRooted:
+      return "rooted";
+    case WrapperLifetimeMode::kCanary:
+      return "canary";
+    case WrapperLifetimeMode::kResurrecting:
+      break;
+  }
+  return "resurrecting";
 }
 
 const char* WrapperLifetimeScopeName(WrapperLifetimeScope scope) {
@@ -304,6 +325,7 @@ const char* WrapperLifetimeScopeName(WrapperLifetimeScope scope) {
 
 void WrapperLifetime::Init(Isolate* isolate) {
   std::call_once(configOnce_, ReadConfig);
+  WrapperLifetimeCanary::Init(isolate);
   if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kRooted) {
     return;
   }
@@ -312,9 +334,12 @@ void WrapperLifetime::Init(Isolate* isolate) {
       PrologueCallback, static_cast<GCType>(kGCTypeMarkSweepCompact | kGCTypeIncrementalMarking));
 }
 
+bool WrapperLifetime::InScope(id obj) { return IsInScope(obj); }
+
 void WrapperLifetime::Adopt(Isolate* isolate, ObjCDataWrapper* wrapper,
-                            const std::shared_ptr<Persistent<Value>>& handle, id target) {
-  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kRooted || target == nil) {
+                            const std::shared_ptr<Persistent<Value>>& handle, id target,
+                            bool intercepted) {
+  if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kResurrecting || target == nil) {
     return;
   }
   RootedState* rooted = Caches::StateFor<RootedState>(isolate);
@@ -328,9 +353,22 @@ void WrapperLifetime::Adopt(Isolate* isolate, ObjCDataWrapper* wrapper,
   }
   state->lifetimeWrapper_ = wrapper;
   state->lifetimeTarget_ = target;
-  state->runtimeRetains_ = AcquireRuntimeRetain(target);
+  if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kRooted) {
+    state->runtimeRetains_ = AcquireRuntimeRetain(target);
+  }
   wrapper->SetLifetimeState(state);
-  if (IsRootable(target)) {
+  if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary) {
+    state->lifetimeCanary_ = IsInScope(target);
+    // A canary without the handlers would lose its JS properties when it dies.
+    tns::Assert(!state->lifetimeCanary_ || intercepted, isolate);
+    if (state->lifetimeCanary_) {
+      state->canaryRecord_ = WrapperLifetimeCanary::Find(isolate, target);
+      if (state->canaryRecord_ != nullptr) {
+        WrapperLifetimeCanary::Hydrate(isolate, handle->Get(isolate).As<Object>());
+      }
+    }
+    MakeWeak(state);
+  } else if (IsInScope(target)) {
     // Born strong: a wrapper just handed to JS or native is in use; the next
     // major collection decides whether native code keeps it.
     state->lifetimeTracked_ = true;
@@ -351,7 +389,8 @@ void WrapperLifetime::EscapeSlow(ObjCDataWrapper* wrapper) {
 
 ObjectWeakCallbackState* WrapperLifetime::Relinquish(ObjCDataWrapper* wrapper) {
   ObjectWeakCallbackState* state = wrapper->LifetimeState();
-  if (state == nullptr || state->lifetimeTracked_ || state->target_->IsEmpty()) {
+  if (state == nullptr || state->lifetimeTracked_ || state->lifetimeCanary_ ||
+      state->target_->IsEmpty()) {
     return nullptr;
   }
   if (state->target_->IsWeak()) {
@@ -387,6 +426,7 @@ void WrapperLifetime::DrainReleases(Isolate* isolate) {
 }
 
 void WrapperLifetime::DrainForTeardown(Isolate* isolate) {
+  WrapperLifetimeCanary::CloseForTeardown(isolate);
   RootedState* rooted = Caches::ExistingStateFor<RootedState>(isolate);
   if (rooted == nullptr) {
     return;

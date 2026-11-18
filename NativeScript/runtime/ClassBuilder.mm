@@ -14,6 +14,7 @@
 #include "Runtime.h"
 #include "TNSDerivedClass.h"
 #include "WrapperLifetime.h"
+#include "WrapperLifetimeCanary.h"
 
 using namespace v8;
 
@@ -91,6 +92,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     tns::Assert(extendedClass != nil, isolate);
     class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
     class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
+    WrapperLifetimeCanary::InstallDeallocHook(extendedClass);
 
     if (!nativeSignature.IsEmpty()) {
       ClassBuilder::ExposeDynamicMembers(context, extendedClass, implementationObject,
@@ -109,6 +111,8 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     Local<FunctionTemplate> extendedClassCtorFuncTemplate =
         FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, ext);
     extendedClassCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+    WrapperLifetimeCanary::ConfigureInstanceTemplate(
+        extendedClassCtorFuncTemplate->InstanceTemplate());
 
     Local<v8::Function> extendClassCtorFunc;
     if (!extendedClassCtorFuncTemplate->GetFunction(context).ToLocal(&extendClassCtorFunc)) {
@@ -175,7 +179,7 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
         info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
     Class klass = item->data_;
 
-    ArgConverter::ConstructObject(context, info, klass);
+    ArgConverter::ConstructObject(context, info, klass, nullptr, true);
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
   }
@@ -235,6 +239,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         tns::Assert(extendedClass != nil, isolate);
         class_addProtocol(extendedClass, @protocol(TNSDerivedClass));
         class_addProtocol(object_getClass(extendedClass), @protocol(TNSDerivedClass));
+        WrapperLifetimeCanary::InstallDeallocHook(extendedClass);
 
         extendedClassName = class_getName(extendedClass);
 
@@ -737,7 +742,14 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
       IMP methodBody =
           Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
       std::string typeInfo = GetTypeEncoding(typeEncoding, argsCount);
-      tns::Assert(class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str()), isolate);
+      IMP installed = WrapperLifetimeCanary::WrapDealloc(selector, methodBody);
+      if (installed != methodBody) {
+        // Replaces the canary dealloc hook the class already carries.
+        class_replaceMethod(extendedClass, selector, installed, typeInfo.c_str());
+      } else {
+        tns::Assert(class_addMethod(extendedClass, selector, methodBody, typeInfo.c_str()),
+                    isolate);
+      }
     }
   }
 
@@ -844,7 +856,9 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
       IMP methodBody =
           Interop::CreateMethod(2, argsCount, typeEncoding, ArgConverter::MethodCallback, userData);
       std::string typeInfo = GetTypeEncoding(typeEncoding, argsCount);
-      class_replaceMethod(extendedClass, selector, methodBody, typeInfo.c_str());
+      class_replaceMethod(extendedClass, selector,
+                          WrapperLifetimeCanary::WrapDealloc(selector, methodBody),
+                          typeInfo.c_str());
     }
   }
 }

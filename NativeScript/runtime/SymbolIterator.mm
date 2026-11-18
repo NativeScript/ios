@@ -2,6 +2,7 @@
 #include <Foundation/Foundation.h>
 #include "ArgConverter.h"
 #include "Helpers.h"
+#include "WrapperLifetime.h"
 
 using namespace v8;
 
@@ -10,17 +11,26 @@ namespace tns {
 void SymbolIterator::Set(Local<Context> context, Local<Value> object) {
   Isolate* isolate = v8::Isolate::GetCurrent();
 
+  // In the canary wrapper lifetime mode it iterates its receiver: this
+  // property lives on the object's state there, which a reference back to the
+  // object would keep alive until native death. Elsewhere it keeps `object`, so
+  // an unbound call still iterates it.
+  Local<Value> captured =
+      GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary ? Local<Value>() : object;
   Local<v8::Function> iterator;
   bool success = v8::Function::New(
                      context,
                      [](const FunctionCallbackInfo<Value>& args) {
                        Isolate* isolate = args.GetIsolate();
                        Local<Context> context = isolate->GetCurrentContext();
-                       Local<Value> object = args.Data();
-                       Local<Object> result = CreateIteratorObject(context, object);
+                       Local<Value> target = args.Data();
+                       if (target.IsEmpty() || target->IsUndefined()) {
+                         target = args.This();
+                       }
+                       Local<Object> result = CreateIteratorObject(context, target);
                        args.GetReturnValue().Set(result);
                      },
-                     object)
+                     captured)
                      .ToLocal(&iterator);
   tns::Assert(success, isolate);
 

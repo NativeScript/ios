@@ -14,6 +14,7 @@
 #include "Runtime.h"
 #include "RuntimeConfig.h"
 #include "WrapperLifetime.h"
+#include "WrapperLifetimeCanary.h"
 
 using namespace v8;
 using namespace std;
@@ -56,6 +57,15 @@ bool IsKVOSubclassOf(Class klass, Class base) {
          strncmp(class_getName(klass), prefix, sizeof(prefix) - 1) == 0;
 }
 
+// Canary mode: constructors of wrappers that carry the canary handlers.
+struct CanaryWrapperConstructors {
+  // The empty instance's, for canaries.
+  std::unique_ptr<Persistent<v8::Function>> emptyInstance;
+  // Shaped like a native class constructor's instances, which lack the
+  // handlers under scope "extended".
+  std::unique_ptr<Persistent<v8::Function>> constructedInstance;
+};
+
 }  // namespace
 
 NativeCallbackSelf::NativeCallbackSelf(Local<Context> context, id self)
@@ -88,7 +98,35 @@ void ArgConverter::Init(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   auto cache = Caches::Get(isolate);
   cache->EmptyObjCtorFunc = std::make_unique<Persistent<v8::Function>>(
-      isolate, ArgConverter::CreateEmptyInstanceFunction(context));
+      isolate, ArgConverter::CreateEmptyInstanceFunction(context, false));
+  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
+    return;
+  }
+  CanaryWrapperConstructors* canary = Caches::StateFor<CanaryWrapperConstructors>(isolate);
+  if (canary == nullptr) {
+    return;
+  }
+  canary->emptyInstance = std::make_unique<Persistent<v8::Function>>(
+      isolate, ArgConverter::CreateEmptyInstanceFunction(context, true));
+  Local<FunctionTemplate> constructedTemplate = FunctionTemplate::New(isolate);
+  constructedTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+  WrapperLifetimeCanary::ConfigureInstanceTemplate(constructedTemplate->InstanceTemplate());
+  Local<v8::Function> constructedFunc;
+  tns::Assert(constructedTemplate->GetFunction(context).ToLocal(&constructedFunc), isolate);
+  canary->constructedInstance =
+      std::make_unique<Persistent<v8::Function>>(isolate, constructedFunc);
+}
+
+Persistent<v8::Function>* ArgConverter::EmptyInstanceFunction(Isolate* isolate, bool intercepted) {
+  if (intercepted) {
+    // Teardown-safe: a -dealloc receiver can be built after InvalidateIsolate,
+    // while deferred releases drain.
+    CanaryWrapperConstructors* canary =
+        Caches::ExistingStateFor<CanaryWrapperConstructors>(isolate);
+    tns::Assert(canary != nullptr && canary->emptyInstance != nullptr, isolate);
+    return canary->emptyInstance.get();
+  }
+  return Caches::Get(isolate)->EmptyObjCtorFunc.get();
 }
 
 Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Object> receiver,
@@ -702,7 +740,8 @@ bool ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
 }
 
 void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbackInfo<Value>& info,
-                                   Class klass, const InterfaceMeta* interfaceMeta) {
+                                   Class klass, const InterfaceMeta* interfaceMeta,
+                                   bool thisIntercepts) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   tns::Assert(klass != nullptr, isolate);
   WrapperLifetime::DrainAtCallEntry(isolate);
@@ -766,6 +805,21 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
     ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
     Local<Object> thiz = info.This();
     Local<Context> context = cache->GetContext();
+    bool intercepted = thisIntercepts;
+    if (!intercepted && WrapperLifetimeCanary::Intercepts(result)) {
+      // A canary needs the handlers `this` was built without: returning
+      // another object makes it the result of `new`, and `this` after super().
+      CanaryWrapperConstructors* canary = Caches::StateFor<CanaryWrapperConstructors>(isolate);
+      tns::Assert(canary != nullptr && canary->constructedInstance != nullptr, isolate);
+      Local<Object> replacement = NewEmptyInstance(context, canary->constructedInstance.get());
+      bool success;
+      if (!replacement->SetPrototype(context, thiz->GetPrototype()).To(&success) || !success) {
+        tns::Assert(false, isolate);
+      }
+      thiz = replacement;
+      info.GetReturnValue().Set(thiz);
+      intercepted = true;
+    }
     tns::SetValue(isolate, thiz, wrapper);
     std::shared_ptr<Persistent<Value>> poThiz = ObjectManager::Register(context, thiz);
     cache->Instances.emplace(result, poThiz);
@@ -783,7 +837,7 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
       wrapper->SetBornOnRuntimeThread();
       ObjectManager::ProtectIfNativelyRetained(isolate, result, wrapper);
     }
-    WrapperLifetime::Adopt(isolate, wrapper, poThiz, result);
+    WrapperLifetime::Adopt(isolate, wrapper, poThiz, result, intercepted);
     ExternalMemory::ChargeEstimatedSize(isolate, thiz);
   }
 }
@@ -1004,7 +1058,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
     ObjCAllocDataWrapper* allocDataWrapper = static_cast<ObjCAllocDataWrapper*>(wrapper);
     Class klass = allocDataWrapper->Klass();
 
-    std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context);
+    std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context, false);
     receiver = poValue->Get(isolate).As<Object>();
 
     const Meta* meta = FindMeta(klass);
@@ -1054,7 +1108,8 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
       receiver = it->second->Get(isolate).As<Object>();
       WrapperLifetime::EscapeValue(isolate, receiver);
     } else {
-      std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context);
+      bool intercepted = WrapperLifetimeCanary::Intercepts(target);
+      std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context, intercepted);
       receiver = poValue->Get(isolate).As<Object>();
       tns::SetValue(isolate, receiver, wrapper);
       cache->Instances.emplace(target, poValue);
@@ -1068,7 +1123,8 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
         ObjectManager::ProtectIfNativelyRetained(isolate, target, objcWrapper);
       }
       if (wrapper->Type() == WrapperType::ObjCObject) {
-        WrapperLifetime::Adopt(isolate, static_cast<ObjCDataWrapper*>(wrapper), poValue, target);
+        WrapperLifetime::Adopt(isolate, static_cast<ObjCDataWrapper*>(wrapper), poValue, target,
+                               intercepted);
       }
     }
   } else {
@@ -1275,8 +1331,11 @@ Local<Object> ArgConverter::WrapNativeCallbackSelf(Local<Context> context, id se
     // Called from -dealloc: a retain cannot keep the object alive, so the
     // wrapper is neither cached nor owning, and the caller detaches it.
     wrapper->MarkBorrowed();
-    Local<Object> receiver = NewEmptyInstance(context, cache->EmptyObjCtorFunc.get());
+    // Its writes reach the object's JS state through the canary handlers.
+    Local<Object> receiver = NewEmptyInstance(
+        context, EmptyInstanceFunction(isolate, WrapperLifetimeCanary::Intercepts(self)));
     CreateJsWrapper(context, wrapper, receiver);
+    WrapperLifetimeCanary::Hydrate(isolate, receiver);
     *borrowed = wrapper;
     return receiver;
   }
@@ -1288,7 +1347,8 @@ Local<Object> ArgConverter::WrapNativeCallbackSelf(Local<Context> context, id se
   // Native code usually still holds the object (it is mid-initialization or
   // owned by whoever called in), and its JS state must outlive this call: the
   // handle stays strong until the Instances entry is the object's only owner.
-  // A wrapper a lifetime mode roots keeps the mode's own lifetime instead.
+  // A wrapper a lifetime mode roots or makes a canary keeps the mode's own
+  // lifetime instead.
   if (wrapper->LifetimeState() != nullptr) {
     if (ObjectWeakCallbackState* state = WrapperLifetime::Relinquish(wrapper)) {
       ObjectManager::ManageOwnership(isolate, wrapper, state);
@@ -1303,9 +1363,10 @@ Local<Object> ArgConverter::WrapNativeCallbackSelf(Local<Context> context, id se
   return result;
 }
 
-std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyObject(Local<Context> context) {
+std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyObject(Local<Context> context,
+                                                                   bool intercepted) {
   Isolate* isolate = v8::Isolate::GetCurrent();
-  Persistent<v8::Function>* ctorFunc = Caches::Get(isolate)->EmptyObjCtorFunc.get();
+  Persistent<v8::Function>* ctorFunc = EmptyInstanceFunction(isolate, intercepted);
   tns::Assert(ctorFunc != nullptr, isolate);
   return ArgConverter::CreateEmptyInstance(context, ctorFunc);
 }
@@ -1328,7 +1389,8 @@ std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(
   return ObjectManager::Register(context, result);
 }
 
-Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Local<Context> context) {
+Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Local<Context> context,
+                                                              bool intercepted) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   Local<FunctionTemplate> emptyInstanceCtorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
   Local<ObjectTemplate> instanceTemplate = emptyInstanceCtorFuncTemplate->InstanceTemplate();
@@ -1336,6 +1398,9 @@ Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Local<Context> con
 
   instanceTemplate->SetHandler(IndexedPropertyHandlerConfiguration(IndexedPropertyGetterCallback,
                                                                    IndexedPropertySetterCallback));
+  if (intercepted) {
+    WrapperLifetimeCanary::ConfigureInstanceTemplate(instanceTemplate);
+  }
 
   Local<v8::Function> emptyInstanceCtorFunc;
   if (!emptyInstanceCtorFuncTemplate->GetFunction(context).ToLocal(&emptyInstanceCtorFunc)) {

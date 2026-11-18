@@ -140,6 +140,22 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index);
 
 @end
 
+// Native properties for the canary write handler specs. Setting `guarded` to a
+// negative value raises. Each `via*` property and `dropped` belongs to the one
+// spec that redefines or deletes it on this class's prototype.
+@interface TNSCanaryWriteTarget : NSObject
+
+@property(nonatomic) NSInteger level;
+@property(nonatomic) NSInteger guarded;
+@property(nonatomic, readonly) NSInteger fixed;
+@property(nonatomic) NSInteger viaDefineProperty;
+@property(nonatomic) NSInteger viaDefineProperties;
+@property(nonatomic) NSInteger viaReflect;
+@property(nonatomic) NSInteger viaDefineSetter;
+@property(nonatomic) NSInteger dropped;
+
+@end
+
 // -dealloc reads `value`.
 @interface TNSAccessorDeallocHost : TNSAccessorHost
 

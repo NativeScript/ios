@@ -323,6 +323,9 @@ describe("Wrapper lifetime", function () {
             "demotions",
             "promotions",
             "queuedReleases",
+            "canaryStates",
+            "canaryNativeDeaths",
+            "canaryInterceptedWrites",
             "stateLostCandidates",
             "stateLostConfirmed",
         ].sort());
