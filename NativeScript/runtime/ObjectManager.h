@@ -1,6 +1,8 @@
 #ifndef ObjectManager_h
 #define ObjectManager_h
 
+#include <objc/objc.h>
+
 #include "Common.h"
 
 namespace tns {
@@ -76,6 +78,14 @@ class ObjectManager {
   // wrapper to protect; this catches up. A surplus reference the caller drops
   // afterwards goes through -release, which unprotects again.
   static void ProtectIfNativelyRetained(v8::Isolate* isolate, id obj, ObjCDataWrapper* wrapper);
+  // The -retainCount instances of `cls` answer with natively, never one JS
+  // implements, so it can be called where JS may not run, such as a GC
+  // prologue. JS subclasses are skipped, and a native class whose -retainCount
+  // JS replaced answers with the original that the replacement keeps under the
+  // swizzled-prefixed alias. Null for NSTimer.alloc()'s placeholder, whose
+  // -retainCount does not return, and for classes without a -retainCount.
+  // Walks method lists, so callers cache the result per class.
+  static IMP NativeRetainCountImp(Class cls);
 
  private:
   static void ReleaseNativeCounterpartCallback(

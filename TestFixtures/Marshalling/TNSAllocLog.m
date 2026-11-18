@@ -1,4 +1,5 @@
 #import "TNSAllocLog.h"
+#import <objc/message.h>
 #import "../TNSTestCommon.h"
 
 @implementation TNSAllocLog
@@ -419,6 +420,49 @@ static TNSAccessorHost* keptAccessorHost;
 
 + (void)dropKeptHost {
     keptAccessorHost = nil;
+}
+
+@end
+
+@implementation TNSReplaceableRetainCount
+
++ (NSUInteger)retainCountOf:(id)object {
+  return ((NSUInteger (*)(id, SEL))objc_msgSend)(object, sel_registerName("retainCount"));
+}
+
++ (void)addNewInstanceTo:(NSMutableArray*)owner {
+  TNSReplaceableRetainCount* instance = [[self alloc] init];
+  [owner addObject:instance];
+  [self retainCountOf:instance];
+}
+
+@end
+
+@implementation NSTimer (TNSCallbackHook)
+
+- (void)tnsCallbackHook {
+}
+
++ (void)tnsAddHookedTimerTo:(NSMutableArray*)owner {
+  NSTimer* timer = [NSTimer timerWithTimeInterval:1000
+                                           target:[[TNSAllocLog alloc] init]
+                                         selector:@selector(description)
+                                         userInfo:nil
+                                          repeats:NO];
+  [owner addObject:timer];
+  [timer tnsCallbackHook];
+}
+
+@end
+
+@implementation TNSUninitializedTimer
+
++ (id)placeholder {
+  return [NSTimer alloc];
+}
+
++ (void)hookPlaceholder {
+  [[NSTimer alloc] tnsCallbackHook];
 }
 
 @end

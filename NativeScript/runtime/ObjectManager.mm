@@ -26,6 +26,8 @@ namespace {
 // finalizer state their handle carries.
 struct OwnershipTracking {
   std::unordered_map<ObjectWeakCallbackState*, ObjCDataWrapper*> managed;
+  // ObjectManager::NativeRetainCountImp per class.
+  std::unordered_map<Class, IMP> retainCountImps;
 };
 
 void ForgetOwnership(Isolate* isolate, ObjectWeakCallbackState* state) {
@@ -43,17 +45,26 @@ void ApplyOwnership(ObjectWeakCallbackState* state, bool nativelyOwned) {
   }
 }
 
-// The GC prologue may not enter JS, so a JS-implemented -retainCount is
-// skipped. Timers read as unowned: the retain count of an uninitialized NSTimer
-// (NSTimer.alloc()) can hang.
-bool NativelyOwnedWithoutJS(id obj) {
-  for (Class c = object_getClass(obj); c != nil; c = class_getSuperclass(c)) {
-    if (c == NSTimerClass) {
-      return false;
+// Runs in a GC prologue, where JS may not run, so only a native -retainCount
+// is read. Objects without one read as unowned.
+bool NativelyOwnedWithoutJS(OwnershipTracking* tracking, id obj) {
+  Class cls = object_getClass(obj);
+  IMP imp;
+  if (tracking != nullptr) {
+    auto found = tracking->retainCountImps.find(cls);
+    if (found == tracking->retainCountImps.end()) {
+      found =
+          tracking->retainCountImps.emplace(cls, ObjectManager::NativeRetainCountImp(cls)).first;
     }
+    imp = found->second;
+  } else {
+    imp = ObjectManager::NativeRetainCountImp(cls);
   }
-  IMP imp = ClassBuilder::FindNotOverridenMethod(object_getClass(obj), @selector(retainCount));
-  return ((NSUInteger (*)(id, SEL))imp)(obj, @selector(retainCount)) > 1;
+  return imp != nullptr && ((NSUInteger (*)(id, SEL))imp)(obj, @selector(retainCount)) > 1;
+}
+
+bool NativelyOwnedWithoutJS(Isolate* isolate, id obj) {
+  return NativelyOwnedWithoutJS(Caches::ExistingStateFor<OwnershipTracking>(isolate), obj);
 }
 
 void ReconcileOwnershipBeforeGC(Isolate* isolate, GCType, GCCallbackFlags) {
@@ -65,7 +76,7 @@ void ReconcileOwnershipBeforeGC(Isolate* isolate, GCType, GCCallbackFlags) {
     if (state->disposing_ || state->target_ == nullptr || state->target_->IsEmpty()) {
       continue;
     }
-    ApplyOwnership(state, NativelyOwnedWithoutJS(wrapper->Data()));
+    ApplyOwnership(state, NativelyOwnedWithoutJS(tracking, wrapper->Data()));
   }
 }
 
@@ -316,7 +327,7 @@ void ObjectManager::ReconcileOwnership(Isolate* isolate, ObjCDataWrapper* wrappe
   // The handle's strength carries the ownership; a GcProtect from the retain
   // swizzle would keep a weak handle from ever being disposed.
   wrapper->GcUnprotect();
-  ApplyOwnership(state, NativelyOwnedWithoutJS(wrapper->Data()));
+  ApplyOwnership(state, NativelyOwnedWithoutJS(isolate, wrapper->Data()));
 }
 
 void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackState>& data) {
@@ -361,7 +372,7 @@ void ObjectManager::FinalizerCallback(const WeakCallbackInfo<ObjectWeakCallbackS
   if (wrapper != nullptr && wrapper->Type() == WrapperType::ObjCObject) {
     ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
     if (objcWrapper->OwnershipState() == state) {
-      ApplyOwnership(state, NativelyOwnedWithoutJS(objcWrapper->Data()));
+      ApplyOwnership(state, NativelyOwnedWithoutJS(isolate, objcWrapper->Data()));
     }
   }
 }
@@ -419,7 +430,8 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
   // to making it strong again.
   if (!isFinalDisposal && wrapper->Type() == WrapperType::ObjCObject) {
     ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
-    if (objcWrapper->OwnershipState() != nullptr && NativelyOwnedWithoutJS(objcWrapper->Data())) {
+    if (objcWrapper->OwnershipState() != nullptr &&
+        NativelyOwnedWithoutJS(isolate, objcWrapper->Data())) {
       return false;
     }
   }
@@ -678,6 +690,37 @@ long ObjectManager::GetRetainCount(id obj) {
   }
 
   return CFGetRetainCount(obj);
+}
+
+IMP ObjectManager::NativeRetainCountImp(Class cls) {
+  static Class timerPlaceholder = object_getClass([NSTimer alloc]);
+  if (cls == timerPlaceholder) {
+    return nullptr;
+  }
+  SEL selector = @selector(retainCount);
+  static SEL original = sel_registerName((Constants::SwizzledPrefix + "retainCount").c_str());
+  // Each class's own method list, rather than class_getMethodImplementation,
+  // so an alias inherited from a replaced ancestor never hides a native
+  // override below it.
+  for (Class c = ClassBuilder::FindNativeClass(cls); c != nil; c = class_getSuperclass(c)) {
+    unsigned int count = 0;
+    Method* methods = class_copyMethodList(c, &count);
+    IMP own = nullptr;
+    IMP kept = nullptr;
+    for (unsigned int i = 0; i < count; i++) {
+      SEL name = method_getName(methods[i]);
+      if (name == original) {
+        kept = method_getImplementation(methods[i]);
+      } else if (name == selector) {
+        own = method_getImplementation(methods[i]);
+      }
+    }
+    free(methods);
+    if (kept != nullptr || own != nullptr) {
+      return kept != nullptr ? kept : own;
+    }
+  }
+  return nullptr;
 }
 
 }  // namespace tns
