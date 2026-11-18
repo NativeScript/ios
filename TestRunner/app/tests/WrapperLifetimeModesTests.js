@@ -756,12 +756,16 @@ describe("Wrapper lifetime modes", function () {
             }
         }, { name: "WrapperLifetimeModesJSDealloc" });
         var owner = NSMutableArray.new();
+        var payloads = [];
         settle(2, function () {
             var before = runtime.getWrapperLifetimeStats();
             (function () {
                 for (var i = 0; i < N; i++) {
                     var obj = WithDealloc.new();
                     obj.tag = "state";
+                    var payload = { index: i };
+                    obj.payload = payload;
+                    payloads.push(new WeakRef(payload));
                     owner.addObject(obj);
                 }
             })();
@@ -774,6 +778,9 @@ describe("Wrapper lifetime modes", function () {
                         // The JS dealloc still reads the object's JS state.
                         expect(seen.filter(function (tag) { return tag === "state"; }).length).toBe(N);
                         expect(after.canaryNativeDeaths - before.canaryNativeDeaths).not.toBeLessThan(N);
+                        // The death count is isolate-wide; each fixture's own
+                        // state must be gone.
+                        expect(payloads.filter(function (ref) { return ref.deref() !== undefined; }).length).toBe(0);
                     }
                     done();
                 });
