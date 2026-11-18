@@ -231,7 +231,13 @@ id Interop::CallInitializer(Local<Context> context, const MethodMeta* methodMeta
 
   Interop::SetValue(call.ArgumentBuffer(0), target);
   Interop::SetValue(call.ArgumentBuffer(1), selector);
-  Interop::SetFFIParams(context, typeEncoding, &call, argsCount, initialParameterIndex, args);
+  try {
+    Interop::SetFFIParams(context, typeEncoding, &call, argsCount, initialParameterIndex, args);
+  } catch (...) {
+    // `target` was allocated for this initializer, which would have consumed it.
+    [target release];
+    throw;
+  }
 
   ffi_call(parametrizedCall->Cif, FFI_FN(functionPointer), call.ResultBuffer(), call.ArgsArray());
 
@@ -825,6 +831,19 @@ void Interop::WriteValue(Local<Context> context, const TypeEncoding* typeEncodin
       return;
     }
 
+    // A wrapper whose native object was released must never reach native code
+    // as a DictionaryAdapter standing in for it.
+    tns::ReleasedReason releasedReason = tns::GetReleasedReason(obj);
+    if (releasedReason != tns::ReleasedReason::kNone) {
+      if (tns::GetReleasedObjectPolicy() == tns::ReleasedObjectPolicy::kThrow) {
+        tns::ThrowReleasedObject(isolate, releasedReason, "native argument");
+      }
+      tns::ReportReleasedObject(isolate, obj, releasedReason, "native argument", false);
+      id none = nil;
+      Interop::SetValue(dest, none);
+      return;
+    }
+
     bool isNSArray = false;
     if (typeEncoding->type == BinaryTypeEncodingType::InterfaceDeclarationReference) {
       std::string name = typeEncoding->details.interfaceDeclarationReference.name.valuePtr();
@@ -915,6 +934,13 @@ id Interop::ToObject(Local<Context> context, v8::Local<v8::Value> arg) {
           break;
       }
     } else {
+      // nil is not a legal collection element, and this runs inside adapter
+      // callbacks where nothing can be thrown.
+      tns::ReleasedReason releasedReason = tns::GetReleasedReason(arg);
+      if (releasedReason != tns::ReleasedReason::kNone) {
+        tns::ReportReleasedObject(isolate, arg, releasedReason, "collection element", false);
+        return [NSNull null];
+      }
       DictionaryAdapter* adapter = [[DictionaryAdapter alloc] initWithJSObject:source.As<Object>()
                                                                        isolate:isolate];
       // CFAutorelease(adapter);
@@ -1255,31 +1281,35 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
         v8::Function::New(
             context,
             [](const FunctionCallbackInfo<Value>& info) {
-              Local<External> ext = info.Data().As<External>();
-              BlockWrapper* wrapper =
-                  static_cast<BlockWrapper*>(ext->Value(v8::kExternalPointerTypeTagDefault));
-
-              JSBlock* block = static_cast<JSBlock*>(wrapper->Block());
-
-              const TypeEncoding* typeEncoding = wrapper->Encodings();
-              int argsCount = typeEncoding->details.block.signature.count;
-              const TypeEncoding* enc = typeEncoding->details.block.signature.first();
-
-              ParametrizedCall* parametrizedCall = ParametrizedCall::Get(enc, 1, argsCount);
-              FFICall call(parametrizedCall);
-
-              V8FunctionCallbackArgs args(info);
               Isolate* isolate = info.GetIsolate();
-              Local<Context> context = isolate->GetCurrentContext();
-              Interop::SetValue(call.ArgumentBuffer(0), block);
-              Interop::SetFFIParams(context, enc, &call, argsCount, 1, args);
+              try {
+                Local<External> ext = info.Data().As<External>();
+                BlockWrapper* wrapper =
+                    static_cast<BlockWrapper*>(ext->Value(v8::kExternalPointerTypeTagDefault));
 
-              ffi_call(parametrizedCall->Cif, FFI_FN(block->invoke), call.ResultBuffer(),
-                       call.ArgsArray());
+                JSBlock* block = static_cast<JSBlock*>(wrapper->Block());
 
-              Local<Value> result = Interop::GetResult(context, enc, &call, true);
+                const TypeEncoding* typeEncoding = wrapper->Encodings();
+                int argsCount = typeEncoding->details.block.signature.count;
+                const TypeEncoding* enc = typeEncoding->details.block.signature.first();
 
-              info.GetReturnValue().Set(result);
+                ParametrizedCall* parametrizedCall = ParametrizedCall::Get(enc, 1, argsCount);
+                FFICall call(parametrizedCall);
+
+                V8FunctionCallbackArgs args(info);
+                Local<Context> context = isolate->GetCurrentContext();
+                Interop::SetValue(call.ArgumentBuffer(0), block);
+                Interop::SetFFIParams(context, enc, &call, argsCount, 1, args);
+
+                ffi_call(parametrizedCall->Cif, FFI_FN(block->invoke), call.ResultBuffer(),
+                         call.ArgsArray());
+
+                Local<Value> result = Interop::GetResult(context, enc, &call, true);
+
+                info.GetReturnValue().Set(result);
+              } catch (NativeScriptException& ex) {
+                ex.ReThrowToV8(isolate);
+              }
             },
             ext)
             .ToLocal(&callback);
@@ -1319,10 +1349,14 @@ Local<Value> Interop::GetResult(Local<Context> context, const TypeEncoding* type
               const TypeEncoding* typeEncoding = wrapper->ParametersEncoding();
 
               Local<Context> context = isolate->GetCurrentContext();
-              CMethodCall methodCall(context, functionPointer, typeEncoding, args, false, false);
-              Local<Value> result = Interop::CallFunction(methodCall);
+              try {
+                CMethodCall methodCall(context, functionPointer, typeEncoding, args, false, false);
+                Local<Value> result = Interop::CallFunction(methodCall);
 
-              info.GetReturnValue().Set(result);
+                info.GetReturnValue().Set(result);
+              } catch (NativeScriptException& ex) {
+                ex.ReThrowToV8(isolate);
+              }
             },
             ext)
             .ToLocal(&func);
@@ -1899,8 +1933,16 @@ Local<Value> Interop::CallFunctionInternal(MethodCall& methodCall) {
       methodCall.typeEncoding_->type == BinaryTypeEncodingType::InstanceTypeEncoding;
   bool marshalToPrimitive = methodCall.isPrimitiveFunction_ || !isInstanceReturnType;
 
-  Interop::SetFFIParams(methodCall.context_, methodCall.typeEncoding_, &call, argsCount,
-                        initialParameterIndex, methodCall.args_);
+  try {
+    Interop::SetFFIParams(methodCall.context_, methodCall.typeEncoding_, &call, argsCount,
+                          initialParameterIndex, methodCall.args_);
+  } catch (...) {
+    // The initializer that would have consumed it never runs.
+    if (methodCall.receiverAllocatedForCall_) {
+      [methodCall.target_ release];
+    }
+    throw;
+  }
 
   if (initialParameterIndex > 1) {
     int consumed = ConsumedObjectArgumentIndex(methodCall.selector_, methodCall.typeEncoding_,

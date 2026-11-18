@@ -55,6 +55,12 @@ bool ResolveProxyReceiver(Isolate* isolate, Local<Object>& receiver, const char*
                       (wrapper->Type() == WrapperType::ObjCObject ||
                        wrapper->Type() == WrapperType::ObjCAllocObject);
     if (!isClass && !isInstance) {
+      if (tns::GetReleasedReason(target) != tns::ReleasedReason::kNone) {
+        // A released wrapper: the call reports it the same way as on the
+        // target directly.
+        receiver = target.As<Object>();
+        return true;
+      }
       reason = "on a Proxy whose target is not a native object";
     }
   }
@@ -805,6 +811,19 @@ void MetadataBuilder::ToStringFunctionCallback(const FunctionCallbackInfo<Value>
     return;
   }
   BaseDataWrapper* wrapper = tns::GetValue(isolate, thiz);
+
+  if (wrapper == nullptr) {
+    tns::ReleasedReason releasedReason = tns::GetReleasedReason(thiz);
+    if (releasedReason != tns::ReleasedReason::kNone) {
+      // String coercion (logging, template literals) still gets a string under
+      // the report policy.
+      if (tns::ReportReleasedObject(isolate, thiz, releasedReason, "toString receiver", true)) {
+        std::string name = tns::ToString(isolate, thiz->GetConstructorName());
+        info.GetReturnValue().Set(tns::ToV8String(isolate, "[released " + name + "]"));
+      }
+      return;
+    }
+  }
 
   if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject) {
     info.GetReturnValue().Set(thiz);

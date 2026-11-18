@@ -8,6 +8,10 @@
 //- (void)release;
 
 - (instancetype)init;
+// Ignores `object`.
+- (instancetype)initWithObject:(id)object;
+// Answers a block that ignores its argument.
++ (void (^)(id))objectSink;
 - (void)dealloc;
 
 @end

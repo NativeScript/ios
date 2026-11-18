@@ -103,8 +103,9 @@ defined and validated natively; the module surface is a thin frozen wrapper.
 | `escapeException(error)` | Returns an `Error` branded to cross the next JS-to-native boundary as a native exception rather than being reported in JS (see [error-handling.md](error-handling.md#forwarding-a-throw-to-native-interopescapeexception)). An already-branded value is returned unchanged; no argument throws `TypeError`. |
 | `setExternalSize(target, bytes)` | Reports `bytes` of native memory held by a native object, pointer, reference, block or function reference to the garbage collector, replacing any earlier size (`0` clears it). Throws `TypeError` for any other value, `RangeError` for a byte count outside 0–2^34. |
 | `getExternalSize(target)` | The size currently charged to `target`, `0` when there is none. |
+| `getWrapperLifetimeStats()` | Wrapper lifetime counters for the calling isolate (see [Wrapper lifetime counters](#wrapper-lifetime-counters)). |
 
-The last three are also members of the global `interop` (see
+`escapeException`, `setExternalSize` and `getExternalSize` are also members of the global `interop` (see
 [The global `interop`](#the-global-interop)); the module and the global hold
 the same function objects.
 
@@ -114,6 +115,7 @@ Config keys:
 |---|---|---|---|
 | `releasedObjectPolicy` | `"report"` \| `"throw"` | process-wide (main-isolate writes only; read live by every isolate) | `"report"` |
 | `debug` | comma-separated category list, e.g. `"esm,fetch"` | process-wide (main-isolate writes only; read live by every isolate) | the `NS_DEBUG` environment variable, or `""` |
+| `wrapperLifetimeWarnings` | `true` \| `false` | process-wide (main-isolate writes only; read live by every isolate) | the app config `"wrapperLifetime": { "warnings": … }`, or on in debug builds |
 
 ```js
 const { setConfig, getConfig } = require("ns:runtime");
@@ -141,6 +143,31 @@ The `TypeError` messages are part of the contract:
 | process-wide key written from a worker | `'<key>' is process-wide and can only be set from the main isolate` |
 | invalid `releasedObjectPolicy` value | `'releasedObjectPolicy' must be 'report' or 'throw'` |
 | non-string `debug` value | `'debug' must be a comma-separated category string (<categories>), or '' to disable tracing` |
+| non-boolean `wrapperLifetimeWarnings` value | `'wrapperLifetimeWarnings' must be a boolean` |
+
+### Wrapper lifetime counters
+
+`getWrapperLifetimeStats()` returns counters for the calling isolate, kept in
+every build (they only cost an increment on finalizer and error paths):
+
+| counter | counts |
+|---|---|
+| `resurrections` | finalizers that kept a wrapper alive because native code still retained its object (JS-extended classes) |
+| `collected` | finalizers that released their native object |
+| `releasedExplicitly` | native objects released through `__releaseNativeCounterpart` |
+| `releasedAccesses` | times JS passed a released wrapper to native code, used it as a method receiver, or touched a released pointer, reference or struct |
+| `stateLostCandidates` | collected wrappers carrying JS properties whose object was still retained by something else (only while `wrapperLifetimeWarnings` is on) |
+| `stateLostConfirmed` | candidates whose object was still alive a runloop turn later, once releases queued for the runtime thread ran; each class is also reported once in the log |
+
+A wrapper whose native object was released keeps its JS identity. Passing it
+to native code follows `releasedObjectPolicy`: under `"report"` the argument
+or return value becomes `nil` (`NSNull` inside a collection) and a
+`releasednativeaccess` event fires; under `"throw"` an argument throws a
+`ReferenceError`. Calling a method on it always throws a `ReferenceError`;
+`toString()` returns `"[released <class>]"` under `"report"` and throws under
+`"throw"`. An `NSNull` element still breaks native code that expects a typed
+value there (an attributes dictionary holding a released `UIColor`, say); the
+event names the element so the cause can be found.
 
 Remote-module security (`security.allowRemoteModules`,
 `security.remoteModuleAllowlist`) is **not** part of this surface. Those
@@ -154,9 +181,10 @@ Controls what happens when JS touches a wrapper whose native counterpart has
 already been released (a state a resurrected object can expose — see the iOS
 runtime's `docs/knowledge/v8-resurrecting-finalizers.md`):
 
-- `"report"` (default): the operation no-ops — reads produce `undefined`,
-  writes are skipped, `toString` yields a `<Pointer: released>`-style
-  placeholder — and a cancelable `releasednativeaccess` event fires on
+- `"report"` (default): the operation no-ops — pointer, reference and struct
+  reads produce `undefined`, writes are skipped, `toString` yields a
+  `<Pointer: released>`-style placeholder — and a cancelable
+  `releasednativeaccess` event fires on
   `globalThis` (`event.error` carries a `ReferenceError` whose stack names the
   touch site; `event.operation` names the API surface, e.g.
   `"struct field assignment"`). Reports are deduplicated per released object.
@@ -164,6 +192,13 @@ runtime's `docs/knowledge/v8-resurrecting-finalizers.md`):
   that handles the report suppresses it with `preventDefault()`.
 - `"throw"`: the touch throws a catchable `ReferenceError` synchronously, and
   no event fires.
+
+Under either policy, calling a method on a released Objective-C object or
+reading one of its native properties throws a `ReferenceError`: there is no
+value to stand in for the result. Native code that receives a released object
+with no JS caller to throw to (the return value of a JS-implemented method,
+an element of a collection native code is reading) gets `nil` or `NSNull` and
+the event fires, under `"throw"` too.
 
 ```js
 const { setConfig } = require("ns:runtime");
