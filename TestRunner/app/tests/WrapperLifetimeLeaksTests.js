@@ -27,6 +27,7 @@ describe("Wrapper lifetime leak cycles", function () {
     var SelfHandler = NSBlockOperation.extend({}, { name: "TNSLeakSelfHandler" });
     var WeakHandler = NSBlockOperation.extend({}, { name: "TNSLeakWeakHandler" });
     var WeakMapValue = NSBlockOperation.extend({}, { name: "TNSLeakWeakMapValue" });
+    var WeakMapTable = NSBlockOperation.extend({}, { name: "TNSLeakWeakMapTable" });
     var GestureView = UIView.extend({}, { name: "TNSLeakGestureView" });
     var HeldView = UIView.extend({}, { name: "TNSLeakHeldView" });
     var NotifiedView = UIView.extend({}, { name: "TNSLeakNotifiedView" });
@@ -57,6 +58,7 @@ describe("Wrapper lifetime leak cycles", function () {
         TNSLeakSelfHandler: true,
         TNSLeakWeakHandler: false,
         TNSLeakWeakMapValue: true,
+        TNSLeakWeakMapTable: true,
         TNSLeakInitOwned: true,
     };
 
@@ -186,6 +188,8 @@ describe("Wrapper lifetime leak cycles", function () {
         var watched = NSHashTable.weakObjectsHashTable();
         // Reachable from the roots for the whole describe, like a module-level map.
         var meta = new WeakMap();
+        // A key the roots keep, of a map only its own entry's value keeps.
+        var rootedKey = {};
         var heldView = HeldView.new();
         var reports = {};
 
@@ -262,6 +266,17 @@ describe("Wrapper lifetime leak cycles", function () {
                 watched.addObject(weakMapValue);
             })();
             (function () {
+                // The handler closes over the map, whose entry names the
+                // operation: the value is alive only while the map is.
+                var weakMapTable = WeakMapTable.new();
+                var map = new WeakMap();
+                map.set(rootedKey, { owner: weakMapTable });
+                weakMapTable.addExecutionBlock(function () {
+                    return map;
+                });
+                watched.addObject(weakMapTable);
+            })();
+            (function () {
                 // A recognizer's JS state naming the view that owns it.
                 var gestureView = GestureView.new();
                 var recognizer = UITapGestureRecognizer.new();
@@ -312,6 +327,7 @@ describe("Wrapper lifetime leak cycles", function () {
                 }
             });
             meta = new WeakMap();
+            rootedKey = {};
             owner.removeAllObjects();
             hiddenOwner.removeAllObjects();
         });
