@@ -67,9 +67,8 @@ struct RootedState {
   std::vector<ObjectWeakCallbackState*> releases;
   bool draining = false;
   bool drainPosted = false;
-  // The first -retainCount implementation that is not JS-implemented, per
-  // class (null for timers): the scan runs in a GC prologue, where JS may not
-  // run.
+  // The native -retainCount implementation per class (NativeRetainCountImp):
+  // the scan runs in a GC prologue, where JS may not run.
   std::unordered_map<Class, IMP> retainCountImps;
 };
 
@@ -149,15 +148,46 @@ bool IsTimerClass(Class cls) {
   return false;
 }
 
-// Timers read as 0, as in ObjectManager's ownership checks: the retain count
-// of an uninitialized NSTimer (NSTimer.alloc()) can hang.
+// The -retainCount the native class of `cls` answers with, never one JS
+// implements: JS subclasses are skipped, and a class whose -retainCount JS
+// replaced keeps the original under the swizzled-prefixed alias. Read from the
+// method lists of each class, so an alias inherited from a replaced ancestor
+// never hides a native override below it. Null for timers, as in
+// ObjectManager's ownership checks: the retain count of an uninitialized
+// NSTimer (NSTimer.alloc()) can hang.
+IMP NativeRetainCountImp(Class cls) {
+  if (IsTimerClass(cls)) {
+    return nullptr;
+  }
+  SEL selector = @selector(retainCount);
+  static SEL original = sel_registerName((Constants::SwizzledPrefix + "retainCount").c_str());
+  for (Class c = ClassBuilder::FindNativeClass(cls); c != nil; c = class_getSuperclass(c)) {
+    unsigned int count = 0;
+    Method* methods = class_copyMethodList(c, &count);
+    IMP own = nullptr;
+    IMP kept = nullptr;
+    for (unsigned int i = 0; i < count; i++) {
+      SEL name = method_getName(methods[i]);
+      if (name == original) {
+        kept = method_getImplementation(methods[i]);
+      } else if (name == selector) {
+        own = method_getImplementation(methods[i]);
+      }
+    }
+    free(methods);
+    if (kept != nullptr || own != nullptr) {
+      return kept != nullptr ? kept : own;
+    }
+  }
+  return nullptr;
+}
+
+// Classes without a native -retainCount read as 0.
 NSUInteger NativeRetainCount(RootedState* state, id obj) {
   Class cls = object_getClass(obj);
   auto found = state->retainCountImps.find(cls);
   if (found == state->retainCountImps.end()) {
-    IMP imp = IsTimerClass(cls) ? nullptr
-                                : ClassBuilder::FindNotOverridenMethod(cls, @selector(retainCount));
-    found = state->retainCountImps.emplace(cls, imp).first;
+    found = state->retainCountImps.emplace(cls, NativeRetainCountImp(cls)).first;
   }
   if (found->second == nullptr) {
     return 0;

@@ -292,6 +292,14 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index) {
 
 @end
 
+@implementation TNSReplaceableRetainCount
+
++ (NSUInteger)retainCountOf:(id)object {
+  return ((NSUInteger (*)(id, SEL))objc_msgSend)(object, sel_registerName("retainCount"));
+}
+
+@end
+
 @implementation TNSDecodeDelegate
 
 - (id)unarchiver:(NSKeyedUnarchiver*)unarchiver didDecodeObject:(id)object {

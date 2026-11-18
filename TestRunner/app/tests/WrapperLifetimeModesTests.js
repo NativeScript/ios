@@ -271,6 +271,57 @@ describe("Wrapper lifetime modes", function () {
         });
     });
 
+    // Replaced through the protocol prototype, the native class itself answers
+    // -retainCount from JS, so the scan has to read the original. The
+    // replacement outlives the spec, and the other modes' ownership checks
+    // still call it from a GC prologue, so it is installed in the rooted mode
+    // only.
+    it("never calls a JS replacement of a native class's retainCount while scanning", function (done) {
+        if (!rooted) {
+            done();
+            return;
+        }
+        var calls = 0;
+        var proto = TNSReplaceableRetainCountProtocol.prototype;
+        var original = proto.retainCount;
+        proto.retainCount = function () {
+            calls++;
+            return original.call(this);
+        };
+        var Replaced = (function (_super) {
+            __extends(Replaced, _super);
+            function Replaced() {
+                return (_super !== null && _super.apply(this, arguments)) || this;
+            }
+            return Replaced;
+        })(TNSReplaceableRetainCount);
+        var owner = NSMutableArray.new();
+        var scanned;
+        (function () {
+            var obj = Replaced.new();
+            obj.state = 3;
+            owner.addObject(obj);
+            var before = calls;
+            expect(TNSReplaceableRetainCount.retainCountOf(obj)).toBeGreaterThan(1);
+            expect(calls).toBe(before + 1);
+            scanned = calls;
+        })();
+        settle(2, function () {
+            if (rooted) {
+                expect(calls).toBe(scanned);
+                expect(owner.objectAtIndex(0).state).toBe(3);
+            }
+            owner.removeAllObjects();
+            settle(3, function () {
+                if (rooted) {
+                    expect(calls).toBe(scanned);
+                    expect(deallocs()).toBe(1);
+                }
+                done();
+            });
+        });
+    });
+
     it("lets an explicitly released rooted wrapper go", function (done) {
         var owner = NSMutableArray.new();
         var obj = Extended.new();
