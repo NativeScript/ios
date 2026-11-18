@@ -119,7 +119,10 @@ void ArgConverter::Init(Local<Context> context) {
 
 Persistent<v8::Function>* ArgConverter::EmptyInstanceFunction(Isolate* isolate, bool intercepted) {
   if (intercepted) {
-    CanaryWrapperConstructors* canary = Caches::StateFor<CanaryWrapperConstructors>(isolate);
+    // Teardown-safe: a -dealloc receiver can be built after InvalidateIsolate,
+    // while deferred releases drain.
+    CanaryWrapperConstructors* canary =
+        Caches::ExistingStateFor<CanaryWrapperConstructors>(isolate);
     tns::Assert(canary != nullptr && canary->emptyInstance != nullptr, isolate);
     return canary->emptyInstance.get();
   }
