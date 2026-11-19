@@ -81,14 +81,17 @@ v8_build
 !tools/v8/
 !tools/v8/**
 
+#
+# libffi follows the same rule: download_libffi.sh installs the release pinned
+# in LIBFFI_RELEASE, built by NativeScript/libffi-buildscripts. libffi.h is
+# ours (it picks the architecture's headers) and stays tracked.
 /.v8-prebuilt/
+/.libffi-prebuilt/
 NativeScript/lib/*/*.a
-!NativeScript/lib/*/libffi.a
 NativeScript/lib/.v8-release-stamp
+NativeScript/lib/.libffi-release-stamp
 NativeScript/include/**
 !NativeScript/include/libffi.h
-!NativeScript/include/libffi/
-!NativeScript/include/libffi/**
 NativeScript/inspector/src/
 NativeScript/inspector/third_party/
 NativeScript/inspector/absl/

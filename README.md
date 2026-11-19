@@ -26,6 +26,9 @@ git submodule update --init
 # (set V8_SKIP_DOWNLOAD=1 to keep a local V8 build instead)
 ./download_v8.sh
 
+# Fetch the prebuilt libffi libraries and headers for the release pinned in LIBFFI_RELEASE
+./download_libffi.sh
+
 sudo gem install xcodeproj
 sudo gem install cocoapods
 
@@ -142,6 +145,24 @@ It builds every Android ABI and Apple variant in CI and publishes them as
 release assets — which it has to, because the full matrix cannot be produced on
 any single machine: the 32-bit Android ABIs need an ia32-capable host and the
 Apple variants need macOS.
+
+# Updating libffi
+
+libffi is installed the same way. `./download_libffi.sh` installs the libraries
+and the per-architecture `ffi.h`/`ffitarget.h` from the release pinned in
+`LIBFFI_RELEASE`, after checking them against the release's checksums.
+`build_nativescript.sh` calls it for you.
+
+```
+./download_libffi.sh                              # install the pinned release
+./download_libffi.sh --release <tag>              # install a different one
+./download_libffi.sh --from-dir <buildscripts>/dist   # install a local build
+```
+
+The releases come from
+[NativeScript/libffi-buildscripts](https://github.com/NativeScript/libffi-buildscripts),
+which builds upstream's release tarball for every Apple variant. To move to a
+new libffi version, cut a release there and update `LIBFFI_RELEASE`.
 
 
 # Building a Distribution Package

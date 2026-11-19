@@ -70,3 +70,6 @@ runs:
     - name: Fetch prebuilt V8
       shell: bash
       run: ./download_v8.sh
+    - name: Fetch prebuilt libffi
+      shell: bash
+      run: ./download_libffi.sh
