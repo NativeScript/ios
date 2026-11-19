@@ -159,6 +159,10 @@ else
     STAMP_VALUE="$RELEASE"
 fi
 
+# Cleared before the first file is replaced, so an install that fails partway
+# is redone by the next run instead of passing as the previous one.
+rm -f "$STAMP"
+
 echo "Installing libraries"
 for entry in "${VARIANTS[@]}"; do
     variant="${entry%%:*}"
