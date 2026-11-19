@@ -128,6 +128,14 @@ class PromiseRejectionTracker {
   void OnReject(v8::Local<v8::Promise> promise, v8::Local<v8::Value> reason);
   void OnHandlerAdded(v8::Local<v8::Promise> promise);
   void Drain(v8::Local<v8::Context> context);
+  // Drains the isolate's tracker when it has work, taking the Locker and
+  // entering the main context. Runs after every event-loop task and port
+  // message, Node's model (rejections processed after each callback): a
+  // rejection left unhandled by one task is reported before the next task
+  // can attach a handler. HTML is looser - it queues the notification as a
+  // task that re-checks the promise - so this is the deterministic choice.
+  // Isolate's own thread only.
+  static void DrainIfPending(v8::Isolate* isolate);
   // Safe to call without holding the isolate lock: OnReject can run on any
   // thread that holds the v8::Locker (e.g. a background-thread rejection), so
   // the runloop observer polls this atomic instead of touching pending_.

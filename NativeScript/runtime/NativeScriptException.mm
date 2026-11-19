@@ -598,6 +598,24 @@ static bool GiveWorkerOnErrorAChance(Isolate* isolate, Local<Context> context, L
   return !result.IsEmpty() && result->BooleanValue(isolate);
 }
 
+void PromiseRejectionTracker::DrainIfPending(Isolate* isolate) {
+  auto cache = Caches::Get(isolate);
+  // HasPending is an atomic read: OnReject can run on any thread holding the
+  // v8::Locker, so pending_ itself must only be touched under the lock below.
+  // The event loop runs v8 tasks before Runtime::Init creates the context.
+  if (cache == nullptr || !cache->IsValid() || !cache->HasContext() ||
+      cache->PromiseRejections == nullptr || !cache->PromiseRejections->HasPending()) {
+    return;
+  }
+
+  v8::Locker locker(isolate);
+  Isolate::Scope isolate_scope(isolate);
+  HandleScope handle_scope(isolate);
+  Local<Context> context = cache->GetContext();
+  Context::Scope context_scope(context);
+  cache->PromiseRejections->Drain(context);
+}
+
 void PromiseRejectionTracker::Drain(Local<Context> context) {
   if (draining_) {
     return;

@@ -67,12 +67,16 @@ void DisposeTimer(CFRunLoopTimerRef timer) {
 namespace tns {
 
 double EventLoop::NowMs() {
+  // mach_absolute_time's clock, the one CFRunLoopTimers fire on: a token's
+  // timer is armed once, so a key on a clock that keeps counting through
+  // sleep (CLOCK_MONOTONIC) would disagree with its timer after a wake and
+  // hand newer timers an older timer's far-off token
   struct timespec res;
-  clock_gettime(CLOCK_MONOTONIC, &res);
+  clock_gettime(CLOCK_UPTIME_RAW, &res);
   return 1000.0 * res.tv_sec + (double)res.tv_nsec / 1e6;
 }
 
-// converts a CLOCK_MONOTONIC due time to a CFRunLoopTimer fire date. The two
+// converts a NowMs() due time to a CFRunLoopTimer fire date. The two
 // clocks can drift (CFAbsoluteTime is wall-based), so consumers must treat a
 // fire as "check what is due now", never as proof a specific item is due.
 static CFAbsoluteTime FireDateFor(double dueMs, double nowMs) {
@@ -429,7 +433,10 @@ void EventLoop::RunOneInternal() {
     RunEntry(*entry);
     return;
   }
-  RunGuarded([&] { RunEntry(*entry); });
+  RunGuarded([&] {
+    RunEntry(*entry);
+    PromiseRejectionTracker::DrainIfPending(isolate_);
+  });
 }
 
 void EventLoop::RunNestableV8Tasks() {
@@ -520,8 +527,8 @@ void EventLoop::OrderedTokenFired(CFRunLoopTimerRef timer, void* info) {
     }
     auto now = NowMs();
     if (token->key > now) {
-      // fired ahead of its CLOCK_MONOTONIC due time; still in the future, so
-      // CF honors the new date
+      // fired ahead of its NowMs() due time; still in the future, so CF
+      // honors the new date
       CFRunLoopTimerSetNextFireDate(timer, FireDateFor(token->key, now));
       return;
     }
@@ -568,7 +575,19 @@ void EventLoop::OrderedTokenFired(CFRunLoopTimerRef timer, void* info) {
       }
     }
   } unpark{self};
-  self->RunOrderedTask();
+  // Overdue tokens fire back to back within one CF timer pass, so the
+  // runloop's own pool would span the whole batch; each task gets its own.
+  @autoreleasepool {
+    self->RunOrderedTask();
+    bool stopped;
+    {
+      std::lock_guard<std::mutex> lock(self->mutex_);
+      stopped = self->stopped_;
+    }
+    if (!stopped) {
+      RunGuarded([&] { PromiseRejectionTracker::DrainIfPending(self->isolate_); });
+    }
+  }
 }
 
 }  // namespace tns

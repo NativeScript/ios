@@ -107,8 +107,8 @@ class EventLoop {
   bool PostOrderedDelayed(std::function<void()> fn, double delayMs);
 
   /**
-   * Posts a bare ordered token due at an absolute CLOCK_MONOTONIC time
-   * (NowMs() units) for an item the OrderedTaskSource keeps in its own
+   * Posts a bare ordered token due at an absolute NowMs() time
+   * (CLOCK_UPTIME_RAW milliseconds) for an item the OrderedTaskSource keeps in its own
    * bookkeeping (Timers). One token per item; the drain picks the earliest
    * due item across the source and the ordered entries, so the token needn't
    * name what it will run. Returns the key actually recorded (an overdue due
@@ -177,7 +177,8 @@ class EventLoop {
    */
   void RunOrderedTask();
 
-  // CLOCK_MONOTONIC milliseconds - the clock every due time and token is on
+  // CLOCK_UPTIME_RAW milliseconds - the clock every due time and token is on;
+  // it pauses during system sleep, like the CFRunLoopTimers tokens ride
   static double NowMs();
 
  private:

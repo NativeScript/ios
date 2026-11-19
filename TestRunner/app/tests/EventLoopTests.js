@@ -233,6 +233,67 @@ describe("event loop ordered macrotasks", function () {
     });
 });
 
+// A rejection a task leaves unhandled is reported before the next task runs,
+// Node's model (rejections processed after each callback), even when both
+// tasks were due in the same runloop pass or arrive in one port drain. A
+// later task attaching a handler then gets rejectionhandled, not silence.
+describe("event loop unhandled rejections", function () {
+    // schedule(reject, handle) queues two tasks and may return a cleanup
+    function expectReportedBeforeNextTask(schedule) {
+        return raisesGlobalErrors(function (done) {
+            const events = [];
+            const onUnhandled = (e) => {
+                e.preventDefault();
+                events.push("unhandled");
+            };
+            const onHandled = () => events.push("handled");
+            global.addEventListener("unhandledrejection", onUnhandled);
+            global.addEventListener("rejectionhandled", onHandled);
+            let rejected;
+            const cleanup = schedule(() => {
+                rejected = Promise.reject(new Error("reported before the next task"));
+                events.push("reject");
+            }, () => {
+                rejected.catch(() => { });
+                events.push("handle");
+            });
+            foreignSetTimeout(() => {
+                global.removeEventListener("unhandledrejection", onUnhandled);
+                global.removeEventListener("rejectionhandled", onHandled);
+                if (cleanup) {
+                    cleanup();
+                }
+                expect(events).toEqual(["reject", "unhandled", "handle", "handled"]);
+                done();
+            }, 100);
+        });
+    }
+
+    it("reports before a timer due in the same pass attaches a handler",
+        expectReportedBeforeNextTask((reject, handle) => {
+            __ns__setTimeout(reject, 0);
+            __ns__setTimeout(handle, 0);
+        }));
+
+    it("reports before a macrotask due in the same pass attaches a handler",
+        expectReportedBeforeNextTask((reject, handle) => {
+            __ns__setTimeout(reject, 0);
+            __ns__queueMacrotask(handle);
+        }));
+
+    it("reports before the next message on the same port attaches a handler",
+        expectReportedBeforeNextTask((reject, handle) => {
+            const channel = new MessageChannel();
+            channel.port2.onmessage = (event) => (event.data === "reject" ? reject : handle)();
+            channel.port1.postMessage("reject");
+            channel.port1.postMessage("handle");
+            return () => {
+                channel.port1.close();
+                channel.port2.close();
+            };
+        }));
+});
+
 // A self-rescheduling immediate timer must not starve the rest of the
 // runloop: foreign timers, the GCD main queue and the before-waiting phase
 // all have to keep running between steps. The before-waiting probe is the
