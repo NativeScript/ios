@@ -8,7 +8,6 @@
 #include <map>
 #include <memory>
 #include <mutex>
-#include <set>
 #include <vector>
 
 #include "Common.h"
@@ -45,14 +44,19 @@ class OrderedTaskSource {
  *
  * Ordered lane - work whose ordering is observable against other app-level
  * runloop work (spec'd macrotasks, JS timers). Every post is an anonymous
- * "task due" token on ONE CFRunLoopTimer armed at the earliest pending due
- * time (a due-now token gets a past fire date and fires on the next pass), so
- * tokens stay in fire-date order with foreign NSTimers and each fire yields a
- * full runloop pass - performed-block delivery would be sooner but a
- * self-rescheduling chain of blocks starves the before-waiting phase (CA
- * rendering, autorelease pool, the rejection drain). Each token runs the
- * earliest due item across the ordered entries and the OrderedTaskSource
- * (Timers) - one due-ordered domain, and a leftover token is a cheap no-op.
+ * "task due" token with its own CFRunLoopTimer at the token's due time,
+ * never re-armed once that time has passed: CF clamps a past fire date to
+ * now, so such a timer would fall behind every overdue foreign NSTimer.
+ * Tokens therefore keep fire-date order with foreign timers even when
+ * several are overdue at once. Ordered tasks never nest: a token that fires
+ * in a runloop spun from inside one waits for it to return (losing its
+ * fire-date position only then). A due-now token still waits for the
+ * timer phase rather than riding a performed block: a self-rescheduling
+ * chain of blocks starves the before-waiting phase (CA rendering, autorelease
+ * pool, the rejection drain), while a timer created during a timer pass only
+ * fires on the next one. Each token runs the earliest due item across the
+ * ordered entries and the OrderedTaskSource (Timers) - one due-ordered
+ * domain, and a leftover token is a cheap no-op.
  *
  * Internal lane - work in its own ordering domain: v8 platform foreground
  * tasks (Atomics.waitAsync wakeups, GC tasks, streaming-compilation
@@ -114,11 +118,11 @@ class EventLoop {
   double PostOrderedToken(double dueTimeMs);
 
   /**
-   * Removes one not-yet-matured ordered token at this due time, un-arming its
-   * wakeup. Returns false when no such token is pending - it already matured,
-   * so its slot cannot be recalled; the caller must leave a tombstone for it
-   * instead. Tokens are anonymous and counted,
-   * so cancelling one token plus one item keeps slots 1:1 no matter which
+   * Removes one not-yet-matured ordered token at this due time, invalidating
+   * its timer. Returns false when no such token is pending - it already
+   * matured, so its slot cannot be recalled; the caller must leave a
+   * tombstone for it instead. Tokens are anonymous and counted, so
+   * cancelling one token plus one item keeps slots 1:1 no matter which
    * producer's token is physically removed.
    */
   bool TryCancelOrderedToken(double dueTimeMs);
@@ -205,13 +209,13 @@ class EventLoop {
   static bool HasDueLocked(Lane& lane, double now);
   void SignalInternalLocked();
   void ArmInternalTimerLocked(double now);
-  void ArmOrderedTimerLocked(double now);
+  void AddOrderedTokenLocked(double key, double now);
   void RunEntry(Entry& entry);
   void RunOneInternal();
 
   static void InternalSourcePerform(void* info);
   static void InternalTimerFired(CFRunLoopTimerRef timer, void* info);
-  static void OrderedTimerFired(CFRunLoopTimerRef timer, void* info);
+  static void OrderedTokenFired(CFRunLoopTimerRef timer, void* info);
 
   v8::Isolate* isolate_;
   std::mutex mutex_;
@@ -219,14 +223,18 @@ class EventLoop {
   Lane ordered_;
   // ordered-lane source with its own bookkeeping (Timers); home-thread only
   OrderedTaskSource* timerSource_ = nullptr;
-  // future-due ordered tokens awaiting orderedTimer_
-  std::multiset<double> pendingTokens_;
+  // pending ordered tokens by key, each owning its CFRunLoopTimer (+1)
+  std::multimap<double, CFRunLoopTimerRef> pendingTokens_;
+  // set while an ordered task runs; tokens that fire meanwhile (from a
+  // runloop the task spins) are parked, still in pendingTokens_, and
+  // re-armed when it returns
+  bool runningOrderedTask_ = false;
+  std::vector<std::pair<double, CFRunLoopTimerRef>> parkedTokens_;
   // tokens posted before the bind; flushed by BindToCurrentThread
   std::vector<double> bufferedTokens_;
   CFRunLoopRef loop_ = nullptr;
   CFRunLoopSourceRef internalSource_ = nullptr;
   CFRunLoopTimerRef internalTimer_ = nullptr;
-  CFRunLoopTimerRef orderedTimer_ = nullptr;
   bool stopped_ = false;
 };
 

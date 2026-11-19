@@ -256,13 +256,12 @@ describe("createRequire", function () {
                 }, 0);
             });
 
-            // Entered from a main-queue block, not from a timer callback: JS
-            // timers ride ONE shared CFRunLoopTimer, and a CFRunLoopTimer does
-            // not re-enter, so a require started from inside that timer's own
-            // callback can never let another timer fire no matter how the loop
-            // is pumped. From a runloop block the timer is free to fire, which
-            // is what makes this a test of pumpRunLoop rather than of
-            // re-entrancy.
+            // Entered from a main-queue block, not from a timer callback:
+            // ordered tasks (JS timers, macrotasks) never nest, so a require
+            // started from inside a timer callback can never let another
+            // timer fire no matter how the loop is pumped. From a runloop
+            // block the timer is free to fire, which is what makes this a
+            // test of pumpRunLoop rather than of re-entrancy.
             function onFreshTask(fn) {
                 NSOperationQueue.mainQueue.addOperationWithBlock(fn);
             }

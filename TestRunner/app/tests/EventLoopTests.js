@@ -165,6 +165,72 @@ describe("event loop ordered macrotasks", function () {
             done();
         }, 30);
     });
+
+    // CF clamps a past fire date to now, so re-arming a matured token's timer
+    // would land it behind every overdue foreign timer. Each case makes ns20
+    // and nstimer25 overdue together and disturbs the ordered lane in a
+    // different way.
+    function expectDueOrderAfterBusyWait(order, expected, afterBusyWait, done) {
+        __ns__setTimeout(() => order.push("ns20"), 20);
+        foreignSetTimeout(() => order.push("nstimer25"), 25);
+        __ns__setTimeout(() => order.push("ns30"), 30);
+        const start = Date.now();
+        while (Date.now() - start < 45) { }
+        if (afterBusyWait) {
+            afterBusyWait();
+        }
+        foreignSetTimeout(() => {
+            expect(order).toEqual(expected);
+            done();
+        }, 30);
+    }
+
+    it("keeps due-time order with foreign timers behind an earlier overdue timer", function (done) {
+        const order = [];
+        __ns__setTimeout(() => order.push("ns10"), 10);
+        expectDueOrderAfterBusyWait(order, ["ns10", "ns20", "nstimer25", "ns30"], null, done);
+    });
+
+    it("keeps due-time order with foreign timers behind an earlier macrotask", function (done) {
+        const order = [];
+        __ns__queueMacrotask(() => order.push("macro"));
+        expectDueOrderAfterBusyWait(order, ["macro", "ns20", "nstimer25", "ns30"], null, done);
+    });
+
+    it("keeps due-time order with foreign timers when a timer is scheduled after they matured", function (done) {
+        const order = [];
+        let late;
+        expectDueOrderAfterBusyWait(order, ["ns20", "nstimer25", "ns30"], () => {
+            late = __ns__setTimeout(() => order.push("late"), 1000);
+        }, () => {
+            __ns__clearTimeout(late);
+            done();
+        });
+    });
+
+    // A runloop spun from inside a timer callback (a pumped require, app code)
+    // must not run other ordered tasks nested inside it.
+    it("does not run ordered tasks inside a runloop spun from a timer callback", function (done) {
+        __ns__setTimeout(() => {
+            const order = [];
+            __ns__setTimeout(() => order.push("timer"), 0);
+            __ns__queueMacrotask(() => order.push("macro"));
+            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, false);
+            expect(order).toEqual([]);
+            __ns__setTimeout(() => {
+                expect(order).toEqual(["timer", "macro"]);
+                done();
+            }, 0);
+        }, 0);
+    });
+
+    it("keeps due-time order with foreign timers when a timer is cleared after they matured", function (done) {
+        const order = [];
+        const unrelated = __ns__setTimeout(() => order.push("cleared"), 1000);
+        expectDueOrderAfterBusyWait(order, ["ns20", "nstimer25", "ns30"], () => {
+            __ns__clearTimeout(unrelated);
+        }, done);
+    });
 });
 
 // A self-rescheduling immediate timer must not starve the rest of the
