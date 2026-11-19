@@ -2,9 +2,11 @@
 set -e
 source "$(dirname "$0")/build_utils.sh"
 
-# The V8 libraries and headers are not committed; fetch the pinned release.
-# No-ops once they are in place, and honours V8_SKIP_DOWNLOAD=1.
+# The V8 and libffi libraries and headers are not committed; fetch the pinned
+# releases. Both no-op once they are in place; download_v8.sh honours
+# V8_SKIP_DOWNLOAD=1.
 "$(dirname "$0")/download_v8.sh"
+"$(dirname "$0")/download_libffi.sh"
 
 function to_bool() {
   local arg="$1"

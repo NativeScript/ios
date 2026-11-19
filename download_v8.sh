@@ -140,7 +140,7 @@ for entry in "${VARIANTS[@]}"; do
     [ -d "$src" ] || { echo "Archive for $variant has no lib/" >&2; exit 1; }
     for dest in ${entry#*:}; do
         mkdir -p "$LIB_DIR/$dest"
-        # libffi.a is built by build_libffi.sh and lives in the same directory,
+        # libffi.a is installed by download_libffi.sh into the same directory,
         # so only the V8 archives are replaced.
         find "$LIB_DIR/$dest" -maxdepth 1 -name '*.a' ! -name 'libffi.a' -delete
         cp "$src"/*.a "$LIB_DIR/$dest/"
@@ -148,8 +148,8 @@ for entry in "${VARIANTS[@]}"; do
 done
 
 echo "Installing public headers"
-# libffi's headers live in the same directory, so V8's are replaced selectively
-# rather than by wiping include/.
+# libffi's headers (installed by download_libffi.sh) live in the same directory,
+# so V8's are replaced selectively rather than by wiping include/.
 SRC_INC="$STAGE/ios-arm64-device/include"
 [ -d "$SRC_INC" ] || { echo "Archive has no include/" >&2; exit 1; }
 for entry in cppgc libplatform inspector; do
