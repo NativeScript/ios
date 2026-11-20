@@ -2,19 +2,29 @@
 #include "ModuleInternalCallbacks.h"
 #import <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
+#include <pthread.h>
+#include <sys/qos.h>
 #include <sys/stat.h>
 #include <v8.h>
 #include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdio>
+#include <cstring>
+#include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <queue>
 #include <string>
+#include <thread>
+#include <unordered_map>
 #include <vector>
 #include "Caches.h"
 #include "EventLoop.h"
+#include "ExternalMemory.h"
 #include "Helpers.h"  // for tns::Exists
 #include "HttpLoader.h"
 #include "ModuleInternal.h"  // for CompileFileEsModule / EvaluateModuleGraph
@@ -86,6 +96,7 @@ static const char* ModuleStatusToString(v8::Module::Status status);
 // QuiesceModuleLoadsForIsolate so in-flight walks can't touch a disposed
 // isolate.
 static void KillAsyncGraphLoadsForIsolate(v8::Isolate* isolate);
+static void DrainStreamedCompilesForIsolate(v8::Isolate* isolate);
 static v8::MaybeLocal<v8::Module> CompileJsonTextAsEsModule(v8::Isolate* isolate,
                                                             v8::Local<v8::Context> context,
                                                             const std::string& jsonText,
@@ -100,6 +111,131 @@ struct AsyncGraphLoad;
 struct RequireFacadeEntry {
   v8::Global<v8::Module> target;
   v8::Global<v8::Module> facade;
+};
+
+// ── Off-thread compile of large HTTP module bodies ───────────────────────────
+//
+// ScriptStreamingTask::Run() works on the isolate's heap from another thread
+// (it opens a LocalIsolate), so the isolate must outlive every Run() and a
+// task that has run must be destroyed before the isolate is disposed. Hence:
+//   - StreamedModuleCompile (StreamedSource + task) is owned by the isolate's
+//     ModuleLoaderState and created, finalized and destroyed on the isolate
+//     thread only;
+//   - background threads hold a StreamTicket, which never owns V8 state;
+//   - StreamCompileGate counts Run() calls in flight; teardown closes it and
+//     waits for zero before the event loop stops and the state is destroyed.
+
+// Hands the fetched body to the stream. GetMoreData blocks until it is fed or
+// cancelled; V8 takes ownership of the chunk and delete[]s it.
+class StreamFeed {
+ public:
+  void Feed(std::unique_ptr<uint8_t[]> chunk, size_t length) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    chunk_ = std::move(chunk);
+    length_ = length;
+    ready_ = true;
+    cv_.notify_all();
+  }
+
+  void Cancel() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    ready_ = true;
+    cv_.notify_all();
+  }
+
+  size_t Take(const uint8_t** src) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    cv_.wait(lock, [this] { return ready_; });
+    if (chunk_ == nullptr) {
+      return 0;
+    }
+    *src = chunk_.release();
+    return length_;
+  }
+
+ private:
+  std::mutex mutex_;
+  std::condition_variable cv_;
+  std::unique_ptr<uint8_t[]> chunk_;
+  size_t length_ = 0;
+  bool ready_ = false;
+};
+
+class FeedSourceStream : public v8::ScriptCompiler::ExternalSourceStream {
+ public:
+  explicit FeedSourceStream(std::shared_ptr<StreamFeed> feed) : feed_(std::move(feed)) {}
+  size_t GetMoreData(const uint8_t** src) override { return feed_->Take(src); }
+
+ private:
+  std::shared_ptr<StreamFeed> feed_;
+};
+
+class StreamCompileGate {
+ public:
+  // False once closed: no Run() may start after teardown began.
+  bool TryEnter() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (closed_) {
+      return false;
+    }
+    inFlight_++;
+    return true;
+  }
+
+  void Leave() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (--inFlight_ == 0) {
+      cv_.notify_all();
+    }
+  }
+
+  // Isolate thread. A Run() that needs a GC parks until the isolate thread
+  // performs it (CollectionBarrier::AwaitCollectionBackground), and the
+  // waiting thread is not parked itself, so a plain wait could deadlock:
+  // `serviceGcRequests` runs between short waits to let that GC happen.
+  void CloseAndDrain(const std::function<void()>& serviceGcRequests) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    closed_ = true;
+    while (inFlight_ > 0) {
+      if (cv_.wait_for(lock, std::chrono::milliseconds(2), [this] { return inFlight_ == 0; })) {
+        break;
+      }
+      lock.unlock();
+      serviceGcRequests();
+      lock.lock();
+    }
+  }
+
+ private:
+  std::mutex mutex_;
+  std::condition_variable cv_;
+  int inFlight_ = 0;
+  bool closed_ = false;
+};
+
+// The background threads' view of one streamed compile. `task` is owned by
+// the isolate-side StreamedModuleCompile and may be used only between a
+// successful gate->TryEnter() and the matching Leave(). `ran` and `ascii` are
+// written before the completion task is posted and read after it runs.
+struct StreamTicket {
+  uint64_t id = 0;
+  std::shared_ptr<StreamCompileGate> gate;
+  std::shared_ptr<StreamFeed> feed;
+  v8::ScriptCompiler::ScriptStreamingTask* task = nullptr;
+  bool ran = false;
+  bool ascii = false;
+};
+
+struct StreamedModuleCompile {
+  ~StreamedModuleCompile() {
+    if (feed != nullptr) {
+      feed->Cancel();
+    }
+  }
+  std::shared_ptr<StreamFeed> feed;
+  // Declared before `task`, which points into it.
+  std::unique_ptr<v8::ScriptCompiler::StreamedSource> source;
+  std::unique_ptr<v8::ScriptCompiler::ScriptStreamingTask> task;
 };
 
 // All module-loader state owned by one isolate. v8::Global handles are bound
@@ -151,6 +287,12 @@ struct ModuleLoaderState {
   // Holds the facade target across that facade's InstantiateModule and nothing
   // else — the facade's resolve callback is the only reader.
   v8::Global<v8::Module> pendingFacadeTarget;
+
+  // Streamed compiles issued and not yet finalized or discarded, by ticket id.
+  // QuiesceModuleLoadsForIsolate drains the gate before any of these die.
+  std::shared_ptr<StreamCompileGate> streamGate = std::make_shared<StreamCompileGate>();
+  std::unordered_map<uint64_t, std::unique_ptr<StreamedModuleCompile>> streamedCompiles;
+  uint64_t nextStreamedCompileId = 1;
 };
 
 // This isolate's loader state, or null once teardown has begun — callers must
@@ -450,9 +592,15 @@ static std::string DescribeCaughtError(v8::Isolate* isolate, v8::Local<v8::Conte
 // which nothing downstream can reconstruct. A caller that cannot let it
 // propagate must consume it through its own TryCatch and route the text into
 // its own failure channel — never drop it.
-static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
-    v8::Isolate* isolate, v8::Local<v8::Context> context, const std::string& code,
-    const std::string& urlStr) {
+//
+// `compile` produces the module for `origin`; it is not called when the key is
+// already registered.
+using ModuleCompileStep = std::function<v8::MaybeLocal<v8::Module>(const v8::ScriptOrigin& origin)>;
+
+static v8::MaybeLocal<v8::Module> CompileAndRegisterModule(v8::Isolate* isolate,
+                                                           v8::Local<v8::Context> context,
+                                                           const std::string& urlStr,
+                                                           const ModuleCompileStep& compile) {
   v8::EscapableHandleScope hs(isolate);
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) {
@@ -476,20 +624,16 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
     }
   }
 
-  // Length-aware conversion: module source may contain embedded NUL bytes,
-  // which the char* overload would truncate.
-  v8::Local<v8::String> sourceText = tns::ToV8String(isolate, code);
   v8::Local<v8::String> urlV8;
   if (!v8::String::NewFromUtf8(isolate, urlStr.c_str(), v8::NewStringType::kNormal)
            .ToLocal(&urlV8)) {
     return v8::MaybeLocal<v8::Module>();
   }
   v8::ScriptOrigin origin(urlV8, 0, 0, false, -1, v8::Local<v8::Value>(), false, false, true);
-  v8::ScriptCompiler::Source src(sourceText, origin);
   v8::Local<v8::Module> mod;
   {
     v8::TryCatch tcCompile(isolate);
-    if (!v8::ScriptCompiler::CompileModule(isolate, &src).ToLocal(&mod)) {
+    if (!compile(origin).ToLocal(&mod)) {
       TNS_DEBUG(Esm, "[http-esm][compile][fail] %s %s", urlStr.c_str(),
                 DescribeCaughtError(isolate, context, tcCompile).c_str());
       tcCompile.ReThrow();
@@ -498,6 +642,64 @@ static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
   }
   SetRegisteredModule(*moduleState, isolate, registryKey, mod);
   return hs.Escape(mod);
+}
+
+static v8::MaybeLocal<v8::Module> CompileModuleForResolveRegisterOnly(
+    v8::Isolate* isolate, v8::Local<v8::Context> context, const std::string& code,
+    const std::string& urlStr) {
+  return CompileAndRegisterModule(
+      isolate, context, urlStr, [isolate, &code](const v8::ScriptOrigin& origin) {
+        // Length-aware conversion: module source may contain embedded NUL
+        // bytes, which the char* overload would truncate.
+        v8::ScriptCompiler::Source src(tns::ToV8String(isolate, code), origin);
+        return v8::ScriptCompiler::CompileModule(isolate, &src);
+      });
+}
+
+// A module body the isolate keeps as an external one-byte string. Valid only
+// for pure-ASCII bodies: a one-byte string is Latin-1, which matches the
+// UTF-8 bytes the streamed compile parsed only below 0x80. The bytes live
+// outside the V8 heap, so they are charged as external memory for as long as
+// the string holds them.
+class OwnedAsciiSource : public v8::String::ExternalOneByteStringResource {
+ public:
+  OwnedAsciiSource(std::string body, v8::Isolate* isolate, int gateId)
+      : body_(std::move(body)), charge_(isolate, gateId) {}
+  const char* data() const override { return body_.data(); }
+  size_t length() const override { return body_.size(); }
+  // Isolate thread, while the string is reachable: it can run a collection.
+  void Charge() { charge_.Set(body_.size()); }
+
+ private:
+  std::string body_;
+  ExternalMemoryCharge charge_;
+};
+
+// Finalizes a streamed compile whose ScriptStreamingTask::Run() has returned.
+// `body` must be the exact bytes the stream was fed.
+static v8::MaybeLocal<v8::Module> CompileStreamedModuleRegisterOnly(v8::Isolate* isolate,
+                                                                    v8::Local<v8::Context> context,
+                                                                    StreamedModuleCompile& streamed,
+                                                                    std::string body, bool ascii,
+                                                                    const std::string& urlStr) {
+  return CompileAndRegisterModule(
+      isolate, context, urlStr,
+      [isolate, context, &streamed, &body, ascii](const v8::ScriptOrigin& origin) {
+        v8::Local<v8::String> sourceText;
+        if (ascii) {
+          auto* resource =
+              new OwnedAsciiSource(std::move(body), isolate, Caches::Get(isolate)->getGateId());
+          if (!v8::String::NewExternalOneByte(isolate, resource).ToLocal(&sourceText)) {
+            delete resource;
+            return v8::MaybeLocal<v8::Module>();
+          }
+          resource->Charge();
+        } else {
+          sourceText = tns::ToV8String(isolate, body);
+        }
+        return v8::ScriptCompiler::CompileModule(context, streamed.source.get(), sourceText,
+                                                 origin);
+      });
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -535,9 +737,13 @@ ModuleHandleMap* ModuleRegistryFor(v8::Isolate* isolate) {
 
 // Neutralize any in-flight async graph loads for `isolate`: their fetch
 // completions check the dead flag before touching V8, and their context
-// Globals are Reset here, while the isolate is still alive. The rest of the
-// loader state is destroyed with the isolate's Caches.
-void QuiesceModuleLoadsForIsolate(v8::Isolate* isolate) { KillAsyncGraphLoadsForIsolate(isolate); }
+// Globals are Reset here, while the isolate is still alive. Background compiles
+// are waited out for the same reason. The rest of the loader state is
+// destroyed with the isolate's Caches.
+void QuiesceModuleLoadsForIsolate(v8::Isolate* isolate) {
+  KillAsyncGraphLoadsForIsolate(isolate);
+  DrainStreamedCompilesForIsolate(isolate);
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Import map: bare specifier → resolved URL (populated by ns:module configureLoader)
@@ -984,17 +1190,20 @@ void SetCanonicalizationConfig(CanonicalizationConfig config) {
 //   EnqueueUrl(root)
 //     → FetchModuleBodyAsync (NSURLSession on a
 //       background queue — see HttpLoader.mm)
+//     → JavaScript bodies of kStreamingCompileThresholdBytes or more: parse +
+//       bytecode generation on a StreamCompilePool thread (V8 streaming)
 //     → hop to the isolate's JS thread (ExecuteOnRunLoop on the runtime loop)
-//     → CompileModuleForResolveRegisterOnly (registers under the canonical
-//       URL key — the exact entry ResolveModuleCallback will look up)
+//     → CompileModuleForResolveRegisterOnly, or the streamed compile's
+//       finalization (registers under the canonical URL key — the exact
+//       entry ResolveModuleCallback will look up)
 //     → GetModuleRequests() → ResolveSpecifierToPath → EnqueueUrl(…)
 //     → when pendingFetches drains, onComplete fires on the JS thread.
 //
 // Thread discipline: `visited`, `pendingFetches`, `failed`, `completed` are
 // touched ONLY on the isolate's JS thread (every fetch completion hops there
-// first). Only raw I/O runs off-thread. The one crossing signal is `dead`,
-// an atomic set by isolate teardown so in-flight completions become no-ops
-// instead of touching a disposed isolate.
+// first). Off-thread work is the I/O and ScriptStreamingTask::Run(). The one
+// crossing signal is `dead`, an atomic set by isolate teardown so in-flight
+// completions become no-ops instead of touching a disposed isolate.
 //
 // Failure semantics are deliberately unchanged from the synchronous loader:
 // only a ROOT fetch/compile failure fails the walk (mirroring today's
@@ -1063,6 +1272,199 @@ void RegisterAsyncGraphLoad(v8::Isolate* isolate, const std::shared_ptr<AsyncGra
               loads.end());
   loads.push_back(load);
 }
+
+// Smaller JavaScript bodies compile on the isolate thread: for them the round
+// trip through a background thread costs more than the compile it moves.
+constexpr size_t kStreamingCompileThresholdBytes = 32 * 1024;
+
+// Threads that run ScriptStreamingTask::Run(). The background parser checks
+// for stack overflow against V8's --stack-size (984 KB on arm64) below the
+// stack pointer at which Run() starts, so a thread with less stack than that
+// overflows for real before the parser can report a RangeError. GCD worker
+// threads have 512 KB, hence dedicated threads with a larger stack.
+class StreamCompilePool {
+ public:
+  static StreamCompilePool& Shared() {
+    // Never destroyed: its threads wait on its members for the life of the
+    // process.
+    static StreamCompilePool* pool = new StreamCompilePool();
+    return *pool;
+  }
+
+  // False when no thread could be started to run `job`, which is then
+  // dropped without running.
+  bool Post(std::function<void()> job) {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (jobs_.size() >= idle_ && threads_ < maxThreads_ && StartThreadLocked()) {
+        threads_++;
+      }
+      if (threads_ == 0) {
+        return false;
+      }
+      jobs_.push_back(std::move(job));
+    }
+    cv_.notify_one();
+    return true;
+  }
+
+ private:
+  static constexpr size_t kStackBytes = 2 * 1024 * 1024;
+
+  StreamCompilePool() {
+    const unsigned cpus = std::thread::hardware_concurrency();
+    maxThreads_ = std::clamp(cpus > 1 ? cpus - 1 : 1u, 1u, 4u);
+  }
+
+  bool StartThreadLocked() {
+    pthread_attr_t attr;
+    if (pthread_attr_init(&attr) != 0) {
+      return false;
+    }
+    pthread_attr_setstacksize(&attr, kStackBytes);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    pthread_attr_set_qos_class_np(&attr, QOS_CLASS_USER_INITIATED, 0);
+    pthread_t thread;
+    const bool started = pthread_create(&thread, &attr, &ThreadMain, this) == 0;
+    pthread_attr_destroy(&attr);
+    return started;
+  }
+
+  static void* ThreadMain(void* arg) {
+    pthread_setname_np("org.nativescript.esm.stream-compile");
+    auto* pool = static_cast<StreamCompilePool*>(arg);
+    for (;;) {
+      std::function<void()> job;
+      {
+        std::unique_lock<std::mutex> lock(pool->mutex_);
+        pool->idle_++;
+        pool->cv_.wait(lock, [pool] { return !pool->jobs_.empty(); });
+        pool->idle_--;
+        job = std::move(pool->jobs_.front());
+        pool->jobs_.pop_front();
+      }
+      @autoreleasepool {
+        job();
+      }
+    }
+    return nullptr;
+  }
+
+  std::mutex mutex_;
+  std::condition_variable cv_;
+  std::deque<std::function<void()>> jobs_;
+  size_t idle_ = 0;
+  unsigned threads_ = 0;
+  unsigned maxThreads_ = 1;
+};
+
+// Isolate thread, at fetch issue. Null when V8 declines to stream; otherwise
+// the compile is parked in the loader state, its stream empty until the
+// transport feeds it.
+std::shared_ptr<StreamTicket> BeginStreamedCompile(v8::Isolate* isolate, ModuleLoaderState& state) {
+  auto compile = std::make_unique<StreamedModuleCompile>();
+  compile->feed = std::make_shared<StreamFeed>();
+  compile->source = std::make_unique<v8::ScriptCompiler::StreamedSource>(
+      std::make_unique<FeedSourceStream>(compile->feed), v8::ScriptCompiler::StreamedSource::UTF8);
+  // Streaming follows --lazy-streaming, not --lazy, so the --no-lazy that
+  // Runtime sets outside debug has to be passed explicitly.
+  const auto options = RuntimeConfig.IsDebug ? v8::ScriptCompiler::kNoCompileOptions
+                                             : v8::ScriptCompiler::kEagerCompile;
+  compile->task.reset(v8::ScriptCompiler::StartStreaming(isolate, compile->source.get(),
+                                                         v8::ScriptType::kModule, options));
+  if (compile->task == nullptr) {
+    return nullptr;
+  }
+  auto ticket = std::make_shared<StreamTicket>();
+  ticket->id = state.nextStreamedCompileId++;
+  ticket->gate = state.streamGate;
+  ticket->feed = compile->feed;
+  ticket->task = compile->task.get();
+  state.streamedCompiles.emplace(ticket->id, std::move(compile));
+  return ticket;
+}
+
+// The issuing isolate's compile for `ticket`, now owned by the caller.
+// Isolate thread only.
+std::unique_ptr<StreamedModuleCompile> TakeStreamedCompile(v8::Isolate* isolate,
+                                                           const StreamTicket* ticket) {
+  auto* state = ticket != nullptr ? ModuleLoaderStateFor(isolate) : nullptr;
+  if (state == nullptr) {
+    return nullptr;
+  }
+  auto it = state->streamedCompiles.find(ticket->id);
+  if (it == state->streamedCompiles.end()) {
+    return nullptr;
+  }
+  std::unique_ptr<StreamedModuleCompile> compile = std::move(it->second);
+  state->streamedCompiles.erase(it);
+  return compile;
+}
+
+bool IsAscii(const std::string& bytes) {
+  const unsigned char* p = reinterpret_cast<const unsigned char*>(bytes.data());
+  const size_t n = bytes.size();
+  size_t i = 0;
+  for (; i + sizeof(uint64_t) <= n; i += sizeof(uint64_t)) {
+    uint64_t word;
+    memcpy(&word, p + i, sizeof(word));
+    if (word & 0x8080808080808080ull) {
+      return false;
+    }
+  }
+  for (; i < n; i++) {
+    if (p[i] & 0x80) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Transport thread. Feeds `result` to the ticket's stream and runs the compile
+// on the StreamCompilePool, which calls `postCompletion` once Run() has
+// returned. Returns false, without running anything, when the body is not to
+// be streamed; the caller then posts the completion itself.
+bool DispatchStreamedCompile(const std::shared_ptr<AsyncGraphLoad>& load,
+                             const std::shared_ptr<StreamTicket>& ticket,
+                             const std::shared_ptr<ModuleFetchResult>& result,
+                             std::function<void()> postCompletion) {
+  if (!result->ok || result->kind != ModuleResponseKind::kJavaScript ||
+      result->body.size() < kStreamingCompileThresholdBytes) {
+    return false;
+  }
+  // The stream skips a leading UTF-8 BOM that the full source string would
+  // keep, which would shift every position the finalized script reports.
+  if (StartsWith(result->body, "\xEF\xBB\xBF")) {
+    return false;
+  }
+  if (!ticket->gate->TryEnter()) {
+    return false;
+  }
+  if (load->dead.load(std::memory_order_acquire)) {
+    ticket->gate->Leave();
+    return false;
+  }
+  const bool posted = StreamCompilePool::Shared().Post([load, ticket, result, postCompletion]() {
+    if (!load->dead.load(std::memory_order_acquire)) {
+      const std::string& body = result->body;
+      std::unique_ptr<uint8_t[]> chunk(new uint8_t[body.size()]);
+      memcpy(chunk.get(), body.data(), body.size());
+      ticket->ascii = IsAscii(body);
+      ticket->feed->Feed(std::move(chunk), body.size());
+      ticket->task->Run();
+      ticket->ran = true;
+      // Posted before Leave(): teardown stops the event loop only after the
+      // gate drains, so this post cannot be dropped off the isolate thread.
+      postCompletion();
+    }
+    ticket->gate->Leave();
+  });
+  if (!posted) {
+    ticket->gate->Leave();
+    return false;
+  }
+  return true;
+}
 }  // namespace
 
 bool HasPendingAsyncModuleGraphWork() {
@@ -1088,6 +1490,26 @@ static void KillAsyncGraphLoadsForIsolate(v8::Isolate* isolate) {
     }
   }
   state->asyncGraphLoads.clear();
+}
+
+// Isolate-teardown hook, after KillAsyncGraphLoadsForIsolate and before the
+// event loop stops: closes the streaming gate, waits out every Run() in flight
+// and destroys the compiles that will never be finalized, all while the
+// isolate is alive and locked. A Run() parked on a GC request is released by
+// running the loop's nestable v8 tasks, where V8 posted the request.
+static void DrainStreamedCompilesForIsolate(v8::Isolate* isolate) {
+  auto* state = Caches::ExistingStateFor<ModuleLoaderState>(isolate);
+  if (state == nullptr) {
+    return;
+  }
+  Runtime* runtime = Runtime::GetRuntime(isolate);
+  std::shared_ptr<EventLoop> loop = runtime != nullptr ? runtime->GetEventLoop() : nullptr;
+  state->streamGate->CloseAndDrain([&loop]() {
+    if (loop != nullptr) {
+      loop->RunNestableV8Tasks();
+    }
+  });
+  state->streamedCompiles.clear();
 }
 
 // ── The shared resolution seam ───────────────────────────────────────────────
@@ -1466,7 +1888,9 @@ static void AsyncGraphMaybeComplete(const std::shared_ptr<AsyncGraphLoad>& load,
 // it enters the isolate the same way other cross-thread callbacks do.
 static void AsyncGraphOnFetchCompleted(const std::shared_ptr<AsyncGraphLoad>& load,
                                        const std::string& url,
-                                       const std::shared_ptr<ModuleFetchResult>& fetched) {
+                                       const std::shared_ptr<ModuleFetchResult>& fetched,
+                                       const std::shared_ptr<StreamTicket>& ticket) {
+  // Dead loads leave their streamed compile to DrainStreamedCompilesForIsolate.
   if (load->dead.load(std::memory_order_acquire)) {
     return;
   }
@@ -1479,6 +1903,8 @@ static void AsyncGraphOnFetchCompleted(const std::shared_ptr<AsyncGraphLoad>& lo
   v8::Locker locker(isolate);
   v8::Isolate::Scope isolate_scope(isolate);
   v8::HandleScope handle_scope(isolate);
+  std::unique_ptr<StreamedModuleCompile> streamed = TakeStreamedCompile(isolate, ticket.get());
+  const bool streamedRan = streamed != nullptr && ticket->ran;
   v8::Local<v8::Context> context = load->context.Get(isolate);
   if (context.IsEmpty()) {
     return;
@@ -1529,8 +1955,15 @@ static void AsyncGraphOnFetchCompleted(const std::shared_ptr<AsyncGraphLoad>& lo
         // compile exception must be consumed here rather than left pending;
         // its text goes into the load's own failure channel instead.
         v8::TryCatch tcCompile(isolate);
-        compiled =
-            CompileModuleForResolveRegisterOnly(isolate, context, fetched->body, key).ToLocal(&mod);
+        if (streamedRan) {
+          compiled = CompileStreamedModuleRegisterOnly(isolate, context, *streamed,
+                                                       std::move(fetched->body), ticket->ascii, key)
+                         .ToLocal(&mod);
+          streamed.reset();
+        } else {
+          compiled = CompileModuleForResolveRegisterOnly(isolate, context, fetched->body, key)
+                         .ToLocal(&mod);
+        }
         if (!compiled) {
           compileError = DescribeCaughtError(isolate, context, tcCompile);
         }
@@ -1651,32 +2084,42 @@ static void AsyncGraphEnqueue(const std::shared_ptr<AsyncGraphLoad>& load,
   load->pendingFetches++;
   std::shared_ptr<AsyncGraphLoad> loadRef = load;
   const std::string url = target;
+  std::shared_ptr<StreamTicket> ticket = BeginStreamedCompile(isolate, *moduleState);
   // The canonical key is computed here, on the isolate's thread; the fetch
   // carries it so background threads never touch per-isolate vocabulary.
-  FetchModuleBodyAsync(url, key, load->fetchDeadline, [loadRef, url](ModuleFetchResult result) {
-    // Arbitrary thread. Hop to the isolate's home thread as a nestable v8
-    // foreground task — thread-independent delivery, so an import() issued
-    // from a background thread still lands on the isolate's own event loop,
-    // and the boot pump's RunNestableV8Tasks can drain it with JS frames on
-    // the stack. If the isolate died in between, drop everything — the
-    // context Global was already Reset by the teardown hook, which runs
-    // before the event loop shuts down, so a post dropped on this thread
-    // destroys only inert state.
-    if (loadRef->dead.load(std::memory_order_acquire)) {
-      return;
-    }
-    auto* platform = NativeScriptPlatform::Instance();
-    std::shared_ptr<EventLoop> loop =
-        platform != nullptr ? platform->LookupEventLoop(loadRef->isolate) : nullptr;
-    if (loop == nullptr) {
-      return;
-    }
-    auto resultPtr = std::make_shared<ModuleFetchResult>(std::move(result));
-    loop->PostV8Task(std::make_unique<FetchCompletionTask>([loadRef, url, resultPtr]() {
-                       AsyncGraphOnFetchCompleted(loadRef, url, resultPtr);
-                     }),
-                     /*nestable=*/true, /*delaySeconds=*/0);
-  });
+  FetchModuleBodyAsync(
+      url, key, load->fetchDeadline, [loadRef, url, ticket](ModuleFetchResult result) {
+        // Arbitrary thread. Hop to the isolate's home thread as a nestable v8
+        // foreground task — thread-independent delivery, so an import() issued
+        // from a background thread still lands on the isolate's own event loop,
+        // and the boot pump's RunNestableV8Tasks can drain it with JS frames on
+        // the stack. If the isolate died in between, drop everything — the
+        // context Global was already Reset by the teardown hook, which runs
+        // before the event loop shuts down, so a post dropped on this thread
+        // destroys only inert state.
+        if (loadRef->dead.load(std::memory_order_acquire)) {
+          return;
+        }
+        auto* platform = NativeScriptPlatform::Instance();
+        std::shared_ptr<EventLoop> loop =
+            platform != nullptr ? platform->LookupEventLoop(loadRef->isolate) : nullptr;
+        if (loop == nullptr) {
+          return;
+        }
+        auto resultPtr = std::make_shared<ModuleFetchResult>(std::move(result));
+        auto postCompletion = [loop, loadRef, url, resultPtr, ticket]() {
+          loop->PostV8Task(
+              std::make_unique<FetchCompletionTask>([loadRef, url, resultPtr, ticket]() {
+                AsyncGraphOnFetchCompleted(loadRef, url, resultPtr, ticket);
+              }),
+              /*nestable=*/true, /*delaySeconds=*/0);
+        };
+        if (ticket != nullptr &&
+            DispatchStreamedCompile(loadRef, ticket, resultPtr, postCompletion)) {
+          return;
+        }
+        postCompletion();
+      });
 }
 
 // Classify a walk root. The root arrives already resolved — an absolute URL
