@@ -61,12 +61,18 @@ describe("Dev tunnel", function () {
         [["alpha", alpha], ["beta", beta]].forEach(function (tunnel) {
             var payload = "hello " + tunnel[0];
             var parts = TNSDevTunnelRoundTrip(tunnelPort, tunnel[1], payload).split("|");
-            expect(parts[0]).toMatch(new RegExp("^NSDT/1 PAIR " + tunnel[0] + " " + tunnel[1] + " \\d+$"));
+            var pair = parts[0].split(" ");
+            expect(pair.slice(0, 4)).toEqual(["NSDT/1", "PAIR", tunnel[0], String(tunnel[1])]);
+            expect(pair.length).toBe(5);
+            expect(pair[4]).toMatch(/^\d+$/);
             expect(parts[1]).toBe(payload);
             expect(parts[2]).toBe("echo:" + payload);
         });
 
         var lines = TNSDevTunnelControl(tunnelPort, "NSDT/1 LIST").split("\n");
-        expect(lines[1]).toMatch(new RegExp("^NSDT/1 READY " + bundleId.replace(/\./g, "\\.") + " \\d+ " + tunnelPort + " " + listed + " - -$"));
+        var fields = lines[1].split(" ");
+        expect(fields[3]).toMatch(/^\d+$/);
+        fields[3] = "<pid>";
+        expect(fields).toEqual(["NSDT/1", "READY", bundleId, "<pid>", String(tunnelPort), listed, "-", "-"]);
     });
 });

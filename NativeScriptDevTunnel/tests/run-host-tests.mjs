@@ -55,7 +55,13 @@ const BUNDLE = "org.nativescript.devtunnel.harness";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const sha = (buffer) => createHash("sha256").update(buffer).digest("hex");
 
+// The largest body any case asks for.
+const MAX_BODY_BYTES = 300000;
+
 function body(size, seed) {
+  if (!Number.isSafeInteger(size) || size < 0 || size > MAX_BODY_BYTES) {
+    throw new RangeError(`body size ${size} is not an integer from 0 to ${MAX_BODY_BYTES}`);
+  }
   const buffer = Buffer.alloc(size);
   for (let i = 0; i < size; i++) buffer[i] = (i * 31 + seed) & 0xff;
   return buffer;
@@ -198,16 +204,20 @@ function parseList(list) {
   return tunnels;
 }
 
-// Dev server stand-in: GET /bytes/<n>/<seed> returns n deterministic bytes,
-// anything else "<label> <url>"; /ws upgrades to a WebSocket echo. Counts the
-// TCP connections it accepts.
+// Dev server stand-in: GET /bytes/<n>/<seed> returns n deterministic bytes
+// (400 when n exceeds MAX_BODY_BYTES), anything else "<label> <url>"; /ws
+// upgrades to a WebSocket echo. Counts the TCP connections it accepts.
 function startTarget(label) {
   const state = { connections: 0 };
   const server = http.createServer((req, res) => {
-    const match = /^\/bytes\/(\d+)\/(\d+)/.exec(req.url);
-    const payload = match
-      ? body(Number(match[1]), Number(match[2]))
-      : Buffer.from(`${label} ${req.url}`);
+    const match = /^\/bytes\/(\d{1,7})\/(\d{1,3})(?:$|[/?])/.exec(req.url);
+    const size = match ? Number(match[1]) : 0;
+    if (match && size > MAX_BODY_BYTES) {
+      res.writeHead(400);
+      res.end();
+      return;
+    }
+    const payload = match ? body(size, Number(match[2])) : Buffer.from(`${label} ${req.url}`);
     res.writeHead(200, {
       "content-type": "application/octet-stream",
       "content-length": payload.length,
