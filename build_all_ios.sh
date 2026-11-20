@@ -16,6 +16,7 @@ rm -rf ./dist
 ./build_nativescript.sh --no-vision
 ./build_tklivesync.sh --no-vision
 ./build_leak_probe.sh --no-vision
+./build_dev_tunnel.sh --no-vision
 ./build_default_metadata.sh
 ./prepare_dSYMs.sh
 ./build_spm_artifacts.sh ios

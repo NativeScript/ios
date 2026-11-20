@@ -144,6 +144,7 @@ require("./WrapperLifetimeTests");
 require("./WrapperLifetimeModesTests");
 require("./WrapperLifetimeWeakCollectionsTests");
 require("./WrapperLifetimeLeaksTests");
+require("./DevTunnelTests");
 require("./BlockCacheRaceTests");
 require("./WorkerConcurrentStartupTests");
 require("./WorkerOptionsTests");

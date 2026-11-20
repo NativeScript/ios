@@ -24,5 +24,6 @@
 #import "Marshalling/TNSPrimitives.h"
 #import "Marshalling/TNSRecords.h"
 
+#import "TNSDevTunnel.h"
 #import "TNSTestCommon.h"
 #import "TNSTestNativeCallbacks.h"

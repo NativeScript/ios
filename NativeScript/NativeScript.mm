@@ -5,6 +5,7 @@
 #include <mach-o/getsect.h>
 #include "inspector/JsV8InspectorClient.h"
 #include "runtime/Console.h"
+#include "runtime/DevTunnel.h"
 #include "runtime/Helpers.h"
 #include "runtime/ModuleInternal.h"
 #include "runtime/ModuleInternalCallbacks.h"
@@ -241,6 +242,9 @@ static void DestroyMainRuntime() {
     RuntimeConfig.MetadataPtr = ResolveMetadataPtr(config);
     RuntimeConfig.IsDebug = [config IsDebug];
     RuntimeConfig.LogToSystemConsole = [config LogToSystemConsole];
+    if (RuntimeConfig.IsDebug) {
+      tns::devtunnel::Init();
+    }
 
     Runtime::Initialize();
     DestroyMainRuntime();

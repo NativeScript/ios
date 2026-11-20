@@ -23,6 +23,8 @@
 
 - [Messaging and `node:worker_threads`](worker-threads.md) — `MessagePort`, `MessageChannel`, `BroadcastChannel` and `MessageEvent`, the `node:worker_threads` real-vs-shim table and its documented deviations, the strong-until-closed port lifetime, HTML port enabling, and the transfer support matrix with its `DataCloneError` messages.
 
+- [Dev tunnel](dev-tunnel.md) — the debug-only `NativeScriptDevTunnel.framework` that lets a tool on the Mac reach an app on a USB-connected device and the app reach servers on the Mac: ports, the `TunnelRequest` notification, the discovery log line, wire protocol v1 with its optional token, and how release builds exclude it.
+
 - [Node-API](node-api.md) — writing a Node-API addon for this runtime: registering a module and loading it with `require()`, getting the `napi_env` from native code, the threading contract, finalizer timing, which Node-API version applies, and the divergences from Node's `node_api.h`.
 
 ## Knowledge
