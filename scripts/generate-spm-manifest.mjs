@@ -92,11 +92,13 @@ if (!VERSION_RE.test(opts.version)) {
 const IOS_KEYS = [
   "NS_CHECKSUM_NATIVESCRIPT_IOS",
   "NS_CHECKSUM_TKLIVESYNC_IOS",
+  "NS_CHECKSUM_LEAKPROBE_IOS",
   "NS_CHECKSUM_DEFAULTMETADATA_IOS",
 ];
 const VISION_KEYS = [
   "NS_CHECKSUM_NATIVESCRIPT_VISIONOS",
   "NS_CHECKSUM_TKLIVESYNC_VISIONOS",
+  "NS_CHECKSUM_LEAKPROBE_VISIONOS",
 ];
 const KNOWN_KEYS = new Set([...IOS_KEYS, ...VISION_KEYS]);
 
@@ -154,7 +156,7 @@ if (opts.strict && !includeVision) {
 const visionPlatform = includeVision ? `\n        .visionOS(.v1),` : "";
 const visionProduct = includeVision
   ? `\n        // visionOS family (xros + xrsimulator)
-        .library(name: "NativeScriptVisionOS", targets: ["NativeScriptVisionOS", "TKLiveSyncVisionOS"]),`
+        .library(name: "NativeScriptVisionOS", targets: ["NativeScriptVisionOS", "TKLiveSyncVisionOS", "NativeScriptLeakProbeVisionOS"]),`
   : "";
 const visionTargets = includeVision
   ? `
@@ -167,6 +169,11 @@ const visionTargets = includeVision
             name: "TKLiveSyncVisionOS",
             url: "\\(releaseBase)/TKLiveSync.visionos.xcframework.zip",
             checksum: "${checksums.NS_CHECKSUM_TKLIVESYNC_VISIONOS}"
+        ),
+        .binaryTarget(
+            name: "NativeScriptLeakProbeVisionOS",
+            url: "\\(releaseBase)/NativeScriptLeakProbe.visionos.xcframework.zip",
+            checksum: "${checksums.NS_CHECKSUM_LEAKPROBE_VISIONOS}"
         ),`
   : "";
 
@@ -215,10 +222,10 @@ let package = Package(
     products: [
         // iOS family (iphoneos + iphonesimulator + Mac Catalyst). Apps built by
         // the NativeScript CLI link their own metadata and use this product.
-        .library(name: "NativeScript", targets: ["NativeScript", "TKLiveSync"]),
+        .library(name: "NativeScript", targets: ["NativeScript", "TKLiveSync", "NativeScriptLeakProbe"]),
         // For embedding NativeScript into an existing app: also bundles default
         // iOS SDK metadata, used when the host provides none of its own.
-        .library(name: "NativeScriptSDK", targets: ["NativeScript", "TKLiveSync", "NativeScriptDefaultMetadata"]),${visionProduct}
+        .library(name: "NativeScriptSDK", targets: ["NativeScript", "TKLiveSync", "NativeScriptLeakProbe", "NativeScriptDefaultMetadata"]),${visionProduct}
     ],
     dependencies: [],
     targets: [
@@ -231,6 +238,11 @@ let package = Package(
             name: "TKLiveSync",
             url: "\\(releaseBase)/TKLiveSync.xcframework.zip",
             checksum: "${checksums.NS_CHECKSUM_TKLIVESYNC_IOS}"
+        ),
+        .binaryTarget(
+            name: "NativeScriptLeakProbe",
+            url: "\\(releaseBase)/NativeScriptLeakProbe.xcframework.zip",
+            checksum: "${checksums.NS_CHECKSUM_LEAKPROBE_IOS}"
         ),
         .binaryTarget(
             name: "NativeScriptDefaultMetadata",

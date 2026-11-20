@@ -111,6 +111,105 @@ declare module "ns:runtime" {
     canaryInterceptedWrites: number;
   }
 
+  /** Live native object wrappers of one class in the calling isolate. */
+  export interface WrapperClassCounts {
+    /** JS wrappers the runtime holds a retain for. */
+    wrappers: number;
+    /** `"rooted"` only: wrappers currently strong because native code owns their object. */
+    strong: number;
+    /** `"canary"` only: native objects whose JS properties live on a state object. */
+    states: number;
+  }
+
+  export interface LeakCycleOptions {
+    /**
+     * Also report cycles through objects whose retain count is lower than the
+     * references found to them (some found reference does not own), marked
+     * `uncertain`. Off by default: such objects are treated as externally owned.
+     * Every cycle the default run finds on the same heap is reported as well.
+     */
+    strict?: boolean;
+    /** Class-name prefixes whose native objects the report details in `inspected`. */
+    inspect?: string[];
+  }
+
+  export interface LeakCycle {
+    /**
+     * The cycle rotated canonically, with addresses, V8 ids, element indices and
+     * storage offsets removed: stable across runs.
+     */
+    signature: string;
+    /** The cycle in the same rotation as `signature`, with those details kept. */
+    path: string;
+    /** Native objects on the cycle, and the objects of wrappers on it. */
+    members: { className: string; address: string }[];
+    /**
+     * The cycle passes an object freed while the probe ran, or, in strict mode,
+     * one whose retains the graph over-explains; `reasons` names each.
+     */
+    uncertain: boolean;
+    reasons: string[];
+  }
+
+  export interface LeakCycleReport {
+    mode: "resurrecting" | "rooted" | "canary";
+    scope: "extended" | "all";
+    strict: boolean;
+    cycles: LeakCycle[];
+    /** Native objects in the graph: wrapped ones, ones with state, and what they own. */
+    nativeObjects: number;
+    /** Native objects whose retain count is lower than the references found to them. */
+    uncertainNativeObjects: number;
+    /**
+     * Native objects freed (or freed and replaced) by other threads while the
+     * probe ran. They keep the references found before they changed, are never
+     * treated as owned from outside, and a cycle through one is marked
+     * `uncertain`.
+     */
+    changedNativeObjects: number;
+    /** Up to 50 of them, with the reference that led to each. */
+    changed: { className: string; address: string; seed: boolean; depth: number; foundFrom: string }[];
+    /** The native graph hit its 200,000-object limit; cycles past it are not seen. */
+    truncated: boolean;
+    /** Where the walk stopped short; cycles past these limits are not seen. */
+    cutOffs: {
+      /** Native objects 8 references from a wrapped one, not expanded. */
+      depth: number;
+      /** Storage blocks read only up to 64 KB, and one object's storage up to 256 KB in all. */
+      storage: number;
+      /** Cycles longer than 64 hops, not reported. */
+      cycleLength: number;
+    };
+    /** Layouts read instead of scanned, as measured in this process. */
+    calibrated: {
+      /** `CALayer`'s unretained superlayer, and delegate when it has none, are skipped. */
+      layer: boolean;
+      /** Only the live range of an `NSMutableArray`'s storage is read. */
+      mutableArray: boolean;
+    };
+    snapshotNodes: number;
+    snapshotMs: number;
+    analysisMs: number;
+    inspected?: {
+      className: string;
+      address: string;
+      seed: boolean;
+      retainCount: number;
+      /**
+       * No retain count readable without messaging the class, or without the
+       * object possibly being freed meanwhile: owned from outside.
+       */
+      retainCountUnknown: boolean;
+      runtimeRetains: number;
+      incoming: number;
+      out: string;
+      root: boolean;
+      jsBlock: boolean;
+      reached: boolean;
+      reachedFrom: string;
+    }[];
+  }
+
   /**
    * Sets a runtime config key.
    *
@@ -165,4 +264,33 @@ declare module "ns:runtime" {
    * counters only advance while `wrapperLifetimeWarnings` is on.
    */
   export function getWrapperLifetimeStats(): WrapperLifetimeStats;
+
+  /**
+   * Live wrappers per native class name in the calling isolate.
+   *
+   * @throws {Error} When the app does not embed `NativeScriptLeakProbe.framework`,
+   * which app templates embed in debug builds only; list it in
+   * `NS_SHIP_DEBUG_FRAMEWORKS` to ship it in other builds.
+   */
+  export function getWrapperClassCounts(): Record<string, WrapperClassCounts>;
+
+  /**
+   * Takes a heap snapshot of the calling isolate and reports JS <-> native
+   * reference cycles that keep native objects alive: what the `"rooted"` and
+   * `"canary"` wrapper lifetime modes leak, and JS blocks whose callback
+   * reaches their owner in every mode. Slow (a full snapshot plus a native
+   * object graph walk); meant for diagnostics, not production paths.
+   *
+   * What it cannot read counts as owned from outside, so those cycles are
+   * missed rather than misreported: among others, the contents of
+   * `NSHashTable`, `NSMapTable` and `NSPointerArray`. Before iOS 26, UIKit's
+   * gesture environment retains every recognizer attached to a view, so a
+   * cycle through a view's gesture recognizer is not reported, even when
+   * strict (seen on iOS 18.5; iOS 26.3 reports it).
+   *
+   * @throws {Error} When the app does not embed `NativeScriptLeakProbe.framework`,
+   * which app templates embed in debug builds only; list it in
+   * `NS_SHIP_DEBUG_FRAMEWORKS` to ship it in other builds.
+   */
+  export function findLeakCycles(options?: LeakCycleOptions): LeakCycleReport;
 }

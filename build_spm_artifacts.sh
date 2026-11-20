@@ -21,15 +21,19 @@ case "$TARGET" in
   ios)
     NS_ZIP="NativeScript.xcframework.zip"
     TK_ZIP="TKLiveSync.xcframework.zip"
+    LP_ZIP="NativeScriptLeakProbe.xcframework.zip"
     NS_KEY="NS_CHECKSUM_NATIVESCRIPT_IOS"
     TK_KEY="NS_CHECKSUM_TKLIVESYNC_IOS"
+    LP_KEY="NS_CHECKSUM_LEAKPROBE_IOS"
     ;;
   visionos|vision|xr)
     TARGET="visionos"
     NS_ZIP="NativeScript.visionos.xcframework.zip"
     TK_ZIP="TKLiveSync.visionos.xcframework.zip"
+    LP_ZIP="NativeScriptLeakProbe.visionos.xcframework.zip"
     NS_KEY="NS_CHECKSUM_NATIVESCRIPT_VISIONOS"
     TK_KEY="NS_CHECKSUM_TKLIVESYNC_VISIONOS"
+    LP_KEY="NS_CHECKSUM_LEAKPROBE_VISIONOS"
     ;;
   *)
     echo "Unknown target '$TARGET' (expected ios or visionos)" >&2
@@ -65,9 +69,11 @@ zip_xcframework() {
 
 zip_xcframework "NativeScript.xcframework" "$NS_ZIP"
 zip_xcframework "TKLiveSync.xcframework" "$TK_ZIP"
+zip_xcframework "NativeScriptLeakProbe.xcframework" "$LP_ZIP"
 
 NS_SUM="$(compute_checksum "$OUT/$NS_ZIP")"
 TK_SUM="$(compute_checksum "$OUT/$TK_ZIP")"
+LP_SUM="$(compute_checksum "$OUT/$LP_ZIP")"
 
 # Default metadata ships for the iOS family only.
 if [ "$TARGET" = "ios" ]; then
@@ -82,6 +88,7 @@ CHECKSUMS="$OUT/checksums-$TARGET.env"
 {
   echo "${NS_KEY}=${NS_SUM}"
   echo "${TK_KEY}=${TK_SUM}"
+  echo "${LP_KEY}=${LP_SUM}"
   if [ -n "${DM_SUM:-}" ]; then
     echo "NS_CHECKSUM_DEFAULTMETADATA_IOS=${DM_SUM}"
   fi

@@ -92,6 +92,27 @@ Interop::JSBlock::JSBlockDescriptor Interop::JSBlock::kJSBlockDescriptor = {
 static constexpr int32_t kBlockDeallocating = 0x0001;
 static constexpr int32_t kBlockRefcountMask = 0xfffe;
 
+bool Interop::IsJSBlock(const void* block) {
+  return static_cast<const JSBlock*>(block)->descriptor == &JSBlock::kJSBlockDescriptor;
+}
+
+Local<Value> Interop::JSBlockCallback(Isolate* isolate, const void* block) {
+  const JSBlock* jsBlock = static_cast<const JSBlock*>(block);
+  // Dispose frees the callback wrapper after it releases the Locker, so only
+  // a block not yet disposing is read; one that starts disposing now waits
+  // for the caller's Locker before it touches the wrapper.
+  if (!IsJSBlock(block) ||
+      (__atomic_load_n(&jsBlock->flags, __ATOMIC_ACQUIRE) & kBlockDeallocating) != 0) {
+    return Local<Value>();
+  }
+  MethodCallbackWrapper* wrapper = static_cast<MethodCallbackWrapper*>(jsBlock->userData);
+  if (wrapper == nullptr || wrapper->isolateWrapper_.Isolate() != isolate ||
+      wrapper->callback_ == nullptr || wrapper->callback_->IsEmpty()) {
+    return Local<Value>();
+  }
+  return wrapper->callback_->Get(isolate);
+}
+
 // libclosure's increment ignores the deallocating bit, so Block_copy would hand
 // out a block whose dispose is already waiting for the isolate's Locker and
 // which libclosure frees right after. This CASes the same word libclosure does.

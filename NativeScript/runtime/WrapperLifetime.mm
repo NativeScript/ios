@@ -11,6 +11,7 @@
 #include "ClassBuilder.h"
 #include "DataWrapper.h"
 #include "Helpers.h"
+#include "LeakProbe.h"
 #include "Runtime.h"
 #import "TNSDerivedClass.h"
 #include "WrapperLifetimeCanary.h"
@@ -326,6 +327,7 @@ const char* WrapperLifetimeScopeName(WrapperLifetimeScope scope) {
 void WrapperLifetime::Init(Isolate* isolate) {
   std::call_once(configOnce_, ReadConfig);
   WrapperLifetimeCanary::Init(isolate);
+  LeakProbe::Init(isolate);
   if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kRooted) {
     return;
   }

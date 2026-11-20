@@ -12,8 +12,10 @@ describe("ns:runtime", function () {
     it("exposes exactly the declared surface", function () {
         expect(Object.keys(runtime).sort()).toEqual([
             "escapeException",
+            "findLeakCycles",
             "getConfig",
             "getExternalSize",
+            "getWrapperClassCounts",
             "getWrapperLifetimeStats",
             "setConfig",
             "setExternalSize",

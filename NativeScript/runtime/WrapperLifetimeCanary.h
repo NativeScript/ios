@@ -3,6 +3,7 @@
 
 #include <objc/runtime.h>
 
+#include <functional>
 #include <memory>
 
 #include "Common.h"
@@ -88,6 +89,16 @@ class WrapperLifetimeCanary {
   // Teardown: lets go of every state object while the isolate is alive. Tokens
   // that outlive the isolate find the registry closed.
   static void CloseForTeardown(v8::Isolate* isolate);
+
+  // Calls `visit` with each live object that has state in this isolate, and
+  // its state object, outside the registry lock. Each object comes retained,
+  // and `visit` takes over that reference: its last release can run the
+  // object's -dealloc, JS included. Skips objects whose deallocation started
+  // and those whose class refuses weak references. The caller provides the
+  // HandleScope.
+  static void ForEachState(
+      v8::Isolate* isolate,
+      const std::function<void(id object, v8::Local<v8::Object> state)>& visit);
 };
 
 }  // namespace tns

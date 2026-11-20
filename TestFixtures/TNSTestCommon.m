@@ -1,4 +1,5 @@
 #import "TNSTestCommon.h"
+#include <dlfcn.h>
 
 static NSMutableString* TNSTestOutput;
 
@@ -17,6 +18,16 @@ bool TNSIsAddressSanitizerEnabled() {
 #else
   return false;
 #endif
+}
+
+bool TNSLeakProbeDeclineIsolates(bool decline) {
+    void (*declineIsolates)(bool) =
+        (void (*)(bool))dlsym(RTLD_DEFAULT, "NativeScriptLeakProbeDeclineIsolates");
+    if (declineIsolates == NULL) {
+        return false;
+    }
+    declineIsolates(decline);
+    return true;
 }
 
 NSString* TNSGetOutput() {

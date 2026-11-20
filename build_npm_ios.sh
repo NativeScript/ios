@@ -38,7 +38,7 @@ cp -r "./project-template-ios/" "$OUTPUT_DIR/framework"
 if [ "$SPM_MODE" = "embedded" ]; then
   ARTIFACTS_DIR="dist/artifacts"
   LOCAL_SPM_DIR="$OUTPUT_DIR/framework/internal/local-spm"
-  for zip in NativeScript.xcframework.zip TKLiveSync.xcframework.zip; do
+  for zip in NativeScript.xcframework.zip TKLiveSync.xcframework.zip NativeScriptLeakProbe.xcframework.zip; do
     if [ ! -f "$ARTIFACTS_DIR/$zip" ]; then
       echo "Missing $ARTIFACTS_DIR/$zip — run ./build_spm_artifacts.sh ios first." >&2
       exit 1
@@ -48,6 +48,7 @@ if [ "$SPM_MODE" = "embedded" ]; then
   cp "./spm-templates/local-spm-ios/Package.swift" "$LOCAL_SPM_DIR/"
   cp "$ARTIFACTS_DIR/NativeScript.xcframework.zip" \
      "$ARTIFACTS_DIR/TKLiveSync.xcframework.zip" \
+     "$ARTIFACTS_DIR/NativeScriptLeakProbe.xcframework.zip" \
      "$LOCAL_SPM_DIR/"
   node ./scripts/stamp-template-local-spm.mjs \
     "$OUTPUT_DIR/framework/__PROJECT_NAME__.xcodeproj/project.pbxproj" \

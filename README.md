@@ -88,7 +88,7 @@ The runtime's builtins build phase needs node even when the project builds insid
 
 <img width="941" alt="Screenshot 2020-09-09 at 18 46 18" src="https://user-images.githubusercontent.com/879060/92628228-c294c000-f2cc-11ea-8822-58df689d3cd3.png">
 
-Remove the `NativeScript.xcframework` and `TKLiveSync.xcframework` from the General tab, as we will no longer be using the framework from node_modules and instead will use the source directly:
+Remove the `NativeScript.xcframework`, `TKLiveSync.xcframework` and `NativeScriptLeakProbe.xcframework` from the General tab, as we will no longer be using the framework from node_modules and instead will use the source directly:
 
 <img width="693" alt="Screenshot 2020-09-09 at 18 47 23" src="https://user-images.githubusercontent.com/879060/92628311-e6f09c80-f2cc-11ea-8977-201517badc3b.png">
 
@@ -96,7 +96,7 @@ Hitting Run in Xcode should start the app in the simulator, and we can now add b
 
 ## Only required when running on a physical device
 
-Add the `Nativescript.framework` and `TKLiveSync.framework` from the v8ios workspace:
+Add the `Nativescript.framework`, `TKLiveSync.framework` and `NativeScriptLeakProbe.framework` from the v8ios workspace:
 
 <img width="402" alt="Screen Shot 2021-04-12 at 11 49 10 AM" src="https://user-images.githubusercontent.com/2379994/114423589-51c8c580-9b85-11eb-9d30-eb1cbf73454a.png">
 
@@ -108,7 +108,7 @@ If you encounter vague errors like this when building your app with the runtime 
 /path/to/ios/NativeScript/inspector/src/base/atomicops.h:311:11: No matching function for call to 'Relaxed_Load'
 ```
 
-This is most likely related to `Build Active Architecture Only` setting in Xcode for various targets (your app and the included v8ios runtime). You should check to make sure your app `Build Settings` and the v8ios targets `NativeScript` and `TKLiveSync` Build Settings are set to YES for both Debug and Release. See this reference:
+This is most likely related to `Build Active Architecture Only` setting in Xcode for various targets (your app and the included v8ios runtime). You should check to make sure your app `Build Settings` and the v8ios targets `NativeScript`, `TKLiveSync` and `NativeScriptLeakProbe` Build Settings are set to YES for both Debug and Release. See this reference:
 https://github.com/QuickBlox/quickblox-ios-sdk/issues/993#issuecomment-379656716
 
 
@@ -173,7 +173,7 @@ new libffi version, cut a release there and update `LIBFFI_RELEASE`.
 
 This will create `dist/nativescript-ios-{version}.tgz`.
 
-The runtime's NativeScript / TKLiveSync xcframeworks are consumed via SwiftPM, and the
+The runtime's NativeScript / TKLiveSync / NativeScriptLeakProbe xcframeworks are consumed via SwiftPM, and the
 package can be built in two modes (`--spm-mode`, see `./build_npm_ios.sh --help`):
 
 - **`embedded` (default)** — a self-contained package: the freshly built xcframeworks are
@@ -189,8 +189,10 @@ package can be built in two modes (`--spm-mode`, see `./build_npm_ios.sh --help`
 
 ios-spm exposes two iOS products:
 
-- **`NativeScript`** — the runtime and TKLiveSync. {N} CLI apps use this product and link
-  the metadata generated for them into their own executable.
+- **`NativeScript`** — the runtime, TKLiveSync and NativeScriptLeakProbe (`ns:runtime`'s leak
+  diagnostics). {N} CLI apps use this product and link the metadata generated for them into
+  their own executable; their templates embed TKLiveSync and NativeScriptLeakProbe in debug
+  builds only (`NS_DEBUG_FRAMEWORKS`).
 - **`NativeScriptSDK`** — additionally links `NativeScriptDefaultMetadata`, a separate
   framework carrying a default snapshot of iOS SDK metadata, for apps that embed NativeScript
   without generating metadata of their own. Built by `./build_default_metadata.sh` (iOS

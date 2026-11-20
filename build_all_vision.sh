@@ -15,6 +15,7 @@ rm -rf ./dist
 ./build_metadata_generator.sh
 ./build_nativescript.sh --no-catalyst --no-iphone --no-sim
 ./build_tklivesync.sh --no-catalyst --no-iphone --no-sim
+./build_leak_probe.sh --no-catalyst --no-iphone --no-sim
 ./prepare_dSYMs.sh
 ./build_spm_artifacts.sh visionos
 ./build_npm_vision.sh "$@"

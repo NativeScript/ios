@@ -7,6 +7,7 @@
 #include "Console.h"
 #include "Helpers.h"
 #include "Interop.h"
+#include "LeakProbe.h"
 #include "Messaging.h"
 #include "ModuleInternalCallbacks.h"
 #include "ObjectManager.h"
@@ -308,6 +309,9 @@ MaybeLocal<Object> NsRuntimeBinding(Local<Context> context) {
   }
   Interop::RegisterEscapeExceptionFunction(context, binding);
   Interop::RegisterExternalSizeFunctions(context, binding);
+  if (!LeakProbe::RegisterFunctions(context, binding)) {
+    return MaybeLocal<Object>();
+  }
   return binding;
 }
 

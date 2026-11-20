@@ -6,6 +6,10 @@ bool TNSIsConfigurationDebug();
 
 bool TNSIsAddressSanitizerEnabled();
 
+// Isolates that start while set run without NativeScriptLeakProbe.framework,
+// as in an app that does not embed it. False when the framework is absent.
+bool TNSLeakProbeDeclineIsolates(bool decline);
+
 NSString* TNSGetOutput();
 
 void TNSLog(NSString*);

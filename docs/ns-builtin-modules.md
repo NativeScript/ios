@@ -104,6 +104,8 @@ defined and validated natively; the module surface is a thin frozen wrapper.
 | `setExternalSize(target, bytes)` | Reports `bytes` of native memory held by a native object, pointer, reference, block or function reference to the garbage collector, replacing any earlier size (`0` clears it). Throws `TypeError` for any other value, `RangeError` for a byte count outside 0–2^34. |
 | `getExternalSize(target)` | The size currently charged to `target`, `0` when there is none. |
 | `getWrapperLifetimeStats()` | Wrapper lifetime counters for the calling isolate (see [Wrapper lifetime counters](#wrapper-lifetime-counters)). |
+| `getWrapperClassCounts()` | Live wrappers per native class for the calling isolate (see [Leak diagnostics](#leak-diagnostics)). |
+| `findLeakCycles({ strict, inspect })` | JS ↔ native reference cycles keeping native objects alive (see [Leak diagnostics](#leak-diagnostics)). |
 
 `escapeException`, `setExternalSize` and `getExternalSize` are also members of the global `interop` (see
 [The global `interop`](#the-global-interop)); the module and the global hold
@@ -179,6 +181,109 @@ or return value becomes `nil` (`NSNull` inside a collection) and a
 `"throw"`. An `NSNull` element still breaks native code that expects a typed
 value there (an attributes dictionary holding a released `UIColor`, say); the
 event names the element so the cause can be found.
+
+### Leak diagnostics
+
+The `"rooted"` and `"canary"` wrapper lifetime modes trade resurrection's early
+releases for leaks: a JS ↔ native cycle that `"resurrecting"` broke by
+releasing a native object under live JS stays alive. Two tools find them.
+
+Both live in `NativeScriptLeakProbe.framework`, which app templates embed in
+debug builds only (it is in `NS_DEBUG_FRAMEWORKS`). Without it, both functions
+throw an `Error` that names the framework, heap snapshots carry no native
+objects, and the triggers below are off, `"leakProbe": true` included. To ship
+it in other builds, add `NativeScriptLeakProbe.framework` to
+`NS_SHIP_DEBUG_FRAMEWORKS` in the app's `build.xcconfig`.
+
+`getWrapperClassCounts()` returns, per native class name, the live
+`wrappers`, the rooted-`strong` ones and the canary `states`. It is cheap;
+compare it before and after repeating a journey to find classes that grow.
+
+`findLeakCycles(options)` takes a heap snapshot and reports the cycles. The
+snapshot carries the native objects the runtime wraps or keeps state for, the
+native objects they own (strong ivars, collection and block storage), and the
+runtime's cross-heap edges: `ns:retain` (wrapper → object), `ns:owned`
+(object → wrapper, for a wrapper kept strong because native code owns its
+object: rooted-strong, or a wrapper no lifetime mode adopted whose handle the
+runtime keeps strong), `ns:state` (canary object → state),
+`ns:block-callback` (JS block → function) and `ns:adapter` (collection adapter
+→ JS object). A native object counts as owned from outside when its retain
+count exceeds the retains found in that graph; everything else is marked from
+the V8 roots, and cycles among what stays unmarked are reported. A `WeakMap`
+value is marked only once both its key and its map are. Every heap snapshot,
+DevTools' included, carries the runtime's edges while the framework is
+embedded, except `ns:block-callback`: only `findLeakCycles` walks native
+memory, which is where it finds JS blocks.
+
+| option | effect |
+|---|---|
+| `strict: true` | Objects with *fewer* retains than references found (some found reference does not own: an MRC `assign` ivar, weak storage) are not treated as owned from outside, so cycles through them are reported too, with `uncertain: true` and the reasons. Every cycle the default run finds on the same heap is reported first, as that run reports it. |
+| `inspect: ["Prefix", …]` | Adds `inspected`: the retain accounting, root decision and the path that reached each native object whose class name starts with a prefix. |
+
+Each cycle has a `signature` (addresses, V8 ids, element indices and storage
+offsets removed, rotated canonically) to compare runs and modes, the `path`
+in the same rotation with those details kept, and its `members`. A cycle is
+`uncertain`, with `reasons`, when it passes an object freed while the probe
+ran or, in strict mode, an object with fewer retains than references found.
+
+Other threads keep running while the probe walks native memory, so an object
+can be freed after it was found: such objects are counted in
+`changedNativeObjects` and listed in `changed`. They keep the references
+found before they changed and are never treated as owned from outside.
+
+The walk reads object ivars by their type (strong ones only), scans the
+memory of objects without object ivars, and of collections and blocks, as
+storage, and stops at some limits, which `cutOffs` counts: native objects 8
+references from a wrapped one are not expanded (`depth`), a storage block is
+read up to 64 KB and one object's storage up to 256 KB in all (`storage`),
+and cycles longer than 64 hops are not reported (`cycleLength`). `truncated`
+means the graph hit its 200,000-object limit.
+Some layouts are read rather than scanned, once measured on objects the
+probe builds before its first snapshot (`calibrated`): `CALayer`'s
+unretained superlayer, and its delegate when it has no superlayer, are
+skipped, and only `NSMutableArray`'s live range is read.
+
+What it cannot see, read as owners outside the graph so that their cycles are
+missed rather than misreported:
+
+- references held without an ivar or storage pointer: manual retain/release
+  bookkeeping, C++ members and associated objects. UIKit's retain of a view's
+  subviews is one: where `CALayer` is read as storage (before iOS 26), the
+  view's layer's delegate slot stands for it; on iOS 26 a cycle through a
+  view hierarchy is missed;
+- struct and pointer ivars, and Swift stored properties, of a class that also
+  has an object ivar (only its object ivars are read: `CALayer` on iOS 26,
+  whose sublayers are held through its C++ layer);
+- objects whose `-retainCount` cannot be called without messaging the class
+  (zombies, classes that forward it, the `NSTimer.alloc()` placeholder);
+- objects the runtime does not retain whose class overrides `-retainCount`
+  (CF-bridged classes, Swift and dispatch objects, among others; `CALayer`'s
+  count is read from its ivars): another thread could free them while the
+  probe calls it;
+- the contents of `NSHashTable`, `NSMapTable` and `NSPointerArray`, whose
+  storage may be weak: what they retain counts as owned from outside.
+
+Some leaks are held from a root rather than by a cycle alone, and are not
+reported even when strict. Before iOS 26, UIKit's gesture environment retains
+every recognizer attached to a view (in an `NSMapTable`), so a cycle through a
+view's gesture recognizer and its JS state is missed: seen on iOS 18.5, while
+iOS 26.3 reports it.
+
+When the framework is embedded, in debug builds or with
+`"wrapperLifetime": { "leakProbe": true }` in the app config, the main isolate
+also:
+
+- logs the classes whose live wrappers and states grew since the previous
+  memory warning, on each memory warning;
+- answers Darwin notifications (`xcrun simctl spawn <device> notifyutil -p <name>`;
+  every process on the device with the probe on answers them) by writing a
+  JSON report to the app's temporary directory and logging its
+  path: `org.nativescript.wrapperLifetime.counts` (class counts after full
+  collections), `org.nativescript.wrapperLifetime.findLeakCycles`,
+  `org.nativescript.wrapperLifetime.findLeakCycles.strict` and
+  `org.nativescript.wrapperLifetime.findLeakCycles.inspect` (after full
+  collections, inspecting the class-name prefixes listed one per line in
+  `ns-wrapper-lifetime-inspect.txt` in the temporary directory).
 
 Remote-module security (`security.allowRemoteModules`,
 `security.remoteModuleAllowlist`) is **not** part of this surface. Those
