@@ -35,6 +35,14 @@ class TestRunnerTests: XCTestCase {
             let path = (environ["PATH_INFO"] as? String) ?? "/"
             let query = (environ["QUERY_STRING"] as? String) ?? ""
 
+            func jsStringLiteral(_ s: String) -> String {
+                return s
+                    .replacingOccurrences(of: "\\", with: "\\\\")
+                    .replacingOccurrences(of: "\"", with: "\\\"")
+                    .replacingOccurrences(of: "\n", with: "\\n")
+                    .replacingOccurrences(of: "\r", with: "\\r")
+            }
+
             // Progress beacon from the in-app Jasmine reporter (fire-and-forget):
             // records the spec currently running so a hang/timeout can report
             // where the JS suite stalled, even though no JUnit report is POSTed.
@@ -111,13 +119,6 @@ class TestRunnerTests: XCTestCase {
                 }
 
                 if path == "/esm/query.mjs" || path == "/ns/m/query.mjs" {
-                    func jsStringLiteral(_ s: String) -> String {
-                        return s
-                            .replacingOccurrences(of: "\\", with: "\\\\")
-                            .replacingOccurrences(of: "\"", with: "\\\"")
-                            .replacingOccurrences(of: "\n", with: "\\n")
-                            .replacingOccurrences(of: "\r", with: "\\r")
-                    }
                     let nowMs = Int(Date().timeIntervalSince1970 * 1000.0)
                     let body = """
                     export const path = \"\(jsStringLiteral(path))\";
@@ -125,6 +126,31 @@ class TestRunnerTests: XCTestCase {
                     export const evaluatedAt = \(nowMs);
                     export default { path, query, evaluatedAt };
                     """
+                    startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
+                    sendBody(body.data(using: .utf8) ?? Data())
+                    return
+                }
+
+                // ── Specifier resolution from an HTTP importer ──
+                // `…/importer.mjs` exports `load(spec)`, an import() issued
+                // from its own URL; `…/static.mjs` statically imports the
+                // specifier in its `spec` param; any other path answers with
+                // the request target it was reached at.
+                if path.hasPrefix("/esm/resolve/") {
+                    let body: String
+                    if path.hasSuffix("/importer.mjs") {
+                        body = "export function load(spec) { return import(spec); }\n"
+                    } else if path.hasSuffix("/static.mjs") {
+                        var spec = ""
+                        if let pair = query.split(separator: "&").first(where: { $0.hasPrefix("spec=") }),
+                           let decoded = String(pair.dropFirst("spec=".count)).removingPercentEncoding {
+                            spec = decoded
+                        }
+                        body = "export * as dep from \"\(jsStringLiteral(spec))\";\n"
+                    } else {
+                        body = "export const path = \"\(jsStringLiteral(path))\";\n" +
+                               "export const query = \"\(jsStringLiteral(query))\";\n"
+                    }
                     startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
                     sendBody(body.data(using: .utf8) ?? Data())
                     return
