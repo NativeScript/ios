@@ -6,7 +6,8 @@ declare module "ns:module" {
    * resolved on demand.
    *
    * A key ending in `/` maps a whole subtree and its target must end in `/`
-   * too; longest match wins. The map is validated in full before it is
+   * too; longest match wins. A module loaded over `http(s)` can use a bare
+   * specifier only through this map. The map is validated in full before it is
    * installed — an invalid map throws a `TypeError` out of
    * {@link configureLoader} and leaves the previously installed map in place.
    */

@@ -759,6 +759,36 @@ unmodified where a shim exists:
 
 ## Loading ES modules
 
+### Specifier resolution
+
+`import` and `import()` resolve a specifier the same way, by the kind of the
+importing module. `ns:`/`node:` builtins resolve first, and the
+[import map](#import-maps-and-scopes) is consulted next for every importer;
+the table covers a specifier the map does not match.
+
+| specifier | file importer | http(s) importer |
+|---|---|---|
+| `./x`, `../x` | the importer's directory on disk | the importer's URL, query kept |
+| `/x` | the app root | the importer's origin, query kept |
+| `//host/x` | the app root | the importer's scheme, query kept |
+| `~/x` | the app root | refused |
+| bare (`pkg`, `pkg/x`) | the app root | refused: it needs an import-map entry |
+| `file:///app/x` | the app root | the app root |
+| `http(s)://…` | fetched | fetched |
+
+On disk, the query and fragment are dropped and a missing extension or a
+directory is completed with `.mjs`, `.js`, `/index.mjs`, `/index.js`, in that
+order. An import-map target is never refused — an entry is explicit
+configuration, so it may point an HTTP module at a `~/` path — though a
+relative or root-relative target still resolves against an HTTP importer's
+URL. From an HTTP importer, a specifier with any other URL scheme (`data:`,
+`file:/x`) is never looked up on disk; `import()` of a `blob:nativescript/…`
+URL loads from the blob store whatever the importer. A refused specifier fails
+before anything is fetched or read from disk, with an `Error` whose message
+names the specifier, the importer and what to use instead;
+`createRequire(<file path>)` is the explicit way for an HTTP module to reach
+CommonJS or ES modules on disk.
+
 ### The `require()` specifier
 
 Every `require` — the global one and any minted by `createRequire` /
