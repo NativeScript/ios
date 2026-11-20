@@ -151,7 +151,9 @@ The `TypeError` messages are part of the contract:
 ### Wrapper lifetime counters
 
 `getWrapperLifetimeStats()` returns counters for the calling isolate, kept in
-every build (they only cost an increment on finalizer and error paths):
+every build. Most cost an increment only on finalizer, GC-callback and error
+paths or when a state object is created; `canaryInterceptedWrites` costs one
+on every write to a canary:
 
 | counter | counts |
 |---|---|
@@ -165,7 +167,7 @@ every build (they only cost an increment on finalizer and error paths):
 | `demotions` | `"rooted"` only: strong wrappers made weak at a major collection because native code no longer retained their object |
 | `queuedReleases` | `"rooted"` and `"canary"`: collected wrappers whose native object was queued for release on the runtime's thread |
 | `canaryStates` | `"canary"` only: state objects created to hold native objects' JS properties |
-| `canaryNativeDeaths` | `"canary"` only: state objects let go of because their native object was deallocated |
+| `canaryNativeDeaths` | `"canary"` only: state objects let go of because their native object was deallocated or, with the default death signal, because `objc_removeAssociatedObjects` released its lifecycle token while the object was still alive |
 | `canaryInterceptedWrites` | `"canary"` only: writes to canaries the runtime's write handler saw. Other wrappers have no handler |
 
 A wrapper whose native object was released keeps its JS identity. Passing it

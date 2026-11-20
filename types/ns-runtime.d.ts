@@ -56,8 +56,12 @@ declare module "ns:runtime" {
      *   prototype member (a rebound class method, a field called `copy`), are
      *   also copied to a state object kept until the native object is
      *   deallocated, and a wrapper built for the object later gets them back
-     *   with their attributes. Native property writes still reach the native
-     *   setter. Writes cost more than in the other modes; reads do not.
+     *   with their attributes while that state object lives. An object that
+     *   is not JS-extended is tracked through an associated token, so
+     *   `objc_removeAssociatedObjects` on it lets its state object go while
+     *   it lives, and one whose class forbids associated objects (or, under
+     *   the alternative death signal, refuses weak references) gets none.
+     *   Native property writes still reach the native setter. Writes cost more than in the other modes; reads do not.
      *   WeakMap, WeakSet, WeakRef and FinalizationRegistry key such native
      *   objects by their lifetime in this mode, so they carry over too; a
      *   WeakMap value that references its own native key keeps that object
@@ -101,7 +105,7 @@ declare module "ns:runtime" {
     queuedReleases: number;
     /** `"canary"` only: state objects created for native objects' JS properties. */
     canaryStates: number;
-    /** `"canary"` only: state objects let go of because their native object was deallocated. */
+    /** `"canary"` only: state objects let go of because their native object was deallocated, or because `objc_removeAssociatedObjects` released its lifecycle token. */
     canaryNativeDeaths: number;
     /** `"canary"` only: writes to canaries the runtime's write handler saw. */
     canaryInterceptedWrites: number;

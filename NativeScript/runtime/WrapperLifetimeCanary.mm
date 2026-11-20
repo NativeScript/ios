@@ -13,6 +13,7 @@
 #include "DataWrapper.h"
 #include "EventLoop.h"
 #include "Helpers.h"
+#include "MetadataBuilder.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
 #import "TNSDerivedClass.h"
@@ -621,15 +622,28 @@ Intercepted Setter(Local<v8::Name> property, Local<Value> value,
     // setter: a native property's (an accessor pair on its class's
     // prototype), a JS one's, or one defined on the canary, which runs with
     // the canary as `this` and so mirrors whatever it writes. None is state.
-    // Calling the setter from here was measured slower than V8's own lookup
+    // Calling a JS setter from here was measured slower than V8's own lookup
     // after the decline: the API hands a setter out only in a descriptor
-    // object, and keeping one (or a native property's metadata) across
-    // writes needs to know when JS changes a prototype, which V8 never says.
+    // object. A native property's setter runs from here when its class's
+    // prototype vouches that the accessor found is still its own.
     if ((attributes & ReadOnly) != 0) {
       return Intercepted::kNo;
     }
     Local<Object> owner = OwnerOf(context, holder, property);
-    if (owner.IsEmpty() || owner->HasRealNamedCallbackProperty(context, property).FromMaybe(true)) {
+    if (owner.IsEmpty()) {
+      return Intercepted::kNo;
+    }
+    Maybe<bool> accessor = owner->HasRealNamedCallbackProperty(context, property);
+    if (accessor.IsNothing()) {
+      return Intercepted::kNo;
+    }
+    if (accessor.FromJust()) {
+      // The setter can run JS, a collection or a -dealloc: neither the canary
+      // nor its record is touched after it.
+      if (MetadataBuilder::TrySetNativeProperty(isolate, context, owner, property, holder, value)) {
+        info.GetReturnValue().Set(true);
+        return Intercepted::kYes;
+      }
       return Intercepted::kNo;
     }
   }

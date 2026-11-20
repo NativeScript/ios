@@ -12,6 +12,8 @@
 
 namespace tns {
 
+struct NativeSetters;
+
 class MetadataBuilder {
  public:
   static void RegisterConstantsOnGlobalObject(
@@ -30,6 +32,18 @@ class MetadataBuilder {
                                                  void* data,
                                                  StructStorage storage,
                                                  v8::Local<v8::Object> parent);
+  // Runs the setter of `owner`'s native property `property` on `receiver`, as
+  // the property's accessor would, and returns true. Returns false, having
+  // run nothing, unless `owner` is a native class's prototype, still holding
+  // the accessor pair it was built with for `property`, which has a setter.
+  // The caller establishes that `owner` is where `receiver`'s prototype chain
+  // finds `property`. Only canary mode records the accessors this needs.
+  static bool TrySetNativeProperty(v8::Isolate* isolate,
+                                   v8::Local<v8::Context> context,
+                                   v8::Local<v8::Object> owner,
+                                   v8::Local<v8::Name> property,
+                                   v8::Local<v8::Object> receiver,
+                                   v8::Local<v8::Value> value);
 
  private:
   // The binding of an object whose static type adds protocols to `meta`: a
@@ -102,18 +116,21 @@ class MetadataBuilder {
       v8::Local<v8::FunctionTemplate> ctorFuncTemplate,
       const BaseClassMeta* meta, KnownUnknownClassPair pair,
       robin_hood::unordered_map<std::string, uint8_t>& names);
+  // `setters`, when given, records each accessor pair installed.
   static void RegisterInstanceProperties(
       v8::Local<v8::Context> context,
       v8::Local<v8::FunctionTemplate> ctorFuncTemplate,
       const BaseClassMeta* meta, std::string className,
       KnownUnknownClassPair pair,
-      robin_hood::unordered_map<std::string, uint8_t>& names);
+      robin_hood::unordered_map<std::string, uint8_t>& names,
+      NativeSetters* setters = nullptr);
   static void RegisterInstanceProtocols(
       v8::Local<v8::Context> context,
       v8::Local<v8::FunctionTemplate> ctorFuncTemplate,
       const BaseClassMeta* meta, std::string className,
       KnownUnknownClassPair pair,
-      robin_hood::unordered_map<std::string, uint8_t>& names);
+      robin_hood::unordered_map<std::string, uint8_t>& names,
+      NativeSetters* setters = nullptr);
   static void RegisterAdditionalProtocols(
       v8::Local<v8::Context> context,
       v8::Local<v8::FunctionTemplate> ctorFuncTemplate,
@@ -181,6 +198,13 @@ class MetadataBuilder {
    private:
     Class klass_ = nil;
   };
+
+  friend struct NativeSetters;
+
+  static void SetNativeProperty(v8::Isolate* isolate,
+                                CacheItem<PropertyMeta>* item,
+                                v8::Local<v8::Object> receiver,
+                                v8::Local<v8::Value> value);
 };
 
 }  // namespace tns
