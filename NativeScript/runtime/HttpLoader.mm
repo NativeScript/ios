@@ -14,7 +14,6 @@
 #include "ModuleInternalCallbacks.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
-#include "robin_hood.h"
 
 namespace tns {
 
@@ -142,8 +141,7 @@ std::string RepairCollapsedUrlScheme(const std::string& url) {
 }
 
 std::string CanonicalizeHttpUrlKey(const std::string& url) {
-  // Per-isolate vocabulary, so this runs on the isolate's own thread. Fetch
-  // threads never reach here — they carry keys computed for them.
+  // Per-isolate vocabulary, so this runs on the isolate's own thread only.
   const CanonicalizationConfig* canonConfig = CanonicalizationConfigForCurrentIsolate();
   // Some loaders wrap HTTP module URLs as file://http(s)://...
   // Repaired before any scheme test, so a collapsed `http:/host` keys the same
@@ -188,9 +186,9 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   //
   // The dev server serves every module under ONE canonical URL — module
   // identity IS the URL string. Freshness after an HMR edit is handled by
-  // ns:module `invalidateModules` (registry evict) plus the
-  // eviction-driven fetch nonce in `PerformHttpFetchOnceSync`, never by URL
-  // variation. There is deliberately no path-tag vocabulary to collapse here.
+  // ns:module `invalidateModules` (registry evict) and the server's own
+  // response caching headers, never by URL variation. There is deliberately
+  // no path-tag vocabulary to collapse here.
   //
   // Why `preserveQueryFor` exists (and is checked BEFORE the dev-endpoint
   // prefix test, so it covers endpoints nested under a dev prefix): for some
@@ -256,67 +254,6 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   return rebuilt;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Eviction-driven fetch cache-bust
-//
-// When the HMR client invalidates a module, the NEXT network fetch of
-// that module must not be satisfiable by any OS-level HTTP cache
-// (CFNetwork's fsCachedData has been observed serving a previous
-// save's body on iOS 18+/26+ Simulator even with `no-store` headers
-// and a reload-ignoring cache policy). `InvalidateModules` marks the
-// canonical keys of the eviction set here; `PerformHttpFetchOnceSync`
-// then appends a unique `__ns_dev_nonce` query parameter to the
-// wire-level request for any marked URL, guaranteeing CFNetwork sees
-// a URL it has never cached. The nonce is transport-only — it never
-// enters the module registry key (identity stays the canonical URL),
-// and the server and the registry never see a varied URL.
-//
-// Marks carry a generation rather than being plain set membership. A fetch
-// records the generation it observed and clears only that one, so an
-// invalidation raised while a fetch was already in flight survives that
-// fetch's completion instead of being erased by it — which would have left the
-// next fetch with no nonce and CFNetwork free to serve the body the
-// invalidation was raised to discard.
-//
-// Generation 0 is reserved for "not marked", so a captured 0 clears nothing.
-static std::mutex g_bustNextFetchMutex;
-static robin_hood::unordered_map<std::string, uint64_t> g_bustNextFetchKeys;
-static uint64_t g_bustNextFetchGeneration = 0;
-
-void MarkKeysForCacheBust(const std::vector<std::string>& canonicalKeys) {
-  if (canonicalKeys.empty()) return;
-  std::lock_guard<std::mutex> lock(g_bustNextFetchMutex);
-  const uint64_t generation = ++g_bustNextFetchGeneration;
-  for (const auto& key : canonicalKeys) {
-    if (key.empty()) continue;
-    if (!(StartsWith(key, "http://") || StartsWith(key, "https://"))) continue;
-    // Assigned, not inserted: re-marking an already-marked key has to move it
-    // to the new generation, or the in-flight fetch would clear it.
-    g_bustNextFetchKeys[key] = generation;
-  }
-}
-
-// Peek (do not consume) — the fetch may be retried on transient failure and the
-// retry must still carry a nonce. Returns the generation to carry, or 0 when
-// the key is not marked. Cleared on fetch success, by generation.
-static uint64_t CacheBustGenerationForKey(const std::string& canonicalKey) {
-  std::lock_guard<std::mutex> lock(g_bustNextFetchMutex);
-  if (g_bustNextFetchKeys.empty()) return 0;
-  auto it = g_bustNextFetchKeys.find(canonicalKey);
-  return it == g_bustNextFetchKeys.end() ? 0 : it->second;
-}
-
-// Clears the mark this fetch actually satisfied. A newer mark has a newer
-// generation and is left standing for the fetch that will carry it.
-static void ClearCacheBustForKey(const std::string& canonicalKey, uint64_t observedGeneration) {
-  if (observedGeneration == 0) return;
-  std::lock_guard<std::mutex> lock(g_bustNextFetchMutex);
-  auto it = g_bustNextFetchKeys.find(canonicalKey);
-  if (it != g_bustNextFetchKeys.end() && it->second == observedGeneration) {
-    g_bustNextFetchKeys.erase(it);
-  }
-}
-
 // ============================================================================
 // HTTP module fetching
 // ============================================================================
@@ -342,9 +279,8 @@ static void ClearCacheBustForKey(const std::string& canonicalKey, uint64_t obser
 
 // Forward declarations — these helpers are defined below their first use,
 // matching the existing convention in this file.
-static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& canonicalKey,
-                                     std::string& out, std::string& contentType, int& status,
-                                     uint64_t* outBustGeneration = nullptr);
+static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
+                                     std::string& contentType, int& status);
 
 // ── The module-fetch timeout policy ──────────────────────────────────────────
 //
@@ -514,8 +450,7 @@ static void ClassifyModuleResponse(const std::string& url, bool transportOk, int
   result.body = std::move(body);
 }
 
-bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
-                     ModuleFetchResult& result) {
+bool HttpFetchModule(const std::string& url, ModuleFetchResult& result) {
   result = ModuleFetchResult();
 
   // Security gate: the single point of enforcement for all HTTP module
@@ -541,18 +476,13 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
   std::string body;
   std::string contentType;
   int status = 0;
-  uint64_t bustGeneration = 0;
-  bool transportOk =
-      PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status, &bustGeneration);
+  bool transportOk = PerformHttpFetchOnceSync(url, body, contentType, status);
   if (!transportOk) {
     // One retry, and only for a transport error: an HTTP status is an answer,
     // not a failure to communicate, so asking again would just repeat it.
     TNS_DEBUG(Esm, "[http-loader] retrying %s after initial fetch error", url.c_str());
     usleep((useconds_t)(kModuleFetchRetryDelaySeconds * 1000.0 * 1000.0));
-    // The retry re-peeks, so the generation it carries — the one whose nonce is
-    // on the wire for the body we end up with — replaces the first attempt's.
-    transportOk =
-        PerformHttpFetchOnceSync(url, canonicalKey, body, contentType, status, &bustGeneration);
+    transportOk = PerformHttpFetchOnceSync(url, body, contentType, status);
   }
   // NOTE: no long dev-server-startup retry loop here on purpose. The CLI's
   // `compileWithWatch` gates app deploy/restart on its `vite serve`
@@ -560,14 +490,6 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
   // boot is a real failure, not a startup race — surface it immediately.
 
   ClassifyModuleResponse(url, transportOk, status, contentType, body, result);
-
-  // The mark is spent only once a response classifies as a usable module. A
-  // 2xx alone is not enough: an SPA fallback answering 200 text/html would
-  // otherwise consume the eviction nonce and leave the next fetch cacheable.
-  // Same rule as the async path.
-  if (result.ok) {
-    ClearCacheBustForKey(canonicalKey, bustGeneration);
-  }
 
   if (!result.ok) {
     TNS_DEBUG(Esm, "[http-loader][fetch-sync][reject] %s", result.failureReason.c_str());
@@ -623,51 +545,11 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
 // API that gives us a runloop-independent synchronous fetch with a
 // real HTTP status code.
 // Shared request builder for the sync (NSURLConnection) and async
-// (NSURLSession) module fetch paths so both carry identical cache-defeat
-// semantics. Returns an autoreleased NSMutableURLRequest (nil for
-// unparseable URLs) and reports via `outBustGeneration` which mark the URL was
-// marked for an eviction-driven cache-bust nonce (the caller clears the
-// mark once a fresh body actually arrives).
-static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url,
-                                                    const std::string& canonicalKey,
-                                                    uint64_t* outBustGeneration) {
-  // One-time: replace the shared NSURLCache with a zero-capacity one
-  // so CFNetwork has no on-disk store to satisfy fetches from. Per-
-  // request cache policy + `removeCachedResponseForRequest:` were
-  // empirically insufficient on iOS 18+/26+ Simulator — fsCachedData
-  // would still serve a previous save's body for a just-updated URL.
-  static dispatch_once_t s_cacheDisableOnce;
-  dispatch_once(&s_cacheDisableOnce, ^{
-    NSURLCache* nullCache = [[NSURLCache alloc] initWithMemoryCapacity:0
-                                                          diskCapacity:0
-                                                          directoryURL:nil];
-    [NSURLCache setSharedURLCache:nullCache];
-  });
-
-  // Eviction-driven cache-bust: if this URL's canonical key was marked
-  // by `InvalidateModules` (via `MarkKeysForCacheBust`), append a
-  // unique nonce query parameter so CFNetwork sees a different URL
-  // and cannot satisfy the request from any cache layer. The dev
-  // server ignores unknown query params on module routes, so the
-  // response body is unchanged. First-touch fetches don't need
-  // busting — nothing has cached them yet — so unmarked URLs go out
-  // verbatim (some Vite virtual routes require exact-match URLs and
-  // 404 on unknown query params).
-  std::string fetchUrl = url;
-  const uint64_t bustGeneration = CacheBustGenerationForKey(canonicalKey);
-  if (outBustGeneration) *outBustGeneration = bustGeneration;
-  if (bustGeneration != 0) {
-    static std::atomic<uint64_t> s_fetchSeq{0};
-    const uint64_t seq = s_fetchSeq.fetch_add(1, std::memory_order_relaxed);
-    const uint64_t nowMs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0);
-    fetchUrl += (url.find('?') == std::string::npos) ? '?' : '&';
-    fetchUrl += "__ns_dev_nonce=";
-    fetchUrl += std::to_string(nowMs);
-    fetchUrl += "-";
-    fetchUrl += std::to_string(seq);
-  }
-
-  NSURL* u = [NSURL URLWithString:[NSString stringWithUTF8String:fetchUrl.c_str()]];
+// (NSURLSession) module fetch paths. Caching follows the protocol policy, so
+// the server's response headers decide freshness. Returns an autoreleased
+// NSMutableURLRequest (nil for unparseable URLs).
+static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url) {
+  NSURL* u = [NSURL URLWithString:[NSString stringWithUTF8String:url.c_str()]];
   if (!u) {
     return nil;
   }
@@ -678,40 +560,14 @@ static NSMutableURLRequest* BuildModuleFetchRequest(const std::string& url,
       forHTTPHeaderField:@"Accept"];
   [request setValue:@"identity" forHTTPHeaderField:@"Accept-Encoding"];
   [request setTimeoutInterval:ModuleFetchTimeoutInterval()];
-  // CRITICAL for HMR: layered defense to bypass CFNetwork's URL cache.
-  // `setCachePolicy:` alone is insufficient on iOS 18+/26+ Simulator —
-  // CFNetwork still serves a previous save's body from fsCachedData.
-  // Combined with the zero-capacity sharedURLCache and the eviction-
-  // driven URL nonce above, these give us a reliable "always go to
-  // origin" path for the dev runtime.
-  [request setValue:@"no-cache, no-store, max-age=0" forHTTPHeaderField:@"Cache-Control"];
-  [request setValue:@"no-cache" forHTTPHeaderField:@"Pragma"];
-  // Force a fresh TCP connection per fetch. CFNetwork has been
-  // observed to serve a body buffered on a kept-alive HTTP/1.1
-  // connection for a prior fetch when a new fetch reuses it.
-  [request setValue:@"close" forHTTPHeaderField:@"Connection"];
-  [request setCachePolicy:NSURLRequestReloadIgnoringLocalAndRemoteCacheData];
   [request setHTTPShouldHandleCookies:NO];
-  // `setHTTPShouldUsePipelining:` is deprecated on visionOS 2.4+ (classic
-  // loader only). Passing NO matches the default — pipelining is already
-  // off — so this is intent-preserving on every platform; suppress the
-  // deprecation so the -Werror visionOS build keeps compiling.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  [request setHTTPShouldUsePipelining:NO];
-#pragma clang diagnostic pop
-  [[NSURLCache sharedURLCache] removeCachedResponseForRequest:request];
-
   return request;
 }
 
-static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& canonicalKey,
-                                     std::string& out, std::string& contentType, int& status,
-                                     uint64_t* outBustGeneration) {
+static bool PerformHttpFetchOnceSync(const std::string& url, std::string& out,
+                                     std::string& contentType, int& status) {
   @autoreleasepool {
-    uint64_t bustGeneration = 0;
-    NSMutableURLRequest* request = BuildModuleFetchRequest(url, canonicalKey, &bustGeneration);
-    if (outBustGeneration) *outBustGeneration = bustGeneration;
+    NSMutableURLRequest* request = BuildModuleFetchRequest(url);
     if (!request) {
       status = 0;
       return false;
@@ -731,10 +587,6 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
                                          returningResponse:&response
                                                      error:&err];
 #pragma clang diagnostic pop
-
-    // Drop any response sendSynchronousRequest: implicitly stored so it
-    // cannot poison a later fetch of the same URL.
-    [[NSURLCache sharedURLCache] removeCachedResponseForRequest:request];
 
     if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
       NSHTTPURLResponse* httpResp = (NSHTTPURLResponse*)response;
@@ -809,23 +661,30 @@ static bool PerformHttpFetchOnceSync(const std::string& url, const std::string& 
 // NSURLSession task from the iOS main thread. Fire-and-forget tasks with a
 // background delegate queue are the intended NSURLSession usage.
 //
-// The session is ephemeral with a nil URLCache — the layered cache defeats
-// in BuildModuleFetchRequest assume CFNetwork cannot satisfy any module
-// request from a cache, and an ephemeral cacheless session is the strongest
-// form of that guarantee.
+// Ephemeral, so no cookies or credentials persist, but with an on-disk HTTP
+// cache of its own: module responses are cached as the server's headers allow,
+// and this session never reads or resizes the app's shared NSURLCache.
 static NSURLSession* ModuleFetchSession() {
   static NSURLSession* s_session = nil;
   static dispatch_once_t s_once;
   dispatch_once(&s_once, ^{
     NSURLSessionConfiguration* config = [NSURLSessionConfiguration ephemeralSessionConfiguration];
-    config.URLCache = nil;
-    config.requestCachePolicy = NSURLRequestReloadIgnoringLocalAndRemoteCacheData;
+    NSURL* cachesDirectory = [[NSFileManager defaultManager] URLsForDirectory:NSCachesDirectory
+                                                                    inDomains:NSUserDomainMask]
+                                 .firstObject;
+    NSURL* cacheDirectory = [cachesDirectory URLByAppendingPathComponent:@"ns-module-http-cache"
+                                                             isDirectory:YES];
+    NSURLCache* cache = [[NSURLCache alloc] initWithMemoryCapacity:8 * 1024 * 1024
+                                                      diskCapacity:256 * 1024 * 1024
+                                                      directoryURL:cacheDirectory];
+    config.URLCache = cache;
+    [cache release];
     config.HTTPShouldSetCookies = NO;
     // Every module request overrides this (BuildModuleFetchRequest sets the
     // same policy value); the session default exists so the two settings can
     // never disagree about the budget again.
     config.timeoutIntervalForRequest = ModuleFetchTimeoutInterval();
-    config.HTTPMaximumConnectionsPerHost = 16;
+    config.HTTPMaximumConnectionsPerHost = 32;
     // ARC is disabled in this file: sessionWithConfiguration: returns an
     // autoreleased object; retain it for the process-lifetime singleton.
     s_session = [[NSURLSession sessionWithConfiguration:config] retain];
@@ -847,8 +706,7 @@ static NSURLSession* ModuleFetchSession() {
 // lands late is still reported — a dep failure stays on the designed path —
 // but no request is issued that could only complete past the deadline.
 static void PerformModuleFetchAsyncAttempt(
-    const std::string& url, const std::string& canonicalKey, int attempt,
-    CFAbsoluteTime fetchDeadline,
+    const std::string& url, int attempt, CFAbsoluteTime fetchDeadline,
     std::function<void(ModuleFetchResult result)>* completionHeap) {
   @autoreleasepool {
     const double remaining =
@@ -862,8 +720,7 @@ static void PerformModuleFetchAsyncAttempt(
       return;
     }
 
-    uint64_t bustGeneration = 0;
-    NSMutableURLRequest* request = BuildModuleFetchRequest(url, canonicalKey, &bustGeneration);
+    NSMutableURLRequest* request = BuildModuleFetchRequest(url);
     if (!request) {
       ModuleFetchResult failed;
       failed.failureReason = "HTTP import failed: " + url + " (malformed request URL)";
@@ -877,8 +734,6 @@ static void PerformModuleFetchAsyncAttempt(
     }
 
     const std::string urlCopy = url;
-    const std::string keyCopy = canonicalKey;
-    const uint64_t bust = bustGeneration;
     const uint64_t startUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
     NSURLSessionDataTask* task = [ModuleFetchSession()
         dataTaskWithRequest:request
@@ -924,9 +779,7 @@ static void PerformModuleFetchAsyncAttempt(
                                              (int64_t)(kModuleFetchRetryDelaySeconds *
                                                        NSEC_PER_SEC)),
                                dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-                                 // Background thread: the carried key is the
-                                 // only way this attempt can consult the bust set.
-                                 PerformModuleFetchAsyncAttempt(urlCopy, keyCopy, 1, fetchDeadline,
+                                 PerformModuleFetchAsyncAttempt(urlCopy, 1, fetchDeadline,
                                                                 completionHeap);
                                });
                 // Set only once the retry is actually queued: it now owns the
@@ -935,9 +788,6 @@ static void PerformModuleFetchAsyncAttempt(
               } else {
                 ClassifyModuleResponse(urlCopy, error == nil, status, contentType, body, result);
 
-                if (result.ok) {
-                  ClearCacheBustForKey(keyCopy, bust);
-                }
                 if (!result.ok) {
                   TNS_DEBUG(Esm, "[http-loader][fetch-async][reject] attempt=%d %s", attempt,
                             result.failureReason.c_str());
@@ -977,8 +827,7 @@ static void PerformModuleFetchAsyncAttempt(
   }
 }
 
-void FetchModuleBodyAsync(const std::string& url, const std::string& canonicalKey,
-                          CFAbsoluteTime fetchDeadline,
+void FetchModuleBodyAsync(const std::string& url, CFAbsoluteTime fetchDeadline,
                           std::function<void(ModuleFetchResult result)> completion) {
   // Security gate: single point of enforcement, same as HttpFetchModule.
   if (!IsRemoteUrlAllowed(url)) {
@@ -991,7 +840,7 @@ void FetchModuleBodyAsync(const std::string& url, const std::string& canonicalKe
   }
 
   auto* completionHeap = new std::function<void(ModuleFetchResult)>(std::move(completion));
-  PerformModuleFetchAsyncAttempt(url, canonicalKey, 0, fetchDeadline, completionHeap);
+  PerformModuleFetchAsyncAttempt(url, 0, fetchDeadline, completionHeap);
 }
 
 // Cold-boot JS-thread runloop pump.
