@@ -89,7 +89,7 @@ import PackageDescription
 
 let package = Package(
     name: "Probe",
-    platforms: [.iOS(.v13)],
+    platforms: [.iOS(.v15)],
     dependencies: [
         .package(url: "https://github.com/NativeScript/ios-spm.git", exact: "${values.version}")
     ],
