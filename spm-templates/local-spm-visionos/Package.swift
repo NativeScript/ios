@@ -19,11 +19,12 @@ let package = Package(
     ],
     products: [
         // visionOS family (xros + xrsimulator)
-        .library(name: "NativeScriptVisionOS", targets: ["NativeScriptVisionOS", "TKLiveSyncVisionOS", "NativeScriptLeakProbeVisionOS"]),
+        .library(name: "NativeScriptVisionOS", targets: ["NativeScriptVisionOS", "TKLiveSyncVisionOS", "NativeScriptLeakProbeVisionOS", "NativeScriptDevTunnelVisionOS"]),
     ],
     targets: [
         .binaryTarget(name: "NativeScriptVisionOS", path: "NativeScript.visionos.xcframework.zip"),
         .binaryTarget(name: "TKLiveSyncVisionOS", path: "TKLiveSync.visionos.xcframework.zip"),
         .binaryTarget(name: "NativeScriptLeakProbeVisionOS", path: "NativeScriptLeakProbe.visionos.xcframework.zip"),
+        .binaryTarget(name: "NativeScriptDevTunnelVisionOS", path: "NativeScriptDevTunnel.visionos.xcframework.zip"),
     ]
 )
