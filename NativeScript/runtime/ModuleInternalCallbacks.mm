@@ -1076,7 +1076,8 @@ bool HasPendingAsyncModuleGraphWork() {
 // load's shared_ptr past teardown, so the slot destructor alone cannot cover
 // these. Called from QuiesceModuleLoadsForIsolate.
 static void KillAsyncGraphLoadsForIsolate(v8::Isolate* isolate) {
-  auto* state = ModuleLoaderStateFor(isolate);
+  // Runtime invalidates the Caches before quiescing, so StateFor would be null.
+  auto* state = Caches::ExistingStateFor<ModuleLoaderState>(isolate);
   if (state == nullptr) {
     return;
   }

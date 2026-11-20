@@ -363,6 +363,64 @@ describe("HTTP ESM Loader", function() {
             });
         });
 
+        describe("worker teardown", function () {
+            var originalTimeout;
+            beforeEach(function () {
+                originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+                jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
+            });
+            afterEach(function () {
+                jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+            });
+
+            it("survives HTTP module fetches that land after their worker terminated",
+               function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                var workerDelayMs = 2000;
+                var workerCount = 5;
+                var remaining = workerCount;
+
+                // Delayed past every worker response, so by the time it
+                // settles all of them have arrived at their torn-down loaders.
+                function importOnMain() {
+                    import(origin + "/esm/slow/leaf.mjs?k=wt-main&delayMs=" + (workerDelayMs + 1000))
+                        .then(function (mod) {
+                            expect(mod.value).toBe(42);
+                            done();
+                        }).catch(function (error) {
+                            expect("rejected: " + formatError(error)).toBe("resolved");
+                            done();
+                        });
+                }
+
+                function settle(worker) {
+                    worker.terminate();
+                    if (--remaining === 0) {
+                        importOnMain();
+                    }
+                }
+
+                for (var i = 0; i < workerCount; i++) {
+                    (function (worker, k) {
+                        worker.onmessage = function () {
+                            settle(worker);
+                        };
+                        worker.onerror = function (error) {
+                            fail("worker " + k + " errored: " + formatError(error));
+                            settle(worker);
+                        };
+                        worker.postMessage(origin + "/esm/slow/leaf.mjs?k=" + k +
+                                           "&delayMs=" + workerDelayMs);
+                    })(new Worker("./httpImportTerminateWorker.js"), "wt" + i);
+                }
+            });
+        });
+
         // The import map is process-wide, so every spec here installs its own
         // and restores the empty map afterwards.
         // Each present configureLoader section replaces its state wholesale, so
