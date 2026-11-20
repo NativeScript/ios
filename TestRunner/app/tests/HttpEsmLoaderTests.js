@@ -421,6 +421,246 @@ describe("HTTP ESM Loader", function() {
             });
         });
 
+        // Bodies of 32 KiB or more compile off the JS thread. Every module
+        // here comes from ModuleTestServer's /esm/big.mjs generator, has its
+        // own `k` (modules evaluate once per process) and asserts `bytes` so
+        // it is above that threshold by construction.
+        describe("large modules", function () {
+            var STREAMING_THRESHOLD = 32 * 1024;
+            var LINES = 1500;
+            var originalTimeout;
+            beforeEach(function () {
+                originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+                jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
+            });
+            afterEach(function () {
+                jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+            });
+
+            function bigQuery(k, lines, extra) {
+                return "k=" + k + "&lines=" + lines + (extra || "");
+            }
+
+            function bigUrl(origin, k, lines, extra) {
+                return origin + "/esm/big.mjs?" + bigQuery(k, lines, extra);
+            }
+
+            function expectWholeBody(mod, k, lines) {
+                var total = 0;
+                for (var i = 0; i < lines; i++) {
+                    total += (i * 3 + i) % 1000;
+                }
+                expect(mod.id).toBe(k);
+                expect(mod.count).toBe(lines);
+                expect(mod.total).toBe(total);
+                expect(mod.bytes).toBeGreaterThan(STREAMING_THRESHOLD);
+                expect(globalThis.__nsBigModuleEvaluations[k]).toBe(1);
+            }
+
+            function rejectionOf(url) {
+                return import(url).then(function () {
+                    return "resolved";
+                }, function (error) {
+                    return formatError(error);
+                });
+            }
+
+            // The rejection names the module and the error position; strip the
+            // URL so a small and a large module's texts compare equal.
+            function withoutUrl(message, url) {
+                return message.split(url).join("<url>");
+            }
+
+            function failWith(done) {
+                return function (error) {
+                    expect("rejected: " + formatError(error)).toBe("resolved");
+                    done();
+                };
+            }
+
+            it("evaluates one loaded with import()", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                import(bigUrl(origin, "big-dynamic", LINES)).then(function (mod) {
+                    expectWholeBody(mod, "big-dynamic", LINES);
+                    done();
+                }).catch(failWith(done));
+            });
+
+            it("evaluates one reached through a static import", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                var child = encodeURIComponent(bigQuery("big-static", LINES));
+                import(origin + "/esm/big-parent.mjs?k=big-static-parent&child=" + child)
+                    .then(function (mod) {
+                        expect(mod.parent).toBe("big-static-parent");
+                        expectWholeBody(mod.child, "big-static", LINES);
+                        done();
+                    }).catch(failWith(done));
+            });
+
+            it("evaluates one reached during a pumped require()", function () {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    return;
+                }
+                var nsModule = require("ns:module");
+                nsModule.configureLoader({
+                    importMap: {
+                        imports: { "ns-big-leaf": bigUrl(origin, "big-require", LINES) },
+                    },
+                });
+                try {
+                    var req = nsModule.createRequire(__dirname + "/anything.js");
+                    var mod = req("./esm/mixed/big-entry.mjs");
+                    expectWholeBody(mod.leaf, "big-require", LINES);
+                } finally {
+                    nsModule.configureLoader({ importMap: { imports: {} } });
+                }
+            });
+
+            it("evaluates non-ASCII string literals to the right values", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                import(bigUrl(origin, "big-unicode", LINES, "&unicode=1")).then(function (mod) {
+                    expectWholeBody(mod, "big-unicode", LINES);
+                    var joinedLength = 0;
+                    for (var i = 0; i < LINES; i++) {
+                        joinedLength += ("café 日本語 😀 " + i).length;
+                    }
+                    expect(mod.first).toBe("café 日本語 😀 0");
+                    expect(mod.last).toBe("café 日本語 😀 " + (LINES - 1));
+                    expect(mod.joinedLength).toBe(joinedLength);
+                    done();
+                }).catch(failWith(done));
+            });
+
+            it("rejects a syntax error with the text a small module produces", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                var smallUrl = bigUrl(origin, "small-syntax", 0, "&error=1");
+                var largeUrl = bigUrl(origin, "big-syntax", LINES, "&error=1");
+                Promise.all([rejectionOf(smallUrl), rejectionOf(largeUrl)]).then(function (texts) {
+                    var position = /\(line (\d+):(\d+)\)/;
+                    var small = withoutUrl(texts[0], smallUrl);
+                    var large = withoutUrl(texts[1], largeUrl);
+                    expect(small).toContain("SyntaxError");
+                    // The error sits on the line after the filler declarations.
+                    expect(small.match(position)[1]).toBe("3");
+                    expect(large.match(position)[1]).toBe(String(LINES + 3));
+                    expect(large.replace(position, "")).toBe(small.replace(position, ""));
+                    expect(large.match(position)[2]).toBe(small.match(position)[2]);
+                    done();
+                }).catch(failWith(done));
+            });
+
+            it("rejects pathologically deep nesting like a small module does", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                // 20 KB of brackets: below the threshold on its own, above it
+                // with the filler declarations.
+                var smallUrl = bigUrl(origin, "small-deep", 0, "&nest=10000");
+                var largeUrl = bigUrl(origin, "big-deep", 600, "&nest=10000");
+                Promise.all([rejectionOf(smallUrl), rejectionOf(largeUrl)]).then(function (texts) {
+                    var position = /\s*\(line \d+:\d+\)/;
+                    var small = withoutUrl(texts[0], smallUrl).replace(position, "");
+                    var large = withoutUrl(texts[1], largeUrl).replace(position, "");
+                    expect(small).toContain("Maximum call stack size exceeded");
+                    expect(large).toBe(small);
+                    done();
+                }).catch(failWith(done));
+            });
+
+            it("resolves one module for concurrent imports from several call sites",
+               function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                var query = bigQuery("big-shared", LINES);
+                var url = origin + "/esm/big.mjs?" + query;
+                var parent = origin + "/esm/big-parent.mjs?child=" + encodeURIComponent(query) +
+                             "&k=";
+                Promise.all([
+                    import(url),
+                    import(parent + "big-shared-a"),
+                    import(url),
+                    import(parent + "big-shared-b"),
+                ]).then(function (mods) {
+                    expectWholeBody(mods[0], "big-shared", LINES);
+                    expect(mods[2]).toBe(mods[0]);
+                    expect(mods[1].child).toBe(mods[0]);
+                    expect(mods[3].child).toBe(mods[0]);
+                    done();
+                }).catch(failWith(done));
+            });
+
+            it("survives workers terminated while their large modules compile",
+               function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                // Termination delays spread across the fetch and the
+                // multi-megabyte background compile that follows it.
+                var delaysMs = [0, 10, 20, 40, 60, 90, 130, 180];
+                var remaining = delaysMs.length;
+
+                function importOnMain() {
+                    import(bigUrl(origin, "big-after-workers", LINES)).then(function (mod) {
+                        expectWholeBody(mod, "big-after-workers", LINES);
+                        done();
+                    }).catch(failWith(done));
+                }
+
+                function settle(worker) {
+                    worker.terminate();
+                    if (--remaining === 0) {
+                        importOnMain();
+                    }
+                }
+
+                delaysMs.forEach(function (delayMs, i) {
+                    var worker = new Worker("./httpImportTerminateWorker.js");
+                    worker.onmessage = function () {
+                        setTimeout(function () {
+                            settle(worker);
+                        }, delayMs);
+                    };
+                    worker.onerror = function (error) {
+                        fail("worker " + i + " errored: " + formatError(error));
+                        settle(worker);
+                    };
+                    worker.postMessage(bigUrl(origin, "big-worker-" + i, 40000));
+                });
+            });
+        });
+
         // The import map is process-wide, so every spec here installs its own
         // and restores the empty map afterwards.
         // Each present configureLoader section replaces its state wholesale, so
