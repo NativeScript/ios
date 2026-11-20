@@ -165,6 +165,137 @@ describe("event loop ordered macrotasks", function () {
             done();
         }, 30);
     });
+
+    // CF clamps a past fire date to now, so re-arming the lane for a matured
+    // token lands it behind every overdue foreign timer. Each case makes ns20
+    // and nstimer25 overdue together and disturbs the ordered lane in a
+    // different way.
+    function expectDueOrderAfterBusyWait(order, expected, afterBusyWait, done) {
+        __ns__setTimeout(() => order.push("ns20"), 20);
+        foreignSetTimeout(() => order.push("nstimer25"), 25);
+        __ns__setTimeout(() => order.push("ns30"), 30);
+        const start = Date.now();
+        while (Date.now() - start < 45) { }
+        if (afterBusyWait) {
+            afterBusyWait();
+        }
+        foreignSetTimeout(() => {
+            expect(order).toEqual(expected);
+            done();
+        }, 30);
+    }
+
+    // Two matured runtime timers ahead of a foreign one: the default build
+    // yields a runloop pass between matured timers (setTimeout(fn, 0) is how
+    // apps yield to native), so the second is re-armed after the foreign
+    // timer. Only a build with NS_EXACT_TIMER_ORDERING=1 passes these.
+    xit("keeps due-time order with foreign timers behind an earlier overdue timer", function (done) {
+        const order = [];
+        __ns__setTimeout(() => order.push("ns10"), 10);
+        expectDueOrderAfterBusyWait(order, ["ns10", "ns20", "nstimer25", "ns30"], null, done);
+    });
+
+    xit("keeps due-time order with foreign timers behind an earlier macrotask", function (done) {
+        const order = [];
+        __ns__queueMacrotask(() => order.push("macro"));
+        expectDueOrderAfterBusyWait(order, ["macro", "ns20", "nstimer25", "ns30"], null, done);
+    });
+
+    it("keeps due-time order with foreign timers when a timer is scheduled after they matured", function (done) {
+        const order = [];
+        let late;
+        expectDueOrderAfterBusyWait(order, ["ns20", "nstimer25", "ns30"], () => {
+            late = __ns__setTimeout(() => order.push("late"), 1000);
+        }, () => {
+            __ns__clearTimeout(late);
+            done();
+        });
+    });
+
+    // A runloop spun from inside a timer callback (a pumped require, app code)
+    // must not run other ordered tasks nested inside it.
+    it("does not run ordered tasks inside a runloop spun from a timer callback", function (done) {
+        __ns__setTimeout(() => {
+            const order = [];
+            __ns__setTimeout(() => order.push("timer"), 0);
+            __ns__queueMacrotask(() => order.push("macro"));
+            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, false);
+            expect(order).toEqual([]);
+            __ns__setTimeout(() => {
+                expect(order).toEqual(["timer", "macro"]);
+                done();
+            }, 0);
+        }, 0);
+    });
+
+    it("keeps due-time order with foreign timers when a timer is cleared after they matured", function (done) {
+        const order = [];
+        const unrelated = __ns__setTimeout(() => order.push("cleared"), 1000);
+        expectDueOrderAfterBusyWait(order, ["ns20", "nstimer25", "ns30"], () => {
+            __ns__clearTimeout(unrelated);
+        }, done);
+    });
+});
+
+// A rejection a task leaves unhandled is reported before the next task runs,
+// Node's model (rejections processed after each callback), even when both
+// tasks were due in the same runloop pass or arrive in one port drain. A
+// later task attaching a handler then gets rejectionhandled, not silence.
+describe("event loop unhandled rejections", function () {
+    // schedule(reject, handle) queues two tasks and may return a cleanup
+    function expectReportedBeforeNextTask(schedule) {
+        return raisesGlobalErrors(function (done) {
+            const events = [];
+            const onUnhandled = (e) => {
+                e.preventDefault();
+                events.push("unhandled");
+            };
+            const onHandled = () => events.push("handled");
+            global.addEventListener("unhandledrejection", onUnhandled);
+            global.addEventListener("rejectionhandled", onHandled);
+            let rejected;
+            const cleanup = schedule(() => {
+                rejected = Promise.reject(new Error("reported before the next task"));
+                events.push("reject");
+            }, () => {
+                rejected.catch(() => { });
+                events.push("handle");
+            });
+            foreignSetTimeout(() => {
+                global.removeEventListener("unhandledrejection", onUnhandled);
+                global.removeEventListener("rejectionhandled", onHandled);
+                if (cleanup) {
+                    cleanup();
+                }
+                expect(events).toEqual(["reject", "unhandled", "handle", "handled"]);
+                done();
+            }, 100);
+        });
+    }
+
+    it("reports before a timer due in the same pass attaches a handler",
+        expectReportedBeforeNextTask((reject, handle) => {
+            __ns__setTimeout(reject, 0);
+            __ns__setTimeout(handle, 0);
+        }));
+
+    it("reports before a macrotask due in the same pass attaches a handler",
+        expectReportedBeforeNextTask((reject, handle) => {
+            __ns__setTimeout(reject, 0);
+            __ns__queueMacrotask(handle);
+        }));
+
+    it("reports before the next message on the same port attaches a handler",
+        expectReportedBeforeNextTask((reject, handle) => {
+            const channel = new MessageChannel();
+            channel.port2.onmessage = (event) => (event.data === "reject" ? reject : handle)();
+            channel.port1.postMessage("reject");
+            channel.port1.postMessage("handle");
+            return () => {
+                channel.port1.close();
+                channel.port2.close();
+            };
+        }));
 });
 
 // A self-rescheduling immediate timer must not starve the rest of the
