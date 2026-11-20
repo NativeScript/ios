@@ -122,7 +122,7 @@ Supported architectures:
  - arm64
 
 iOS deployment target:
- - 9.0
+ - 15.0
 
 The `--jitless` mode in which V8 is running is explained in the following [document](https://docs.google.com/document/d/1YYU17VqFMBeSJ8whCqXknOGXtXDVDLulchsTkmi0YdI/edit#heading=h.mz26kq2dsu6k)
 

@@ -15,8 +15,8 @@ import PackageDescription
 let package = Package(
     name: "NativeScriptSDK",
     platforms: [
-        .iOS(.v13),
-        .macCatalyst(.v13),
+        .iOS(.v15),
+        .macCatalyst(.v15),
     ],
     products: [
         // iOS family (iphoneos + iphonesimulator + Mac Catalyst)
