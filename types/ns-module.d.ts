@@ -61,7 +61,12 @@ declare module "ns:module" {
   export interface LoaderConfig {
     /** Replaces the whole map. */
     importMap?: ImportMap;
-    /** URL substrings identifying modules that are always re-fetched, never cached. */
+    /**
+     * URL substrings identifying modules that are re-requested on every import
+     * instead of being reused from the module registry. The request still goes
+     * through the loader's HTTP cache, so the server's caching headers decide
+     * whether it reaches the network.
+     */
     volatilePatterns?: string[];
     canonicalization?: CanonicalizationConfig;
   }
@@ -79,9 +84,10 @@ declare module "ns:module" {
   export function configureLoader(config: LoaderConfig): void;
 
   /**
-   * Evicts the given URLs (canonicalized) from the module registry and marks
-   * them bust-next-fetch, so the next network fetch bypasses every HTTP
-   * cache layer.
+   * Evicts the given URLs (canonicalized) from the module registry, so the
+   * next import of each requests it again. That request goes through the
+   * loader's HTTP cache: the server's caching headers decide whether it
+   * reaches the network.
    *
    * Throws `TypeError` if `urls` is not an array or holds a non-string, naming
    * the offending index.

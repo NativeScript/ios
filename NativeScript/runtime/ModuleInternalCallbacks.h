@@ -44,7 +44,8 @@ struct LoaderVocabulary {
   // Distinguishes "no vocabulary supplied" (mechanical canonicalization only)
   // from "supplied, and empty" — an empty vocabulary is explicit policy.
   bool canonicalizationConfigured = false;
-  // URL substrings whose modules are always re-fetched, never cached.
+  // URL substrings whose modules are re-requested on every import instead of
+  // being reused from the registry.
   std::vector<std::string> volatilePatterns;
 };
 
@@ -212,7 +213,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 // calling isolate only.
 bool SetImportMap(const std::string& json, std::string* error);
 
-// Set URL patterns that should bypass module cache (e.g. "?v=", "/hot/") on
+// Set URL patterns that should bypass the module registry (e.g. "?v=", "/hot/") on
 // the calling isolate.
 void SetVolatilePatterns(const std::vector<std::string>& patterns);
 

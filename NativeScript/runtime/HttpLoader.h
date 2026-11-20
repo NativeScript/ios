@@ -16,8 +16,6 @@ namespace tns {
 //   - the async NSURLSession fetch behind the phase-1 module-graph walk
 //     (StartModuleGraphLoad), which is how module bodies
 //     normally arrive,
-//   - eviction plumbing (an eviction-driven fetch nonce that defeats
-//     CFNetwork's HTTP cache),
 //   - the boot-evaluation flag that arms the cold-boot runloop pump only
 //     while an entry module is evaluating (derived by the runtime itself),
 //   - the remote-module security gate, seeded once from nativescript.config
@@ -39,7 +37,7 @@ namespace tns {
 // `CanonicalizeHttpUrlKey`. It is per-isolate loader vocabulary — installed
 // through SetCanonicalizationConfig in ModuleInternalCallbacks.h — so
 // CanonicalizeHttpUrlKey runs on the isolate's own thread only. The transport
-// never canonicalizes; it carries keys computed for it.
+// never canonicalizes.
 //
 // When unconfigured, canonicalization is purely mechanical (fragment strip).
 struct CanonicalizationConfig {
@@ -63,7 +61,7 @@ std::string CanonicalizeHttpUrlKey(const std::string& url);
 // tests the scheme — otherwise the collapsed form fails the test, is passed
 // through verbatim, and the same module ends up with two registry identities:
 // one from the resolver (which repairs) and one from whatever came in through
-// invalidateModules or a cache-bust mark (which did not).
+// invalidateModules (which did not).
 std::string RepairCollapsedUrlScheme(const std::string& url);
 
 // What a module response turned out to be. Decided once, by the shared
@@ -92,19 +90,15 @@ struct ModuleFetchResult {
 // Synchronous module fetch with one retry on transport error — the fallback
 // path for anything the async module-graph walk missed. Blocks the calling
 // thread. Returns `result.ok`.
-// `canonicalKey` is the module's canonical registry key, computed by the
-// caller on its isolate's thread — the transport must never canonicalize,
-// since that reads per-isolate loader vocabulary.
-bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
-                     ModuleFetchResult& result);
+bool HttpFetchModule(const std::string& url, ModuleFetchResult& result);
 
 // Asynchronous single-URL module fetch — the I/O primitive behind the
 // module-graph walk (see StartModuleGraphLoad in ModuleInternalCallbacks.h).
 // Same response policy as HttpFetchModule, minus the JS-thread block:
 //   - security gate (IsRemoteUrlAllowed) checked up front,
 //   - an NSURLSession GET on a background queue with the same request shape
-//     as the sync path (cache-bust nonce, zero-cache headers, no cookies) and
-//     one retry on transport error.
+//     as the sync path (no cookies, HTTP caching as the response headers
+//     allow) and one retry on transport error.
 // `fetchDeadline` is the enclosing graph load's fetch budget as an absolute
 // CFAbsoluteTime (double; 0 = unbounded): attempts clamp their request
 // timeout to the time remaining and the transport-error retry is skipped
@@ -112,27 +106,9 @@ bool HttpFetchModule(const std::string& url, const std::string& canonicalKey,
 // that is pumping for it.
 // `completion(result)` is invoked exactly once, on an arbitrary thread —
 // callers must hop to their JS thread before touching V8.
-// `canonicalKey` as for HttpFetchModule: computed on the calling isolate's
-// thread and carried, because the fetch and its completion run on background
-// threads that cannot read per-isolate vocabulary.
 void FetchModuleBodyAsync(
-    const std::string& url, const std::string& canonicalKey,
-    double fetchDeadline,
+    const std::string& url, double fetchDeadline,
     std::function<void(ModuleFetchResult result)> completion);
-
-// Mark a URL set (canonicalized internally) so that the NEXT network
-// fetch of each URL carries a unique `__ns_dev_nonce` query parameter,
-// guaranteeing CFNetwork cannot satisfy the request from any HTTP cache
-// layer (observed on iOS 18+/26+ Simulator even with `no-store` headers
-// and a reload-ignoring cache policy). Called by `InvalidateModules` for
-// the eviction set; marks are consumed when a fresh body arrives.
-// The nonce is transport-only and never affects module identity.
-//
-// Takes canonical registry keys, already computed by the caller on its
-// isolate's thread: the mark set guards the process-global CFNetwork cache
-// and is consulted from background fetch threads, which must never
-// canonicalize (that reads per-isolate vocabulary).
-void MarkKeysForCacheBust(const std::vector<std::string>& canonicalKeys);
 
 // ─────────────────────────────────────────────────────────────
 // Remote-module security gate
