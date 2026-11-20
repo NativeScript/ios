@@ -1181,27 +1181,25 @@ static void RenderErrorModalUI(v8::Isolate* isolate, const std::string& title,
 
   UpdateDisplayedStackText(stackForModal);
 
-  bool alreadyShowing = isErrorDisplayShowing;
-
-  UIApplication* app = [UIApplication sharedApplication];
-  BOOL hasAnyWindows = AllSceneWindows().count > 0;
-  if (!alreadyShowing && !hasAnyWindows && app.connectedScenes.count == 0) {
-    Log(@"Note: JavaScript error during boot.");
-    Log(@"================================");
-    Log(@"%s", stackForModal.c_str());
-    Log(@"================================");
-    Log(@"Please fix the error and save the file to auto reload the app.");
-    Log(@"================================");
-    return;
-  }
-
-  if (alreadyShowing) {
-    return;
-  }
-
-  isErrorDisplayShowing = true;
-
+  // UIKit reads and the isErrorDisplayShowing check-and-set must happen on the main thread.
   auto showSynchronously = ^{
+    if (isErrorDisplayShowing) {
+      return;
+    }
+
+    if (AllSceneWindows().count == 0 &&
+        [UIApplication sharedApplication].connectedScenes.count == 0) {
+      Log(@"Note: JavaScript error during boot.");
+      Log(@"================================");
+      Log(@"%s", stackForModal.c_str());
+      Log(@"================================");
+      Log(@"Please fix the error and save the file to auto reload the app.");
+      Log(@"================================");
+      return;
+    }
+
+    isErrorDisplayShowing = true;
+
     @try {
       // Log(@"[ShowErrorModal] On main thread - showing modal synchronously %s", message.c_str());
       ShowErrorModalSynchronously(title, message, stackForModal);
