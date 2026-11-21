@@ -289,7 +289,42 @@ of 125 (380 instead of 115 four prototypes up) while the handler left it to V8; 
 setter from the handler brings it from about 324 to 289 ns two prototypes up and from 396 to
 324 for a `UIButton` `tag` four up (323 to 292 and 392 to 334 under `"all"`, where a plain
 `UIButton`'s goes from 322 to 266). Building a canary for an object with state costs
-about 330 ns per state property. Instances of JS-extended classes report their own
+about 330 ns per state property.
+
+That masking handler is what JS-extended instances keep. Under `"scope": "all"`, wrappers of
+plain objects get a non-masking forwarding set instead (getter, setter, query, deleter,
+enumerator, definer and descriptor), unless `"allowShadowingNativeMembers": true` in the app
+config gives them the masking one: the state is the only copy of their properties, every access
+to one is answered from it, and a new canary needs no copy. V8 calls a non-masking interceptor
+only for names absent from the object and its whole prototype chain, own lookups included
+(WebIDL's named-property visibility, `LookupIterator::kSkipNonMaskingOwnProperty`), so native
+calls and native property stores never reach C++. ObjC prototypes carry the swizzle interceptor,
+which made an own lookup on such a canary stop at the prototype until the prebuilts' patch
+`v8_nonmasking_own_lookup` (v8-buildscripts #11): without it `delete obj.m` deleted `m` from the
+prototype. The holes are names the chain has: an instance write or `Object.defineProperty` over
+an inherited data property (a native method, `toString`, `valueOf`, `constructor`, a member JS put
+on a prototype) creates an own property of that canary only, and deleting such a name deletes
+nothing. `v8::Object::Set` reports success for a store `[[Set]]` rejects, so the setter checks a
+read-only property and a getter-only accessor in the state itself, and runs a state accessor's
+setter with the canary as `this`. A record that dies under a live forwarding canary
+(`objc_removeAssociatedObjects`) keeps its state while the canary holds it (`ReleaseStates` parks
+it in `orphaned`, which the leak probe also walks, and `DropRecord` sweeps once the canary is
+collected or released); the canary keeps reading it, and its next write moves the state object
+into a new record, so what the weak collections keyed on the object survives too. A released
+forwarding canary gets the state's properties copied onto it (`KeepWeakCollectionKey`), since its
+handlers no longer reach the state; the handlers answer nothing while that copy runs, or V8 would
+find each property already defined and skip it. An accessor kept in the state sees the canary as
+`this` whatever the receiver, and a write through a Proxy or an inheriting object never runs its
+setter: interceptors are given only the holder, and V8 consults only the query callback when the
+holder is not the receiver. Measured on a Release
+simulator build (iPhone 16 Pro simulator, jitless), forwarding vs masking for a plain `NSObject`:
+an expando read takes 64 ns instead of 19 and a miss 47 instead of 20, `in` 111 instead of 21, an
+expando rewrite 81 instead of 105, a first write creating the state 544 instead of 676, a native
+property store (`UIView` `tag`) 112 instead of 219, and wrapping an object with five state
+properties again costs what wrapping one without state does (903 vs 925 ns) instead of 2496;
+native method calls and native property reads are unchanged.
+
+Instances of JS-extended classes report their own
 deallocation: the runtime gives each extended class a `-dealloc` that marks the instance's
 records dying in every isolate, calls the superclass's (which can be a JS one the class
 inherits, whose receiver still reads the state), and then retires them. For other objects it is

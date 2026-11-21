@@ -1341,10 +1341,10 @@ Local<Object> ArgConverter::WrapNativeCallbackSelf(Local<Context> context, id se
     // wrapper is neither cached nor owning, and the caller detaches it.
     wrapper->MarkBorrowed();
     // Its writes reach the object's JS state through the canary handlers.
-    Local<Object> receiver = NewEmptyInstance(
-        context, EmptyInstanceFunction(isolate, WrapperLifetimeCanary::KindOf(self)));
+    CanaryKind kind = WrapperLifetimeCanary::KindOf(self);
+    Local<Object> receiver = NewEmptyInstance(context, EmptyInstanceFunction(isolate, kind));
     CreateJsWrapper(context, wrapper, receiver);
-    WrapperLifetimeCanary::Hydrate(isolate, receiver);
+    WrapperLifetimeCanary::Hydrate(isolate, receiver, kind);
     *borrowed = wrapper;
     return receiver;
   }

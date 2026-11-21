@@ -276,7 +276,8 @@ void PrologueCallback(Isolate* isolate, GCType type, GCCallbackFlags) {
   }
 }
 
-void ReleaseQueued(const std::shared_ptr<Caches>& cache, ObjectWeakCallbackState* state) {
+void ReleaseQueued(Isolate* isolate, const std::shared_ptr<Caches>& cache,
+                   ObjectWeakCallbackState* state) {
   id target = state->lifetimeTarget_;
   // A wrapper built for the object after this one died owns the entry now.
   auto it = cache->Instances.find(target);
@@ -285,7 +286,9 @@ void ReleaseQueued(const std::shared_ptr<Caches>& cache, ObjectWeakCallbackState
   }
   delete state->lifetimeWrapper_;
   std::atomic<uint64_t>* counter = state->runtimeRetains_;
+  std::shared_ptr<CanaryRecord> record = std::move(state->canaryRecord_);
   delete state;
+  WrapperLifetimeCanary::DropRecord(isolate, std::move(record));
   DropRuntimeRetain(target, counter);
   [target release];
 }
@@ -313,7 +316,7 @@ void ReleaseAll(Isolate* isolate, RootedState* rooted) {
     if (rooted->releases.empty()) {
       WrapperLifetime::pendingReleaseIsolates_.fetch_sub(1, std::memory_order_relaxed);
     }
-    ReleaseQueued(cache, state);
+    ReleaseQueued(isolate, cache, state);
   }
 }
 
@@ -380,7 +383,7 @@ void WrapperLifetime::Adopt(Isolate* isolate, ObjCDataWrapper* wrapper,
     if (state->lifetimeCanary_) {
       state->canaryRecord_ = WrapperLifetimeCanary::Find(isolate, target);
       if (state->canaryRecord_ != nullptr) {
-        WrapperLifetimeCanary::Hydrate(isolate, handle->Get(isolate).As<Object>());
+        WrapperLifetimeCanary::Hydrate(isolate, handle->Get(isolate).As<Object>(), kind);
       }
     }
     MakeWeak(state);
