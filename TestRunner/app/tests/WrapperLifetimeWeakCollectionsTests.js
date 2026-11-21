@@ -186,6 +186,147 @@ describe("Weak collections of native objects", function () {
         });
     });
 
+    // Uses every collection, and a deref, on a canary in an earlier job, so
+    // whatever they keep for it would still be there.
+    function keyEverywhere(obj, collections) {
+        collections.map.set(obj, "value");
+        collections.set.add(obj);
+        collections.registry.register(obj, "held", obj);
+        var ref = new WeakRef(obj);
+        ref.deref();
+        collections.map.get(obj);
+        collections.set.has(obj);
+        collections.refs.push(ref);
+        collections.wrappers.push(new WrapperWeakRef(obj));
+    }
+
+    function collections() {
+        return {
+            map: new WeakMap(),
+            set: new WeakSet(),
+            registry: new FinalizationRegistry(function () {}),
+            refs: [],
+            wrappers: []
+        };
+    }
+
+    it("lets a keyed wrapper nothing references die and its JS-owned native object go", function (done) {
+        var watch = NSHashTable.weakObjectsHashTable();
+        var keyed = collections();
+        (function () {
+            var obj = Extended.new();
+            watch.addObject(obj);
+            keyEverywhere(obj, keyed);
+        })();
+        var attempts = 15;
+        (function poll() {
+            settle(1, function () {
+                var gone = watch.allObjects.count === 0;
+                if (gone || --attempts === 0) {
+                    expect(gone).toBe(true);
+                    if (canary) {
+                        expect(keyed.wrappers[0].deref() === undefined).toBe(true);
+                        expect(keyed.refs[0].deref() === undefined).toBe(true);
+                    }
+                    done();
+                    return;
+                }
+                poll();
+            });
+        })();
+    });
+
+    it("lets a keyed canary nothing references die while native code owns its object", function (done) {
+        if (!canary) {
+            done();
+            return;
+        }
+        var owner = NSMutableArray.new();
+        var keyed = collections();
+        (function () {
+            var obj = Extended.new();
+            owner.addObject(obj);
+            keyEverywhere(obj, keyed);
+        })();
+        settle(2, function () {
+            expect(keyed.wrappers[0].deref() === undefined).toBe(true);
+            var later = owner.objectAtIndex(0);
+            expect(keyed.map.get(later)).toBe("value");
+            expect(keyed.set.has(later)).toBe(true);
+            expect(keyed.refs[0].deref() === later).toBe(true);
+            expect(keyed.registry.unregister(later)).toBe(true);
+            done();
+        });
+    });
+
+    it("dereferences no wrapper of a released object a WeakRef returned before the release", function () {
+        if (!canary) {
+            return;
+        }
+        var owner = NSMutableArray.new();
+        var obj = Extended.new();
+        owner.addObject(obj);
+        var ref = new WeakRef(obj);
+        expect(ref.deref() === obj).toBe(true);
+        __releaseNativeCounterpart(obj);
+        expect(ref.deref() === undefined).toBe(true);
+        var later = owner.objectAtIndex(0);
+        expect(ref.deref() === later).toBe(true);
+    });
+
+    // Only objects outside JS-extended classes carry the token the removal
+    // releases, and they are canaries only under scope "all".
+    it("keys a live object again after its associations are removed", function (done) {
+        if (!canary || runtime.getConfig("wrapperLifetimeScope") !== "all" ||
+            typeof objc_removeAssociatedObjects !== "function") {
+            done();
+            return;
+        }
+        var owner = NSMutableArray.new();
+        var before = new WeakMap();
+        var after = new WeakMap();
+        (function () {
+            var obj = TNSAllocLog.new();
+            owner.addObject(obj);
+            before.set(obj, "before");
+            expect(before.get(obj)).toBe("before");
+            objc_removeAssociatedObjects(obj);
+            after.set(obj, "after");
+            expect(after.get(obj)).toBe("after");
+        })();
+        settle(2, function () {
+            expect(after.get(owner.objectAtIndex(0))).toBe("after");
+            done();
+        });
+    });
+
+    it("finds what was keyed on an object through its JS dealloc's receiver", function (done) {
+        var map = new WeakMap();
+        var seen = [];
+        var Keyed = TNSAllocLog.extend({
+            dealloc: function () {
+                seen.push(map.get(this));
+                this.super.dealloc();
+            }
+        }, { name: "WrapperLifetimeWeakCollectionsDeallocGet" });
+        var owner = NSMutableArray.new();
+        (function () {
+            var obj = Keyed.new();
+            map.set(obj, "value");
+            owner.addObject(obj);
+        })();
+        settle(2, function () {
+            owner.removeAllObjects();
+            settle(2, function () {
+                expect(seen.length).toBe(1);
+                if (canary) {
+                    expect(seen[0]).toBe("value");
+                }
+                done();
+            });
+        });
+    });
+
     it("keys a Proxy around a native object by the Proxy", function () {
         var obj = Extended.new();
         var proxy = new Proxy(obj, {});
