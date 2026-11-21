@@ -1,6 +1,7 @@
 // Debug builds in the "rooted" and "canary" modes guard native instance
-// methods: assigning one's name on a native object throws, since native code
-// never calls that own property. The suite is a debug build; the resurrecting
+// methods, and the methods of JS-extended classes that native code calls:
+// assigning one's name on a native object throws, since native code never
+// calls that own property. The suite is a debug build; the resurrecting
 // mode and "allowShadowingNativeMembers" keep plain data properties.
 describe("Native member guard", function () {
     var runtime = require("ns:runtime");
@@ -242,12 +243,189 @@ describe("Native member guard", function () {
         var object = Extended.new();
         expect(object.value(1)).toBe(102);
         expect(TNSNativeMemberGuard.callValueWith(object, 1)).toBe(102);
-        // The override is a JS method, not guarded; the inherited native one is.
-        object.value = replacement;
-        expect(object.value).toBe(replacement);
+        // Native code calls the override the class captured, so it is
+        // guarded like the inherited native method.
+        expectShadowing(object, "value", assignSloppy);
         expect(TNSNativeMemberGuard.callValueWith(object, 1)).toBe(102);
-        delete object.value;
         expectShadowing(object, "other", assignSloppy);
+    });
+
+    // A JS-extended class's methods that native code calls through the
+    // function the class captured (exposed methods, overrides of native
+    // methods, protocol implementations) are guarded like native methods. Its
+    // other methods stay plain data properties.
+    describe("JS-extended classes' methods native code calls", function () {
+        var tapped = [];
+        var Guarded = TNSNativeMemberGuard.extend({
+            value: function (x) {
+                return 1000 + TNSNativeMemberGuard.prototype.value.call(this, x);
+            },
+            tapped: function () {
+                tapped.push(this);
+            },
+            baseProtocolMethod1: function () {
+                TNSLog("guarded baseProtocolMethod1");
+            },
+            helper: function () {
+                return "helper";
+            }
+        }, {
+            name: "TNSNativeMemberGuardJSMethods",
+            protocols: [TNSBaseProtocol1],
+            exposedMethods: { tapped: { returns: interop.types.void, params: [] } }
+        });
+        var implementation = Object.getPrototypeOf(Guarded.prototype);
+
+        var Subclass = (function (_super) {
+            __extends(Subclass, _super);
+            function Subclass() {
+                return (_super !== null && _super.apply(this, arguments)) || this;
+            }
+            Subclass.prototype.value = function (x) {
+                return 10 * _super.prototype.value.call(this, x);
+            };
+            Subclass.prototype.tapped = function () {
+                tapped.push("subclass");
+            };
+            Subclass.prototype.helper = function () {
+                return "subclass helper";
+            };
+            Subclass.ObjCExposedMethods = { tapped: { returns: interop.types.void, params: [] } };
+            return Subclass;
+        })(TNSNativeMemberGuard);
+
+        beforeEach(function () {
+            tapped.length = 0;
+            TNSClearOutput();
+        });
+
+        it("guards exposed methods, native overrides and protocol implementations in strict and sloppy code", function () {
+            var object = Guarded.new();
+            ["value", "tapped", "baseProtocolMethod1"].forEach(function (name) {
+                expectShadowing(object, name, assignStrict);
+                expectShadowing(object, name, assignSloppy);
+            });
+            var sub = Subclass.new();
+            expectShadowing(sub, "value", assignStrict);
+            expectShadowing(sub, "tapped", assignSloppy);
+        });
+
+        it("names the method, the class, the mode and the escape hatch", function () {
+            if (!guarded) {
+                return;
+            }
+            var object = Guarded.new();
+            var error = null;
+            try {
+                object.tapped = replacement;
+            } catch (e) {
+                error = e;
+            }
+            expect(error instanceof TypeError).toBe(true);
+            var message = String(error && error.message);
+            expect(message).toContain("'tapped' on an instance of TNSNativeMemberGuardJSMethods");
+            expect(message).toContain("native code calls the class's implementation");
+            expect(message).toContain('mode "' + mode + '"');
+            expect(message).toContain("allowShadowingNativeMembers");
+        });
+
+        it("leaves JS-only methods writable data properties", function () {
+            var object = Guarded.new();
+            var descriptor = Object.getOwnPropertyDescriptor(implementation, "helper");
+            expect(typeof descriptor.value).toBe("function");
+            expect(descriptor.writable).toBe(true);
+            object.helper = replacement;
+            expect(hasOwn(object, "helper")).toBe(true);
+            expect(object.helper()).toBe("js");
+            var sub = Subclass.new();
+            sub.helper = replacement;
+            expect(sub.helper()).toBe("js");
+            expect(typeof Object.getOwnPropertyDescriptor(Subclass.prototype, "helper").value).toBe("function");
+        });
+
+        it("describes guarded methods as accessor pairs on their prototype", function () {
+            Subclass.new();
+            [[implementation, "value"], [implementation, "tapped"], [implementation, "baseProtocolMethod1"],
+                [Subclass.prototype, "value"], [Subclass.prototype, "tapped"]].forEach(function (entry) {
+                var descriptor = Object.getOwnPropertyDescriptor(entry[0], entry[1]);
+                expect(descriptor.enumerable).toBe(true);
+                expect(descriptor.configurable).toBe(true);
+                if (guarded) {
+                    expect(typeof descriptor.get).toBe("function");
+                    expect(typeof descriptor.set).toBe("function");
+                    expect(descriptor.get()).toBe(entry[0][entry[1]]);
+                } else {
+                    expect(typeof descriptor.value).toBe("function");
+                }
+            });
+            expect("value" in Object.getOwnPropertyDescriptor(Subclass.prototype, "constructor")).toBe(true);
+        });
+
+        it("keeps native dispatch to the class's implementations", function () {
+            var object = Guarded.new();
+            expect(TNSNativeMemberGuard.callValueWith(object, 1)).toBe(1002);
+            object.performSelector("tapped");
+            expect(tapped).toEqual([object]);
+            TNSTestNativeCallbacks.protocolImplementationMethods(object);
+            expect(TNSGetOutput()).toContain("guarded baseProtocolMethod1");
+            var sub = Subclass.new();
+            expect(TNSNativeMemberGuard.callValueWith(sub, 1)).toBe(20);
+            sub.performSelector("tapped");
+            expect(tapped).toEqual([object, "subclass"]);
+        });
+
+        it("keeps super and _super.prototype calls", function () {
+            var sub = Subclass.new();
+            expect(sub.value(2)).toBe(30);
+            expect(TNSNativeMemberGuard.prototype.value.call(sub, 2)).toBe(3);
+            expect(Subclass.prototype.value.call(sub, 2)).toBe(30);
+            var home = {
+                __proto__: Subclass.prototype,
+                value(x) {
+                    return super.value(x) + 1;
+                }
+            };
+            expect(home.value.call(sub, 2)).toBe(31);
+            var object = Guarded.new();
+            expect(implementation.value.call(object, 1)).toBe(1002);
+        });
+
+        it("lets objects inheriting from an instance assign the name", function () {
+            var object = Guarded.new();
+            var derived = Object.create(object);
+            derived.tapped = replacement;
+            expect(hasOwn(derived, "tapped")).toBe(true);
+            expect(derived.tapped).toBe(replacement);
+            expect(hasOwn(object, "tapped")).toBe(false);
+            expect(object.tapped).toBe(implementation.tapped);
+        });
+
+        // Runs last in this block: the replacement stays installed.
+        it("lets the prototype replace a guarded method, which native code then keeps calling the captured one of", function () {
+            var Late = (function (_super) {
+                __extends(Late, _super);
+                function Late() {
+                    return (_super !== null && _super.apply(this, arguments)) || this;
+                }
+                Late.prototype.value = function (x) {
+                    return 7 * x;
+                };
+                return Late;
+            })(TNSNativeMemberGuard);
+            var object = Late.new();
+            var later = function (x) {
+                return 9 * x;
+            };
+            Late.prototype.value = later;
+            var descriptor = Object.getOwnPropertyDescriptor(Late.prototype, "value");
+            expect(descriptor.value).toBe(later);
+            expect(descriptor.writable).toBe(true);
+            expect(object.value(1)).toBe(9);
+            expect(TNSNativeMemberGuard.callValueWith(object, 1)).toBe(7);
+            // A data property from then on: instance writes are no longer guarded.
+            object.value = replacement;
+            expect(hasOwn(object, "value")).toBe(true);
+        });
     });
 
     // Runs last among the specs that use TNSNativeMemberGuard: the replacement

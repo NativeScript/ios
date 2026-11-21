@@ -9,6 +9,7 @@
 #include "FastEnumerationAdapter.h"
 #include "Helpers.h"
 #include "Interop.h"
+#include "MetadataBuilder.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
@@ -638,6 +639,9 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
                                         Local<Value> exposedMethods, Local<Value> exposedProtocols,
                                         Local<Object> implementationObject) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  // The methods native code calls: exposed ones, and those implementing a
+  // native class's or protocol's method.
+  std::vector<std::string> nativeCalled;
   std::vector<const ProtocolMeta*> protocols;
   if (!exposedProtocols.IsEmpty() && exposedProtocols->IsArray()) {
     Local<v8::Array> protocolsArray = exposedProtocols.As<v8::Array>();
@@ -711,6 +715,7 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
 
       std::string methodNameStr = tns::ToString(isolate, methodName);
       SEL selector = sel_registerName(methodNameStr.c_str());
+      nativeCalled.push_back(methodNameStr);
 
       // TODO: Investigate and maybe find a way to free this
       // Currently this is added to the meta cache by the Interop::CreateMethod
@@ -755,6 +760,7 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
 
   const Meta* m = ArgConverter::FindMeta(extendedClass);
   if (m == nullptr) {
+    MetadataBuilder::GuardNativeCalledMethods(context, implementationObject, nativeCalled, false);
     return;
   }
 
@@ -828,19 +834,24 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
                   .ToLocal(&setter);
     tns::Assert(success, isolate);
 
+    Local<Value> method;
     if ((!getter.IsEmpty() || !setter.IsEmpty()) &&
         (getter->IsFunction() || setter->IsFunction())) {
-      std::vector<const PropertyMeta*> propertyMetas;
-      VisitProperties(methodName, extendedClassMeta, propertyMetas, protocols);
-      ExposeProperties(isolate, extendedClass, propertyMetas, getter, setter);
-      continue;
+      // A method an earlier pass over this prototype turned into an accessor
+      // pair: +initialize also runs for a subclass that does not implement it.
+      method = MetadataBuilder::GuardedNativeCalledMethod(context, getter);
+      if (method.IsEmpty()) {
+        std::vector<const PropertyMeta*> propertyMetas;
+        VisitProperties(methodName, extendedClassMeta, propertyMetas, protocols);
+        ExposeProperties(isolate, extendedClass, propertyMetas, getter, setter);
+        continue;
+      }
+    } else {
+      success = propertyDescriptor.As<Object>()
+                    ->Get(context, tns::ToV8String(isolate, "value"))
+                    .ToLocal(&method);
+      tns::Assert(success, isolate);
     }
-
-    Local<Value> method;
-    success = propertyDescriptor.As<Object>()
-                  ->Get(context, tns::ToV8String(isolate, "value"))
-                  .ToLocal(&method);
-    tns::Assert(success, isolate);
 
     if (method.IsEmpty() || !method->IsFunction()) {
       continue;
@@ -848,6 +859,9 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
 
     std::vector<const MethodMeta*> methodMetas;
     VisitMethods(extendedClass, methodName, extendedClassMeta, methodMetas, protocols);
+    if (!methodMetas.empty()) {
+      nativeCalled.push_back(methodName);
+    }
 
     for (int j = 0; j < methodMetas.size(); j++) {
       const MethodMeta* methodMeta = methodMetas[j];
@@ -868,6 +882,10 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
                           typeInfo.c_str());
     }
   }
+
+  MetadataBuilder::GuardNativeCalledMethods(
+      context, implementationObject, nativeCalled,
+      ownsIterator && !symbolIterator.IsEmpty() && symbolIterator->IsFunction());
 }
 
 void ClassBuilder::VisitProperties(std::string propertyName, const BaseClassMeta* meta,
