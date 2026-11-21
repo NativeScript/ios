@@ -85,9 +85,10 @@ declare module "ns:runtime" {
      *
      * In debug builds under the `"rooted"` and `"canary"` modes, assigning a
      * native instance method's name (or `toString`, or an NSArray's
-     * `Symbol.iterator`) on a native object throws a `TypeError`, since native
-     * code never calls a JS own property of a native object; `true` turns that
-     * off. Those members are then accessor pairs on their class's prototype.
+     * `Symbol.iterator`, or a JS-extended class's method that native code
+     * calls: an exposed method, a native override, a protocol implementation)
+     * on a native object throws a `TypeError`, since native code never calls
+     * a JS own property of a native object; `true` turns that off. Those members are then accessor pairs on their class's prototype.
      * Release builds and the `"resurrecting"` mode never throw.
      */
     wrapperLifetimeAllowShadowingNativeMembers: boolean;

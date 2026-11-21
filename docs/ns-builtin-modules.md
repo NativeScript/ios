@@ -236,15 +236,27 @@ protocols the metadata does not list for a class):
 - `toString`;
 - `NSArray`'s `Symbol.iterator`.
 
+Guarded too, on the prototype level of a JS-extended class (an `extend()`
+implementation object, or an `__extends` or `@NativeClass` class's prototype)
+that defines them: the methods native code calls through the function the
+class captured when it was built. Those are exposed methods (`exposedMethods`
+in an `extend()` signature, `ObjCExposedMethods`), methods overriding a native
+method or implementing a protocol's, and a `Symbol.iterator` the class
+enumerates natively with. Native code calls the class's implementation, so an
+instance's own property of that name is never seen by it. The accessor pair
+is installed when the level is built: when `extend()` returns, and at the
+class's first use (its `+initialize`) for `__extends` and `@NativeClass`.
+
 Not guarded: `constructor`, static methods (they live on the constructor),
 native properties (already accessor pairs whose setter calls native code), and
-methods JS defines on an `extend()`, `@NativeClass` or `__extends` class's
-prototype.
+the other methods a JS-extended class defines (JS-only methods stay writable
+data properties).
 
 A guarded member is an accessor pair on its class's prototype instead of a data
 property: `Object.getOwnPropertyDescriptor(UIView.prototype, "setNeedsLayout")`
 has `get` and `set` (enumerable and configurable, as the data property was)
-and no `value` or `writable`. The getter returns the same function every time,
+and no `value` or `writable`, and so does a JS-extended class's prototype for
+the names above, e.g. `layoutSubviews` on a `UIView` subclass's prototype. The getter returns the same function every time,
 so `obj.m === obj.m`, `typeof`, `in`, `.call`, `.bind` and `super.m` read as
 before. The setter throws when the receiver is a native object, a released
 one or a Proxy around one, and otherwise creates the own data property an
@@ -252,7 +264,9 @@ assignment would. So these still work:
 
 - assigning on the class's prototype, `Klass.prototype.m = fn`, which replaces
   the native implementation as before; the name is a plain data property from
-  then on and no longer guarded;
+  then on and no longer guarded. On a JS-extended class's prototype this
+  changes what JS callers get only: native code keeps calling the function the
+  class captured;
 - overriding on a subclass prototype (`__extends`, `extend()`,
   `@NativeClass`), and `_super.prototype.m.call(this)`;
 - assigning on an object that merely inherits from a native one

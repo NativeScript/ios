@@ -223,7 +223,27 @@ struct NativeMemberGuardState {
   // (function (f) { return function () { return f; }; }): the getter is a JS
   // closure, since an API getter sends `super.m` loads to the slow path.
   Global<v8::Function> getterFactory;
+  // Marks the getters MetadataBuilder::GuardNativeCalledMethods installs.
+  Global<Private> nativeCalledGetter;
 };
+
+NativeMemberGuardState* GuardState(Isolate* isolate, Local<Context> context) {
+  NativeMemberGuardState* state = Caches::StateFor<NativeMemberGuardState>(isolate);
+  if (state == nullptr || !state->getterFactory.IsEmpty()) {
+    return state;
+  }
+  Local<Script> script;
+  Local<Value> factory;
+  if (!Script::Compile(context, tns::ToV8String(isolate, "(function (f) { return function () { "
+                                                         "return f; }; })"))
+           .ToLocal(&script) ||
+      !script->Run(context).ToLocal(&factory) || !factory->IsFunction()) {
+    return nullptr;
+  }
+  state->getterFactory.Reset(isolate, factory.As<v8::Function>());
+  state->nativeCalledGetter.Reset(isolate, Private::New(isolate));
+  return state;
+}
 
 std::string DescribeMemberName(Isolate* isolate, Local<v8::Name> name) {
   if (name->IsSymbol()) {
@@ -231,6 +251,34 @@ std::string DescribeMemberName(Isolate* isolate, Local<v8::Name> name) {
     return "[" + (description->IsString() ? tns::ToString(isolate, description) : "") + "]";
   }
   return tns::ToString(isolate, name);
+}
+
+// A wrapper of a native object, a released one included, or a Proxy or
+// `this.super` alias of one.
+bool IsNativeObject(Isolate* isolate, Local<Object> receiver) {
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, receiver);
+  return wrapper != nullptr ? wrapper->Type() == WrapperType::ObjCObject ||
+                                  wrapper->Type() == WrapperType::ObjCAllocObject
+                            : tns::GetReleasedReason(receiver) != ReleasedReason::kNone;
+}
+
+// `reason` says why native code never sees the assignment.
+void ThrowShadowing(Isolate* isolate, Local<Object> receiver, Local<v8::Name> name,
+                    const char* reason) {
+  // The JS class name: the native one can be a private class cluster member.
+  std::string className;
+  Local<Value> target = tns::UnwrapProxy(receiver);
+  if (!target.IsEmpty() && target->IsObject()) {
+    className = tns::ToString(isolate, target.As<Object>()->GetConstructorName());
+  }
+  std::string message =
+      "Cannot assign '" + DescribeMemberName(isolate, name) + "' on an instance of " + className +
+      ": " + reason + " (wrapperLifetime mode \"" +
+      WrapperLifetimeModeName(GetWrapperLifetimeMode()) +
+      "\", debug builds). Override the method on a class instead (extend() or a subclass), "
+      "define a JS-only property with Object.defineProperty, or set \"wrapperLifetime\": { "
+      "\"allowShadowingNativeMembers\": true } in the app config.";
+  isolate->ThrowException(Exception::TypeError(tns::ToV8String(isolate, message)));
 }
 
 // The guard's setter: `info.Data()` is the member's name. An own property on a
@@ -241,87 +289,88 @@ std::string DescribeMemberName(Isolate* isolate, Local<v8::Name> name) {
 // ordinary assignment would create.
 void NativeMemberGuardSetter(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
-  Local<Context> context = isolate->GetCurrentContext();
   Local<v8::Name> name = info.Data().As<v8::Name>();
   Local<Object> receiver = info.This();
-  Local<Value> value = info.Length() > 0 ? info[0] : v8::Undefined(isolate).As<Value>();
-
-  BaseDataWrapper* wrapper = tns::GetValue(isolate, receiver);
-  bool nativeObject = wrapper != nullptr
-                          ? wrapper->Type() == WrapperType::ObjCObject ||
-                                wrapper->Type() == WrapperType::ObjCAllocObject
-                          : tns::GetReleasedReason(receiver) != ReleasedReason::kNone;
-  if (!nativeObject) {
-    DefiningGuardedMember defining;
-    (void)receiver->CreateDataProperty(context, name, value);
+  if (IsNativeObject(isolate, receiver)) {
+    ThrowShadowing(isolate, receiver, name,
+                   "it would shadow the native method for JS callers only, since native code "
+                   "never calls JS own properties of a native object");
     return;
   }
+  DefiningGuardedMember defining;
+  (void)receiver->CreateDataProperty(isolate->GetCurrentContext(), name,
+                                     info.Length() > 0 ? info[0] : v8::Undefined(isolate));
+}
 
-  // The JS class name: the native one can be a private class cluster member.
-  std::string className;
-  Local<Value> target = tns::UnwrapProxy(receiver);
-  if (!target.IsEmpty() && target->IsObject()) {
-    className = tns::ToString(isolate, target.As<Object>()->GetConstructorName());
+// The setter of a JS-extended class's method native code calls
+// (GuardNativeCalledMethods): `info.Data()` is the method's name. Native code
+// calls the function the class captured when it was built, never an
+// instance's own property, so assigning the name on a native object throws.
+// Any other receiver, such as a subclass's prototype or an object inheriting
+// from an instance, gets the own data property an ordinary assignment would
+// create.
+void NativeCalledMethodSetter(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<v8::Name> name = info.Data().As<v8::Name>();
+  Local<Object> receiver = info.This();
+  if (IsNativeObject(isolate, receiver)) {
+    ThrowShadowing(isolate, receiver, name,
+                   "native code calls the class's implementation of this method, so it would "
+                   "never see the instance's own property, which would change the method for JS "
+                   "callers only");
+    return;
   }
-  std::string member = DescribeMemberName(isolate, name);
-  std::string message =
-      "Cannot assign '" + member + "' on an instance of " + className +
-      ": it would shadow the native method for JS callers only, since native code never calls "
-      "JS own properties of a native object (wrapperLifetime mode \"" +
-      WrapperLifetimeModeName(GetWrapperLifetimeMode()) +
-      "\", debug builds). Override the method on a class instead (extend() or a subclass), "
-      "define a JS-only property with Object.defineProperty, or set \"wrapperLifetime\": { "
-      "\"allowShadowingNativeMembers\": true } in the app config.";
-  isolate->ThrowException(Exception::TypeError(tns::ToV8String(isolate, message)));
+  DefiningGuardedMember defining;
+  (void)receiver->CreateDataProperty(isolate->GetCurrentContext(), name,
+                                     info.Length() > 0 ? info[0] : v8::Undefined(isolate));
+}
+
+// Turns `prototype`'s own writable, configurable, function-valued data
+// property `name` into an accessor pair whose getter returns that same
+// function and whose setter is `setter`, with `name` as its data. Keeps the
+// property's enumerability; configurable, so an assignment the setter allows
+// can replace it. The getter, or empty when `name` is no such property.
+Local<v8::Function> GuardMethod(Isolate* isolate, Local<Context> context,
+                                NativeMemberGuardState* state, Local<Object> prototype,
+                                Local<v8::Name> name, FunctionCallback setter) {
+  PropertyAttribute attributes = PropertyAttribute::None;
+  Local<Value> method;
+  if (!prototype->HasRealNamedProperty(context, name).FromMaybe(false) ||
+      prototype->HasRealNamedCallbackProperty(context, name).FromMaybe(true) ||
+      !prototype->GetRealNamedPropertyAttributes(context, name).To(&attributes) ||
+      (attributes & (ReadOnly | DontDelete)) != 0 ||
+      !prototype->GetRealNamedProperty(context, name).ToLocal(&method) || !method->IsFunction()) {
+    return Local<v8::Function>();
+  }
+  Local<Value> getter;
+  Local<v8::Function> setterFunction;
+  if (!state->getterFactory.Get(isolate)
+           ->Call(context, v8::Undefined(isolate), 1, &method)
+           .ToLocal(&getter) ||
+      !v8::Function::New(context, setter, name, 1, ConstructorBehavior::kThrow)
+           .ToLocal(&setterFunction)) {
+    return Local<v8::Function>();
+  }
+  DefiningGuardedMember defining;
+  prototype->SetAccessorProperty(name, getter.As<v8::Function>(), setterFunction,
+                                 static_cast<PropertyAttribute>(attributes & DontEnum));
+  return getter.As<v8::Function>();
 }
 
 // Turns each named own method of a native class prototype, and the symbol
-// `iterator` when given, into an accessor pair whose getter returns that same
-// function. Configurable, so an assignment the setter allows can replace it.
+// `iterator` when given, into a guarded accessor pair (GuardMethod).
 void GuardNativeMembers(Isolate* isolate, Local<Context> context, Local<Object> prototype,
                         const std::vector<std::string>& names, Local<v8::Name> iterator) {
-  NativeMemberGuardState* state = Caches::StateFor<NativeMemberGuardState>(isolate);
+  NativeMemberGuardState* state = GuardState(isolate, context);
   if (state == nullptr) {
     return;
   }
-  if (state->getterFactory.IsEmpty()) {
-    Local<Script> script;
-    Local<Value> factory;
-    if (!Script::Compile(context, tns::ToV8String(isolate, "(function (f) { return function () { "
-                                                           "return f; }; })"))
-             .ToLocal(&script) ||
-        !script->Run(context).ToLocal(&factory) || !factory->IsFunction()) {
-      return;
-    }
-    state->getterFactory.Reset(isolate, factory.As<v8::Function>());
-  }
-  Local<v8::Function> factory = state->getterFactory.Get(isolate);
-
-  DefiningGuardedMember defining;
-  auto guard = [&](Local<v8::Name> name) {
-    PropertyAttribute attributes = PropertyAttribute::None;
-    Local<Value> method;
-    if (!prototype->HasRealNamedProperty(context, name).FromMaybe(false) ||
-        prototype->HasRealNamedCallbackProperty(context, name).FromMaybe(true) ||
-        !prototype->GetRealNamedPropertyAttributes(context, name).To(&attributes) ||
-        !prototype->GetRealNamedProperty(context, name).ToLocal(&method) || !method->IsFunction()) {
-      return;
-    }
-    Local<Value> getter;
-    Local<v8::Function> setter;
-    if (!factory->Call(context, v8::Undefined(isolate), 1, &method).ToLocal(&getter) ||
-        !v8::Function::New(context, NativeMemberGuardSetter, name, 1, ConstructorBehavior::kThrow)
-             .ToLocal(&setter)) {
-      return;
-    }
-    prototype->SetAccessorProperty(name, getter.As<v8::Function>(), setter,
-                                   static_cast<PropertyAttribute>(attributes & DontEnum));
-  };
   for (const std::string& name : names) {
-    guard(tns::ToV8String(isolate, name));
+    GuardMethod(isolate, context, state, prototype, tns::ToV8String(isolate, name),
+                NativeMemberGuardSetter);
   }
   if (!iterator.IsEmpty()) {
-    guard(iterator);
+    GuardMethod(isolate, context, state, prototype, iterator, NativeMemberGuardSetter);
   }
 }
 
@@ -1483,6 +1532,53 @@ void MetadataBuilder::SetNativeProperty(Isolate* isolate, CacheItem<PropertyMeta
   Local<Context> context = isolate->GetCurrentContext();
   MetadataBuilder::InvokeMethod(context, item->meta_->setter(), receiver, args,
                                 item->ResolveClass(), true);
+}
+
+void MetadataBuilder::GuardNativeCalledMethods(Local<Context> context, Local<Object> prototype,
+                                               const std::vector<std::string>& names,
+                                               bool iterator) {
+  if (!GuardsNativeMembers()) {
+    return;
+  }
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  NativeMemberGuardState* state = GuardState(isolate, context);
+  if (state == nullptr) {
+    return;
+  }
+  Local<Private> marker = state->nativeCalledGetter.Get(isolate);
+  auto guard = [&](Local<v8::Name> name) {
+    Local<v8::Function> getter =
+        GuardMethod(isolate, context, state, prototype, name, NativeCalledMethodSetter);
+    if (!getter.IsEmpty()) {
+      (void)getter->SetPrivate(context, marker, v8::True(isolate));
+    }
+  };
+  for (const std::string& name : names) {
+    guard(tns::ToV8String(isolate, name));
+  }
+  if (iterator) {
+    guard(Symbol::GetIterator(isolate));
+  }
+}
+
+Local<Value> MetadataBuilder::GuardedNativeCalledMethod(Local<Context> context,
+                                                        Local<Value> getter) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  NativeMemberGuardState* state = Caches::ExistingStateFor<NativeMemberGuardState>(isolate);
+  Local<Value> marked;
+  Local<Value> method;
+  if (state == nullptr || state->nativeCalledGetter.IsEmpty() || !getter->IsFunction() ||
+      !getter.As<Object>()
+           ->GetPrivate(context, state->nativeCalledGetter.Get(isolate))
+           .ToLocal(&marked) ||
+      !marked->IsTrue() ||
+      !getter.As<v8::Function>()
+           ->Call(context, v8::Undefined(isolate), 0, nullptr)
+           .ToLocal(&method)) {
+    return Local<Value>();
+  }
+  return method;
 }
 
 bool MetadataBuilder::TrySetNativeProperty(Isolate* isolate, Local<Context> context,
