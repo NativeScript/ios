@@ -199,20 +199,25 @@ it in other builds, add `NativeScriptLeakProbe.framework` to
 `wrappers`, the rooted-`strong` ones and the canary `states`. It is cheap;
 compare it before and after repeating a journey to find classes that grow.
 
-`findLeakCycles(options)` takes a heap snapshot and reports the cycles. The
-snapshot carries the native objects the runtime wraps or keeps state for, the
-native objects they own (strong ivars, collection and block storage), and the
-runtime's cross-heap edges: `ns:retain` (wrapper → object), `ns:owned`
-(object → wrapper, for a wrapper kept strong because native code owns its
-object: rooted-strong, or a wrapper no lifetime mode adopted whose handle the
-runtime keeps strong), `ns:state` (canary object → state),
-`ns:block-callback` (JS block → function) and `ns:adapter` (collection adapter
-→ JS object). A native object counts as owned from outside when its retain
-count exceeds the retains found in that graph; everything else is marked from
-the V8 roots, and cycles among what stays unmarked are reported. A `WeakMap`
-value is marked only once both its key and its map are. Every heap snapshot,
-DevTools' included, carries the runtime's edges while the framework is
-embedded, except `ns:block-callback`: only `findLeakCycles` walks native
+`findLeakCycles(options)` takes a heap snapshot and reports the cycles. It
+first runs three full collections, each followed by the releases the wrapper
+lifetime modes queue for dead wrappers and by letting go of the state of
+deallocated canary objects, so that neither reads as an owner; those releases
+can run JS-implemented `-dealloc` methods. The snapshot carries the native
+objects the runtime wraps or keeps state for, the native objects they own
+(strong ivars, collection and block storage), and the runtime's cross-heap
+edges: `ns:retain` (wrapper → object), `ns:owned` (object → wrapper, for a
+wrapper kept strong because native code owns its object: rooted-strong, or a
+wrapper no lifetime mode adopted whose handle the runtime keeps strong),
+`ns:kept` (object → wrapper, for a `"resurrecting"` wrapper whose collection
+is refused while native code retains its object), `ns:state` (canary object →
+state), `ns:block-callback` (JS block → function) and `ns:adapter` (collection
+adapter → JS object). A native object counts as owned from outside when its
+retain count exceeds the retains found in that graph; everything else is
+marked from the V8 roots, and cycles among what stays unmarked are reported. A
+`WeakMap` value is marked only once both its key and its map are. Every heap
+snapshot, DevTools' included, carries the runtime's edges while the framework
+is embedded, except `ns:block-callback`: only `findLeakCycles` walks native
 memory, which is where it finds JS blocks.
 
 | option | effect |
@@ -261,7 +266,9 @@ missed rather than misreported:
   count is read from its ivars): another thread could free them while the
   probe calls it;
 - the contents of `NSHashTable`, `NSMapTable` and `NSPointerArray`, whose
-  storage may be weak: what they retain counts as owned from outside.
+  storage may be weak: what they retain counts as owned from outside;
+- a JS block whose last release started on another thread while the probe
+  ran: until its disposal finishes, its function counts as a root.
 
 Some leaks are held from a root rather than by a cycle alone, and are not
 reported even when strict. Before iOS 26, UIKit's gesture environment retains
@@ -281,9 +288,9 @@ also:
   path: `org.nativescript.wrapperLifetime.counts` (class counts after full
   collections), `org.nativescript.wrapperLifetime.findLeakCycles`,
   `org.nativescript.wrapperLifetime.findLeakCycles.strict` and
-  `org.nativescript.wrapperLifetime.findLeakCycles.inspect` (after full
-  collections, inspecting the class-name prefixes listed one per line in
-  `ns-wrapper-lifetime-inspect.txt` in the temporary directory).
+  `org.nativescript.wrapperLifetime.findLeakCycles.inspect` (inspecting the
+  class-name prefixes listed one per line in `ns-wrapper-lifetime-inspect.txt`
+  in the temporary directory).
 
 Remote-module security (`security.allowRemoteModules`,
 `security.remoteModuleAllowlist`) is **not** part of this surface. Those

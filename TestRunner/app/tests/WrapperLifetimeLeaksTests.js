@@ -27,6 +27,23 @@ describe("Wrapper lifetime leak cycles", function () {
     var Unexplained = shape("TNSLeakUnexplained");
     var Counted = shape("TNSLeakCounted");
     var InFlight = shape("TNSLeakInFlight");
+    var QueuedOwned = shape("TNSLeakQueuedOwned");
+    var SharedChild = shape("TNSLeakSharedChild");
+    var ReleasedOwner = shape("TNSLeakReleasedOwner");
+    // Its operation's block names the object through `this`. Extended the
+    // way TypeScript does: only such classes track native retains, which is
+    // what makes "resurrecting" keep a natively owned instance's wrapper.
+    var Kept = (function (_super) {
+        __extends(TNSLeakKept, _super);
+        function TNSLeakKept() {
+            return (_super !== null && _super.apply(this, arguments)) || this;
+        }
+        TNSLeakKept.prototype.arm = function () {
+            this.x = 1;
+            this.op = NSBlockOperation.blockOperationWithBlock(() => this.x);
+        };
+        return TNSLeakKept;
+    })(NSObject);
     // The operation retains its execution blocks.
     var SelfHandler = NSBlockOperation.extend({}, { name: "TNSLeakSelfHandler" });
     var WeakHandler = NSBlockOperation.extend({}, { name: "TNSLeakWeakHandler" });
@@ -64,6 +81,7 @@ describe("Wrapper lifetime leak cycles", function () {
         TNSLeakWeakMapValue: true,
         TNSLeakWeakMapTable: true,
         TNSLeakInitOwned: true,
+        TNSLeakKept: false,
     };
 
     function scrub(n) {
@@ -188,6 +206,7 @@ describe("Wrapper lifetime leak cycles", function () {
         // Holds its element strongly, but the probe treats it as a weak
         // container: an owner it cannot see.
         var hiddenOwner = NSHashTable.hashTableWithOptions(0 /* NSPointerFunctionsStrongMemory */);
+        var keptOwner = NSHashTable.hashTableWithOptions(0 /* NSPointerFunctionsStrongMemory */);
         // Weak watchers, to reach the leaked objects again and break their cycles.
         var watched = NSHashTable.weakObjectsHashTable();
         // Reachable from the roots for the whole describe, like a module-level map.
@@ -298,6 +317,17 @@ describe("Wrapper lifetime leak cycles", function () {
                 watched.addObject(selfList);
             })();
             (function () {
+                // Owned from outside, so whatever keeps its wrapper alive
+                // (resurrection, a rooted or state handle) is not a leak. The
+                // probe does not see a list only the hash table holds.
+                var kept = Kept.alloc().init();
+                var list = NSMutableArray.new();
+                list.addObject(kept);
+                keptOwner.addObject(list);
+                kept.arm();
+                watched.addObject(kept);
+            })();
+            (function () {
                 // Its wrapper's handle is strong while the list retains it.
                 var initOwned = InitOwned.new();
                 var list = NSMutableArray.new();
@@ -334,6 +364,7 @@ describe("Wrapper lifetime leak cycles", function () {
             rootedKey = {};
             owner.removeAllObjects();
             hiddenOwner.removeAllObjects();
+            keptOwner.removeAllObjects();
         });
 
         it("describe the run", function () {
@@ -441,6 +472,11 @@ describe("Wrapper lifetime leak cycles", function () {
             });
         });
 
+        it("does not report, even when strict, a cycle through an object owned from outside", function () {
+            expect(cyclesNaming(reports.strict, "TNSLeakKept").length).toBe(0);
+            expect(aliveNamed(watched, "TNSLeakKept")).toBe(1);
+        });
+
         it("collects a handler that reaches its owner through a WeakRef", function () {
             expect(aliveNamed(watched, "TNSLeakWeakHandler")).toBe(0);
             expect(aliveNamed(watched, "TNSLeakSelfHandler")).toBe(1);
@@ -449,7 +485,77 @@ describe("Wrapper lifetime leak cycles", function () {
         it("keeps the controls alive", function () {
             expect(owner.count).toBe(1);
             expect(hiddenOwner.count).toBe(1);
+            expect(keptOwner.count).toBe(1);
         });
+    });
+
+    // A probe that follows a collection or a native release in the same turn,
+    // before the runtime's posted releases and state drains have run.
+    describe("in the turn of a collection or a release", function () {
+        var hidden = NSHashTable.hashTableWithOptions(0 /* NSPointerFunctionsStrongMemory */);
+        var holder = NSMutableArray.new();
+        var watched = NSHashTable.weakObjectsHashTable();
+
+        afterAll(function () {
+            watched.allObjects.enumerateObjectsUsingBlock(function (o) {
+                delete o.me;
+                if (o.list) {
+                    o.list.removeAllObjects();
+                    delete o.list;
+                }
+            });
+            hidden.removeAllObjects();
+            holder.removeAllObjects();
+        });
+
+        it("treats an object whose canary just died as the object it was", function () {
+            if (!canary) {
+                return;
+            }
+            (function () {
+                var queued = QueuedOwned.new();
+                hidden.addObject(queued);
+                var list = NSMutableArray.new();
+                list.addObject(queued);
+                queued.list = list;
+                watched.addObject(queued);
+            })();
+            scrub(300);
+            __collect();
+            var report = runtime.findLeakCycles();
+            var changed = report.changed.filter(function (entry) {
+                return entry.className.indexOf("TNSLeakQueuedOwned") !== -1;
+            });
+            expect(changed.length).toBe(0);
+            expect(cyclesNaming(report, "TNSLeakQueuedOwned").length).toBe(0);
+            expect(aliveNamed(watched, "TNSLeakQueuedOwned")).toBe(1);
+        });
+
+        it("finds a cycle that an object released in the same turn shared", function (done) {
+            if (!canary) {
+                done();
+                return;
+            }
+            (function () {
+                var child = SharedChild.new();
+                child.me = child;
+                var owner = ReleasedOwner.new();
+                owner.child = child;
+                holder.addObject(owner);
+                watched.addObject(child);
+                watched.addObject(owner);
+            })();
+            settle(3, function () {
+                // Wrapping the owner before the release would keep it alive.
+                expect(holder.count).toBe(1);
+                holder.removeAllObjects();
+                var report = runtime.findLeakCycles();
+                expect(cyclesNaming(report, "TNSLeakSharedChild").length).toBe(1);
+                expect(aliveNamed(watched, "TNSLeakReleasedOwner")).toBe(0);
+                expect(aliveNamed(watched, "TNSLeakSharedChild")).toBe(1);
+                done();
+            });
+        }, 30000);
     });
 
     // The session owns the task, the task its completion block, and the block

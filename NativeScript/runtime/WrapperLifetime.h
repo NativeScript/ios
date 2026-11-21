@@ -2,6 +2,7 @@
 #define WrapperLifetime_h
 
 #include <atomic>
+#include <functional>
 
 #include "Common.h"
 #include "DataWrapper.h"
@@ -93,6 +94,11 @@ class WrapperLifetime {
   // Releases the native objects of wrappers that died. Runs only where JS may
   // run: release can reach a JS-implemented -dealloc.
   static void DrainReleases(v8::Isolate* isolate);
+
+  // Calls `visit` with the object of each dead wrapper whose release
+  // DrainReleases has yet to make, once per queued retain.
+  static void ForEachQueuedRelease(v8::Isolate* isolate,
+                                   const std::function<void(id object)>& visit);
 
   // JS->native call entry: a long synchronous stretch of JS must not hold dead
   // objects until it yields. The gate is process-wide; while another isolate
