@@ -53,7 +53,8 @@ declare module "ns:runtime" {
      *   the runtime's thread.
      * - `"canary"`: no resurrection. A wrapper in scope dies with its JS
      *   references; JS properties set on it, including ones that shadow a
-     *   prototype member (a rebound class method, a field called `copy`), are
+     *   prototype member (a rebound JS method, or a native method where
+     *   `wrapperLifetimeAllowShadowingNativeMembers` lets one be assigned), are
      *   also copied to a state object kept until the native object is
      *   deallocated, and a wrapper built for the object later gets them back
      *   with their attributes while that state object lives. An object that
@@ -78,6 +79,18 @@ declare module "ns:runtime" {
      * - `"all"`: every ObjC object wrapper except blocks and tagged pointers.
      */
     wrapperLifetimeScope: "extended" | "all";
+    /**
+     * From the app config `"wrapperLifetime": { "allowShadowingNativeMembers": ... }`,
+     * `false` by default. Read-only: `setConfig` throws.
+     *
+     * In debug builds under the `"rooted"` and `"canary"` modes, assigning a
+     * native instance method's name (or `toString`, or an NSArray's
+     * `Symbol.iterator`) on a native object throws a `TypeError`, since native
+     * code never calls a JS own property of a native object; `true` turns that
+     * off. Those members are then accessor pairs on their class's prototype.
+     * Release builds and the `"resurrecting"` mode never throw.
+     */
+    wrapperLifetimeAllowShadowingNativeMembers: boolean;
   }
 
   /**

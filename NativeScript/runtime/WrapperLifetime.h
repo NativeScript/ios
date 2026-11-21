@@ -44,6 +44,8 @@ inline WrapperLifetimeMode wrapperLifetimeMode =
     WrapperLifetimeMode::kResurrecting;
 inline WrapperLifetimeScope wrapperLifetimeScope =
     WrapperLifetimeScope::kExtended;
+inline bool allowShadowingNativeMembers = false;
+inline bool guardsNativeMembers = false;
 }  // namespace detail
 
 inline WrapperLifetimeMode GetWrapperLifetimeMode() {
@@ -52,6 +54,15 @@ inline WrapperLifetimeMode GetWrapperLifetimeMode() {
 inline WrapperLifetimeScope GetWrapperLifetimeScope() {
   return detail::wrapperLifetimeScope;
 }
+// "wrapperLifetime": { "allowShadowingNativeMembers": true } in the app config.
+inline bool GetAllowShadowingNativeMembers() {
+  return detail::allowShadowingNativeMembers;
+}
+// Debug builds in the "rooted" and "canary" modes, unless shadowing is
+// allowed: assigning a native instance method's name on a native object
+// throws instead of creating an own property native code never calls
+// (MetadataBuilder's native member guard).
+inline bool GuardsNativeMembers() { return detail::guardsNativeMembers; }
 const char* WrapperLifetimeModeName(WrapperLifetimeMode mode);
 const char* WrapperLifetimeScopeName(WrapperLifetimeScope scope);
 

@@ -111,11 +111,13 @@ class MetadataBuilder {
   static void RegisterAllocMethod(
       v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> ctorFuncTemplate,
       const InterfaceMeta* interfaceMeta);
+  // `guarded`, when given, records the JS name of each method installed.
   static void RegisterInstanceMethods(
       v8::Local<v8::Context> context,
       v8::Local<v8::FunctionTemplate> ctorFuncTemplate,
       const BaseClassMeta* meta, KnownUnknownClassPair pair,
-      robin_hood::unordered_map<std::string, uint8_t>& names);
+      robin_hood::unordered_map<std::string, uint8_t>& names,
+      std::vector<std::string>* guarded = nullptr);
   // `setters`, when given, records each accessor pair installed.
   static void RegisterInstanceProperties(
       v8::Local<v8::Context> context,
@@ -130,13 +132,15 @@ class MetadataBuilder {
       const BaseClassMeta* meta, std::string className,
       KnownUnknownClassPair pair,
       robin_hood::unordered_map<std::string, uint8_t>& names,
-      NativeSetters* setters = nullptr);
+      NativeSetters* setters = nullptr,
+      std::vector<std::string>* guarded = nullptr);
   static void RegisterAdditionalProtocols(
       v8::Local<v8::Context> context,
       v8::Local<v8::FunctionTemplate> ctorFuncTemplate,
       KnownUnknownClassPair pair,
       const std::vector<std::string>& additionalProtocols,
-      robin_hood::unordered_map<std::string, uint8_t>& names);
+      robin_hood::unordered_map<std::string, uint8_t>& names,
+      std::vector<std::string>* guarded = nullptr);
   static void RegisterStaticMethods(
       v8::Local<v8::Context> context, v8::Local<v8::Function> ctorFunc,
       const BaseClassMeta* meta, KnownUnknownClassPair pair,

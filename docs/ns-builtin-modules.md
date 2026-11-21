@@ -120,6 +120,7 @@ Config keys:
 | `wrapperLifetimeWarnings` | `true` \| `false` | process-wide (main-isolate writes only; read live by every isolate); no effect in the `"rooted"` and `"canary"` modes | the app config `"wrapperLifetime": { "warnings": … }`, or on in debug builds |
 | `wrapperLifetimeMode` | `"resurrecting"` \| `"rooted"` \| `"canary"` | process-wide, read-only | the app config `"wrapperLifetime": { "mode": … }`, or `"resurrecting"` |
 | `wrapperLifetimeScope` | `"extended"` \| `"all"` | process-wide, read-only | the app config `"wrapperLifetime": { "scope": … }`, or `"extended"` |
+| `wrapperLifetimeAllowShadowingNativeMembers` | `true` \| `false` | process-wide, read-only | the app config `"wrapperLifetime": { "allowShadowingNativeMembers": … }`, or `false` (see [Native member guard](#native-member-guard)) |
 
 ```js
 const { setConfig, getConfig } = require("ns:runtime");
@@ -148,7 +149,7 @@ The `TypeError` messages are part of the contract:
 | invalid `releasedObjectPolicy` value | `'releasedObjectPolicy' must be 'report' or 'throw'` |
 | non-string `debug` value | `'debug' must be a comma-separated category string (<categories>), or '' to disable tracing` |
 | non-boolean `wrapperLifetimeWarnings` value | `'wrapperLifetimeWarnings' must be a boolean` |
-| `setConfig` of `wrapperLifetimeMode` or `wrapperLifetimeScope` | `'<key>' is read-only; set "wrapperLifetime" in the app config` |
+| `setConfig` of `wrapperLifetimeMode`, `wrapperLifetimeScope` or `wrapperLifetimeAllowShadowingNativeMembers` | `'<key>' is read-only; set "wrapperLifetime" in the app config` |
 
 ### Wrapper lifetime counters
 
@@ -218,6 +219,57 @@ in the standard collections. What follows from that:
   wrapper itself as a key does not count.
 - A prototype set later with `Object.setPrototypeOf` or `__proto__` is not
   state: a later wrapper has its class's prototype again.
+
+### Native member guard
+
+Native code never calls a JS own property of a native object: it sends the
+message, which runs the class's implementation. So `view.layoutSubviews = fn`
+on an instance changes what JS callers get and nothing else. In debug builds
+(`RuntimeConfig.IsDebug`) under the `"rooted"` and `"canary"` modes, either
+scope, such an assignment throws a `TypeError` that names the method, the
+object's class, the mode and the escape hatch.
+
+Guarded, on the prototype of every native class (and of the bindings for
+protocols the metadata does not list for a class):
+
+- native instance methods, including those of the class's protocols;
+- `toString`;
+- `NSArray`'s `Symbol.iterator`.
+
+Not guarded: `constructor`, static methods (they live on the constructor),
+native properties (already accessor pairs whose setter calls native code), and
+methods JS defines on an `extend()`, `@NativeClass` or `__extends` class's
+prototype.
+
+A guarded member is an accessor pair on its class's prototype instead of a data
+property: `Object.getOwnPropertyDescriptor(UIView.prototype, "setNeedsLayout")`
+has `get` and `set` (enumerable and configurable, as the data property was)
+and no `value` or `writable`. The getter returns the same function every time,
+so `obj.m === obj.m`, `typeof`, `in`, `.call`, `.bind` and `super.m` read as
+before. The setter throws when the receiver is a native object, a released
+one or a Proxy around one, and otherwise creates the own data property an
+assignment would. So these still work:
+
+- assigning on the class's prototype, `Klass.prototype.m = fn`, which replaces
+  the native implementation as before; the name is a plain data property from
+  then on and no longer guarded;
+- overriding on a subclass prototype (`__extends`, `extend()`,
+  `@NativeClass`), and `_super.prototype.m.call(this)`;
+- assigning on an object that merely inherits from a native one
+  (`Object.create(obj)`).
+
+`Object.defineProperty(obj, "m", …)` still defines an own property on a native
+object: use it for a JS-only member that native code is not meant to see.
+Class fields have define semantics and bypass the guard the same way.
+
+`"wrapperLifetime": { "allowShadowingNativeMembers": true }` in the app config
+turns the guard off, leaving data properties as in the `"resurrecting"` mode;
+`getConfig("wrapperLifetimeAllowShadowingNativeMembers")` reads it.
+
+Release builds never throw and keep data properties, since the accessor costs
+every native method load. An instance shadow there is silently ignored by
+native code, and it can be lost when the object's wrapper is collected and
+rebuilt.
 
 ### Leak diagnostics
 

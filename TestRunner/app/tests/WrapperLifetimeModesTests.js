@@ -9,6 +9,9 @@ describe("Wrapper lifetime modes", function () {
     var canary = mode === "canary";
     // JS state on a natively owned object survives its wrapper's death.
     var keepsState = rooted || canary;
+    // The suite is a debug build: assigning a native method's name on a native
+    // object throws in these modes (the native member guard).
+    var guardsNativeMembers = keepsState && !runtime.getConfig("wrapperLifetimeAllowShadowingNativeMembers");
 
     var Extended = (function (_super) {
         __extends(Extended, _super);
@@ -79,6 +82,14 @@ describe("Wrapper lifetime modes", function () {
 
     function hasOwn(obj, name) {
         return Object.prototype.hasOwnProperty.call(obj, name);
+    }
+
+    // Outside the specs' closures: a shadow kept in an object's JS state must
+    // not capture that object.
+    function assignIsEqualShadow(obj) {
+        obj.isEqual = function () {
+            return "shadow";
+        };
     }
 
     var WithMethod = (function (_super) {
@@ -524,9 +535,11 @@ describe("Wrapper lifetime modes", function () {
     it("hands back a JS property that shadows a prototype member on a new wrapper", function (done) {
         rewrap(function () {
             var obj = WithMethod.new();
-            obj.isEqual = function () {
-                return "shadow";
-            };
+            if (guardsNativeMembers) {
+                expect(assignIsEqualShadow.bind(null, obj)).toThrowError(TypeError);
+            } else {
+                assignIsEqualShadow(obj);
+            }
             // Bound to another object: one bound to `obj` would keep it alive.
             obj.greet = obj.greet.bind({ greeting: "bound" });
             obj.tag = "kept";
@@ -534,7 +547,7 @@ describe("Wrapper lifetime modes", function () {
         }, function (obj) {
             if (keepsState) {
                 expect(obj.tag).toBe("kept");
-                expect(obj.isEqual(obj)).toBe("shadow");
+                expect(obj.isEqual(obj)).toBe(guardsNativeMembers ? true : "shadow");
                 expect(obj.greet()).toBe("bound");
                 expect(hasOwn(obj, "greet")).toBe(true);
             }

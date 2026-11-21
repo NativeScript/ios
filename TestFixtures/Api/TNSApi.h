@@ -60,6 +60,16 @@ typedef NSError* _Nullable TNSNullableError;
 - (int)instanceMethod:(int)x;
 @end
 
+@interface TNSNativeMemberGuard : NSObject
+- (int)value:(int)x;
+- (int)other:(int)x;
++ (int)callValue:(TNSNativeMemberGuard*)object with:(int)x;
++ (int)callOther:(TNSNativeMemberGuard*)object with:(int)x;
+@end
+
+@interface TNSNativeMemberGuardChild : TNSNativeMemberGuard
+@end
+
 @protocol TNSPropertyMethodConflictProtocol
 - (BOOL)conflict;
 @end
