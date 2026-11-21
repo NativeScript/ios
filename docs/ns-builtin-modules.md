@@ -159,16 +159,16 @@ on every write to a canary:
 
 | counter | counts |
 |---|---|
-| `resurrections` | finalizers that kept a wrapper alive because native code still retained its object (JS-extended classes) |
+| `resurrections` | finalizers that kept an ObjC wrapper alive because native code still retained its object: a JS-extended class's instance, or a wrapper the runtime keeps strong while native code owns its object |
 | `collected` | finalizers that released their native object |
 | `releasedExplicitly` | native objects released through `__releaseNativeCounterpart` |
-| `releasedAccesses` | times JS passed a released wrapper to native code, used it as a method receiver, or touched a released pointer, reference or struct |
+| `releasedAccesses` | uses of a released wrapper: as a native argument, collection element or return value, as a method receiver or `toString()` receiver, and reads or writes through a released pointer, reference or struct |
 | `stateLostCandidates` | collected wrappers carrying JS properties whose object was still retained by something else (only while `wrapperLifetimeWarnings` is on) |
 | `stateLostConfirmed` | candidates whose object was still alive a runloop turn later, once releases queued for the runtime thread ran; each class is also reported once in the log |
 | `promotions` | `"rooted"` only: weak wrappers made strong because native code retained their object |
 | `demotions` | `"rooted"` only: strong wrappers made weak at a major collection because native code no longer retained their object |
 | `queuedReleases` | `"rooted"` and `"canary"`: collected wrappers whose native object was queued for release on the runtime's thread |
-| `canaryStates` | `"canary"` only: state objects created to hold native objects' JS properties |
+| `canaryStates` | `"canary"` only: state objects created to hold native objects' JS properties, or only to hold the key a weak collection made for the object (see [Weak collections in canary mode](#weak-collections-in-canary-mode)) |
 | `canaryNativeDeaths` | `"canary"` only: state objects let go of because their native object was deallocated or, with the default death signal, because `objc_removeAssociatedObjects` released its lifecycle token while the object was still alive |
 | `canaryInterceptedWrites` | `"canary"` only: writes to canaries the runtime's write handler saw. Other wrappers have no handler |
 
@@ -181,6 +181,38 @@ or return value becomes `nil` (`NSNull` inside a collection) and a
 `"throw"`. An `NSNull` element still breaks native code that expects a typed
 value there (an attributes dictionary holding a released `UIColor`, say); the
 event names the element so the cause can be found.
+
+### Weak collections in canary mode
+
+In the `"canary"` mode a wrapper dies with its JS references while its native
+object lives on, and the next wrapper for that object is a new JS object. So
+the runtime replaces `WeakMap`, `WeakSet`, `WeakRef` and
+`FinalizationRegistry` with subclasses that key a native object by a key that
+lives exactly as long as the object, rather than by its current wrapper.
+Entries and targets survive a wrapper change, and `WeakRef.prototype.deref`
+returns the live wrapper, a new one, or `undefined` once the object is gone.
+Every other value, a Proxy around a native object included, is its own key as
+in the standard collections. What follows from that:
+
+- They are subclasses, and it shows: `Object.getPrototypeOf(WeakMap.prototype)`
+  is the standard prototype, and `WeakMap.toString()` is not native code.
+- `deref` builds a wrapper when the old one died, and that wrapper holds the
+  native object strongly until it dies in turn. A `WeakRef` dereferenced on
+  every frame or event may keep its object from ever being released.
+- A key lives in the object's state, so the first `set`, `add`, `new WeakRef`
+  or `register` of an object without JS properties creates a state, counted in
+  `canaryStates` and `getWrapperClassCounts()`'s `states`. Lookups never do.
+- What was keyed on a native object follows the object, not a released
+  wrapper of it. After `__releaseNativeCounterpart(w)`, `w` still finds the
+  object's entries while JS holds it, and a wrapper native code hands back
+  later finds them too. `deref` returns `undefined` until native code hands
+  the object back, and a `FinalizationRegistry` callback runs only once the
+  object is gone and `w` is collected. If the release deallocated the object,
+  the callback runs once `w` is collected. A wrapper released before anything
+  keyed its object is a plain key from then on: entries made through it don't
+  reach the object, and `new WeakRef(w).deref()` returns `w`.
+- A prototype set later with `Object.setPrototypeOf` or `__proto__` is not
+  state: a later wrapper has its class's prototype again.
 
 ### Leak diagnostics
 

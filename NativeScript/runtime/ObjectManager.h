@@ -73,13 +73,16 @@ class ObjectManager {
   // getWrapperLifetimeStats().
   struct LifetimeStats {
     // An ObjC wrapper's finalizer refused disposal because native code still
-    // retains its object (IsGcProtected), keeping the wrapper alive.
+    // retains its object (IsGcProtected, or an OwnershipState wrapper whose
+    // object is natively owned), keeping the wrapper alive.
     uint64_t resurrections = 0;
     // An ObjC wrapper's finalizer released its native object.
     uint64_t collected = 0;
     // __releaseNativeCounterpart released a native object.
     uint64_t releasedExplicitly = 0;
-    // JS handed a released wrapper to native code or used it as a receiver.
+    // A released wrapper was used: as a native argument, collection element or
+    // return value, as a receiver (toString included), or through a released
+    // pointer, reference or struct.
     uint64_t releasedAccesses = 0;
     // A finalized ObjC wrapper carried JS properties while something other
     // than the wrapper still retained its object, and whether that object was
