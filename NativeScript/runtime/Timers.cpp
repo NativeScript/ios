@@ -55,11 +55,8 @@ inline static double ToMaybePositiveValue(const v8::Local<v8::Value>& v,
   return value;
 }
 
-static double now_ms() {
-  struct timespec res;
-  clock_gettime(CLOCK_MONOTONIC, &res);
-  return 1000.0 * res.tv_sec + (double)res.tv_nsec / 1e6;
-}
+// due times become ordered-token keys, so they share the EventLoop's clock
+static double now_ms() { return tns::EventLoop::NowMs(); }
 
 namespace tns {
 

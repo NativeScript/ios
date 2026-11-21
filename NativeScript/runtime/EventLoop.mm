@@ -1,6 +1,8 @@
 #include "EventLoop.h"
 
 #include <algorithm>
+#include <atomic>
+#include <cmath>
 #include <ctime>
 #include <limits>
 
@@ -32,17 +34,56 @@ void RunGuarded(F&& body) {
   }
 }
 
+#if NS_EXACT_TIMER_ORDERING
+// Context of one ordered token's CFRunLoopTimer. Refcounted through the
+// context's retain/release so CF holds a reference across each callout:
+// CFRunLoopTimerInvalidate releases the context immediately, and a token may
+// be cancelled from another thread while its callout is being dispatched.
+struct OrderedTokenInfo {
+  OrderedTokenInfo(tns::EventLoop* loop, double key) : loop(loop), key(key) {}
+  tns::EventLoop* const loop;
+  const double key;
+  std::atomic<int> refs{0};
+};
+
+const void* RetainOrderedTokenInfo(const void* info) {
+  auto token = const_cast<OrderedTokenInfo*>(static_cast<const OrderedTokenInfo*>(info));
+  token->refs.fetch_add(1, std::memory_order_relaxed);
+  return info;
+}
+
+void ReleaseOrderedTokenInfo(const void* info) {
+  auto token = const_cast<OrderedTokenInfo*>(static_cast<const OrderedTokenInfo*>(info));
+  if (token->refs.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+    delete token;
+  }
+}
+
+void DisposeTimer(CFRunLoopTimerRef timer) {
+  CFRunLoopTimerInvalidate(timer);
+  CFRelease(timer);
+}
+#endif
+
 }  // namespace
 
 namespace tns {
 
 double EventLoop::NowMs() {
   struct timespec res;
+#if NS_EXACT_TIMER_ORDERING
+  // mach_absolute_time's clock, the one CFRunLoopTimers fire on: a token's
+  // timer is armed once, so a key on a clock that keeps counting through
+  // sleep (CLOCK_MONOTONIC) would disagree with its timer after a wake and
+  // hand newer timers an older timer's far-off token
+  clock_gettime(CLOCK_UPTIME_RAW, &res);
+#else
   clock_gettime(CLOCK_MONOTONIC, &res);
+#endif
   return 1000.0 * res.tv_sec + (double)res.tv_nsec / 1e6;
 }
 
-// converts a CLOCK_MONOTONIC due time to a CFRunLoopTimer fire date. The two
+// converts a NowMs() due time to a CFRunLoopTimer fire date. The two
 // clocks can drift (CFAbsoluteTime is wall-based), so consumers must treat a
 // fire as "check what is due now", never as proof a specific item is due.
 static CFAbsoluteTime FireDateFor(double dueMs, double nowMs) {
@@ -68,10 +109,12 @@ void EventLoop::BindToCurrentThread() {
       CFRunLoopTimerCreate(kCFAllocatorDefault, CFAbsoluteTimeGetCurrent() + kNeverFireInterval,
                            kNeverFireInterval, 0, 0, &EventLoop::InternalTimerFired, &timerContext);
   CFRunLoopAddTimer(loop_, internalTimer_, kCFRunLoopCommonModes);
+#if !NS_EXACT_TIMER_ORDERING
   orderedTimer_ =
       CFRunLoopTimerCreate(kCFAllocatorDefault, CFAbsoluteTimeGetCurrent() + kNeverFireInterval,
                            kNeverFireInterval, 0, 0, &EventLoop::OrderedTimerFired, &timerContext);
   CFRunLoopAddTimer(loop_, orderedTimer_, kCFRunLoopCommonModes);
+#endif
 
   // flush work buffered before the home thread was known
   auto now = NowMs();
@@ -85,9 +128,8 @@ void EventLoop::BindToCurrentThread() {
   auto tokens = std::move(bufferedTokens_);
   bufferedTokens_.clear();
   for (double due : tokens) {
-    pendingTokens_.insert(due);
+    AddOrderedTokenLocked(due, now);
   }
-  ArmOrderedTimerLocked(now);
 }
 
 void EventLoop::Shutdown() {
@@ -108,6 +150,18 @@ void EventLoop::Shutdown() {
   droppedInternalDelayed.swap(internal_.delayed);
   droppedOrdered.swap(ordered_.immediate);
   droppedOrderedDelayed.swap(ordered_.delayed);
+#if NS_EXACT_TIMER_ORDERING
+  for (auto& token : pendingTokens_) {
+    DisposeTimer(token.second);
+  }
+  parkedTokens_.clear();
+#else
+  if (orderedTimer_ != nullptr) {
+    CFRunLoopTimerInvalidate(orderedTimer_);
+    CFRelease(orderedTimer_);
+    orderedTimer_ = nullptr;
+  }
+#endif
   pendingTokens_.clear();
   bufferedTokens_.clear();
   if (internalSource_ != nullptr) {
@@ -119,11 +173,6 @@ void EventLoop::Shutdown() {
     CFRunLoopTimerInvalidate(internalTimer_);
     CFRelease(internalTimer_);
     internalTimer_ = nullptr;
-  }
-  if (orderedTimer_ != nullptr) {
-    CFRunLoopTimerInvalidate(orderedTimer_);
-    CFRelease(orderedTimer_);
-    orderedTimer_ = nullptr;
   }
   loop_ = nullptr;
 }
@@ -169,18 +218,60 @@ double EventLoop::PostOrderedTokenLocked(double dueTimeMs, double now) {
     return dueTimeMs;
   }
   // every token rides the timer phase, even due-now ones (a past fire date
-  // fires on the next runloop pass). Performed blocks would deliver sooner,
+  // fires on the next timer pass). Performed blocks would deliver sooner,
   // but a self-rescheduling chain of them never lets the loop reach its
   // before-waiting phase - starving CA rendering commits, the autorelease
-  // pool and the rejection drain - while a due timer still yields a full
-  // pass between fires. This also keeps due-now tokens in fire-date order
-  // with foreign NSTimers, like the per-timer CFRunLoopTimers this replaces.
+  // pool and the rejection drain.
   double key = std::max(dueTimeMs, now);
-  pendingTokens_.insert(key);
-  ArmOrderedTimerLocked(now);
+  AddOrderedTokenLocked(key, now);
   CFRunLoopWakeUp(loop_);
   return key;
 }
+
+#if !NS_EXACT_TIMER_ORDERING
+void EventLoop::AddOrderedTokenLocked(double key, double now) {
+  pendingTokens_.insert(key);
+  ArmOrderedTimerLocked(now);
+}
+
+void EventLoop::ArmOrderedTimerLocked(double now) {
+  if (orderedTimer_ == nullptr) {
+    return;
+  }
+  // Left alone while the earliest token is unchanged: re-arming for a matured
+  // token clamps its fire date to now (CF does as well), which would move it
+  // behind every overdue foreign timer.
+  if (pendingTokens_.empty()) {
+    if (std::isnan(armedTokenKey_)) {
+      return;
+    }
+    armedTokenKey_ = std::numeric_limits<double>::quiet_NaN();
+    CFRunLoopTimerSetNextFireDate(orderedTimer_, CFAbsoluteTimeGetCurrent() + kNeverFireInterval);
+    return;
+  }
+  double head = *pendingTokens_.begin();
+  if (head == armedTokenKey_) {
+    return;
+  }
+  armedTokenKey_ = head;
+  CFRunLoopTimerSetNextFireDate(orderedTimer_, FireDateFor(head, now));
+}
+#else
+void EventLoop::AddOrderedTokenLocked(double key, double now) {
+  CFRunLoopTimerContext context = {0, new OrderedTokenInfo(this, key), &RetainOrderedTokenInfo,
+                                   &ReleaseOrderedTokenInfo, nullptr};
+  // Not re-armed once it is due, except when parked by a nested runloop (see
+  // OrderedTokenFired): CF clamps a past fire date to now, which would move
+  // the token behind overdue foreign timers. Repeating with an unreachable
+  // interval only so its own callout can re-arm it - CF invalidates a
+  // one-shot timer after its callout.
+  CFRunLoopTimerRef timer =
+      CFRunLoopTimerCreate(kCFAllocatorDefault, FireDateFor(key, now), kNeverFireInterval, 0, 0,
+                           &EventLoop::OrderedTokenFired, &context);
+  CFRunLoopAddTimer(loop_, timer, kCFRunLoopCommonModes);
+  pendingTokens_.emplace(key, timer);
+}
+#endif
 
 bool EventLoop::PostInternal(std::function<void()> fn) {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -249,8 +340,13 @@ bool EventLoop::TryCancelOrderedToken(double dueTimeMs) {
   if (pendingIt == pendingTokens_.end()) {
     return false;
   }
+#if NS_EXACT_TIMER_ORDERING
+  DisposeTimer(pendingIt->second);
+  pendingTokens_.erase(pendingIt);
+#else
   pendingTokens_.erase(pendingIt);
   ArmOrderedTimerLocked(NowMs());
+#endif
   return true;
 }
 
@@ -339,15 +435,6 @@ void EventLoop::ArmInternalTimerLocked(double now) {
       due >= 0 ? FireDateFor(due, now) : CFAbsoluteTimeGetCurrent() + kNeverFireInterval);
 }
 
-void EventLoop::ArmOrderedTimerLocked(double now) {
-  if (orderedTimer_ == nullptr) {
-    return;
-  }
-  CFRunLoopTimerSetNextFireDate(
-      orderedTimer_, !pendingTokens_.empty() ? FireDateFor(*pendingTokens_.begin(), now)
-                                             : CFAbsoluteTimeGetCurrent() + kNeverFireInterval);
-}
-
 void EventLoop::RunEntry(Entry& entry) {
   if (entry.bare) {
     // the fn does its own ceremony - it may lock a different isolate, or
@@ -402,7 +489,10 @@ void EventLoop::RunOneInternal() {
     RunEntry(*entry);
     return;
   }
-  RunGuarded([&] { RunEntry(*entry); });
+  RunGuarded([&] {
+    RunEntry(*entry);
+    PromiseRejectionTracker::DrainIfPending(isolate_);
+  });
 }
 
 void EventLoop::RunNestableV8Tasks() {
@@ -483,6 +573,17 @@ void EventLoop::InternalTimerFired(CFRunLoopTimerRef timer, void* info) {
   self->ArmInternalTimerLocked(now);
 }
 
+void EventLoop::DrainRejectionsAfterOrderedTask() {
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_) {
+      return;
+    }
+  }
+  RunGuarded([&] { PromiseRejectionTracker::DrainIfPending(isolate_); });
+}
+
+#if !NS_EXACT_TIMER_ORDERING
 void EventLoop::OrderedTimerFired(CFRunLoopTimerRef timer, void* info) {
   auto self = static_cast<EventLoop*>(info);
   bool due = false;
@@ -496,14 +597,85 @@ void EventLoop::OrderedTimerFired(CFRunLoopTimerRef timer, void* info) {
       self->pendingTokens_.erase(self->pendingTokens_.begin());
       due = true;
     }
-    // one matured token per fire: re-arming with an already-past due time
-    // fires again on the next runloop pass, so foreign timers and blocks due
-    // between two matured tokens interleave instead of waiting out a batch
+    // One matured token per fire: re-arming with an already-past due time
+    // fires again on the next runloop pass, so native work runs between two
+    // matured tokens instead of waiting out a batch. This fire spent the
+    // arming (CF moves a fired timer to its unreachable interval unless its
+    // callout re-arms it), so the re-arm is unconditional.
+    self->armedTokenKey_ = std::numeric_limits<double>::quiet_NaN();
     self->ArmOrderedTimerLocked(now);
   }
   if (due) {
     self->RunOrderedTask();
+    self->DrainRejectionsAfterOrderedTask();
   }
 }
+#else
+void EventLoop::OrderedTokenFired(CFRunLoopTimerRef timer, void* info) {
+  auto token = static_cast<OrderedTokenInfo*>(info);
+  auto self = token->loop;
+  {
+    std::lock_guard<std::mutex> lock(self->mutex_);
+    if (self->stopped_) {
+      return;
+    }
+    auto now = NowMs();
+    if (token->key > now) {
+      // fired ahead of its NowMs() due time; still in the future, so CF
+      // honors the new date
+      CFRunLoopTimerSetNextFireDate(timer, FireDateFor(token->key, now));
+      return;
+    }
+    auto range = self->pendingTokens_.equal_range(token->key);
+    auto it = std::find_if(range.first, range.second,
+                           [timer](const auto& entry) { return entry.second == timer; });
+    if (it == range.second) {
+      // recalled by TryCancelOrderedToken while this fire was being dispatched
+      return;
+    }
+    if (self->runningOrderedTask_) {
+      // a runloop spun from inside an ordered task (a pumped require, app
+      // code): ordered tasks never nest, so the token waits for that task
+      CFRunLoopTimerSetNextFireDate(timer, CFAbsoluteTimeGetCurrent() + kNeverFireInterval);
+      self->parkedTokens_.emplace_back(token->key, timer);
+      return;
+    }
+    self->pendingTokens_.erase(it);
+    DisposeTimer(timer);
+    self->runningOrderedTask_ = true;
+  }
+
+  struct UnparkOnExit {
+    EventLoop* self;
+    ~UnparkOnExit() {
+      std::lock_guard<std::mutex> lock(self->mutex_);
+      self->runningOrderedTask_ = false;
+      auto parked = std::move(self->parkedTokens_);
+      self->parkedTokens_.clear();
+      if (self->stopped_) {
+        return;
+      }
+      auto now = NowMs();
+      for (auto& [key, timer] : parked) {
+        // only timers still owned by pendingTokens_; a parked token may have
+        // been cancelled (and its timer freed) meanwhile
+        auto range = self->pendingTokens_.equal_range(key);
+        for (auto it = range.first; it != range.second; ++it) {
+          if (it->second == timer) {
+            CFRunLoopTimerSetNextFireDate(timer, FireDateFor(key, now));
+            break;
+          }
+        }
+      }
+    }
+  } unpark{self};
+  // Overdue tokens fire back to back within one CF timer pass, so the
+  // runloop's own pool would span the whole batch; each task gets its own.
+  @autoreleasepool {
+    self->RunOrderedTask();
+    self->DrainRejectionsAfterOrderedTask();
+  }
+}
+#endif
 
 }  // namespace tns

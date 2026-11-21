@@ -5,6 +5,7 @@
 
 #include <deque>
 #include <functional>
+#include <limits>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -13,6 +14,13 @@
 
 #include "Common.h"
 #include "v8-platform.h"
+
+// 1: JS timers keep exact fire-date order with foreign runloop timers at the
+// cost of O(pending timers) per timer operation and no yielding between
+// matured timers (see EventLoop's ordered lane).
+#ifndef NS_EXACT_TIMER_ORDERING
+#define NS_EXACT_TIMER_ORDERING 0
+#endif
 
 namespace tns {
 
@@ -45,14 +53,29 @@ class OrderedTaskSource {
  *
  * Ordered lane - work whose ordering is observable against other app-level
  * runloop work (spec'd macrotasks, JS timers). Every post is an anonymous
- * "task due" token on ONE CFRunLoopTimer armed at the earliest pending due
- * time (a due-now token gets a past fire date and fires on the next pass), so
- * tokens stay in fire-date order with foreign NSTimers and each fire yields a
- * full runloop pass - performed-block delivery would be sooner but a
+ * "task due" token; each token runs the earliest due item across the
+ * ordered entries and the OrderedTaskSource (Timers) - one due-ordered
+ * domain, and a leftover token is a cheap no-op. A due-now token still waits
+ * for the timer phase rather than riding a performed block: a
  * self-rescheduling chain of blocks starves the before-waiting phase (CA
- * rendering, autorelease pool, the rejection drain). Each token runs the
- * earliest due item across the ordered entries and the OrderedTaskSource
- * (Timers) - one due-ordered domain, and a leftover token is a cheap no-op.
+ * rendering, autorelease pool, the rejection drain). Ordered tasks never
+ * nest, and every task is followed by an unhandled-rejection drain.
+ *
+ * By default every token rides ONE CFRunLoopTimer armed at the earliest
+ * pending token, and each fire consumes one token, so every matured token
+ * yields a full runloop pass to native work - setTimeout(fn, 0) is how apps
+ * yield to native. The timer is left alone while the earliest token is
+ * unchanged. Once it is re-armed for a matured token, CF clamps the fire
+ * date to now: the first matured token keeps its fire-date position against
+ * foreign NSTimers, later ones fall behind any that are already overdue.
+ *
+ * With NS_EXACT_TIMER_ORDERING each token owns a CFRunLoopTimer at its due
+ * time instead, never re-armed once that time has passed, so tokens keep
+ * fire-date order with foreign timers however many are overdue. In exchange
+ * every post, cancel and runloop pass costs O(pending timers) in CF, and
+ * matured tokens run back to back in one timer pass without yielding. A
+ * token that fires in a runloop spun from inside an ordered task waits for
+ * that task to return.
  *
  * Internal lane - work in its own ordering domain: v8 platform foreground
  * tasks (Atomics.waitAsync wakeups, GC tasks, streaming-compilation
@@ -103,22 +126,21 @@ class EventLoop {
   bool PostOrderedDelayed(std::function<void()> fn, double delayMs);
 
   /**
-   * Posts a bare ordered token due at an absolute CLOCK_MONOTONIC time
-   * (NowMs() units) for an item the OrderedTaskSource keeps in its own
-   * bookkeeping (Timers). One token per item; the drain picks the earliest
-   * due item across the source and the ordered entries, so the token needn't
-   * name what it will run. Returns the key actually recorded (an overdue due
-   * time is clamped to now) - the value TryCancelOrderedToken must be given
-   * to recall this token.
+   * Posts a bare ordered token due at an absolute NowMs() time for an item
+   * the OrderedTaskSource keeps in its own bookkeeping (Timers). One token per
+   * item; the drain picks the earliest due item across the source and the
+   * ordered entries, so the token needn't name what it will run. Returns the
+   * key actually recorded (an overdue due time is clamped to now) - the value
+   * TryCancelOrderedToken must be given to recall this token.
    */
   double PostOrderedToken(double dueTimeMs);
 
   /**
-   * Removes one not-yet-matured ordered token at this due time, un-arming its
-   * wakeup. Returns false when no such token is pending - it already matured,
-   * so its slot cannot be recalled; the caller must leave a tombstone for it
-   * instead. Tokens are anonymous and counted,
-   * so cancelling one token plus one item keeps slots 1:1 no matter which
+   * Removes one not-yet-matured ordered token at this due time, un-arming
+   * its wakeup. Returns false when no such token is pending - it already
+   * matured, so its slot cannot be recalled; the caller must leave a
+   * tombstone for it instead. Tokens are anonymous and counted, so
+   * cancelling one token plus one item keeps slots 1:1 no matter which
    * producer's token is physically removed.
    */
   bool TryCancelOrderedToken(double dueTimeMs);
@@ -173,7 +195,9 @@ class EventLoop {
    */
   void RunOrderedTask();
 
-  // CLOCK_MONOTONIC milliseconds - the clock every due time and token is on
+  // milliseconds on the clock every due time and token is on: CLOCK_MONOTONIC,
+  // or with NS_EXACT_TIMER_ORDERING CLOCK_UPTIME_RAW, which pauses during
+  // sleep like the CFRunLoopTimers those tokens are fixed on
   static double NowMs();
 
  private:
@@ -205,13 +229,20 @@ class EventLoop {
   static bool HasDueLocked(Lane& lane, double now);
   void SignalInternalLocked();
   void ArmInternalTimerLocked(double now);
-  void ArmOrderedTimerLocked(double now);
+  void AddOrderedTokenLocked(double key, double now);
   void RunEntry(Entry& entry);
   void RunOneInternal();
+  // reports what the ordered task just run left unhandled; mutex_ not held
+  void DrainRejectionsAfterOrderedTask();
 
   static void InternalSourcePerform(void* info);
   static void InternalTimerFired(CFRunLoopTimerRef timer, void* info);
+#if NS_EXACT_TIMER_ORDERING
+  static void OrderedTokenFired(CFRunLoopTimerRef timer, void* info);
+#else
+  void ArmOrderedTimerLocked(double now);
   static void OrderedTimerFired(CFRunLoopTimerRef timer, void* info);
+#endif
 
   v8::Isolate* isolate_;
   std::mutex mutex_;
@@ -219,14 +250,26 @@ class EventLoop {
   Lane ordered_;
   // ordered-lane source with its own bookkeeping (Timers); home-thread only
   OrderedTaskSource* timerSource_ = nullptr;
-  // future-due ordered tokens awaiting orderedTimer_
+#if NS_EXACT_TIMER_ORDERING
+  // pending ordered tokens by key, each owning its CFRunLoopTimer (+1)
+  std::multimap<double, CFRunLoopTimerRef> pendingTokens_;
+  // set while an ordered task runs; tokens that fire meanwhile (from a
+  // runloop the task spins) are parked, still in pendingTokens_, and
+  // re-armed when it returns
+  bool runningOrderedTask_ = false;
+  std::vector<std::pair<double, CFRunLoopTimerRef>> parkedTokens_;
+#else
+  // pending ordered tokens, all riding orderedTimer_
   std::multiset<double> pendingTokens_;
+  CFRunLoopTimerRef orderedTimer_ = nullptr;
+  // the token key orderedTimer_ is armed for; NaN while disarmed or spent
+  double armedTokenKey_ = std::numeric_limits<double>::quiet_NaN();
+#endif
   // tokens posted before the bind; flushed by BindToCurrentThread
   std::vector<double> bufferedTokens_;
   CFRunLoopRef loop_ = nullptr;
   CFRunLoopSourceRef internalSource_ = nullptr;
   CFRunLoopTimerRef internalTimer_ = nullptr;
-  CFRunLoopTimerRef orderedTimer_ = nullptr;
   bool stopped_ = false;
 };
 
