@@ -3,6 +3,7 @@
 
 #include <objc/runtime.h>
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 
@@ -11,6 +12,18 @@
 namespace tns {
 
 struct CanaryRecord;
+
+// The handlers a wrapper's template carries in canary mode: none for a wrapper
+// that is not a canary, and per kind for one that is. A canary must be built
+// from a template configured for its object's kind (WrapperLifetimeCanary::
+// KindOf).
+enum class CanaryKind : uint8_t {
+  kNone,
+  // A canary of an object outside JS-extended classes (scope "all").
+  kPlain,
+  // A canary of an instance of a JS-extended class.
+  kExtended,
+};
 
 // The canary wrapper lifetime mode (WrapperLifetimeMode::kCanary).
 //
@@ -55,22 +68,22 @@ class WrapperLifetimeCanary {
   // `imp` unchanged for any other selector, or unless the mode is canary.
   static IMP WrapDealloc(SEL selector, IMP imp);
 
-  // Installs the forwarding handlers on an ObjC instance template. No-op unless
-  // the mode is canary. Only canaries need them: other wrappers would pay for
-  // every write and gain nothing.
+  // Installs `kind`'s handlers on an ObjC instance template. No-op for kNone,
+  // or unless the mode is canary. Only canaries need them: other wrappers would
+  // pay for every write and gain nothing.
   static void ConfigureInstanceTemplate(
-      v8::Local<v8::ObjectTemplate> instanceTemplate);
+      v8::Local<v8::ObjectTemplate> instanceTemplate, CanaryKind kind);
 
-  // Whether `object`'s wrapper is a canary, so must be built from a template
-  // ConfigureInstanceTemplate configured.
-  static bool Intercepts(id object);
+  // The kind of canary `object`'s wrapper is, kNone when it is not one.
+  static CanaryKind KindOf(id object);
 
-  // Whether a native class constructor's instance template gets the handlers:
-  // under scope "all" its instances are canaries. Under "extended" they are
-  // canaries only when the constructor yields an instance of a JS-extended
-  // class (an existing object adopted from a pointer, or one an initializer
-  // returned instead), which ArgConverter::ConstructObject wraps anew.
-  static bool NativeInstancesIntercept();
+  // The kind a native class constructor's instance template is configured
+  // for: under scope "all" its instances are plain canaries. Under "extended"
+  // they are canaries only when the constructor yields an instance of a
+  // JS-extended class (an existing object adopted from a pointer, or one an
+  // initializer returned instead), which ArgConverter::ConstructObject wraps
+  // anew, as it does any result whose kind differs from the template's.
+  static CanaryKind NativeInstancesKind();
 
   // Adds `unwrap` (a canary's native object -> its weak-collection key) and
   // `wrap` (key -> live or new canary, or undefined once the object is gone)

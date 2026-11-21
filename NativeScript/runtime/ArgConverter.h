@@ -7,6 +7,7 @@
 #include "Common.h"
 #include "DataWrapper.h"
 #include "IsolateWrapper.h"
+#include "WrapperLifetimeCanary.h"
 #include "libffi.h"
 
 namespace tns {
@@ -64,14 +65,14 @@ class ArgConverter {
       v8::Local<v8::Object> receiver,
       const std::vector<std::string>& additionalProtocols =
           std::vector<std::string>());
-  // `intercepted`: the object carries the canary handlers
-  // (WrapperLifetimeCanary::Intercepts).
+  // `kind`: the canary handlers the object carries
+  // (WrapperLifetimeCanary::KindOf).
   static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyObject(
-      v8::Local<v8::Context> context, bool intercepted);
-  // The constructor NewEmptyInstance takes: EmptyObjCtorFunc, or with
-  // `intercepted` its counterpart carrying the canary handlers.
+      v8::Local<v8::Context> context, CanaryKind kind);
+  // The constructor NewEmptyInstance takes: EmptyObjCtorFunc for kNone, or its
+  // counterpart carrying `kind`'s canary handlers.
   static v8::Persistent<v8::Function>* EmptyInstanceFunction(
-      v8::Isolate* isolate, bool intercepted);
+      v8::Isolate* isolate, CanaryKind kind);
   // CreateEmptyObject's object without the ObjectManager registration, for an
   // object whose collection has nothing to dispose.
   static v8::Local<v8::Object> NewEmptyInstance(
@@ -138,17 +139,17 @@ class ArgConverter {
   // caller returns its defined default. Resets `tc` in both cases.
   static id HandleBoundaryException(v8::Local<v8::Context> context,
                                     v8::TryCatch& tc);
-  // `thisIntercepts`: the constructor's instance template carries the canary
-  // handlers (WrapperLifetimeCanary::ConfigureInstanceTemplate). Without them,
-  // a canary gets a new object, returned in place of `this`.
+  // `thisKind`: the canary handlers the constructor's instance template
+  // carries (WrapperLifetimeCanary::ConfigureInstanceTemplate). A canary whose
+  // kind differs gets a new object, returned in place of `this`.
   static void ConstructObject(v8::Local<v8::Context> context,
                               const v8::FunctionCallbackInfo<v8::Value>& info,
                               Class klass, const InterfaceMeta* interfaceMeta,
-                              bool thisIntercepts);
+                              CanaryKind thisKind);
 
  private:
   static v8::Local<v8::Function> CreateEmptyInstanceFunction(
-      v8::Local<v8::Context> context, bool intercepted);
+      v8::Local<v8::Context> context, CanaryKind kind);
   static std::shared_ptr<v8::Persistent<v8::Value>> CreateEmptyInstance(
       v8::Local<v8::Context> context, v8::Persistent<v8::Function>* ctorFunc);
   static void FindMethodOverloads(Class klass, std::string methodName,
