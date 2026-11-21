@@ -82,7 +82,9 @@ class WrapperLifetimeCanary {
   // __releaseNativeCounterpart: marks `record` released, so the weak
   // collections hand out no wrapper of the object until native code returns
   // it, and copies the object's weak-collection key onto the canary, so what
-  // was keyed on the object is still found through the released canary.
+  // was keyed on the object is still found through the released canary. With
+  // no key to copy, the canary is marked so that weak collections report it as
+  // a released-object access.
   static void KeepWeakCollectionKey(
       v8::Isolate* isolate, v8::Local<v8::Object> canary,
       const std::shared_ptr<CanaryRecord>& record);

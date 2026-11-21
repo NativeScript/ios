@@ -162,7 +162,7 @@ on every write to a canary:
 | `resurrections` | finalizers that kept an ObjC wrapper alive because native code still retained its object: a JS-extended class's instance, or a wrapper the runtime keeps strong while native code owns its object |
 | `collected` | finalizers that released their native object |
 | `releasedExplicitly` | native objects released through `__releaseNativeCounterpart` |
-| `releasedAccesses` | uses of a released wrapper: as a native argument, collection element or return value, as a method receiver or `toString()` receiver, and reads or writes through a released pointer, reference or struct |
+| `releasedAccesses` | uses of a released wrapper: as a native argument, collection element or return value, as a method receiver or `toString()` receiver, as a weak collection key in `"canary"` mode when it was released before anything keyed its object (see [Weak collections in canary mode](#weak-collections-in-canary-mode)), and reads or writes through a released pointer, reference or struct |
 | `stateLostCandidates` | collected wrappers carrying JS properties whose object was still retained by something else (only while `wrapperLifetimeWarnings` is on) |
 | `stateLostConfirmed` | candidates whose object was still alive a runloop turn later, once releases queued for the runtime thread ran; each class is also reported once in the log |
 | `promotions` | `"rooted"` only: weak wrappers made strong because native code retained their object |
@@ -210,7 +210,12 @@ in the standard collections. What follows from that:
   object is gone and `w` is collected. If the release deallocated the object,
   the callback runs once `w` is collected. A wrapper released before anything
   keyed its object is a plain key from then on: entries made through it don't
-  reach the object, and `new WeakRef(w).deref()` returns `w`.
+  reach the object, and `new WeakRef(w).deref()` returns `w`. Each weak
+  collection operation that has to look such a wrapper up is a released-object
+  access: it counts in `releasedAccesses` and follows `releasedObjectPolicy`
+  (a `releasednativeaccess` event, then the plain-key behavior, under
+  `"report"`; a `ReferenceError` under `"throw"`). A lookup that finds the
+  wrapper itself as a key does not count.
 - A prototype set later with `Object.setPrototypeOf` or `__proto__` is not
   state: a later wrapper has its class's prototype again.
 

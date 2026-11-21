@@ -471,6 +471,92 @@ describe("Weak collections of native objects", function () {
         });
     });
 
+    // A canary released before anything keyed its object is a key of its own,
+    // which nothing keyed on the object can find.
+    function releasedNeverKeyed() {
+        var obj = Extended.new();
+        __releaseNativeCounterpart(obj);
+        return obj;
+    }
+
+    function releasedAccesses() {
+        return runtime.getWrapperLifetimeStats().releasedAccesses;
+    }
+
+    it("reports a weak collection operation on a canary released before anything keyed its object", function (done) {
+        if (!canary) {
+            done();
+            return;
+        }
+        var messages = [];
+        var onReleased = function (e) {
+            if (/weak collection/.test(e.error.message)) {
+                messages.push(e.error.message);
+            }
+        };
+        global.addEventListener("releasednativeaccess", onReleased);
+        var map = new WeakMap();
+        var before = releasedAccesses();
+        map.set(releasedNeverKeyed(), 1);
+        expect(releasedAccesses()).toBe(before + 1);
+        new WeakRef(releasedNeverKeyed());
+        expect(releasedAccesses()).toBe(before + 2);
+        expect(map.get(releasedNeverKeyed())).toBeUndefined();
+        expect(releasedAccesses()).toBe(before + 3);
+        setTimeout(function () {
+            global.removeEventListener("releasednativeaccess", onReleased);
+            expect(messages.length).toBe(3);
+            for (var i = 0; i < messages.length; i++) {
+                expect(messages[i]).toMatch(/released by __releaseNativeCounterpart \(weak collection key/);
+            }
+            done();
+        });
+    });
+
+    it("throws for a weak collection operation on a canary released before anything keyed its object under the throw policy", function () {
+        if (!canary) {
+            return;
+        }
+        var policy = runtime.getConfig("releasedObjectPolicy");
+        runtime.setConfig("releasedObjectPolicy", "throw");
+        try {
+            var map = new WeakMap();
+            expect(function () {
+                map.set(releasedNeverKeyed(), 1);
+            }).toThrowError(ReferenceError, /weak collection key/);
+            expect(function () {
+                new WeakRef(releasedNeverKeyed());
+            }).toThrowError(ReferenceError, /weak collection key/);
+            expect(function () {
+                map.get(releasedNeverKeyed());
+            }).toThrowError(ReferenceError, /weak collection key/);
+        } finally {
+            runtime.setConfig("releasedObjectPolicy", policy);
+        }
+    });
+
+    it("does not report a weak collection operation on a released wrapper whose object was keyed", function () {
+        var policy = runtime.getConfig("releasedObjectPolicy");
+        runtime.setConfig("releasedObjectPolicy", "throw");
+        try {
+            var obj = Extended.new();
+            var map = new WeakMap();
+            map.set(obj, 1);
+            __releaseNativeCounterpart(obj);
+            var before = releasedAccesses();
+            var other = new WeakMap();
+            expect(map.get(obj)).toBe(1);
+            expect(other.get(obj)).toBeUndefined();
+            other.set(obj, 2);
+            expect(other.get(obj)).toBe(2);
+            new WeakRef(obj);
+            new WeakSet().add(obj);
+            expect(releasedAccesses()).toBe(before);
+        } finally {
+            runtime.setConfig("releasedObjectPolicy", policy);
+        }
+    });
+
     it("makes no key for a call the standard collection rejects", function () {
         var obj = Extended.new();
         var registry = new FinalizationRegistry(function () {});
