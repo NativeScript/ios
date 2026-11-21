@@ -339,7 +339,7 @@
 		F1F30E762B58FC74006A62C0 /* URLSearchParamsImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = F1F30E722B58FC74006A62C0 /* URLSearchParamsImpl.h */; };
 		F1F30E772B58FC74006A62C0 /* URLImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = F1F30E732B58FC74006A62C0 /* URLImpl.h */; };
 		F1F30E8B2B58FE28006A62C0 /* ada.h in Headers */ = {isa = PBXBuildFile; fileRef = F1F30E872B58FE28006A62C0 /* ada.h */; };
-		F1F30E8C2B58FE28006A62C0 /* ada.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F1F30E882B58FE28006A62C0 /* ada.cpp */; };
+		F1F30E8C2B58FE28006A62C0 /* ada.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F1F30E882B58FE28006A62C0 /* ada.cpp */; settings = {COMPILER_FLAGS = "-Wno-unused-function"; }; };
 		F6191AAE29C0FCE8003F588F /* JsV8InspectorClient.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */; };
 		F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */; };
 		A1B2C3D40000000000000003 /* WorkerInspectorClient.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000001 /* WorkerInspectorClient.h */; };
