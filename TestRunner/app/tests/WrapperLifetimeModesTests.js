@@ -914,7 +914,8 @@ describe("Wrapper lifetime modes", function () {
 
     // Third-party code can strip a live object's associations. Where an
     // associated token reports native death, the record goes with it, and the
-    // next write seeds a new state from the canary's own properties.
+    // next write seeds a new state from the canary's own properties, or from
+    // the dead record's state for a plain canary that forwards.
     it("survives a live object's associations being removed", function (done) {
         if (typeof objc_removeAssociatedObjects !== "function") {
             done();
@@ -1527,6 +1528,282 @@ describe("Wrapper lifetime modes", function () {
                 }, function (obj) {
                     if (keepsState) {
                         expect(obj.other).toBe("new");
+                    }
+                    done();
+                });
+            });
+        });
+    });
+
+    // Under scope "all", a plain native object's canary keeps its JS
+    // properties in the state only (forwarding), unless the app config allows
+    // shadowing native members, which only the mirroring handlers capture.
+    describe("plain canaries", function () {
+        var allowShadowing = runtime.getConfig("wrapperLifetimeAllowShadowingNativeMembers");
+        var plainKeepsState = keepsState && scope === "all";
+        var forwarding = canary && scope === "all" && !allowShadowing;
+
+        // rewrap for a plain object, which only scope "all" makes a canary.
+        function rewrapPlain(make, callback) {
+            var owner = NSMutableArray.new();
+            var first;
+            (function () {
+                var obj = make();
+                owner.addObject(obj);
+                first = new WrapperWeakRef(obj);
+            })();
+            settle(2, function () {
+                if (canary && scope === "all") {
+                    expect(first.deref()).toBeUndefined();
+                }
+                callback(owner.objectAtIndex(0));
+            });
+        }
+
+        it("reports whether native members may be shadowed (" + allowShadowing + ")", function () {
+            expect(typeof allowShadowing).toBe("boolean");
+            expect(function () {
+                runtime.setConfig("wrapperLifetimeAllowShadowingNativeMembers", !allowShadowing);
+            }).toThrowError(TypeError, /read-only/);
+        });
+
+        it("keeps own-property semantics for JS properties on a plain native object", function () {
+            var key = Symbol("key");
+            var obj = TNSAllocLog.new();
+            obj.a = 1;
+            obj[key] = 2;
+            Object.defineProperty(obj, "hidden", { value: 3, enumerable: false, configurable: true });
+            Object.defineProperty(obj, "fixed", { value: 4, enumerable: true });
+            Object.defineProperty(obj, "me", {
+                get: function () {
+                    return this;
+                },
+                configurable: true
+            });
+
+            expect(Object.keys(obj)).toEqual(["a", "fixed"]);
+            expect(Object.getOwnPropertyNames(obj).sort()).toEqual(["a", "fixed", "hidden", "me"]);
+            expect(Object.getOwnPropertySymbols(obj)).toEqual([key]);
+            expect("a" in obj).toBe(true);
+            expect(hasOwn(obj, "hidden")).toBe(true);
+            expect(obj.hidden).toBe(3);
+            expect(obj[key]).toBe(2);
+            expect(obj.me).toBe(obj);
+            expect(Object.getOwnPropertyDescriptor(obj, "fixed")).toEqual({
+                value: 4, writable: false, enumerable: true, configurable: false
+            });
+            expect(strictAssignThrows(obj, "fixed", 5)).toBe(true);
+            expect(obj.fixed).toBe(4);
+            expect(strictAssignThrows(obj, "me", 5)).toBe(true);
+            var receiver;
+            Object.defineProperty(obj, "watched", {
+                set: function () {
+                    receiver = this;
+                },
+                configurable: true
+            });
+            obj.watched = 1;
+            expect(receiver).toBe(obj);
+            receiver = null;
+            expect(delete obj.fixed).toBe(false);
+            expect(JSON.parse(JSON.stringify(obj))).toEqual({ a: 1, fixed: 4 });
+
+            expect(delete obj.a).toBe(true);
+            expect("a" in obj).toBe(false);
+            expect(obj.a).toBeUndefined();
+            expect(hasOwn(obj, "isEqual")).toBe(false);
+        });
+
+        it("hands back a plain object's JS properties with their attributes on a new wrapper", function (done) {
+            var key = Symbol("key");
+            var payload = {};
+            rewrapPlain(function () {
+                var obj = TNSAllocLog.new();
+                obj.visible = 1;
+                obj.payload = payload;
+                obj[key] = 2;
+                Object.defineProperty(obj, "hidden", { value: 3, writable: true, configurable: true });
+                Object.defineProperty(obj, "me", {
+                    get: function () {
+                        return this;
+                    },
+                    configurable: true
+                });
+                return obj;
+            }, function (obj) {
+                if (plainKeepsState) {
+                    expect(Object.keys(obj)).toEqual(["visible", "payload"]);
+                    expect(Object.getOwnPropertyNames(obj).sort()).toEqual(["hidden", "me", "payload", "visible"]);
+                    expect(obj.payload).toBe(payload);
+                    expect(obj[key]).toBe(2);
+                    expect(obj.me).toBe(obj);
+                    expect(Object.getOwnPropertyDescriptor(obj, "hidden")).toEqual({
+                        value: 3, writable: true, enumerable: false, configurable: true
+                    });
+                    obj.visible = 5;
+                    expect(obj.visible).toBe(5);
+                }
+                done();
+            });
+        });
+
+        it("counts the writes of new names to a plain canary", function () {
+            var obj = TNSAllocLog.new();
+            var before = runtime.getWrapperLifetimeStats().canaryInterceptedWrites;
+            obj.first = 1;
+            obj.second = 2;
+            var writes = runtime.getWrapperLifetimeStats().canaryInterceptedWrites - before;
+            expect(writes).toBe(canary && scope === "all" ? 2 : 0);
+        });
+
+        // Names the prototype chain has never reach a forwarding canary's
+        // handlers: such writes and defines land on the canary and die with it.
+        it("keeps an instance write over an inherited data property on its wrapper only", function (done) {
+            TNSAllocLog.prototype.wrapperLifetimeJsMember = function () {
+                return "prototype";
+            };
+            rewrapPlain(function () {
+                var obj = TNSAllocLog.new();
+                obj.valueOf = function () {
+                    return 42;
+                };
+                obj.wrapperLifetimeJsMember = function () {
+                    return "shadow";
+                };
+                obj.tag = "kept";
+                expect(+obj).toBe(42);
+                expect(obj.wrapperLifetimeJsMember()).toBe("shadow");
+                expect(hasOwn(obj, "valueOf")).toBe(true);
+                return obj;
+            }, function (obj) {
+                var member = obj.wrapperLifetimeJsMember();
+                delete TNSAllocLog.prototype.wrapperLifetimeJsMember;
+                if (plainKeepsState) {
+                    expect(obj.tag).toBe("kept");
+                }
+                if (forwarding) {
+                    expect(hasOwn(obj, "valueOf")).toBe(false);
+                    expect(obj.valueOf()).toBe(obj);
+                    expect(member).toBe("prototype");
+                } else if (plainKeepsState) {
+                    expect(+obj).toBe(42);
+                    expect(member).toBe("shadow");
+                }
+                done();
+            });
+        });
+
+        it("keeps a property defined over an inherited name on its wrapper only", function (done) {
+            rewrapPlain(function () {
+                var obj = TNSAllocLog.new();
+                Object.defineProperty(obj, "isEqual", {
+                    value: function () {
+                        return "defined";
+                    },
+                    writable: true,
+                    configurable: true
+                });
+                obj.tag = "kept";
+                expect(obj.isEqual(obj)).toBe("defined");
+                return obj;
+            }, function (obj) {
+                if (plainKeepsState) {
+                    expect(obj.tag).toBe("kept");
+                }
+                if (forwarding) {
+                    expect(hasOwn(obj, "isEqual")).toBe(false);
+                    expect(obj.isEqual(obj)).toBe(true);
+                } else if (plainKeepsState) {
+                    expect(obj.isEqual(obj)).toBe("defined");
+                }
+                done();
+            });
+        });
+
+        it("deletes nothing when an inherited name is deleted", function () {
+            var obj = TNSAllocLog.new();
+            var isEqual = TNSAllocLog.prototype.isEqual;
+            expect(delete obj.isEqual).toBe(true);
+            expect(obj.isEqual).toBe(isEqual);
+            expect(TNSAllocLog.prototype.isEqual).toBe(isEqual);
+            expect(obj.isEqual(obj)).toBe(true);
+        });
+
+        it("keeps a released plain canary's JS properties", function () {
+            var payload = {};
+            var obj = TNSAllocLog.new();
+            obj.tag = "kept";
+            obj.payload = payload;
+            __releaseNativeCounterpart(obj);
+            expect(obj.tag).toBe("kept");
+            expect(obj.payload).toBe(payload);
+            expect(Object.keys(obj)).toEqual(["tag", "payload"]);
+        });
+
+        it("keeps a released plain canary's accessors and read-only properties with their attributes", function () {
+            var obj = TNSAllocLog.new();
+            Object.defineProperty(obj, "me", {
+                get: function () {
+                    return this;
+                },
+                configurable: true
+            });
+            Object.defineProperty(obj, "fixed", { value: 4, enumerable: true });
+            obj.plain = 5;
+            __releaseNativeCounterpart(obj);
+            expect(obj.me).toBe(obj);
+            var me = Object.getOwnPropertyDescriptor(obj, "me");
+            expect(me && typeof me.get).toBe("function");
+            expect(me && me.set).toBeUndefined();
+            expect(me && me.enumerable).toBe(false);
+            expect(me && me.configurable).toBe(true);
+            expect(Object.getOwnPropertyDescriptor(obj, "fixed")).toEqual({
+                value: 4, writable: false, enumerable: true, configurable: false
+            });
+            expect(Object.getOwnPropertyDescriptor(obj, "plain")).toEqual({
+                value: 5, writable: true, enumerable: true, configurable: true
+            });
+            expect(Object.keys(obj)).toEqual(["fixed", "plain"]);
+        });
+
+        // Third-party code can strip a live object's associations, which ends
+        // its record. A forwarding canary keeps reading that record's state,
+        // and its next write carries it over to a new record.
+        it("keeps a live plain object's JS properties after its associations are removed", function (done) {
+            if (typeof objc_removeAssociatedObjects !== "function") {
+                done();
+                return;
+            }
+            var map = new WeakMap();
+            var value = {};
+            var obj = TNSAllocLog.new();
+            obj.tag = "first";
+            obj.other = "kept";
+            map.set(obj, value);
+            objc_removeAssociatedObjects(obj);
+            settle(2, function () {
+                expect(obj.tag).toBe("first");
+                expect(obj.other).toBe("kept");
+                expect(Object.keys(obj)).toEqual(["tag", "other"]);
+                obj.tag = "second";
+                expect(obj.tag).toBe("second");
+                expect(obj.other).toBe("kept");
+                // The new record took over the state, and the weak
+                // collections' key with it.
+                if (forwarding) {
+                    expect(map.get(obj)).toBe(value);
+                }
+                rewrapPlain(function () {
+                    var made = obj;
+                    obj = null;
+                    return made;
+                }, function (again) {
+                    if (plainKeepsState) {
+                        expect(again.tag).toBe("second");
+                        expect(again.other).toBe("kept");
+                    }
+                    if (forwarding) {
+                        expect(map.get(again)).toBe(value);
                     }
                     done();
                 });

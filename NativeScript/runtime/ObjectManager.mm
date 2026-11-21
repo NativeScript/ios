@@ -865,7 +865,9 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
       WrapperLifetime::Forget(isolate, adopted);
       objcWrapper->SetLifetimeState(nullptr);
       UnlinkRegistered(adopted);
+      std::shared_ptr<CanaryRecord> record = std::move(adopted->canaryRecord_);
       delete adopted;
+      WrapperLifetimeCanary::DropRecord(isolate, std::move(record));
     } else if (it != cache->Instances.end()) {
       std::shared_ptr<Persistent<Value>> handle = it->second;
       bool wasWeak = handle->IsWeak();

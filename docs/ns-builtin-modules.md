@@ -120,7 +120,7 @@ Config keys:
 | `wrapperLifetimeWarnings` | `true` \| `false` | process-wide (main-isolate writes only; read live by every isolate); no effect in the `"rooted"` and `"canary"` modes | the app config `"wrapperLifetime": { "warnings": … }`, or on in debug builds |
 | `wrapperLifetimeMode` | `"resurrecting"` \| `"rooted"` \| `"canary"` | process-wide, read-only | the app config `"wrapperLifetime": { "mode": … }`, or `"resurrecting"` |
 | `wrapperLifetimeScope` | `"extended"` \| `"all"` | process-wide, read-only | the app config `"wrapperLifetime": { "scope": … }`, or `"extended"` |
-| `wrapperLifetimeAllowShadowingNativeMembers` | `true` \| `false` | process-wide, read-only | the app config `"wrapperLifetime": { "allowShadowingNativeMembers": … }`, or `false` (see [Native member guard](#native-member-guard)) |
+| `wrapperLifetimeAllowShadowingNativeMembers` | `true` \| `false` | process-wide, read-only | the app config `"wrapperLifetime": { "allowShadowingNativeMembers": … }`, or `false` (see [Native member guard](#native-member-guard) and [Plain canaries](#plain-canaries)) |
 
 ```js
 const { setConfig, getConfig } = require("ns:runtime");
@@ -182,6 +182,48 @@ or return value becomes `nil` (`NSNull` inside a collection) and a
 `"throw"`. An `NSNull` element still breaks native code that expects a typed
 value there (an attributes dictionary holding a released `UIColor`, say); the
 event names the element so the cause can be found.
+
+### Plain canaries
+
+Under `"canary"` with scope `"all"`, a wrapper of a plain (not JS-extended)
+native object keeps its JS properties in the object's state only: a
+non-masking handler answers every read, write, `in`, `delete`, enumeration and
+`Object.defineProperty` of them from the state, so a new wrapper for the object
+needs no copy, while each access to such a property costs a native call.
+JS-extended instances keep the mirroring handler (properties live on the
+wrapper too and are copied onto a new one), because `this.onTap =
+this.onTap.bind(this)` and other writes over names their prototype has must
+carry over.
+
+V8 calls a non-masking handler only for names absent from the object and its
+prototype chain, so on a plain wrapper:
+
+- an assignment or `Object.defineProperty` over an inherited data property (a
+  native method, `toString`, `valueOf`, `constructor`, a member JS added to a
+  prototype) creates an own property of that wrapper alone, gone once a new
+  wrapper replaces it. Native code never sees such a property either way: it
+  sends the message, which runs the class's implementation. In debug builds the
+  assignment throws for the members the native member guard covers;
+- `delete` of an inherited name deletes nothing and returns `true`;
+- a property kept in the state before the prototype chain gets the same name
+  (JS adds it to a native prototype, or a later wrapper of the object has a
+  different prototype) is hidden by the inherited one: reads and
+  `hasOwnProperty` see that one and new writes land on the wrapper, while
+  `Object.keys` still lists the name;
+- native property writes run the native setter with no handler involved.
+
+A handler sees the object it is installed on, not the receiver of the access.
+So an accessor property kept in the state and reached through another
+receiver (a Proxy around the wrapper, `Reflect.get` or `Reflect.set` with a
+receiver, `Object.create(wrapper)`) runs its getter with the wrapper itself as
+`this`, and a write through such a receiver never runs its setter: through a
+Proxy it fails (a `TypeError` in strict code), and on an object inheriting
+from the wrapper it defines an own data property there. Data properties work
+through all of them. Under `allowShadowingNativeMembers` the accessor is a
+real property of the wrapper and behaves as on any object.
+
+`allowShadowingNativeMembers` (see [Native member guard](#native-member-guard))
+gives plain wrappers the mirroring handler instead.
 
 ### Weak collections in canary mode
 
@@ -277,7 +319,11 @@ object: use it for a JS-only member that native code is not meant to see.
 Class fields have define semantics and bypass the guard the same way.
 
 `"wrapperLifetime": { "allowShadowingNativeMembers": true }` in the app config
-turns the guard off, leaving data properties as in the `"resurrecting"` mode;
+turns the guard off, leaving data properties as in the `"resurrecting"` mode,
+and under `"canary"` with scope `"all"` also keeps plain wrappers on the
+mirroring handler, so a shadowing property on one carries over to a new
+wrapper as it does on a JS-extended instance, at the cost of a handler on every
+write to a plain wrapper (see [Plain canaries](#plain-canaries));
 `getConfig("wrapperLifetimeAllowShadowingNativeMembers")` reads it.
 
 Release builds never throw and keep data properties, since the accessor costs
