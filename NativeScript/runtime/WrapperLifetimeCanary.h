@@ -78,8 +78,17 @@ class WrapperLifetimeCanary {
   static bool RegisterWrapFunctions(v8::Local<v8::Context> context,
                                     v8::Local<v8::Object> binding);
 
+  // Before `canary`'s native object is released through
+  // __releaseNativeCounterpart: marks `record` released, so the weak
+  // collections hand out no wrapper of the object until native code returns
+  // it, and copies the object's weak-collection key onto the canary, so what
+  // was keyed on the object is still found through the released canary.
+  static void KeepWeakCollectionKey(
+      v8::Isolate* isolate, v8::Local<v8::Object> canary,
+      const std::shared_ptr<CanaryRecord>& record);
+
   // The record of an object that already has state in this isolate, for a new
-  // canary to share. Null otherwise.
+  // canary to adopt; it is no longer released. Null otherwise.
   static std::shared_ptr<CanaryRecord> Find(v8::Isolate* isolate, id object);
 
   // Copies the state of a new canary's object, or of a -dealloc receiver's,

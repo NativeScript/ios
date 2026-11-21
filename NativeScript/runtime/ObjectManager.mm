@@ -17,6 +17,7 @@
 #include "Helpers.h"
 #include "Runtime.h"
 #include "WrapperLifetime.h"
+#include "WrapperLifetimeCanary.h"
 
 // Exported by libobjc; not declared in a public header for MRC code.
 extern "C" id objc_initWeak(id* location, id value);
@@ -842,6 +843,11 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
       if (adopted->disposing_) {
         // The teardown walk owns this state and releases the object.
         return;
+      }
+      if (adopted->lifetimeCanary_) {
+        // Before the release below, which can run the object's -dealloc.
+        WrapperLifetimeCanary::KeepWeakCollectionKey(isolate, value.As<Object>(),
+                                                     adopted->canaryRecord_);
       }
       if (it != cache->Instances.end() && it->second == adopted->target_) {
         cache->Instances.erase(it);
