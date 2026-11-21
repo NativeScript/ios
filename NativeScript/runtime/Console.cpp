@@ -25,6 +25,19 @@ namespace {
 struct ConsoleTimersState {
   robin_hood::unordered_map<std::string, double> startedAt;
 };
+
+// Errors get the error log type so log readers can tell severity apart. The
+// default handle is kept on purpose: a subsystem would show up in the text of
+// syslog-style output, which older CLIs parse.
+void LogConsoleMessage(bool isError, const std::string& prefix,
+                       const std::string& message) {
+#if TNS_HAVE_OS_LOG
+  TNS_WriteToOsLog(message.c_str(),
+                   isError ? OS_LOG_TYPE_ERROR : OS_LOG_TYPE_DEFAULT, prefix);
+#else
+  Log("%s%s", prefix.c_str(), message.c_str());
+#endif
+}
 }  // namespace
 
 void Console::Init(Local<Context> context) {
@@ -117,9 +130,8 @@ void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
 
   ConsoleAPIType method = VerbosityToInspectorMethod(verbosityLevel);
   SendToDevToolsFrontEnd(method, args);
-  std::string msgWithVerbosity =
-      "CONSOLE " + verbosityLevelUpper + ": " + msgToLog;
-  Log("%s", msgWithVerbosity.c_str());
+  LogConsoleMessage(verbosityLevel == "error",
+                    "CONSOLE " + verbosityLevelUpper + ": ", msgToLog);
 
   if (RuntimeConfig.IsDebug && Runtime::showErrorDisplay() &&
       verbosityLevel == "error" && hasStackTrace) {
@@ -158,7 +170,7 @@ void Console::AssertCallback(const FunctionCallbackInfo<Value>& args) {
     std::string log = ss.str();
 
     SendToDevToolsFrontEnd(ConsoleAPIType::kAssert, args);
-    Log("%s", log.c_str());
+    LogConsoleMessage(true, "", log);
   }
 }
 
