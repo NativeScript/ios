@@ -67,6 +67,9 @@ struct CanaryRecord {
   // record whose object became a weak-collection key (Wrap reads it).
   id object = nil;
   bool weakSet = false;
+  // __releaseNativeCounterpart released a canary of the object and no canary
+  // adopted the record since. Isolate thread only.
+  bool released = false;
 
   ~CanaryRecord() { objc_destroyWeak(&object); }
 
@@ -105,7 +108,7 @@ struct CanaryRegistry {
 struct CanaryState {
   std::shared_ptr<CanaryRegistry> registry = std::make_shared<CanaryRegistry>();
   // The weak collections' key for a native object hangs off its state, and
-  // names the object it stands for.
+  // names the object it stands for. A released canary holds a copy.
   Global<Private> keyOfState;
   Global<Private> objectOfKey;
 };
@@ -712,8 +715,9 @@ void PostSweepAfterGC(Isolate* isolate, GCType, GCCallbackFlags) {
 #endif
 
 // unwrap(value, create): the weak collections' key for a canary's native
-// object, a frozen, null-prototype object that lives exactly as long as the
-// object's state, that is, until the native object is deallocated. Lookups pass
+// object, a frozen, null-prototype object that lives as long as the object's
+// state, that is, until the native object is deallocated, or as long as a
+// released canary of the object holding a copy. Lookups pass
 // `create` false and never make one: with no key yet, no entry can be keyed by
 // it. The value itself for anything that is not a canary, a Proxy included (it
 // is a key of its own, as in every other mode).
@@ -727,13 +731,18 @@ void UnwrapCallback(const FunctionCallbackInfo<Value>& info) {
   if (canaryState == nullptr || !value->IsObject() || value->IsProxy()) {
     return;
   }
-  if (create ? !StateForWrite(isolate, value.As<Object>(), &state)
-             : !ExistingState(isolate, value.As<Object>(), &state)) {
-    return;
-  }
   Local<Context> context = isolate->GetCurrentContext();
   Local<Private> keyOfState = canaryState->keyOfState.Get(isolate);
   Local<Value> key;
+  if (create ? !StateForWrite(isolate, value.As<Object>(), &state)
+             : !ExistingState(isolate, value.As<Object>(), &state)) {
+    // A released canary keeps its key itself (KeepWeakCollectionKey).
+    if (value.As<Object>()->InternalFieldCount() > 0 &&
+        value.As<Object>()->GetPrivate(context, keyOfState).ToLocal(&key) && key->IsObject()) {
+      info.GetReturnValue().Set(key);
+    }
+    return;
+  }
   if (state->GetPrivate(context, keyOfState).ToLocal(&key) && key->IsObject()) {
     info.GetReturnValue().Set(key);
     return;
@@ -819,6 +828,12 @@ void WrapCallback(const FunctionCallbackInfo<Value>& info) {
     info.GetReturnValue().Set(cached->Get(isolate));
     return;
   }
+  if (record->released) {
+    // Released by JS and not handed back by native code: JS holds no wrapper
+    // of it until native code returns it.
+    [object release];
+    return;
+  }
   ObjCDataWrapper* wrapper = new ObjCDataWrapper(object);
   Local<Value> result = ArgConverter::ConvertArgument(context, wrapper);
   tns::DeleteWrapperIfUnused(isolate, result, wrapper);
@@ -859,6 +874,24 @@ bool WrapperLifetimeCanary::RegisterWrapFunctions(Local<Context> context, Local<
          v8::Function::New(context, WrapCallback).ToLocal(&wrap) &&
          binding->Set(context, tns::ToV8String(isolate, "unwrap"), unwrap).FromMaybe(false) &&
          binding->Set(context, tns::ToV8String(isolate, "wrap"), wrap).FromMaybe(false);
+}
+
+void WrapperLifetimeCanary::KeepWeakCollectionKey(Isolate* isolate, Local<Object> canary,
+                                                  const std::shared_ptr<CanaryRecord>& record) {
+  CanaryState* canaryState = Caches::StateFor<CanaryState>(isolate);
+  if (!Usable(record) || canaryState == nullptr || canaryState->keyOfState.IsEmpty()) {
+    return;
+  }
+  record->released = true;
+  HandleScope scope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Private> keyOfState = canaryState->keyOfState.Get(isolate);
+  Local<Value> key;
+  if (Local<Object>::New(isolate, record->state)->GetPrivate(context, keyOfState).ToLocal(&key) &&
+      key->IsObject()) {
+    // Private symbols bypass the canary's handlers.
+    (void)canary->SetPrivate(context, keyOfState, key);
+  }
 }
 
 void WrapperLifetimeCanary::InstallDeallocHook(Class extendedClass) {
@@ -948,6 +981,7 @@ std::shared_ptr<CanaryRecord> WrapperLifetimeCanary::Find(Isolate* isolate, id o
     }
     std::shared_ptr<CanaryRecord> record = it->second;
     if (!RetireIfDead(state->registry.get(), it)) {
+      record->released = false;
       return record;
     }
   }

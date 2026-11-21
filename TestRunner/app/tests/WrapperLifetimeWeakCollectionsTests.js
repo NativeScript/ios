@@ -319,6 +319,158 @@ describe("Weak collections of native objects", function () {
         });
     });
 
+    // In canary mode what was keyed on a native object follows the object, not
+    // a released wrapper of it; elsewhere the standard collections key the
+    // wrapper itself. Only booleans reach expect(), which could otherwise keep
+    // a wrapper alive.
+    function pollCleaned(isCleaned, registry, callback) {
+        var attempts = 15;
+        (function poll() {
+            settle(1, function () {
+                // A collected registry runs no callbacks.
+                if ((isCleaned() && registry !== null) || --attempts === 0) {
+                    callback();
+                    return;
+                }
+                poll();
+            });
+        })();
+    }
+
+    it("keeps what was keyed on a natively retained object after a wrapper of it is released", function (done) {
+        if (!canary) {
+            done();
+            return;
+        }
+        var owner = NSMutableArray.new();
+        var map = new WeakMap();
+        var set = new WeakSet();
+        var cleaned = false;
+        var registry = new FinalizationRegistry(function (held) {
+            cleaned = held === "released";
+        });
+        var obj = Extended.new();
+        owner.addObject(obj);
+        map.set(obj, "value");
+        set.add(obj);
+        var ref = new WeakRef(obj);
+        registry.register(obj, "released");
+        __releaseNativeCounterpart(obj);
+
+        expect(map.get(obj)).toBe("value");
+        expect(set.has(obj)).toBe(true);
+        expect(ref.deref() === undefined).toBe(true);
+        settle(2, function () {
+            expect(map.get(obj)).toBe("value");
+            expect(set.has(obj)).toBe(true);
+            expect(ref.deref() === undefined).toBe(true);
+            var later = owner.objectAtIndex(0);
+            expect(later === obj).toBe(false);
+            expect(map.get(later)).toBe("value");
+            expect(set.has(later)).toBe(true);
+            expect(ref.deref() === later).toBe(true);
+            later = null;
+            obj = null;
+            settle(3, function () {
+                expect(cleaned).toBe(false);
+                owner.removeAllObjects();
+                pollCleaned(function () {
+                    return cleaned;
+                }, registry, function () {
+                    expect(cleaned).toBe(true);
+                    done();
+                });
+            });
+        });
+    });
+
+    it("keeps what was keyed on a native object JS owned alone while its released wrapper lives", function (done) {
+        if (!canary) {
+            done();
+            return;
+        }
+        var map = new WeakMap();
+        var cleaned = false;
+        var registry = new FinalizationRegistry(function (held) {
+            cleaned = held === "released";
+        });
+        var obj = Extended.new();
+        map.set(obj, "value");
+        var ref = new WeakRef(obj);
+        registry.register(obj, "released");
+        __releaseNativeCounterpart(obj);
+
+        expect(ref.deref() === undefined).toBe(true);
+        expect(map.get(obj)).toBe("value");
+        settle(2, function () {
+            expect(map.get(obj)).toBe("value");
+            expect(ref.deref() === undefined).toBe(true);
+            expect(cleaned).toBe(false);
+            obj = null;
+            pollCleaned(function () {
+                return cleaned;
+            }, registry, function () {
+                expect(cleaned).toBe(true);
+                done();
+            });
+        });
+    });
+
+    // __releaseNativeCounterpart frees a heavy native object early: in every
+    // mode, neither its keys nor its released wrapper may keep it alive. The
+    // weak table sees the object without retaining it.
+    it("deallocates a keyed native object JS owned alone at its release", function () {
+        var watch = NSHashTable.weakObjectsHashTable();
+        var map = new WeakMap();
+        var set = new WeakSet();
+        var registry = new FinalizationRegistry(function () {});
+        var obj = Extended.new();
+        watch.addObject(obj);
+        map.set(obj, "value");
+        set.add(obj);
+        var ref = new WeakRef(obj);
+        registry.register(obj, "held");
+        __releaseNativeCounterpart(obj);
+
+        expect(watch.allObjects.count).toBe(0);
+        expect(map.get(obj)).toBe("value");
+        expect(set.has(obj)).toBe(true);
+        expect(ref.deref() === undefined || ref.deref() === obj).toBe(true);
+    });
+
+    it("deallocates a released natively retained object once native code lets go, while its wrapper is held and dereferenced", function (done) {
+        var watch = NSHashTable.weakObjectsHashTable();
+        var owner = NSMutableArray.new();
+        var map = new WeakMap();
+        var set = new WeakSet();
+        var obj = Extended.new();
+        owner.addObject(obj);
+        watch.addObject(obj);
+        map.set(obj, "value");
+        set.add(obj);
+        var ref = new WeakRef(obj);
+        __releaseNativeCounterpart(obj);
+
+        function poke() {
+            for (var i = 0; i < 10; i++) {
+                ref.deref();
+                map.get(obj);
+                set.has(obj);
+            }
+        }
+        poke();
+        settle(2, function () {
+            poke();
+            owner.removeAllObjects();
+            poke();
+            expect(watch.allObjects.count).toBe(0);
+            expect(ref.deref() === undefined || ref.deref() === obj).toBe(true);
+            expect(map.get(obj)).toBe("value");
+            expect(set.has(obj)).toBe(true);
+            done();
+        });
+    });
+
     it("makes no key for a call the standard collection rejects", function () {
         var obj = Extended.new();
         var registry = new FinalizationRegistry(function () {});
