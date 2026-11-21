@@ -101,9 +101,11 @@ class WrapperLifetimeCanary {
   // anew, as it does any result whose kind differs from the template's.
   static CanaryKind NativeInstancesKind();
 
-  // Adds `unwrap` (a canary's native object -> its weak-collection key) and
+  // Adds `unwrap` (a canary's native object -> its weak-collection key),
   // `wrap` (key -> live or new canary, or undefined once the object is gone)
-  // to `binding`, for the weak-collections builtin. Canary mode only.
+  // and `cache` (the Uint32Array that tells the builtin when a wrapper it
+  // cached from wrap is stale) to `binding`, for the weak-collections builtin.
+  // Canary mode only.
   static bool RegisterWrapFunctions(v8::Local<v8::Context> context,
                                     v8::Local<v8::Object> binding);
 

@@ -89,6 +89,22 @@ struct CanaryRecord {
 
 namespace {
 
+// What the weak-collections builtin reads through a Uint32Array over `slots`
+// (RegisterWrapFunctions). It drops every wrapper it cached from wrap once
+// kEpoch changes, which can happen on any thread. After an unwrap that asked
+// (UnwrapCallback), kLiveCanary is 1 when the value is a live canary standing
+// for the key it answered: the wrapper wrap answers with for that key.
+struct WeakCollectionCache {
+  enum Slot { kEpoch, kLiveCanary, kSlotCount };
+  std::atomic<uint32_t> slots[kSlotCount];
+
+  // A wrapper wrap answered may no longer be the one it answers.
+  void Invalidate() { slots[kEpoch].fetch_add(1, std::memory_order_release); }
+  void SetLiveCanary(bool live) {
+    slots[kLiveCanary].store(live ? 1 : 0, std::memory_order_relaxed);
+  }
+};
+
 // Per-isolate. Shared with the tokens associated with native objects, which
 // can be deallocated on any thread and after the isolate is gone.
 struct CanaryRegistry {
@@ -105,6 +121,9 @@ struct CanaryRegistry {
   bool sweepPosted = false;
   // Lets wrapper creation skip the lookup while no object has state.
   std::atomic<size_t> count{0};
+  // Outlives the registry while the builtin's array does.
+  std::shared_ptr<WeakCollectionCache> weakCollectionCache =
+      std::make_shared<WeakCollectionCache>();
   Isolate* isolate = nullptr;
   std::weak_ptr<EventLoop> loop;
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
@@ -197,6 +216,12 @@ void NativeDied(const std::shared_ptr<CanaryRegistry>& registry, void* object,
     // Erased now, inside the object's -dealloc: an object later allocated at
     // this address must not find this record.
     it->second->died.store(true, std::memory_order_release);
+    // A record held outside the registry and not dying is a live canary's (its
+    // associations were removed): wrap no longer answers with that canary.
+    // A transient copy elsewhere bumps it spuriously, which only costs a refill.
+    if (!it->second->dying.load(std::memory_order_acquire) && it->second.use_count() > 1) {
+      registry->weakCollectionCache->Invalidate();
+    }
     registry->dead.push_back(std::move(it->second));
     registry->records.erase(it);
     registry->count.fetch_sub(1, std::memory_order_relaxed);
@@ -993,21 +1018,30 @@ void PostSweepAfterGC(Isolate* isolate, GCType, GCCallbackFlags) {
 }
 #endif
 
-// unwrap(value, create): the weak collections' key for a canary's native
-// object, a frozen, null-prototype object that lives as long as the object's
-// state, that is, until the native object is deallocated, or as long as a
-// released canary of the object holding a copy. Lookups pass
-// `create` false and never make one: with no key yet, no entry can be keyed by
-// it. The value itself for anything that is not a canary, a Proxy included (it
-// is a key of its own, as in every other mode).
+// unwrap(value, create, reportLive): the weak collections' key for a canary's
+// native object, a frozen, null-prototype object that lives as long as the
+// object's state, that is, until the native object is deallocated, or as long
+// as a released canary of the object holding a copy. Lookups pass `create`
+// false and never make one: with no key yet, no entry can be keyed by it. The
+// value itself for anything that is not a canary, a Proxy included (it is a key
+// of its own, as in every other mode). With `reportLive`, also sets
+// WeakCollectionCache::kLiveCanary.
 void UnwrapCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Value> value = info[0];
   bool create = info[1]->IsTrue();
+  bool reportLive = info[2]->IsTrue();
   info.GetReturnValue().Set(value);
   CanaryState* canaryState = Caches::StateFor<CanaryState>(isolate);
   Local<Object> state;
-  if (canaryState == nullptr || !value->IsObject() || value->IsProxy()) {
+  if (reportLive && canaryState != nullptr) {
+    canaryState->registry->weakCollectionCache->SetLiveCanary(false);
+  }
+  // Canaries and -dealloc receivers have internal fields; for any other object
+  // the wrapper lookups below would each read a private property to find no
+  // canary.
+  if (canaryState == nullptr || !value->IsObject() || value->IsProxy() ||
+      value.As<Object>()->InternalFieldCount() == 0) {
     return;
   }
   Local<Context> context = isolate->GetCurrentContext();
@@ -1017,8 +1051,7 @@ void UnwrapCallback(const FunctionCallbackInfo<Value>& info) {
              : !ExistingState(isolate, value.As<Object>(), &state)) {
     // A released canary keeps its key itself, or null when it had none
     // (KeepWeakCollectionKey).
-    if (value.As<Object>()->InternalFieldCount() == 0 ||
-        !value.As<Object>()->GetPrivate(context, keyOfState).ToLocal(&key)) {
+    if (!value.As<Object>()->GetPrivate(context, keyOfState).ToLocal(&key)) {
       return;
     }
     if (key->IsObject()) {
@@ -1036,6 +1069,10 @@ void UnwrapCallback(const FunctionCallbackInfo<Value>& info) {
     return;
   }
   if (state->GetPrivate(context, keyOfState).ToLocal(&key) && key->IsObject()) {
+    if (reportLive) {
+      canaryState->registry->weakCollectionCache->SetLiveCanary(
+          CanaryOf(isolate, value.As<Object>()) != nullptr);
+    }
     info.GetReturnValue().Set(key);
     return;
   }
@@ -1063,6 +1100,9 @@ void UnwrapCallback(const FunctionCallbackInfo<Value>& info) {
       !newKey->SetIntegrityLevel(context, IntegrityLevel::kFrozen).FromMaybe(false) ||
       !state->SetPrivate(context, keyOfState, newKey).FromMaybe(false)) {
     return;
+  }
+  if (reportLive) {
+    canaryState->registry->weakCollectionCache->SetLiveCanary(true);
   }
   info.GetReturnValue().Set(newKey);
 }
@@ -1162,10 +1202,24 @@ bool WrapperLifetimeCanary::RegisterWrapFunctions(Local<Context> context, Local<
   Isolate* isolate = v8::Isolate::GetCurrent();
   Local<v8::Function> unwrap;
   Local<v8::Function> wrap;
+  CanaryState* state = Caches::StateFor<CanaryState>(isolate);
+  if (state == nullptr) {
+    return false;
+  }
+  auto* owner = new std::shared_ptr<WeakCollectionCache>(state->registry->weakCollectionCache);
+  std::unique_ptr<BackingStore> store = ArrayBuffer::NewBackingStore(
+      (*owner)->slots, sizeof((*owner)->slots),
+      [](void*, size_t, void* data) {
+        delete static_cast<std::shared_ptr<WeakCollectionCache>*>(data);
+      },
+      owner);
+  Local<v8::Uint32Array> cache = v8::Uint32Array::New(ArrayBuffer::New(isolate, std::move(store)),
+                                                      0, WeakCollectionCache::kSlotCount);
   return v8::Function::New(context, UnwrapCallback).ToLocal(&unwrap) &&
          v8::Function::New(context, WrapCallback).ToLocal(&wrap) &&
          binding->Set(context, tns::ToV8String(isolate, "unwrap"), unwrap).FromMaybe(false) &&
-         binding->Set(context, tns::ToV8String(isolate, "wrap"), wrap).FromMaybe(false);
+         binding->Set(context, tns::ToV8String(isolate, "wrap"), wrap).FromMaybe(false) &&
+         binding->Set(context, tns::ToV8String(isolate, "cache"), cache).FromMaybe(false);
 }
 
 void WrapperLifetimeCanary::KeepWeakCollectionKey(Isolate* isolate, Local<Object> canary) {
@@ -1219,6 +1273,8 @@ void WrapperLifetimeCanary::KeepWeakCollectionKey(Isolate* isolate, Local<Object
   if (std::shared_ptr<CanaryRecord> current = currentRecord()) {
     current->released = true;
   }
+  // wrap hands out no wrapper of the object now.
+  canaryState->registry->weakCollectionCache->Invalidate();
 }
 
 void WrapperLifetimeCanary::InstallDeallocHook(Class extendedClass) {
