@@ -54,6 +54,14 @@ Runtime initialization took 55ms
 
 If all tests pass, everything is good! At this point you can make changes to the runtime, add breakpoints and step through with the debugger. In the next section we'll see how to attach the runtime to an existing NativeScript application allowing us to debug runtime issues in actual apps.
 
+## Running the suite from the command line
+
+`./run_tests.sh` builds TestRunner, runs the suite on a simulator and leaves the results in `build/tests/<simulator udid>`. `./run_tests.sh --help` lists every option; the common ones:
+
+- `--temp-sim` runs on a throwaway simulator that is deleted afterwards; `--keep-sim` creates (once) and reuses a simulator named after the checkout.
+- `-a` / `--asan` runs under AddressSanitizer.
+- `--wrapper-lifetime <mode>[:<scope>]` runs the suite under a wrapper lifetime mode (`resurrecting`, `rooted` or `canary`; scope `extended` or `all`, default `extended`), e.g. `./run_tests.sh --temp-sim --wrapper-lifetime canary:all`. It sets `"wrapperLifetime"` in the built app's `package.json` only; `TestRunner/app/package.json` is left untouched. From `xcodebuild`, pass the build setting `NS_TEST_WRAPPER_LIFETIME=<mode>:<scope>` instead.
+
 ## Node.js in Xcode builds
 
 Building the `NativeScript` target generates the runtime JS builtins with `tools/js2c.mjs`, and building the `TestRunner` target copies jasmine-core from `node_modules` into the test app with `tools/stage-test-runner-deps.mjs`; both need Node.js. Xcode runs build phases with a minimal `PATH` and never reads your shell profile, so a node managed by nvm/fnm/volta/asdf is invisible to it. The build phase instead sources two files from the repo root:

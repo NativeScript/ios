@@ -1908,6 +1908,7 @@
 				C2DDEB13229EA89000345BFE /* Frameworks */,
 				7A51E7C02F00000000000001 /* Stage Test Runner Dependencies */,
 				C2DDEB14229EA89000345BFE /* Resources */,
+				7A51E7C02F00000000000002 /* Apply Test App Config */,
 				C2C8EE7722CE54EE001F8CEC /* Embed Frameworks */,
 			);
 			buildRules = (
@@ -2187,6 +2188,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "set -e\ncd \"${SRCROOT}\"\n[ -f .xcode.env ] && . ./.xcode.env\n[ -f .xcode.env.local ] && . ./.xcode.env.local\nif [ -z \"${NODE_BINARY:-}\" ] || [ ! -x \"${NODE_BINARY:-}\" ]; then\n  echo \"error: no usable node for tools/stage-test-runner-deps.mjs (NODE_BINARY='${NODE_BINARY:-}'). Run 'npm run setup-xcode-env' in the runtime repo to record your node in .xcode.env.local\" >&2\n  exit 1\nfi\n\"$NODE_BINARY\" tools/stage-test-runner-deps.mjs --out-dir TestRunner/app/Infrastructure/Jasmine/vendor\n";
+		};
+		7A51E7C02F00000000000002 /* Apply Test App Config */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/TestRunner/app/package.json",
+			);
+			name = "Apply Test App Config";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/app/package.json",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\ncd \"${SRCROOT}\"\n[ -f .xcode.env ] && . ./.xcode.env\n[ -f .xcode.env.local ] && . ./.xcode.env.local\nif [ -z \"${NODE_BINARY:-}\" ] || [ ! -x \"${NODE_BINARY:-}\" ]; then\n  echo \"error: no usable node for tools/apply-test-app-config.mjs (NODE_BINARY='${NODE_BINARY:-}'). Run 'npm run setup-xcode-env' in the runtime repo to record your node in .xcode.env.local\" >&2\n  exit 1\nfi\nset -- --source TestRunner/app/package.json --out \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/app/package.json\"\n# NS_TEST_WRAPPER_LIFETIME=<mode>[:<scope>] on the xcodebuild command line (run_tests.sh --wrapper-lifetime).\nif [ -n \"${NS_TEST_WRAPPER_LIFETIME:-}\" ]; then\n  set -- \"$@\" --wrapper-lifetime \"${NS_TEST_WRAPPER_LIFETIME}\"\nfi\n\"$NODE_BINARY\" tools/apply-test-app-config.mjs \"$@\"\n";
 		};
 		C27E5DB322F31FF800498ED0 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
