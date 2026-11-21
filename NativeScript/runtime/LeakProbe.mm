@@ -1,6 +1,7 @@
 #include "LeakProbe.h"
 #include <dlfcn.h>
 #include <memory>
+#include <unordered_map>
 #include "Caches.h"
 #include "ClassBuilder.h"
 #include "DataWrapper.h"
@@ -53,10 +54,20 @@ bool ForEachInstance(Isolate* isolate, void* context,
   if (cache == nullptr || !cache->IsValid()) {
     return false;
   }
+  // A wrapper built for an object whose previous wrapper's release is still
+  // queued replaces its Instances entry, so a queued retain may have none.
+  std::unordered_map<void*, uint32_t> queued;
+  WrapperLifetime::ForEachQueuedRelease(isolate,
+                                        [&](id object) { queued[(__bridge void*)object]++; });
   for (auto& entry : cache->Instances) {
     const std::shared_ptr<Persistent<Value>>& handle = entry.second;
     Instance instance{};
     instance.object = (__bridge void*)entry.first;
+    auto pending = queued.find(instance.object);
+    if (pending != queued.end()) {
+      instance.queued = pending->second;
+      queued.erase(pending);
+    }
     if (handle != nullptr && !handle->IsEmpty()) {
       instance.wrapper = handle->Get(isolate);
       BaseDataWrapper* data = GetValue(isolate, instance.wrapper);
@@ -71,8 +82,17 @@ bool ForEachInstance(Isolate* isolate, void* context,
         ObjectWeakCallbackState* ownership = wrapper->OwnershipState();
         instance.reconciledStrong = ownership != nullptr && !ownership->disposing_ &&
                                     ownership->target_ == handle && !handle->IsWeak();
+        // A handle under ownership tracking is reconciled before every major
+        // collection, the snapshot's included, so reconciledStrong covers it.
+        instance.resurrects = handle->IsWeak() && wrapper->IsGcProtected();
       }
     }
+    visit(context, instance);
+  }
+  for (const auto& [object, count] : queued) {
+    Instance instance{};
+    instance.object = object;
+    instance.queued = count;
     visit(context, instance);
   }
   return true;
@@ -82,6 +102,17 @@ void ForEachCanaryState(Isolate* isolate, void* context,
                         void (*visit)(void* context, id object, Local<Object> state)) {
   WrapperLifetimeCanary::ForEachState(
       isolate, [&](id object, Local<Object> state) { visit(context, object, state); });
+}
+
+void ForEachCanaryStateHandle(Isolate* isolate, void* context,
+                              void (*visit)(void* context, Local<Object> state)) {
+  WrapperLifetimeCanary::ForEachStateHandle(isolate,
+                                            [&](Local<Object> state) { visit(context, state); });
+}
+
+void DrainReleases(Isolate* isolate) {
+  WrapperLifetime::DrainReleases(isolate);
+  WrapperLifetimeCanary::ReleaseDeadStates(isolate);
 }
 
 void* IsolateState(Isolate* isolate) {
@@ -141,6 +172,7 @@ const Host kHost = {
     .size = sizeof(Host),
     .forEachInstance = ForEachInstance,
     .forEachCanaryState = ForEachCanaryState,
+    .forEachCanaryStateHandle = ForEachCanaryStateHandle,
     .isJSBlock = Interop::IsJSBlock,
     .jsBlockCallback = Interop::JSBlockCallback,
     .nativeClass = ClassBuilder::FindNativeClass,
@@ -149,7 +181,7 @@ const Host kHost = {
     .createPoster = CreatePoster,
     .post = Post,
     .destroyPoster = [](Poster* poster) { delete poster; },
-    .drainReleases = WrapperLifetime::DrainReleases,
+    .drainReleases = DrainReleases,
     .lifetimeMode = []() { return WrapperLifetimeModeName(GetWrapperLifetimeMode()); },
     .lifetimeScope = []() { return WrapperLifetimeScopeName(GetWrapperLifetimeScope()); },
     .lifetimeStats = LifetimeStats,

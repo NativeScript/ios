@@ -4,7 +4,8 @@
 //
 // Heap snapshots carry both heaps: an embedder graph adds a node per native
 // object the runtime wraps or keeps JS state for, and the runtime's own
-// cross-heap edges (wrapper -> object retain, rooted-strong object -> wrapper,
+// cross-heap edges (wrapper -> object retain, object -> wrapper while native
+// code owns the object and that keeps the wrapper strong or resurrects it,
 // canary object -> state, adapter -> JS object). Any snapshot gets these,
 // DevTools' included. JS block -> callback edges are added by findLeakCycles()
 // only: the runtime keeps no list of its JS blocks, and never wraps one made
@@ -95,6 +96,13 @@ template <typename Visit>
 void ForEachState(Isolate* isolate, Visit&& visit) {
   host_->forEachCanaryState(isolate, &visit, [](void* context, id object, Local<Object> state) {
     (*static_cast<std::remove_reference_t<Visit>*>(context))(object, state);
+  });
+}
+
+template <typename Visit>
+void ForEachStateHandle(Isolate* isolate, Visit&& visit) {
+  host_->forEachCanaryStateHandle(isolate, &visit, [](void* context, Local<Object> state) {
+    (*static_cast<std::remove_reference_t<Visit>*>(context))(state);
   });
 }
 
@@ -1064,6 +1072,8 @@ struct Wrapped {
   // The map's handle is the strong one the runtime keeps while native code
   // also retains the object: a wrapper no lifetime mode adopted.
   bool reconciledStrong = false;
+  // The object keeps the wrapper alive through resurrection.
+  bool resurrects = false;
 };
 
 // False for entries whose key must not be dereferenced as the wrapped object:
@@ -1096,6 +1106,7 @@ bool ReadInstance(const ClassSet& classes, const Instance& instance, Wrapped* ou
   }
   out->rootedStrong = instance.rootedStrong;
   out->reconciledStrong = instance.reconciledStrong;
+  out->resurrects = instance.resurrects;
   return true;
 }
 
@@ -1130,13 +1141,26 @@ bool BuildNativeGraph(Isolate* isolate, ProbeRun* run) {
 
   bool valid = ForEachInstance(isolate, [&](const Instance& instance) {
     Wrapped wrapped;
-    if (!ReadInstance(run->classes, instance, &wrapped)) {
+    if (ReadInstance(run->classes, instance, &wrapped)) {
+      if (NativeEntry* native = add(instance.object, wrapped.cls, 0)) {
+        native->seed = true;
+        native->held = !wrapped.adapter || instance.queued > 0;
+        native->runtimeRetains = (wrapped.adapter ? 0 : 1) + instance.queued;
+      }
       return;
     }
-    if (NativeEntry* native = add(instance.object, wrapped.cls, 0)) {
-      native->seed = true;
-      native->held = !wrapped.adapter;
-      native->runtimeRetains = wrapped.adapter ? 0 : 1;
+    // A queued retain is released only on this thread, by a drain, so it
+    // keeps the object readable until the probe ends.
+    uintptr_t p = reinterpret_cast<uintptr_t>(instance.object);
+    if (instance.queued == 0 || IsTaggedPointer(p)) {
+      return;
+    }
+    if (Class cls = ObjectClass(run->classes, p, HeapBlockSize(p))) {
+      if (NativeEntry* native = add(instance.object, cls, 0)) {
+        native->seed = true;
+        native->held = true;
+        native->runtimeRetains = instance.queued;
+      }
     }
   });
   if (!valid) {
@@ -1266,7 +1290,8 @@ void BuildEmbedderGraph(Isolate* isolate, EmbedderGraph* graph, void*) {
   bool valid = ForEachInstance(isolate, [&](const Instance& instance) {
     Wrapped wrapped;
     if (!ReadInstance(classes, instance, &wrapped)) {
-      if (run != nullptr) {
+      // A queued retain keeps the object: still the one the graph found.
+      if (run != nullptr && instance.queued == 0) {
         auto found = run->natives.find(instance.object);
         if (found != run->natives.end() && found->second.seed) {
           found->second.changed = true;
@@ -1285,6 +1310,8 @@ void BuildEmbedderGraph(Isolate* isolate, EmbedderGraph* graph, void*) {
     if (wrapped.rootedStrong || wrapped.reconciledStrong) {
       graph->AddEdge(native, js, "ns:owned");
       modeled(wrapped.js);
+    } else if (wrapped.resurrects) {
+      graph->AddEdge(native, js, "ns:kept");
     }
   });
   if (!valid) {
@@ -1304,6 +1331,9 @@ void BuildEmbedderGraph(Isolate* isolate, EmbedderGraph* graph, void*) {
   if (run == nullptr) {
     return;
   }
+  // States of objects being or already deallocated have no ns:state edge, but
+  // their handles are the runtime's, not roots.
+  ForEachStateHandle(isolate, [&](Local<Object> state) { modeled(state); });
   for (auto& native : run->natives) {
     EmbedderGraph::Node* from = nodeFor(native.first, native.second.cls);
     for (const auto& edge : native.second.out) {
@@ -1328,7 +1358,10 @@ std::string Utf8(Isolate* isolate, Local<Value> value) {
   return *utf8 != nullptr ? std::string(*utf8, utf8.length()) : std::string();
 }
 
+// Both run once per edge or node of walks over the whole snapshot, and each
+// call makes a handle.
 std::string EdgeName(Isolate* isolate, const HeapGraphEdge* edge) {
+  HandleScope scope(isolate);
   Local<Value> name = edge->GetName();
   if (name->IsNumber()) {
     return "[" + std::to_string(static_cast<int64_t>(name.As<v8::Number>()->Value())) + "]";
@@ -1337,6 +1370,7 @@ std::string EdgeName(Isolate* isolate, const HeapGraphEdge* edge) {
 }
 
 std::string NodeName(Isolate* isolate, const HeapGraphNode* node) {
+  HandleScope scope(isolate);
   std::string name = Utf8(isolate, node->GetName());
   return name.empty() ? "(anonymous)" : name;
 }
@@ -1472,11 +1506,12 @@ struct Cycle {
 bool FindCycle(Isolate* isolate, const HeapGraphNode* start,
                const std::unordered_set<const HeapGraphNode*>& marked, const Ephemerons& ephemerons,
                std::vector<Hop>* hops, bool* tooLong) {
-  // A rooted-strong wrapper and its object always form a two-node loop; a
-  // leak needs a cycle that leaves through another edge.
+  // A wrapper its object keeps (ns:owned, ns:kept) and that object always form
+  // a two-node loop; a leak needs a cycle that leaves through another edge.
   const HeapGraphNode* ownWrapper = nullptr;
   for (int i = 0; i < start->GetChildrenCount(); i++) {
-    if (EdgeName(isolate, start->GetChild(i)) == "ns:owned") {
+    std::string name = EdgeName(isolate, start->GetChild(i));
+    if (name == "ns:owned" || name == "ns:kept") {
       ownWrapper = start->GetChild(i)->GetToNode();
     }
   }
@@ -1556,10 +1591,25 @@ std::string Describe(Isolate* isolate, const std::vector<Hop>& hops, size_t firs
   return out + " " + (forSignature ? std::regex_replace(name, volatileParts, "") : name);
 }
 
+// Rooted mode frees a JS-only chain of native objects one link per major
+// collection, and releases happen after the collection.
+constexpr int kSettleCollections = 3;
+
+// Until drained, a dead wrapper's queued retain reads as an owner of its
+// object, and a deallocated object's canary state as a root. Runs JS.
+void Settle(Isolate* isolate) {
+  for (int i = 0; i < kSettleCollections; i++) {
+    isolate->LowMemoryNotification();
+    host_->drainReleases(isolate);
+  }
+}
+
 // `inspect` lists class-name prefixes whose native objects the report details
 // (retain accounting, root, reached), to explain a missing or unexpected cycle.
 MaybeLocal<Object> FindLeakCycles(Isolate* isolate, Local<Context> context, bool strict,
                                   const std::vector<std::string>& inspect = {}) {
+  // First: the drains run JS, which can define classes and build wrappers.
+  Settle(isolate);
   ProbeRun run;
   run.strict = strict;
   run.calibration = GetCalibration();
@@ -2064,15 +2114,8 @@ std::string WriteReport(Isolate* isolate, Local<Context> context, const char* ki
   return [path UTF8String];
 }
 
-// Rooted mode frees a JS-only chain of native objects one link per major
-// collection, and releases happen after the collection.
-constexpr int kCountCollections = 3;
-
 void ReportCounts(Isolate* isolate) {
-  for (int i = 0; i < kCountCollections; i++) {
-    isolate->LowMemoryNotification();
-    host_->drainReleases(isolate);
-  }
+  Settle(isolate);
   Local<Context> context = isolate->GetCurrentContext();
   Local<Object> report = Object::New(isolate);
   report->Set(context, ToV8String(isolate, "mode"), ToV8String(isolate, host_->lifetimeMode()))
@@ -2232,10 +2275,6 @@ void RunTrigger(Isolate* isolate, void* trigger) {
       ReportCycles(isolate, true);
       break;
     case Trigger::kInspectCycles:
-      for (int i = 0; i < kCountCollections; i++) {
-        isolate->LowMemoryNotification();
-        host_->drainReleases(isolate);
-      }
       ReportCycles(isolate, false, InspectPrefixes());
       break;
   }

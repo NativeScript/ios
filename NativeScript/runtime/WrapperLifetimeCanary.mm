@@ -1021,4 +1021,48 @@ void WrapperLifetimeCanary::ForEachState(
   }
 }
 
+void WrapperLifetimeCanary::ForEachStateHandle(
+    Isolate* isolate, const std::function<void(Local<Object> state)>& visit) {
+  CanaryState* state = Caches::ExistingStateFor<CanaryState>(isolate);
+  if (state == nullptr) {
+    return;
+  }
+  // Not gated on the live count: dead records outlast it.
+  std::vector<Local<Object>> handles;
+  {
+    std::lock_guard<std::mutex> lock(state->registry->mutex);
+    if (state->registry->closed) {
+      return;
+    }
+    for (auto& entry : state->registry->records) {
+      if (!entry.second->state.IsEmpty()) {
+        handles.push_back(entry.second->state.Get(isolate));
+      }
+    }
+    for (const std::shared_ptr<CanaryRecord>& record : state->registry->dead) {
+      if (!record->state.IsEmpty()) {
+        handles.push_back(record->state.Get(isolate));
+      }
+    }
+  }
+  for (Local<Object> handle : handles) {
+    visit(handle);
+  }
+}
+
+void WrapperLifetimeCanary::ReleaseDeadStates(Isolate* isolate) {
+  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
+    return;
+  }
+  CanaryState* state = Caches::ExistingStateFor<CanaryState>(isolate);
+  if (state == nullptr) {
+    return;
+  }
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
+  Sweep(state->registry);
+#else
+  DrainDead(state->registry);
+#endif
+}
+
 }  // namespace tns

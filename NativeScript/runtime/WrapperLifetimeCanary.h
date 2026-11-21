@@ -99,6 +99,17 @@ class WrapperLifetimeCanary {
   static void ForEachState(
       v8::Isolate* isolate,
       const std::function<void(id object, v8::Local<v8::Object> state)>& visit);
+
+  // Calls `visit` with every state handle the registry holds: ForEachState's,
+  // and those of objects being deallocated or deallocated but not yet let go
+  // of. The caller provides the HandleScope.
+  static void ForEachStateHandle(
+      v8::Isolate* isolate,
+      const std::function<void(v8::Local<v8::Object> state)>& visit);
+
+  // Lets go of the state of every object known to be deallocated now, rather
+  // than on the drain its deallocation posted.
+  static void ReleaseDeadStates(v8::Isolate* isolate);
 };
 
 }  // namespace tns

@@ -427,6 +427,17 @@ void WrapperLifetime::DrainReleases(Isolate* isolate) {
   ReleaseAll(isolate, rooted);
 }
 
+void WrapperLifetime::ForEachQueuedRelease(Isolate* isolate,
+                                           const std::function<void(id object)>& visit) {
+  RootedState* rooted = Caches::ExistingStateFor<RootedState>(isolate);
+  if (rooted == nullptr) {
+    return;
+  }
+  for (ObjectWeakCallbackState* state : rooted->releases) {
+    visit(state->lifetimeTarget_);
+  }
+}
+
 void WrapperLifetime::DrainForTeardown(Isolate* isolate) {
   WrapperLifetimeCanary::CloseForTeardown(isolate);
   RootedState* rooted = Caches::ExistingStateFor<RootedState>(isolate);
