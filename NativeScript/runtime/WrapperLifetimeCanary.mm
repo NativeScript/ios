@@ -221,13 +221,27 @@ void ReportDyingRecordsDied(const DyingRecords& dying, void* object) {
 
 // Not a message: a root class without -conformsToProtocol: would crash under
 // scope "all". Walks the superclasses for key-value observing's subclass.
+// Cached per class and thread, as every wrap under scope "all" asks and the
+// walk costs tens of nanoseconds a class: the answer for a class is fixed
+// before it has instances (ClassBuilder adds TNSDerivedClass to a class it
+// creates first thing). A class disposed with objc_disposeClassPair and
+// another allocated at its address would read the old answer.
 bool IsExtendedInstance(id object) {
-  for (Class cls = object_getClass(object); cls != nil; cls = class_getSuperclass(cls)) {
+  Class klass = object_getClass(object);
+  thread_local std::unordered_map<Class, bool> extendedClasses;
+  auto cached = extendedClasses.find(klass);
+  if (cached != extendedClasses.end()) {
+    return cached->second;
+  }
+  bool extended = false;
+  for (Class cls = klass; cls != nil; cls = class_getSuperclass(cls)) {
     if (class_conformsToProtocol(cls, @protocol(TNSDerivedClass))) {
-      return true;
+      extended = true;
+      break;
     }
   }
-  return false;
+  extendedClasses.emplace(klass, extended);
+  return extended;
 }
 
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
@@ -950,8 +964,9 @@ IMP WrapperLifetimeCanary::WrapDealloc(SEL selector, IMP imp) {
   });
 }
 
-void WrapperLifetimeCanary::ConfigureInstanceTemplate(Local<ObjectTemplate> instanceTemplate) {
-  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
+void WrapperLifetimeCanary::ConfigureInstanceTemplate(Local<ObjectTemplate> instanceTemplate,
+                                                      CanaryKind kind) {
+  if (kind == CanaryKind::kNone || GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
     return;
   }
   instanceTemplate->SetHandler(
@@ -959,14 +974,19 @@ void WrapperLifetimeCanary::ConfigureInstanceTemplate(Local<ObjectTemplate> inst
                                         nullptr, Local<Value>(), PropertyHandlerFlags::kNone));
 }
 
-bool WrapperLifetimeCanary::Intercepts(id object) {
-  return GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary &&
-         WrapperLifetime::InScope(object);
+CanaryKind WrapperLifetimeCanary::KindOf(id object) {
+  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary ||
+      !WrapperLifetime::InScope(object)) {
+    return CanaryKind::kNone;
+  }
+  return IsExtendedInstance(object) ? CanaryKind::kExtended : CanaryKind::kPlain;
 }
 
-bool WrapperLifetimeCanary::NativeInstancesIntercept() {
+CanaryKind WrapperLifetimeCanary::NativeInstancesKind() {
   return GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary &&
-         GetWrapperLifetimeScope() == WrapperLifetimeScope::kAll;
+                 GetWrapperLifetimeScope() == WrapperLifetimeScope::kAll
+             ? CanaryKind::kPlain
+             : CanaryKind::kNone;
 }
 
 void WrapperLifetimeCanary::Hydrate(Isolate* isolate, Local<Object> wrapper) {

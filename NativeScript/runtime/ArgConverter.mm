@@ -57,13 +57,15 @@ bool IsKVOSubclassOf(Class klass, Class base) {
          strncmp(class_getName(klass), prefix, sizeof(prefix) - 1) == 0;
 }
 
-// Canary mode: constructors of wrappers that carry the canary handlers.
+// Canary mode: constructors of wrappers that carry the canary handlers, per
+// CanaryKind (kNone has none).
 struct CanaryWrapperConstructors {
+  static constexpr size_t kKinds = 3;
   // The empty instance's, for canaries.
-  std::unique_ptr<Persistent<v8::Function>> emptyInstance;
-  // Shaped like a native class constructor's instances, which lack the
-  // handlers under scope "extended".
-  std::unique_ptr<Persistent<v8::Function>> constructedInstance;
+  std::unique_ptr<Persistent<v8::Function>> emptyInstance[kKinds];
+  // Shaped like a native class constructor's instances, whose template is
+  // configured for one kind only (WrapperLifetimeCanary::NativeInstancesKind).
+  std::unique_ptr<Persistent<v8::Function>> constructedInstance[kKinds];
 };
 
 }  // namespace
@@ -98,7 +100,7 @@ void ArgConverter::Init(Local<Context> context) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   auto cache = Caches::Get(isolate);
   cache->EmptyObjCtorFunc = std::make_unique<Persistent<v8::Function>>(
-      isolate, ArgConverter::CreateEmptyInstanceFunction(context, false));
+      isolate, ArgConverter::CreateEmptyInstanceFunction(context, CanaryKind::kNone));
   if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
     return;
   }
@@ -106,25 +108,29 @@ void ArgConverter::Init(Local<Context> context) {
   if (canary == nullptr) {
     return;
   }
-  canary->emptyInstance = std::make_unique<Persistent<v8::Function>>(
-      isolate, ArgConverter::CreateEmptyInstanceFunction(context, true));
-  Local<FunctionTemplate> constructedTemplate = FunctionTemplate::New(isolate);
-  constructedTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-  WrapperLifetimeCanary::ConfigureInstanceTemplate(constructedTemplate->InstanceTemplate());
-  Local<v8::Function> constructedFunc;
-  tns::Assert(constructedTemplate->GetFunction(context).ToLocal(&constructedFunc), isolate);
-  canary->constructedInstance =
-      std::make_unique<Persistent<v8::Function>>(isolate, constructedFunc);
+  for (CanaryKind kind : {CanaryKind::kPlain, CanaryKind::kExtended}) {
+    size_t index = static_cast<size_t>(kind);
+    canary->emptyInstance[index] = std::make_unique<Persistent<v8::Function>>(
+        isolate, ArgConverter::CreateEmptyInstanceFunction(context, kind));
+    Local<FunctionTemplate> constructedTemplate = FunctionTemplate::New(isolate);
+    constructedTemplate->InstanceTemplate()->SetInternalFieldCount(1);
+    WrapperLifetimeCanary::ConfigureInstanceTemplate(constructedTemplate->InstanceTemplate(), kind);
+    Local<v8::Function> constructedFunc;
+    tns::Assert(constructedTemplate->GetFunction(context).ToLocal(&constructedFunc), isolate);
+    canary->constructedInstance[index] =
+        std::make_unique<Persistent<v8::Function>>(isolate, constructedFunc);
+  }
 }
 
-Persistent<v8::Function>* ArgConverter::EmptyInstanceFunction(Isolate* isolate, bool intercepted) {
-  if (intercepted) {
+Persistent<v8::Function>* ArgConverter::EmptyInstanceFunction(Isolate* isolate, CanaryKind kind) {
+  if (kind != CanaryKind::kNone) {
     // Teardown-safe: a -dealloc receiver can be built after InvalidateIsolate,
     // while deferred releases drain.
     CanaryWrapperConstructors* canary =
         Caches::ExistingStateFor<CanaryWrapperConstructors>(isolate);
-    tns::Assert(canary != nullptr && canary->emptyInstance != nullptr, isolate);
-    return canary->emptyInstance.get();
+    size_t index = static_cast<size_t>(kind);
+    tns::Assert(canary != nullptr && canary->emptyInstance[index] != nullptr, isolate);
+    return canary->emptyInstance[index].get();
   }
   return Caches::Get(isolate)->EmptyObjCtorFunc.get();
 }
@@ -741,7 +747,7 @@ bool ArgConverter::SetValue(Local<Context> context, void* retValue, size_t retur
 
 void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbackInfo<Value>& info,
                                    Class klass, const InterfaceMeta* interfaceMeta,
-                                   bool thisIntercepts) {
+                                   CanaryKind thisKind) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   tns::Assert(klass != nullptr, isolate);
   WrapperLifetime::DrainAtCallEntry(isolate);
@@ -805,20 +811,23 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
     ObjCDataWrapper* wrapper = new ObjCDataWrapper(result);
     Local<Object> thiz = info.This();
     Local<Context> context = cache->GetContext();
-    bool intercepted = thisIntercepts;
-    if (!intercepted && WrapperLifetimeCanary::Intercepts(result)) {
-      // A canary needs the handlers `this` was built without: returning
-      // another object makes it the result of `new`, and `this` after super().
+    CanaryKind kind = thisKind;
+    CanaryKind resultKind = WrapperLifetimeCanary::KindOf(result);
+    if (resultKind != CanaryKind::kNone && resultKind != kind) {
+      // A canary needs handlers `this` was built without: returning another
+      // object makes it the result of `new`, and `this` after super().
       CanaryWrapperConstructors* canary = Caches::StateFor<CanaryWrapperConstructors>(isolate);
-      tns::Assert(canary != nullptr && canary->constructedInstance != nullptr, isolate);
-      Local<Object> replacement = NewEmptyInstance(context, canary->constructedInstance.get());
+      size_t index = static_cast<size_t>(resultKind);
+      tns::Assert(canary != nullptr && canary->constructedInstance[index] != nullptr, isolate);
+      Local<Object> replacement =
+          NewEmptyInstance(context, canary->constructedInstance[index].get());
       bool success;
       if (!replacement->SetPrototype(context, thiz->GetPrototype()).To(&success) || !success) {
         tns::Assert(false, isolate);
       }
       thiz = replacement;
       info.GetReturnValue().Set(thiz);
-      intercepted = true;
+      kind = resultKind;
     }
     tns::SetValue(isolate, thiz, wrapper);
     std::shared_ptr<Persistent<Value>> poThiz = ObjectManager::Register(context, thiz);
@@ -837,7 +846,7 @@ void ArgConverter::ConstructObject(Local<Context> context, const FunctionCallbac
       wrapper->SetBornOnRuntimeThread();
       ObjectManager::ProtectIfNativelyRetained(isolate, result, wrapper);
     }
-    WrapperLifetime::Adopt(isolate, wrapper, poThiz, result, intercepted);
+    WrapperLifetime::Adopt(isolate, wrapper, poThiz, result, kind);
     ExternalMemory::ChargeEstimatedSize(isolate, thiz);
   }
 }
@@ -1058,7 +1067,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
     ObjCAllocDataWrapper* allocDataWrapper = static_cast<ObjCAllocDataWrapper*>(wrapper);
     Class klass = allocDataWrapper->Klass();
 
-    std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context, false);
+    std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context, CanaryKind::kNone);
     receiver = poValue->Get(isolate).As<Object>();
 
     const Meta* meta = FindMeta(klass);
@@ -1108,8 +1117,8 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
       receiver = it->second->Get(isolate).As<Object>();
       WrapperLifetime::EscapeValue(isolate, receiver);
     } else {
-      bool intercepted = WrapperLifetimeCanary::Intercepts(target);
-      std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context, intercepted);
+      CanaryKind kind = WrapperLifetimeCanary::KindOf(target);
+      std::shared_ptr<Persistent<Value>> poValue = CreateEmptyObject(context, kind);
       receiver = poValue->Get(isolate).As<Object>();
       tns::SetValue(isolate, receiver, wrapper);
       cache->Instances.emplace(target, poValue);
@@ -1124,7 +1133,7 @@ Local<Value> ArgConverter::CreateJsWrapper(Local<Context> context, BaseDataWrapp
       }
       if (wrapper->Type() == WrapperType::ObjCObject) {
         WrapperLifetime::Adopt(isolate, static_cast<ObjCDataWrapper*>(wrapper), poValue, target,
-                               intercepted);
+                               kind);
       }
     }
   } else {
@@ -1333,7 +1342,7 @@ Local<Object> ArgConverter::WrapNativeCallbackSelf(Local<Context> context, id se
     wrapper->MarkBorrowed();
     // Its writes reach the object's JS state through the canary handlers.
     Local<Object> receiver = NewEmptyInstance(
-        context, EmptyInstanceFunction(isolate, WrapperLifetimeCanary::Intercepts(self)));
+        context, EmptyInstanceFunction(isolate, WrapperLifetimeCanary::KindOf(self)));
     CreateJsWrapper(context, wrapper, receiver);
     WrapperLifetimeCanary::Hydrate(isolate, receiver);
     *borrowed = wrapper;
@@ -1364,9 +1373,9 @@ Local<Object> ArgConverter::WrapNativeCallbackSelf(Local<Context> context, id se
 }
 
 std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyObject(Local<Context> context,
-                                                                   bool intercepted) {
+                                                                   CanaryKind kind) {
   Isolate* isolate = v8::Isolate::GetCurrent();
-  Persistent<v8::Function>* ctorFunc = EmptyInstanceFunction(isolate, intercepted);
+  Persistent<v8::Function>* ctorFunc = EmptyInstanceFunction(isolate, kind);
   tns::Assert(ctorFunc != nullptr, isolate);
   return ArgConverter::CreateEmptyInstance(context, ctorFunc);
 }
@@ -1390,7 +1399,7 @@ std::shared_ptr<Persistent<Value>> ArgConverter::CreateEmptyInstance(
 }
 
 Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Local<Context> context,
-                                                              bool intercepted) {
+                                                              CanaryKind kind) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   Local<FunctionTemplate> emptyInstanceCtorFuncTemplate = FunctionTemplate::New(isolate, nullptr);
   Local<ObjectTemplate> instanceTemplate = emptyInstanceCtorFuncTemplate->InstanceTemplate();
@@ -1398,9 +1407,7 @@ Local<v8::Function> ArgConverter::CreateEmptyInstanceFunction(Local<Context> con
 
   instanceTemplate->SetHandler(IndexedPropertyHandlerConfiguration(IndexedPropertyGetterCallback,
                                                                    IndexedPropertySetterCallback));
-  if (intercepted) {
-    WrapperLifetimeCanary::ConfigureInstanceTemplate(instanceTemplate);
-  }
+  WrapperLifetimeCanary::ConfigureInstanceTemplate(instanceTemplate, kind);
 
   Local<v8::Function> emptyInstanceCtorFunc;
   if (!emptyInstanceCtorFuncTemplate->GetFunction(context).ToLocal(&emptyInstanceCtorFunc)) {
