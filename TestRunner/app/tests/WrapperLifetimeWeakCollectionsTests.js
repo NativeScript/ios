@@ -281,6 +281,102 @@ describe("Weak collections of native objects", function () {
         expect(new WeakRef(key).deref()).toBe(key);
     });
 
+    it("keys the entries given to the WeakMap and WeakSet constructors by the native object", function (done) {
+        var owner = NSMutableArray.new();
+        var map;
+        var set;
+        (function () {
+            var obj = Extended.new();
+            map = new WeakMap([[obj, "constructed"]]);
+            set = new WeakSet([obj]);
+            owner.addObject(obj);
+        })();
+        settle(2, function () {
+            var obj = owner.objectAtIndex(0);
+            expect(map.get(obj)).toBe("constructed");
+            expect(set.has(obj)).toBe(true);
+            done();
+        });
+    });
+
+    it("keys a native object in a subclass of WeakMap", function (done) {
+        class TaggedMap extends WeakMap {
+            set(key, value) {
+                return super.set(key, "tagged:" + value);
+            }
+        }
+        var owner = NSMutableArray.new();
+        var map = new TaggedMap();
+        (function () {
+            var obj = Extended.new();
+            map.set(obj, "value");
+            owner.addObject(obj);
+        })();
+        settle(2, function () {
+            expect(map.get(owner.objectAtIndex(0))).toBe("tagged:value");
+            expect(map instanceof WeakMap).toBe(true);
+            done();
+        });
+    });
+
+    it("makes no key for a call the standard collection rejects", function () {
+        var obj = Extended.new();
+        var registry = new FinalizationRegistry(function () {});
+        var map = new WeakMap();
+        var states = runtime.getWrapperLifetimeStats().canaryStates;
+        expect(function () {
+            WeakMap.prototype.set.call({}, obj, 1);
+        }).toThrowError(TypeError);
+        expect(function () {
+            WeakSet.prototype.add.call({}, obj);
+        }).toThrowError(TypeError);
+        expect(function () {
+            registry.register(obj, "held", 1);
+        }).toThrowError(TypeError);
+        expect(function () {
+            FinalizationRegistry.prototype.register.call({}, obj, "held");
+        }).toThrowError(TypeError);
+        if (typeof map.getOrInsertComputed === "function") {
+            expect(function () {
+                WeakMap.prototype.getOrInsert.call({}, obj, 1);
+            }).toThrowError(TypeError);
+            expect(function () {
+                map.getOrInsertComputed(obj, function () {
+                    throw new Error("callback");
+                });
+            }).toThrowError("callback");
+        }
+        expect(runtime.getWrapperLifetimeStats().canaryStates).toBe(states);
+    });
+
+    it("hands getOrInsertComputed's callback the key it was given", function () {
+        var map = new WeakMap();
+        if (typeof map.getOrInsertComputed !== "function") {
+            return;
+        }
+        var obj = Extended.new();
+        var seen;
+        expect(map.getOrInsertComputed(obj, function (key) {
+            seen = key;
+            return "computed";
+        })).toBe("computed");
+        expect(seen === obj).toBe(true);
+        expect(map.get(obj)).toBe("computed");
+    });
+
+    it("matches the standard FinalizationRegistry.prototype.register signature and errors", function () {
+        var registry = new FinalizationRegistry(function () {});
+        expect(FinalizationRegistry.prototype.register.length).toBe(2);
+        expect(function () {
+            registry.register(1, 1);
+        }).toThrowError(TypeError, /invalid target/);
+    });
+
+    it("installs the canary collections only in canary mode", function () {
+        var native = WeakMap.toString().indexOf("[native code]") !== -1;
+        expect(native).toBe(!canary);
+    });
+
     it("iterates NSArray wrappers through the prototype", function () {
         var array = NSArray.arrayWithArray([1, 2, 3]);
         var seen = [];
