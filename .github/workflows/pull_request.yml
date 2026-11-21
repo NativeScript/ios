@@ -85,8 +85,8 @@ jobs:
     runs-on: macos-15
     needs: build
     strategy:
-      # The two variants answer different questions; one failing must not
-      # cancel the other.
+      # The variants answer different questions; one failing must not cancel
+      # the others.
       fail-fast: false
       matrix:
         include:
@@ -94,12 +94,26 @@ jobs:
             xcodebuild-args: ""
             artifact-suffix: ""
             cache-variant: default
+            cache-fallback-variant: ""
+            wrapper-lifetime: ""
           # Only code compiled here is instrumented: the runtime and the test
           # fixtures, not the prebuilt V8 archives.
           - name: Test (ASan)
             xcodebuild-args: "-enableAddressSanitizer YES"
             artifact-suffix: "-asan"
             cache-variant: asan
+            cache-fallback-variant: ""
+            wrapper-lifetime: ""
+          # The same build as "Test" with a different app config, so it can
+          # start from the default variant's cache (only that one is seeded
+          # from main). wrapper-lifetime is the "<mode>/<scope>" the suite
+          # must report.
+          - name: Test (canary)
+            xcodebuild-args: "NS_TEST_WRAPPER_LIFETIME=canary:all"
+            artifact-suffix: "-canary"
+            cache-variant: canary
+            cache-fallback-variant: default
+            wrapper-lifetime: canary/all
     steps:
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
@@ -120,7 +134,10 @@ jobs:
           # A distinct segment per variant: a bare prefix of one would also match
           # the other's keys. npm_release.yml saves the "default" variant from main.
           key: xcode-cas-${{ runner.os }}-${{ runner.arch }}-test-${{ matrix.cache-variant }}-${{ github.sha }}
-          restore-keys: xcode-cas-${{ runner.os }}-${{ runner.arch }}-test-${{ matrix.cache-variant }}-
+          # actions/cache drops the empty line when there is no fallback.
+          restore-keys: |
+            xcode-cas-${{ runner.os }}-${{ runner.arch }}-test-${{ matrix.cache-variant }}-
+            ${{ matrix.cache-fallback-variant && format('xcode-cas-{0}-{1}-test-{2}-', runner.os, runner.arch, matrix.cache-fallback-variant) || '' }}
       - name: Enable Xcode compilation cache
         run: |
           echo "XCODE_XCCONFIG_FILE=$GITHUB_WORKSPACE/tools/ci-compilation-cache.xcconfig" >> "$GITHUB_ENV"
@@ -179,6 +196,11 @@ jobs:
           ls "$TEST_FOLDER"/test-out/*junit*.xml > /dev/null 2>&1 || { echo "::error::No JUnit report in $TEST_FOLDER/test-out"; exit 1; }
           find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
           find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
+      - name: Validate wrapper lifetime mode
+        if: ${{ matrix.wrapper-lifetime != '' }}
+        env:
+          EXPECTED_WRAPPER_LIFETIME: ${{ matrix.wrapper-lifetime }}
+        run: ./scripts/check-wrapper-lifetime-report.sh --reports "$TEST_FOLDER/test-out" --expect "$EXPECTED_WRAPPER_LIFETIME"
       - name: Collect test diagnostics
         if: failure()
         uses: ./.github/actions/collect-test-diagnostics
