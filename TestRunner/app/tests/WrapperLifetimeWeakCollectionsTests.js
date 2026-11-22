@@ -285,13 +285,18 @@ describe("Weak collections of native objects", function () {
         var owner = NSMutableArray.new();
         var map;
         var set;
+        var first;
         (function () {
             var obj = Extended.new();
             map = new WeakMap([[obj, "constructed"]]);
             set = new WeakSet([obj]);
             owner.addObject(obj);
+            first = new WrapperWeakRef(obj);
         })();
         settle(2, function () {
+            if (canary) {
+                expect(first.deref()).toBeUndefined();
+            }
             var obj = owner.objectAtIndex(0);
             expect(map.get(obj)).toBe("constructed");
             expect(set.has(obj)).toBe(true);
@@ -307,12 +312,17 @@ describe("Weak collections of native objects", function () {
         }
         var owner = NSMutableArray.new();
         var map = new TaggedMap();
+        var first;
         (function () {
             var obj = Extended.new();
             map.set(obj, "value");
             owner.addObject(obj);
+            first = new WrapperWeakRef(obj);
         })();
         settle(2, function () {
+            if (canary) {
+                expect(first.deref()).toBeUndefined();
+            }
             expect(map.get(owner.objectAtIndex(0))).toBe("tagged:value");
             expect(map instanceof WeakMap).toBe(true);
             done();
@@ -435,7 +445,7 @@ describe("Weak collections of native objects", function () {
         expect(watch.allObjects.count).toBe(0);
         expect(map.get(obj)).toBe("value");
         expect(set.has(obj)).toBe(true);
-        expect(ref.deref() === undefined || ref.deref() === obj).toBe(true);
+        expect(ref.deref() === (canary ? undefined : obj)).toBe(true);
     });
 
     it("deallocates a released natively retained object once native code lets go, while its wrapper is held and dereferenced", function (done) {
@@ -450,21 +460,25 @@ describe("Weak collections of native objects", function () {
         set.add(obj);
         var ref = new WeakRef(obj);
         __releaseNativeCounterpart(obj);
+        var expected = canary ? undefined : obj;
 
+        // Whether every dereference gave the mode's expected target.
         function poke() {
+            var matched = true;
             for (var i = 0; i < 10; i++) {
-                ref.deref();
+                matched = ref.deref() === expected && matched;
                 map.get(obj);
                 set.has(obj);
             }
+            return matched;
         }
-        poke();
+        expect(poke()).toBe(true);
         settle(2, function () {
-            poke();
+            expect(poke()).toBe(true);
             owner.removeAllObjects();
-            poke();
+            expect(poke()).toBe(true);
             expect(watch.allObjects.count).toBe(0);
-            expect(ref.deref() === undefined || ref.deref() === obj).toBe(true);
+            expect(ref.deref() === expected).toBe(true);
             expect(map.get(obj)).toBe("value");
             expect(set.has(obj)).toBe(true);
             done();
@@ -495,14 +509,22 @@ describe("Weak collections of native objects", function () {
             }
         };
         global.addEventListener("releasednativeaccess", onReleased);
-        var map = new WeakMap();
-        var before = releasedAccesses();
-        map.set(releasedNeverKeyed(), 1);
-        expect(releasedAccesses()).toBe(before + 1);
-        new WeakRef(releasedNeverKeyed());
-        expect(releasedAccesses()).toBe(before + 2);
-        expect(map.get(releasedNeverKeyed())).toBeUndefined();
-        expect(releasedAccesses()).toBe(before + 3);
+        try {
+            var map = new WeakMap();
+            var before = releasedAccesses();
+            var kept = releasedNeverKeyed();
+            map.set(kept, 1);
+            expect(releasedAccesses()).toBe(before + 1);
+            expect(map.get(kept) === 1).toBe(true);
+            expect(releasedAccesses()).toBe(before + 1);
+            new WeakRef(releasedNeverKeyed());
+            expect(releasedAccesses()).toBe(before + 2);
+            expect(map.get(releasedNeverKeyed())).toBeUndefined();
+            expect(releasedAccesses()).toBe(before + 3);
+        } catch (e) {
+            global.removeEventListener("releasednativeaccess", onReleased);
+            throw e;
+        }
         setTimeout(function () {
             global.removeEventListener("releasednativeaccess", onReleased);
             expect(messages.length).toBe(3);
@@ -600,6 +622,14 @@ describe("Weak collections of native objects", function () {
             expect(function () {
                 WeakMap.prototype.getOrInsert.call({}, obj, 1);
             }).toThrowError(TypeError);
+            var computed = false;
+            expect(function () {
+                WeakMap.prototype.getOrInsertComputed.call({}, obj, function () {
+                    computed = true;
+                    return 1;
+                });
+            }).toThrowError(TypeError);
+            expect(computed).toBe(false);
             expect(function () {
                 map.getOrInsertComputed(obj, function () {
                     throw new Error("callback");
