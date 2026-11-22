@@ -90,16 +90,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # wrapper-lifetime-pass: "<mode>:<scope>" to run the suite a second
+          # time, on the same build, under that wrapper lifetime mode.
           - name: Test
             xcodebuild-args: ""
             artifact-suffix: ""
             cache-variant: default
+            wrapper-lifetime-pass: "canary:all"
           # Only code compiled here is instrumented: the runtime and the test
           # fixtures, not the prebuilt V8 archives.
           - name: Test (ASan)
             xcodebuild-args: "-enableAddressSanitizer YES"
             artifact-suffix: "-asan"
             cache-variant: asan
+            wrapper-lifetime-pass: ""
+    env:
+      # Must match the simulator named in "Wait for the test simulator".
+      TEST_DESTINATION: "platform=iOS Simulator,OS=latest,name=iPhone 16 Pro"
     steps:
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
@@ -133,25 +140,30 @@ jobs:
         run: |
           mkdir -p dist-test
           echo TEST_FOLDER=$(pwd)/dist-test >> $GITHUB_ENV
-      # Must match the simulator named in the Xcode Tests -destination.
+      # Must match the simulator named in TEST_DESTINATION.
+      # --boot leaves the simulator booting in the background, so the boot
+      # overlaps build-for-testing instead of delaying the first test run.
       - name: Wait for the test simulator
-        run: ./scripts/wait-for-simulator.sh --name "iPhone 16 Pro"
+        run: ./scripts/wait-for-simulator.sh --name "iPhone 16 Pro" --boot
+      - name: Build for testing
+        id: build-for-testing
+        run: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -destination "$TEST_DESTINATION" ${{ matrix.xcodebuild-args }} build-for-testing | xcpretty
       - name: Xcode Tests
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         # try to run the tests with xcpretty. If it fails then try again without xcpretty twice for better log output
         # the xcode tests are a bit flaky and they should never fail on this step, as this step only collects the JS test results as junit xml
         with:
-          # Build (~10m) + the runtime suite's report-wait (up to 10m, see
-          # TestRunnerTests.swift) need more than 20m headroom per attempt.
-          timeout_minutes: 40
+          # The runtime suite's report-wait alone can take 10m (see
+          # TestRunnerTests.swift), plus app install and launch.
+          timeout_minutes: 25
           max_attempts: 2
-          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro ${{ matrix.xcodebuild-args }} test | xcpretty
+          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination "$TEST_DESTINATION" ${{ matrix.xcodebuild-args }} test-without-building | xcpretty
           # Keep the failed attempt's bundle — it holds the diagnostics of the
           # failure being retried. Everything else at the result path must go
           # (including extensionless staging leftovers), or the retry dies with
           # "Existing file at -resultBundlePath".
           on_retry_command: rm -rf $TEST_FOLDER/test_results_attempt1.xcresult; mv $TEST_FOLDER/test_results.xcresult $TEST_FOLDER/test_results_attempt1.xcresult 2>/dev/null; for f in $TEST_FOLDER/test_results*; do [ "$f" = "$TEST_FOLDER/test_results_attempt1.xcresult" ] || rm -rf "$f"; done; xcrun simctl shutdown all
-          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination platform\=iOS\ Simulator,OS\=latest,name\=iPhone\ 16\ Pro ${{ matrix.xcodebuild-args }} test
+          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $TEST_FOLDER/test_results -destination "$TEST_DESTINATION" ${{ matrix.xcodebuild-args }} test-without-building
       - name: Xcode compilation cache size
         if: ${{ !cancelled() }}
         run: du -sh "$NS_COMPILATION_CACHE_DIR" || true
@@ -179,6 +191,56 @@ jobs:
           ls "$TEST_FOLDER"/test-out/*junit*.xml > /dev/null 2>&1 || { echo "::error::No JUnit report in $TEST_FOLDER/test-out"; exit 1; }
           find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
           find $TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
+      # Second pass: the same build with "wrapperLifetime" set in the built
+      # app's package.json. It runs whatever the first pass's outcome, so a
+      # default-mode failure still yields this pass's results and diagnostics.
+      # test-without-building runs no build phases, so the rewrite stands.
+      - name: Configure the built app for the wrapper lifetime pass
+        id: wrapper-lifetime-app
+        if: ${{ !cancelled() && matrix.wrapper-lifetime-pass != '' && steps.build-for-testing.outcome == 'success' }}
+        env:
+          WRAPPER_LIFETIME: ${{ matrix.wrapper-lifetime-pass }}
+        run: |
+          APP="$(find build -maxdepth 2 -type d -path 'build/*-iphonesimulator/TestRunner.app')"
+          [ -n "$APP" ] && [ "$(printf '%s\n' "$APP" | wc -l)" -eq 1 ] || { echo "::error::Expected one built TestRunner.app under build/, found: ${APP:-none}"; exit 1; }
+          node tools/apply-test-app-config.mjs --source TestRunner/app/package.json --out "$APP/app/package.json" --wrapper-lifetime "$WRAPPER_LIFETIME"
+          # Rewriting a resource breaks the bundle's seal; re-seal it ad hoc,
+          # keeping the build's entitlements.
+          codesign --force --sign - --timestamp=none --preserve-metadata=entitlements "$APP"
+          echo "WL_TEST_FOLDER=$TEST_FOLDER/wrapper-lifetime" >> "$GITHUB_ENV"
+          mkdir -p "$TEST_FOLDER/wrapper-lifetime"
+      - name: Xcode Tests (wrapper lifetime ${{ matrix.wrapper-lifetime-pass }})
+        if: ${{ !cancelled() && steps.wrapper-lifetime-app.outcome == 'success' }}
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+        with:
+          timeout_minutes: 25
+          max_attempts: 2
+          command: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $WL_TEST_FOLDER/test_results -destination "$TEST_DESTINATION" ${{ matrix.xcodebuild-args }} test-without-building | xcpretty
+          on_retry_command: rm -rf $WL_TEST_FOLDER/test_results_attempt1.xcresult; mv $WL_TEST_FOLDER/test_results.xcresult $WL_TEST_FOLDER/test_results_attempt1.xcresult 2>/dev/null; for f in $WL_TEST_FOLDER/test_results*; do [ "$f" = "$WL_TEST_FOLDER/test_results_attempt1.xcresult" ] || rm -rf "$f"; done; xcrun simctl shutdown all
+          new_command_on_retry: xcodebuild -project v8ios.xcodeproj -scheme TestRunner -resultBundlePath $WL_TEST_FOLDER/test_results -destination "$TEST_DESTINATION" ${{ matrix.xcodebuild-args }} test-without-building
+      - name: Extract test results (wrapper lifetime)
+        if: ${{ !cancelled() && steps.wrapper-lifetime-app.outcome == 'success' }}
+        run: |
+          if [ -d "$WL_TEST_FOLDER/test_results.xcresult" ]; then
+            ./scripts/export-test-attachments.sh --result "$WL_TEST_FOLDER/test_results.xcresult" --output "$WL_TEST_FOLDER/test-out"
+          fi
+      - name: Test report summary (wrapper lifetime)
+        if: ${{ !cancelled() && steps.wrapper-lifetime-app.outcome == 'success' }}
+        uses: mikepenz/action-junit-report@6ef3fdcfcd5f0b5d14df3e659ef19b8c6820f93d # v6.6.1
+        with:
+          check_name: JUnit Test Report (wrapper lifetime ${{ matrix.wrapper-lifetime-pass }})
+          report_paths: dist-test/wrapper-lifetime/test-out/*junit*.xml
+          annotate_only: true
+          detailed_summary: true
+      - name: Validate Test Results (wrapper lifetime)
+        if: ${{ !cancelled() && steps.wrapper-lifetime-app.outcome == 'success' }}
+        env:
+          WRAPPER_LIFETIME: ${{ matrix.wrapper-lifetime-pass }}
+        run: |
+          ls "$WL_TEST_FOLDER"/test-out/*junit*.xml > /dev/null 2>&1 || { echo "::error::No JUnit report in $WL_TEST_FOLDER/test-out"; exit 1; }
+          find $WL_TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
+          find $WL_TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
+          ./scripts/check-wrapper-lifetime-report.sh --reports "$WL_TEST_FOLDER/test-out" --expect "$(printf '%s' "$WRAPPER_LIFETIME" | tr ':' '/')"
       - name: Collect test diagnostics
         if: failure()
         uses: ./.github/actions/collect-test-diagnostics
@@ -193,6 +255,8 @@ jobs:
           path: |
             ${{env.TEST_FOLDER}}/test_results.xcresult
             ${{env.TEST_FOLDER}}/test_results_attempt1.xcresult
+            ${{env.TEST_FOLDER}}/wrapper-lifetime/test_results.xcresult
+            ${{env.TEST_FOLDER}}/wrapper-lifetime/test_results_attempt1.xcresult
   test-catalyst:
     name: Test (Mac Catalyst)
     runs-on: macos-15

@@ -295,6 +295,13 @@ Simulator options:
 
 Run options:
   -a, --asan              Run under AddressSanitizer (-enableAddressSanitizer YES)
+      --wrapper-lifetime <mode>[:<scope>]
+                          Run the suite under a wrapper lifetime mode: the built app's
+                          package.json gets "wrapperLifetime": { mode, scope } (the
+                          source TestRunner/app/package.json is not modified), and the
+                          run fails unless the suite reports that mode.
+                          mode: resurrecting | rooted | canary
+                          scope: extended | all (default: extended)
   -t, --temp-folder       Write results to a random temp folder instead of build/tests/<udid>
   -h, --help              Show this help
 
@@ -320,6 +327,7 @@ SIM_RUNTIME=""
 DELETE_TARGET=""
 TEST_FOLDER=""
 CATALYST=0
+WRAPPER_LIFETIME=""
 
 set_sim_mode() {
   if [ -n "$SIM_MODE" ] && [ "$SIM_MODE" != "$1" ]; then
@@ -367,6 +375,8 @@ while [ $# -gt 0 ]; do
     --list-sims)   set_sim_mode "list-sims"; shift ;;
     --delete-sims) set_sim_mode "delete-sims"; shift ;;
     --catalyst)       CATALYST=1; shift ;;
+    --wrapper-lifetime|--wrapper-lifetime=*)
+      take_value "--wrapper-lifetime" "$1" "${2:-}" "$has_next"; WRAPPER_LIFETIME="$OPT_VALUE"; shift "$OPT_SHIFT" ;;
     -a|--asan)        ASAN=1; shift ;;
     -t|--temp-folder) TEMP_FOLDER=1; shift ;;
     -h|--help)        usage; exit 0 ;;
@@ -407,9 +417,22 @@ if { [ -n "$SIM_DEVICE_TYPE" ] || [ -n "$SIM_RUNTIME" ]; } && [ "$CREATES_SIM" -
   die_usage "--device-type and --runtime only apply when a simulator may be created."
 fi
 if [ -n "$SIM_MODE" ] && [ "$SIM_MODE" != "temp-sim" ] && [ "$SIM_MODE" != "keep-sim" ]; then
-  if [ "$ASAN" -eq 1 ] || [ "$TEMP_FOLDER" -eq 1 ]; then
-    die_usage "--asan and --temp-folder do not apply to --$SIM_MODE."
+  if [ "$ASAN" -eq 1 ] || [ "$TEMP_FOLDER" -eq 1 ] || [ -n "$WRAPPER_LIFETIME" ]; then
+    die_usage "--asan, --temp-folder and --wrapper-lifetime do not apply to --$SIM_MODE."
   fi
+fi
+if [ -n "$WRAPPER_LIFETIME" ]; then
+  WL_MODE="${WRAPPER_LIFETIME%%:*}"
+  WL_SCOPE="extended"
+  [[ "$WRAPPER_LIFETIME" == *:* ]] && WL_SCOPE="${WRAPPER_LIFETIME#*:}"
+  case "$WL_MODE" in
+    resurrecting|rooted|canary) ;;
+    *) die_usage "--wrapper-lifetime: unknown mode '$WL_MODE' (resurrecting, rooted or canary)." ;;
+  esac
+  case "$WL_SCOPE" in
+    extended|all) ;;
+    *) die_usage "--wrapper-lifetime: unknown scope '$WL_SCOPE' (extended or all)." ;;
+  esac
 fi
 
 sim_label() {
@@ -562,6 +585,11 @@ if [ "$ASAN" -eq 1 ]; then
   echo "AddressSanitizer: enabled"
   XCODEBUILD_ARGS+=(-enableAddressSanitizer YES)
 fi
+if [ -n "$WRAPPER_LIFETIME" ]; then
+  echo "Wrapper lifetime: $WL_MODE/$WL_SCOPE"
+  # Read by the TestRunner target's "Apply Test App Config" build phase.
+  XCODEBUILD_ARGS+=("NS_TEST_WRAPPER_LIFETIME=$WL_MODE:$WL_SCOPE")
+fi
 
 set -o pipefail
 xcodebuild -project "$SCRIPT_DIR/v8ios.xcodeproj" -scheme TestRunner \
@@ -580,6 +608,17 @@ if command -v xcparse &>/dev/null; then
   xcparse attachments "$TEST_FOLDER/test_results.xcresult" "$TEST_FOLDER/test-out"
   find "$TEST_FOLDER/test-out" -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
   find "$TEST_FOLDER/test-out" -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
+fi
+
+if [ -n "$WRAPPER_LIFETIME" ]; then
+  if ! ls "$TEST_FOLDER"/test-out/*junit*.xml >/dev/null 2>&1 && [ -d "$TEST_FOLDER/test_results.xcresult" ]; then
+    "$SCRIPT_DIR/scripts/export-test-attachments.sh" --result "$TEST_FOLDER/test_results.xcresult" \
+      --output "$TEST_FOLDER/test-out" >/dev/null
+  fi
+  if ! "$SCRIPT_DIR/scripts/check-wrapper-lifetime-report.sh" --reports "$TEST_FOLDER/test-out" \
+       --expect "$WL_MODE/$WL_SCOPE"; then
+    [ $TEST_EXIT -ne 0 ] || TEST_EXIT=1
+  fi
 fi
 
 exit $TEST_EXIT
