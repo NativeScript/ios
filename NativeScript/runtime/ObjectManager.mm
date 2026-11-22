@@ -841,13 +841,23 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
       // An adopted wrapper (WrapperLifetime) owns its registration whether or not
       // the Instances entry still names it, and its handle may be strong.
       if (adopted->disposing_) {
-        // The teardown walk owns this state and releases the object.
+        // Another frame owns this state and releases the object: the teardown
+        // walk, or an outer call still writing the canary's key below.
         return;
       }
       if (adopted->lifetimeCanary_) {
-        // Before the release below, which can run the object's -dealloc.
+        // Before the release below, which can run the object's -dealloc. The
+        // write can allocate, and the finalizers of the collection that
+        // triggers can run JS that calls this builtin on the same wrapper.
+        adopted->disposing_ = true;
         WrapperLifetimeCanary::KeepWeakCollectionKey(isolate, value.As<Object>(),
                                                      adopted->canaryRecord_);
+        // The wrapper first: a release that got through would have freed it.
+        if (tns::GetValue(isolate, value) != wrapper || objcWrapper->LifetimeState() != adopted) {
+          return;
+        }
+        // Those finalizers can also have changed Instances.
+        it = cache->Instances.find(data);
       }
       if (it != cache->Instances.end() && it->second == adopted->target_) {
         cache->Instances.erase(it);

@@ -40,11 +40,14 @@ struct ObjectWeakCallbackState {
   ObjectWeakCallbackState* prev_ = nullptr;
   ObjectWeakCallbackState* next_ = nullptr;
 
-  // Set while one of the two owning sites is disposing this handle's value.
-  // Disposal releases the native counterpart, whose -dealloc can re-enter JS
-  // and reach __releaseNativeCounterpart for this very handle; retiring it
-  // there would free the state under the frame that owns it. Retirement
-  // observes the flag and leaves the handle to that frame.
+  // Set while one of the two owning sites is disposing this handle's value,
+  // or while __releaseNativeCounterpart writes a canary's weak collection key
+  // before retiring the registration it adopted. Disposal releases the native
+  // counterpart, whose -dealloc can re-enter JS and reach
+  // __releaseNativeCounterpart for this very handle, and the key write can
+  // run a collection whose finalizers do; retiring it there would free the
+  // state under the frame that owns it. Retirement observes the flag and
+  // leaves the handle to that frame.
   bool disposing_ = false;
 
   // Set when WrapperLifetime adopted this registration (an ObjC object wrapper
