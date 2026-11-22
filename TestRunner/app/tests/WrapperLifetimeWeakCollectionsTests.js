@@ -535,6 +535,28 @@ describe("Weak collections of native objects", function () {
         }
     });
 
+    it("gets an undefined value stored on a canary released before anything keyed its object", function (done) {
+        if (!canary) {
+            done();
+            return;
+        }
+        var map = new WeakMap();
+        var obj = releasedNeverKeyed();
+        map.set(obj, undefined);
+        var policy = runtime.getConfig("releasedObjectPolicy");
+        runtime.setConfig("releasedObjectPolicy", "throw");
+        try {
+            var before = releasedAccesses();
+            expect(map.get(obj) === undefined).toBe(true);
+            expect(map.has(obj)).toBe(true);
+            expect(releasedAccesses()).toBe(before);
+        } finally {
+            runtime.setConfig("releasedObjectPolicy", policy);
+        }
+        // Lets the report of the set() above be delivered within this spec.
+        setTimeout(done);
+    });
+
     it("does not report a weak collection operation on a released wrapper whose object was keyed", function () {
         var policy = runtime.getConfig("releasedObjectPolicy");
         runtime.setConfig("releasedObjectPolicy", "throw");

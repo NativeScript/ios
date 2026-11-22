@@ -71,7 +71,8 @@ const receiverProbe = ObjectFreeze({ __proto__: null });
 class WeakMap extends NativeWeakMap {
   get(key) {
     const direct = WeakMapPrototypeGet(this, key);
-    if (direct !== undefined) {
+    // A stored undefined is a hit too.
+    if (direct !== undefined || WeakMapPrototypeHas(this, key)) {
       return direct;
     }
     const other = otherKey(key);
