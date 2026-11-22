@@ -63,8 +63,10 @@ typedef NSError* _Nullable TNSNullableError;
 @interface TNSNativeMemberGuard : NSObject
 - (int)value:(int)x;
 - (int)other:(int)x;
+- (int)nested:(int)x;
 + (int)callValue:(TNSNativeMemberGuard*)object with:(int)x;
 + (int)callOther:(TNSNativeMemberGuard*)object with:(int)x;
++ (int)callNested:(TNSNativeMemberGuard*)object with:(int)x;
 @end
 
 @interface TNSNativeMemberGuardChild : TNSNativeMemberGuard

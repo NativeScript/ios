@@ -205,19 +205,35 @@ void ForgetNativeSetter(Isolate* isolate, Local<Object> prototype, Local<v8::Nam
   }
 }
 
-// Set while the native member guard defines a property on an object whose
+// The property the native member guard is defining on an object whose
 // handlers already saw the write: a native class prototype's handlers must
 // not swizzle twice, nor take a guard's accessor pair for a native property's.
-thread_local bool definingGuardedMember_ = false;
-
+// Only that object and name: JS the definition runs, such as a Proxy's
+// defineProperty trap, can assign other members, which must still swizzle.
 class DefiningGuardedMember {
  public:
-  DefiningGuardedMember() : previous_(definingGuardedMember_) { definingGuardedMember_ = true; }
-  ~DefiningGuardedMember() { definingGuardedMember_ = previous_; }
+  DefiningGuardedMember(Isolate* isolate, Local<Object> object, Local<v8::Name> name)
+      : isolate_(isolate), object_(object), name_(name), previous_(current_) {
+    current_ = this;
+  }
+  ~DefiningGuardedMember() { current_ = previous_; }
+
+  // The innermost definition is `property` on `holder` itself.
+  static bool Defines(Isolate* isolate, Local<Object> holder, Local<v8::Name> property) {
+    const DefiningGuardedMember* defining = current_;
+    return defining != nullptr && defining->isolate_ == isolate && defining->object_ == holder &&
+           defining->name_->StrictEquals(property);
+  }
 
  private:
-  bool previous_;
+  static thread_local const DefiningGuardedMember* current_;
+  Isolate* isolate_;
+  Local<Object> object_;
+  Local<v8::Name> name_;
+  const DefiningGuardedMember* previous_;
 };
+
+thread_local const DefiningGuardedMember* DefiningGuardedMember::current_ = nullptr;
 
 struct NativeMemberGuardState {
   // (function (f) { return function () { return f; }; }): the getter is a JS
@@ -297,7 +313,7 @@ void NativeMemberGuardSetter(const FunctionCallbackInfo<Value>& info) {
                    "never calls JS own properties of a native object");
     return;
   }
-  DefiningGuardedMember defining;
+  DefiningGuardedMember defining(isolate, receiver, name);
   (void)receiver->CreateDataProperty(isolate->GetCurrentContext(), name,
                                      info.Length() > 0 ? info[0] : v8::Undefined(isolate));
 }
@@ -320,7 +336,7 @@ void NativeCalledMethodSetter(const FunctionCallbackInfo<Value>& info) {
                    "callers only");
     return;
   }
-  DefiningGuardedMember defining;
+  DefiningGuardedMember defining(isolate, receiver, name);
   (void)receiver->CreateDataProperty(isolate->GetCurrentContext(), name,
                                      info.Length() > 0 ? info[0] : v8::Undefined(isolate));
 }
@@ -351,7 +367,7 @@ Local<v8::Function> GuardMethod(Isolate* isolate, Local<Context> context,
            .ToLocal(&setterFunction)) {
     return Local<v8::Function>();
   }
-  DefiningGuardedMember defining;
+  DefiningGuardedMember defining(isolate, prototype, name);
   prototype->SetAccessorProperty(name, getter.As<v8::Function>(), setterFunction,
                                  static_cast<PropertyAttribute>(attributes & DontEnum));
   return getter.As<v8::Function>();
@@ -1809,10 +1825,10 @@ void ReplaceKeepingOriginal(Class klass, SEL selector, const char* selectorName,
 
 v8::Intercepted MetadataBuilder::SwizzledInstanceMethodCallback(
     Local<v8::Name> property, Local<Value> value, const PropertyCallbackInfo<v8::Boolean>& info) {
-  if (definingGuardedMember_) {
+  Isolate* isolate = info.GetIsolate();
+  if (DefiningGuardedMember::Defines(isolate, info.Holder(), property)) {
     return v8::Intercepted::kNo;
   }
-  Isolate* isolate = info.GetIsolate();
   ForgetNativeSetter(isolate, info.Holder(), property);
   std::string methodName = tns::ToString(isolate, property);
 
@@ -1858,10 +1874,10 @@ v8::Intercepted MetadataBuilder::SwizzledInstanceMethodCallback(
 v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
     Local<v8::Name> property, const PropertyDescriptor& desc,
     const PropertyCallbackInfo<v8::Boolean>& info) {
-  if (definingGuardedMember_) {
+  Isolate* isolate = info.GetIsolate();
+  if (DefiningGuardedMember::Defines(isolate, info.Holder(), property)) {
     return v8::Intercepted::kNo;
   }
-  Isolate* isolate = info.GetIsolate();
   ForgetNativeSetter(isolate, info.Holder(), property);
   std::string propertyName = tns::ToString(isolate, property);
 

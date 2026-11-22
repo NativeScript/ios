@@ -428,6 +428,36 @@ describe("Native member guard", function () {
         });
     });
 
+    it("swizzles a prototype assignment made from a Proxy trap a guarded write runs", function () {
+        var object = TNSNativeMemberGuard.new();
+        var prototype = TNSNativeMemberGuard.prototype;
+        var original = prototype.nested;
+        var descriptor = Object.getOwnPropertyDescriptor(prototype, "nested");
+        var replaced = function (x) {
+            return 10 * original.call(this, x);
+        };
+        var target = Object.create(prototype);
+        var proxy = new Proxy(target, {
+            defineProperty: function (definedOn, key, definition) {
+                if (key === "value") {
+                    prototype.nested = replaced;
+                }
+                return Reflect.defineProperty(definedOn, key, definition);
+            }
+        });
+        try {
+            proxy.value = replacement;
+            expect(hasOwn(target, "value")).toBe(true);
+            expect(object.nested(1)).toBe(40);
+            expect(TNSNativeMemberGuard.callNestedWith(object, 1)).toBe(40);
+        } finally {
+            prototype.nested = original;
+            Object.defineProperty(prototype, "nested", descriptor);
+        }
+        expect(TNSNativeMemberGuard.callNestedWith(object, 1)).toBe(4);
+        expect(Object.getOwnPropertyDescriptor(prototype, "nested")).toEqual(descriptor);
+    });
+
     // Runs last among the specs that use TNSNativeMemberGuard: the replacement
     // stays installed.
     it("swizzles a guarded method assigned on its class's prototype", function () {
