@@ -210,6 +210,17 @@ describe("Weak collections of native objects", function () {
         };
     }
 
+    // The objects a weak table still holds. The array allObjects returns
+    // retains them until its wrapper is released and the autorelease pool
+    // drains; a "rooted" collection before that counts the retain as native
+    // ownership and roots their wrappers.
+    function watchedCount(table) {
+        var all = table.allObjects;
+        var count = all.count;
+        __releaseNativeCounterpart(all);
+        return count;
+    }
+
     it("lets a keyed wrapper nothing references die and its JS-owned native object go", function (done) {
         var watch = NSHashTable.weakObjectsHashTable();
         var keyed = collections();
@@ -221,7 +232,7 @@ describe("Weak collections of native objects", function () {
         var attempts = 15;
         (function poll() {
             settle(1, function () {
-                var gone = watch.allObjects.count === 0;
+                var gone = watchedCount(watch) === 0;
                 if (gone || --attempts === 0) {
                     expect(gone).toBe(true);
                     if (canary) {
@@ -231,7 +242,8 @@ describe("Weak collections of native objects", function () {
                     done();
                     return;
                 }
-                poll();
+                // Collects only after the run loop drained the probe's array.
+                setTimeout(poll, 10);
             });
         })();
     });
