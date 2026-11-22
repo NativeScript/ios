@@ -73,9 +73,10 @@ declare module "ns:runtime" {
      *   WeakMap, WeakSet, WeakRef and FinalizationRegistry key such native
      *   objects by their lifetime in this mode, so they carry over too, and
      *   under scope `"extended"` also key plain objects by their lifetime once
-     *   they first key one (a state holding only the key, with the same
-     *   token); a WeakMap value that references its own native key keeps that
-     *   object alive while the map lives. Native `#private` fields and index-keyed
+     *   they first key one (a state holding only the key; nothing is attached
+     *   to the object, whose death is found after a major collection); a
+     *   WeakMap value that references its own native key keeps that object
+     *   alive while the map lives. Native `#private` fields and index-keyed
      *   properties do not.
      *   State that references its own object keeps that object alive.
      */

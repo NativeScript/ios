@@ -419,8 +419,9 @@ describe("Weak collections of native objects", function () {
         });
     });
 
-    // Only objects outside JS-extended classes carry the token the removal
-    // releases: canaries under scope "all", key-only states under "extended".
+    // Only canaries of objects outside JS-extended classes (scope "all") carry
+    // the token the removal releases; a key-only state under "extended" has
+    // none and survives it.
     it("keys a live object again after its associations are removed", function (done) {
         if (!canary || typeof objc_removeAssociatedObjects !== "function") {
             done();
@@ -437,6 +438,10 @@ describe("Weak collections of native objects", function () {
             var ref = new WeakRef(obj);
             expect(ref.deref() === obj).toBe(true);
             objc_removeAssociatedObjects(obj);
+            if (plainKeys) {
+                expect(before.get(obj)).toBe("before");
+                expect(ref.deref() === obj).toBe(true);
+            }
             // The WeakRef loses the object exactly when the WeakMap does: the
             // token death signal retires the key, the weak sweep keeps it.
             expect((ref.deref() === undefined) === (before.get(obj) === undefined)).toBe(true);
@@ -537,9 +542,10 @@ describe("Weak collections of native objects", function () {
         });
     });
 
-    // Under canary mode such an object gets no state: the token that would
-    // report its deallocation cannot be associated with it.
-    it("keys an object whose class forbids associated objects by its wrapper", function () {
+    // A canary of such an object gets no state: the token that would report
+    // its deallocation cannot be associated with it. A plain object's key-only
+    // state under "extended" needs no token, so the weak collections key it.
+    it("keys an object whose class forbids associated objects", function () {
         var obj = TNSAssociationForbidder.forbiddingInstance();
         expect(TNSAssociationForbidder.forbidsAssociatedObjects(obj)).toBe(true);
         var before = runtime.getWrapperLifetimeStats();
@@ -558,8 +564,32 @@ describe("Weak collections of native objects", function () {
         expect(obj.tag).toBe("kept");
         expect(obj.defined).toBe(1);
         if (canary) {
-            expect(runtime.getWrapperLifetimeStats().canaryStates).toBe(before.canaryStates);
+            expect(runtime.getWrapperLifetimeStats().canaryStates)
+                .toBe(before.canaryStates + (plainKeys ? 1 : 0));
         }
+    });
+
+    it("keeps what was keyed on a plain object whose class forbids associated objects across a wrapper change", function (done) {
+        if (!plainKeys) {
+            done();
+            return;
+        }
+        var owner = NSMutableArray.new();
+        var map = new WeakMap();
+        var first;
+        (function () {
+            var obj = TNSAssociationForbidder.forbiddingInstance();
+            owner.addObject(obj);
+            map.set(obj, "value");
+            first = new WrapperWeakRef(obj);
+        })();
+        pollUntil(function () {
+            return first.deref() === undefined;
+        }, function () {
+            expect(first.deref() === undefined).toBe(true);
+            expect(map.get(owner.objectAtIndex(0))).toBe("value");
+            done();
+        });
     });
 
     it("keeps working as the standard collections for other keys", function () {

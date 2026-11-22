@@ -248,20 +248,27 @@ in the standard collections. What follows from that:
 - Under scope `"extended"` a plain (not JS-extended) object's wrapper is not a
   canary, but it also dies with its JS references while the object lives on.
   So the first `set`, `add`, `new WeakRef` or `register` of a plain object
-  gives the object a state holding only its key, with the same lifecycle
-  token a plain canary gets under `"all"`, and from then on it is keyed by
-  its lifetime exactly as a canary is, release included. Objects of a class
-  that forbids associated objects or refuses weak references, tagged pointers
-  and blocks stay keyed by their wrapper. Wrapping plain objects, calling
-  them and their properties cost nothing more. Each weak collection operation
-  on a keyed plain object asks native code for its key (about 145 ns
-  for a `WeakMap.prototype.get` hit instead of 40, Release
-  simulator build), the first keying of an object costs about 800 ns
-  more, and once any plain object was keyed a miss on one never keyed costs
-  about 126 ns instead of 107. As with canaries, a
-  `WeakMap` value that references its plain key keeps the object alive while
-  the map lives, and `objc_removeAssociatedObjects` on the object loses what
-  was keyed on it.
+  gives the object a state holding only its key, and from then on it is keyed
+  by its lifetime as a canary is, release included. Nothing is attached to
+  the object: the runtime holds a weak reference to it and checks it after
+  each major garbage collection, so what was keyed on a plain object that
+  was deallocated stays until the next major collection (its
+  `FinalizationRegistry` callbacks run after that), and
+  `objc_removeAssociatedObjects` does not affect it. Objects of a class that
+  refuses weak references, tagged pointers and blocks stay keyed by their
+  wrapper. Wrapping plain objects, calling them and their properties cost
+  nothing more, and so does a major collection while no plain object is
+  keyed. Each weak collection operation on a keyed plain object asks native
+  code for its key (about 142 ns for a `WeakMap.prototype.get` hit instead of
+  39, Release simulator build), the first keying of an object costs about
+  700 ns more, once any plain object was keyed a miss on one never keyed
+  costs about 124 ns instead of 106, and with 1000 keyed plain objects a
+  major collection takes about 130 µs more than with the same objects
+  unkeyed, for their keys and states on the heap. Limitations: as with
+  canaries, a `WeakMap` value that references its plain key keeps the object
+  alive while the map lives; and if native code hands a released object back
+  and that wrapper dies before any weak collection operation sees it,
+  `deref` keeps returning `undefined` until native code hands it back again.
 - What was keyed on a native object follows the object, not a released
   wrapper of it. After `__releaseNativeCounterpart(w)`, `w` still finds the
   object's entries while JS holds it, and a wrapper native code hands back

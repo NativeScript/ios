@@ -109,6 +109,8 @@ class WrapperLifetimeCanary {
   // not a tagged pointer or a block) gets a key-only record the first time a
   // weak collection keys it: its wrappers are no canaries, so unwrap finds
   // that record by the object's address, and wrap builds a plain wrapper.
+  // Nothing is attached to the object: a weak reference tells when it is
+  // gone, read by a sweep after each major collection.
   static bool RegisterWrapFunctions(v8::Local<v8::Context> context,
                                     v8::Local<v8::Object> binding);
 
