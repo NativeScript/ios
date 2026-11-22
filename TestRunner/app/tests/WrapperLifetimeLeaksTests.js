@@ -217,32 +217,47 @@ describe("Wrapper lifetime leak cycles", function () {
         var reports = {};
 
         beforeAll(function (done) {
+            // Each shape gets its own scope: functions created in one scope
+            // share its context, which would tie a shape's reachability to
+            // every variable the other shapes' closures capture.
             (function () {
                 var selfRef = SelfRef.new();
                 selfRef.me = selfRef;
-
+                watched.addObject(selfRef);
+            })();
+            (function () {
                 var closure = Closure.new();
                 closure.onTap = function () {
                     return closure;
                 };
-
+                watched.addObject(closure);
+            })();
+            (function () {
                 var nativeCycle = NativeCycle.new();
                 var list = NSMutableArray.new();
                 list.addObject(nativeCycle);
                 nativeCycle.list = list;
-
+                watched.addObject(nativeCycle);
+            })();
+            (function () {
                 var blockCycle = BlockCycle.new();
                 blockCycle.op = NSBlockOperation.blockOperationWithBlock(function () {
                     return blockCycle;
                 });
-
+                watched.addObject(blockCycle);
+            })();
+            (function () {
                 var ownedSelfRef = OwnedSelfRef.new();
                 ownedSelfRef.me = ownedSelfRef;
                 owner.addObject(ownedSelfRef);
-
+                watched.addObject(ownedSelfRef);
+            })();
+            (function () {
                 var weakBackRef = WeakBackRef.new();
                 weakBackRef.me = new WeakRef(weakBackRef);
-
+                watched.addObject(weakBackRef);
+            })();
+            (function () {
                 // Two non-owning pointers (NSValue's storage) explain more
                 // retains than the object has.
                 var unexplained = Unexplained.new();
@@ -251,7 +266,9 @@ describe("Wrapper lifetime leak cycles", function () {
                     NSValue.valueWithNonretainedObject(unexplained),
                     NSValue.valueWithNonretainedObject(unexplained),
                 ];
-
+                watched.addObject(unexplained);
+            })();
+            (function () {
                 // A handler on the object that owns it, naming the object: the
                 // block's strong handle on its function closes the cycle.
                 var selfHandler = SelfHandler.new();
@@ -259,7 +276,9 @@ describe("Wrapper lifetime leak cycles", function () {
                 selfHandler.addExecutionBlock(function () {
                     return selfHandler.x;
                 });
-
+                watched.addObject(selfHandler);
+            })();
+            (function () {
                 var weakHandler = WeakHandler.new();
                 weakHandler.x = 1;
                 var weakHandlerRef = new WeakRef(weakHandler);
@@ -267,16 +286,8 @@ describe("Wrapper lifetime leak cycles", function () {
                     var o = weakHandlerRef.deref();
                     return o && o.x;
                 });
-
-                [selfRef, closure, nativeCycle, blockCycle, ownedSelfRef, weakBackRef, unexplained, selfHandler, weakHandler].forEach(
-                    function (o) {
-                        watched.addObject(o);
-                    }
-                );
+                watched.addObject(weakHandler);
             })();
-            // Shapes below get their own scopes: functions created in one
-            // scope share its context, which would tie their reachability
-            // to every variable the other shapes' closures capture.
             (function () {
                 // The handler does not close over its operation; the WeakMap
                 // entry keyed by the handler does.
