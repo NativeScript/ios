@@ -12,6 +12,7 @@
 
 namespace tns {
 
+struct NativeSetter;
 struct NativeSetters;
 
 class MetadataBuilder {
@@ -32,18 +33,21 @@ class MetadataBuilder {
                                                  void* data,
                                                  StructStorage storage,
                                                  v8::Local<v8::Object> parent);
-  // Runs the setter of `owner`'s native property `property` on `receiver`, as
-  // the property's accessor would, and returns true. Returns false, having
-  // run nothing, unless `owner` is a native class's prototype, still holding
-  // the accessor pair it was built with for `property`, which has a setter.
-  // The caller establishes that `owner` is where `receiver`'s prototype chain
-  // finds `property`. Only canary mode records the accessors this needs.
-  static bool TrySetNativeProperty(v8::Isolate* isolate,
-                                   v8::Local<v8::Context> context,
-                                   v8::Local<v8::Object> owner,
-                                   v8::Local<v8::Name> property,
-                                   v8::Local<v8::Object> receiver,
-                                   v8::Local<v8::Value> value);
+  // Canary mode: the setter of `owner`'s native property `property`, when
+  // `owner` is a native class's prototype still holding the accessor pair it
+  // was built with for `property`, which has a setter; null otherwise. The
+  // caller establishes that `owner` is where a receiver's prototype chain
+  // finds `property`. The result stays valid for the isolate's lifetime.
+  static NativeSetter* FindNativeSetter(v8::Isolate* isolate,
+                                        v8::Local<v8::Context> context,
+                                        v8::Local<v8::Object> owner,
+                                        v8::Local<v8::Name> property);
+  // Runs `setter` on `receiver`, as the property's accessor would, and
+  // returns true; false, having run nothing, once JS has assigned or defined
+  // the property on its prototype since FindNativeSetter.
+  static bool RunNativeSetter(v8::Isolate* isolate, NativeSetter* setter,
+                              v8::Local<v8::Object> receiver,
+                              v8::Local<v8::Value> value);
   // Where the native member guard is on (GuardsNativeMembers): turns each
   // of `names`, and Symbol.iterator with `iterator`, an own method of
   // `prototype`, a prototype level of a JS-extended class, that native code
@@ -217,6 +221,7 @@ class MetadataBuilder {
     Class klass_ = nil;
   };
 
+  friend struct NativeSetter;
   friend struct NativeSetters;
 
   static void SetNativeProperty(v8::Isolate* isolate,

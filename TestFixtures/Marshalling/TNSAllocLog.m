@@ -317,6 +317,29 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index) {
 @implementation TNSAccessorHost
 @end
 
+@implementation TNSCanaryCacheBase
+@end
+
+@implementation TNSCanaryCacheMid
+@end
+
+@implementation TNSCanaryCacheLeaf
+@end
+
+@implementation TNSCanaryCacheShadowBase
+@end
+
+@implementation TNSCanaryCacheShadowMid
+
+- (NSInteger)swizzleTarget {
+    return 1;
+}
+
+@end
+
+@implementation TNSCanaryCacheShadowLeaf
+@end
+
 @implementation TNSCanaryWriteTarget
 
 - (void)setGuarded:(NSInteger)guarded {

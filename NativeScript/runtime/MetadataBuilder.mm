@@ -89,30 +89,34 @@ constexpr int kStructViewSlotShift = 16;
 constexpr int32_t kStructFieldIndexMask = (1 << kStructViewSlotShift) - 1;
 }  // namespace
 
+// One native property setter a native class's prototype was built with
+// (NativeSetters). Lives as long as the isolate; `item` is emptied for good
+// once JS changes the name on that prototype.
+struct NativeSetter {
+  Global<v8::Name> name;
+  MetadataBuilder::CacheItem<PropertyMeta>* item;
+};
+
 // The native property setters a native class's prototype was built with, for
-// TrySetNativeProperty. JS can replace one only by defining the name on that
+// FindNativeSetter. JS can replace one only by defining the name on that
 // prototype, which its definer sees, and a name the prototype's own handlers
 // see defined or assigned is forgotten for good. A deleted accessor needs no
 // such care: the prototype then no longer has the property.
 struct NativeSetters {
-  struct Entry {
-    Global<v8::Name> name;
-    MetadataBuilder::CacheItem<PropertyMeta>* item;
-  };
-
   // In the order RegisterInstanceProperties installed them: a later accessor
   // of a name replaces the earlier one on the prototype.
   std::vector<std::pair<std::string, MetadataBuilder::CacheItem<PropertyMeta>*>> installed;
   // By the name's identity hash. Names reaching an interceptor are internalized,
-  // so a lookup compares identities.
-  robin_hood::unordered_map<int, std::vector<Entry>> byHash;
+  // so a lookup compares identities. Filled once by Index: entries never move
+  // afterwards, as FindNativeSetter hands out pointers to them.
+  robin_hood::unordered_map<int, std::vector<NativeSetter>> byHash;
 
-  Entry* Find(Local<v8::Name> name) {
+  NativeSetter* Find(Local<v8::Name> name) {
     auto it = byHash.find(name->GetIdentityHash());
     if (it == byHash.end()) {
       return nullptr;
     }
-    for (Entry& entry : it->second) {
+    for (NativeSetter& entry : it->second) {
       if (entry.name == name) {
         return &entry;
       }
@@ -127,7 +131,7 @@ struct NativeSetters {
           v8::String::NewFromUtf8(isolate, jsName.c_str(), NewStringType::kInternalized)
               .ToLocalChecked();
       MetadataBuilder::CacheItem<PropertyMeta>* setter = item->meta_->hasSetter() ? item : nullptr;
-      if (Entry* entry = Find(name)) {
+      if (NativeSetter* entry = Find(name)) {
         entry->item = setter;
       } else if (setter != nullptr) {
         byHash[name->GetIdentityHash()].push_back({Global<v8::Name>(isolate, name), setter});
@@ -142,7 +146,7 @@ struct NativeSetters {
     if (it == byHash.end()) {
       return;
     }
-    for (Entry& entry : it->second) {
+    for (NativeSetter& entry : it->second) {
       if (entry.name.Get(isolate)->StrictEquals(name)) {
         entry.item = nullptr;
       }
@@ -1596,18 +1600,23 @@ Local<Value> MetadataBuilder::GuardedNativeCalledMethod(Local<Context> context,
   return method;
 }
 
-bool MetadataBuilder::TrySetNativeProperty(Isolate* isolate, Local<Context> context,
-                                           Local<Object> owner, Local<v8::Name> property,
-                                           Local<Object> receiver, Local<Value> value) {
+NativeSetter* MetadataBuilder::FindNativeSetter(Isolate* isolate, Local<Context> context,
+                                                Local<Object> owner, Local<v8::Name> property) {
   NativeSetters* setters = NativeSettersOf(isolate, context, owner);
   if (setters == nullptr) {
+    return nullptr;
+  }
+  NativeSetter* entry = setters->Find(property);
+  return entry != nullptr && entry->item != nullptr ? entry : nullptr;
+}
+
+bool MetadataBuilder::RunNativeSetter(Isolate* isolate, NativeSetter* setter,
+                                      Local<Object> receiver, Local<Value> value) {
+  CacheItem<PropertyMeta>* item = setter->item;
+  if (item == nullptr) {
     return false;
   }
-  NativeSetters::Entry* entry = setters->Find(property);
-  if (entry == nullptr || entry->item == nullptr) {
-    return false;
-  }
-  SetNativeProperty(isolate, entry->item, receiver, value);
+  SetNativeProperty(isolate, item, receiver, value);
   return true;
 }
 
