@@ -141,8 +141,10 @@ jobs:
           mkdir -p dist-test
           echo TEST_FOLDER=$(pwd)/dist-test >> $GITHUB_ENV
       # Must match the simulator named in TEST_DESTINATION.
+      # --boot leaves the simulator booting in the background, so the boot
+      # overlaps build-for-testing instead of delaying the first test run.
       - name: Wait for the test simulator
-        run: ./scripts/wait-for-simulator.sh --name "iPhone 16 Pro"
+        run: ./scripts/wait-for-simulator.sh --name "iPhone 16 Pro" --boot
       - name: Build for testing
         id: build-for-testing
         run: set -o pipefail && xcodebuild -project v8ios.xcodeproj -scheme TestRunner -destination "$TEST_DESTINATION" ${{ matrix.xcodebuild-args }} build-for-testing | xcpretty
@@ -202,6 +204,9 @@ jobs:
           APP="$(find build -maxdepth 2 -type d -path 'build/*-iphonesimulator/TestRunner.app')"
           [ -n "$APP" ] && [ "$(printf '%s\n' "$APP" | wc -l)" -eq 1 ] || { echo "::error::Expected one built TestRunner.app under build/, found: ${APP:-none}"; exit 1; }
           node tools/apply-test-app-config.mjs --source TestRunner/app/package.json --out "$APP/app/package.json" --wrapper-lifetime "$WRAPPER_LIFETIME"
+          # Rewriting a resource breaks the bundle's seal; re-seal it ad hoc,
+          # keeping the build's entitlements.
+          codesign --force --sign - --timestamp=none --preserve-metadata=entitlements "$APP"
           echo "WL_TEST_FOLDER=$TEST_FOLDER/wrapper-lifetime" >> "$GITHUB_ENV"
           mkdir -p "$TEST_FOLDER/wrapper-lifetime"
       - name: Xcode Tests (wrapper lifetime ${{ matrix.wrapper-lifetime-pass }})
@@ -235,7 +240,7 @@ jobs:
           ls "$WL_TEST_FOLDER"/test-out/*junit*.xml > /dev/null 2>&1 || { echo "::error::No JUnit report in $WL_TEST_FOLDER/test-out"; exit 1; }
           find $WL_TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
           find $WL_TEST_FOLDER/test-out -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
-          ./scripts/check-wrapper-lifetime-report.sh --reports "$WL_TEST_FOLDER/test-out" --expect "${WRAPPER_LIFETIME/:/\/}"
+          ./scripts/check-wrapper-lifetime-report.sh --reports "$WL_TEST_FOLDER/test-out" --expect "$(printf '%s' "$WRAPPER_LIFETIME" | tr ':' '/')"
       - name: Collect test diagnostics
         if: failure()
         uses: ./.github/actions/collect-test-diagnostics
