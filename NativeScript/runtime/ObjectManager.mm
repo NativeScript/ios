@@ -573,6 +573,15 @@ bool ObjectManager::TakeDeferredRelease(Isolate* isolate, id obj) {
   return true;
 }
 
+void ObjectManager::RunDeferredReleases(Isolate* isolate) {
+  if (!OnRuntimeThreadOf(isolate)) {
+    return;
+  }
+  if (DeferredReleases* pending = Caches::ExistingStateFor<DeferredReleases>(isolate)) {
+    DrainDeferredReleases(pending);
+  }
+}
+
 void ObjectManager::ProtectIfNativelyRetained(Isolate* isolate, id obj, ObjCDataWrapper* wrapper) {
   // Only a wrapper the class's -release unprotects again may be protected.
   if (ClassBuilder::TracksNativeRetains(isolate, object_getClass(obj)) && [obj retainCount] > 1) {

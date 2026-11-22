@@ -30,6 +30,7 @@ describe("Wrapper lifetime leak cycles", function () {
     var QueuedOwned = shape("TNSLeakQueuedOwned");
     var SharedChild = shape("TNSLeakSharedChild");
     var ReleasedOwner = shape("TNSLeakReleasedOwner");
+    var DeferredShared = shape("TNSLeakDeferredShared");
     // Its operation's block names the object through `this`. Extended the
     // way TypeScript does: only such classes track native retains, which is
     // what makes "resurrecting" keep a natively owned instance's wrapper.
@@ -514,6 +515,7 @@ describe("Wrapper lifetime leak cycles", function () {
                     o.list.removeAllObjects();
                     delete o.list;
                 }
+                delete o.op;
             });
             hidden.removeAllObjects();
             holder.removeAllObjects();
@@ -567,6 +569,36 @@ describe("Wrapper lifetime leak cycles", function () {
                 done();
             });
         }, 30000);
+
+        // An explicit release on another thread of an object first wrapped on
+        // the runtime's thread waits there for an event loop task. The
+        // Atomics.waitAsync wakeup is posted to the same lane first, so the
+        // probe runs while that release still waits.
+        it("finds a cycle that an object waiting for its release on the runtime's thread shared", function (done) {
+            var other;
+            (function () {
+                var shared = DeferredShared.new();
+                shared.op = NSBlockOperation.blockOperationWithBlock(function () {
+                    return shared;
+                });
+                other = NSMutableArray.new();
+                other.addObject(shared.op);
+                watched.addObject(shared);
+            })();
+            var signal = new Int32Array(new SharedArrayBuffer(4));
+            Atomics.waitAsync(signal, 0, 0).value.then(function () {
+                var report = runtime.findLeakCycles();
+                expect(cyclesNaming(report, "TNSLeakDeferredShared").length).toBeGreaterThan(0);
+                expect(aliveNamed(watched, "TNSLeakDeferredShared")).toBe(1);
+                done();
+            }, done.fail);
+            var queue = dispatch_get_global_queue(qos_class_t.QOS_CLASS_DEFAULT, 0);
+            dispatch_async(queue, function () {
+                Atomics.notify(signal, 0);
+                __releaseNativeCounterpart(other);
+                other = null;
+            });
+        });
     });
 
     // The session owns the task, the task its completion block, and the block
