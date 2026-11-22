@@ -850,8 +850,7 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
         // write can allocate, and the finalizers of the collection that
         // triggers can run JS that calls this builtin on the same wrapper.
         adopted->disposing_ = true;
-        WrapperLifetimeCanary::KeepWeakCollectionKey(isolate, value.As<Object>(),
-                                                     adopted->canaryRecord_);
+        WrapperLifetimeCanary::KeepWeakCollectionKey(isolate, value.As<Object>());
         // The wrapper first: a release that got through would have freed it.
         if (tns::GetValue(isolate, value) != wrapper || objcWrapper->LifetimeState() != adopted) {
           return;

@@ -889,8 +889,7 @@ bool WrapperLifetimeCanary::RegisterWrapFunctions(Local<Context> context, Local<
          binding->Set(context, tns::ToV8String(isolate, "wrap"), wrap).FromMaybe(false);
 }
 
-void WrapperLifetimeCanary::KeepWeakCollectionKey(Isolate* isolate, Local<Object> canary,
-                                                  const std::shared_ptr<CanaryRecord>& record) {
+void WrapperLifetimeCanary::KeepWeakCollectionKey(Isolate* isolate, Local<Object> canary) {
   CanaryState* canaryState = Caches::StateFor<CanaryState>(isolate);
   if (canaryState == nullptr || canaryState->keyOfState.IsEmpty()) {
     return;
@@ -898,17 +897,44 @@ void WrapperLifetimeCanary::KeepWeakCollectionKey(Isolate* isolate, Local<Object
   HandleScope scope(isolate);
   Local<Context> context = isolate->GetCurrentContext();
   Local<Private> keyOfState = canaryState->keyOfState.Get(isolate);
-  Local<Value> copy = v8::Null(isolate);
-  if (Usable(record)) {
-    record->released = true;
+  auto currentRecord = [&]() {
+    ObjectWeakCallbackState* state = CanaryOf(isolate, canary);
+    return state != nullptr ? state->canaryRecord_ : std::shared_ptr<CanaryRecord>();
+  };
+  auto keyOf = [&](const std::shared_ptr<CanaryRecord>& record) {
     Local<Value> key;
-    if (Local<Object>::New(isolate, record->state)->GetPrivate(context, keyOfState).ToLocal(&key) &&
+    if (Usable(record) &&
+        Local<Object>::New(isolate, record->state)->GetPrivate(context, keyOfState).ToLocal(&key) &&
         key->IsObject()) {
-      copy = key;
+      return key;
     }
+    return Local<Value>(v8::Null(isolate));
+  };
+  // The write can allocate, and the finalizers of a collection that starts
+  // there can run JS that gives the canary a record or its record a key: the
+  // write repeats, a bounded number of times, until it stores the current key.
+  constexpr int kMaxWrites = 4;
+  std::shared_ptr<CanaryRecord> record = currentRecord();
+  Local<Value> copy = keyOf(record);
+  for (int writes = 1;; writes++) {
+    // Private symbols bypass the canary's handlers.
+    (void)canary->SetPrivate(context, keyOfState, copy);
+    std::shared_ptr<CanaryRecord> current = currentRecord();
+    if (!Usable(current) || writes == kMaxWrites) {
+      break;
+    }
+    Local<Value> currentCopy = keyOf(current);
+    if (current == record && currentCopy->StrictEquals(copy)) {
+      break;
+    }
+    record = std::move(current);
+    copy = currentCopy;
   }
-  // Private symbols bypass the canary's handlers.
-  (void)canary->SetPrivate(context, keyOfState, copy);
+  // Last, with nothing that allocates after it: whichever record the canary
+  // holds now is the one the release leaves behind.
+  if (std::shared_ptr<CanaryRecord> current = currentRecord()) {
+    current->released = true;
+  }
 }
 
 void WrapperLifetimeCanary::InstallDeallocHook(Class extendedClass) {
