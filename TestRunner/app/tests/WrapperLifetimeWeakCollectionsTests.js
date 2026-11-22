@@ -5,6 +5,9 @@
 describe("Weak collections of native objects", function () {
     var runtime = require("ns:runtime");
     var canary = runtime.getConfig("wrapperLifetimeMode") === "canary";
+    // Under "extended" a plain object's wrapper is no canary, and the weak
+    // collections give the object a key-only state when they first key it.
+    var plainKeys = canary && runtime.getConfig("wrapperLifetimeScope") === "extended";
     // The engine's WeakRef, which keys the wrapper itself.
     var WrapperWeakRef = canary ? Object.getPrototypeOf(WeakRef) : WeakRef;
 
@@ -15,6 +18,18 @@ describe("Weak collections of native objects", function () {
         }
         return Extended;
     })(TNSAllocLog);
+
+    // Release semantics hold for both: a JS-extended object is a canary in
+    // canary mode, and a plain one is a canary under "all" and keyed by a
+    // key-only state under "extended".
+    var kinds = [
+        { name: "a JS-extended object", make: function () { return Extended.new(); } },
+        { name: "a plain object", make: function () { return NSObject.new(); } }
+    ];
+
+    function canaryStates() {
+        return runtime.getWrapperLifetimeStats().canaryStates;
+    }
 
     function scrub(n) {
         return n > 0 ? scrub(n - 1) + n : 0;
@@ -271,26 +286,143 @@ describe("Weak collections of native objects", function () {
         });
     });
 
-    it("dereferences no wrapper of a released object a WeakRef returned before the release", function () {
-        if (!canary) {
+    // The next collection runs in a later job than `condition`: a WeakRef
+    // target that condition dereferences is kept alive until its job ends.
+    function pollUntil(condition, callback) {
+        var attempts = 15;
+        (function poll() {
+            settle(1, function () {
+                if (condition() || --attempts === 0) {
+                    callback();
+                    return;
+                }
+                setTimeout(poll, 0);
+            });
+        })();
+    }
+
+    it("keys a natively owned plain object by its lifetime across a wrapper change", function (done) {
+        if (!plainKeys) {
+            done();
             return;
         }
         var owner = NSMutableArray.new();
-        var obj = Extended.new();
-        owner.addObject(obj);
-        var ref = new WeakRef(obj);
-        expect(ref.deref() === obj).toBe(true);
-        __releaseNativeCounterpart(obj);
-        expect(ref.deref() === undefined).toBe(true);
-        var later = owner.objectAtIndex(0);
-        expect(ref.deref() === later).toBe(true);
+        var map = new WeakMap();
+        var set = new WeakSet();
+        var held = [];
+        var registry = new FinalizationRegistry(function (value) {
+            held.push(value);
+        });
+        var ref;
+        var first;
+        (function () {
+            var obj = NSObject.new();
+            owner.addObject(obj);
+            map.set(obj, "value");
+            set.add(obj);
+            ref = new WeakRef(obj);
+            registry.register(obj, "held");
+            first = new WrapperWeakRef(obj);
+        })();
+        pollUntil(function () {
+            return first.deref() === undefined;
+        }, function () {
+            expect(first.deref() === undefined).toBe(true);
+            var later = owner.objectAtIndex(0);
+            expect(map.get(later)).toBe("value");
+            expect(set.has(later)).toBe(true);
+            expect(ref.deref() === later).toBe(true);
+            expect(held.length).toBe(0);
+            later = null;
+            settle(2, function () {
+                expect(held.length).toBe(0);
+                owner.removeAllObjects();
+                pollUntil(function () {
+                    return held.length > 0;
+                }, function () {
+                    expect(held).toEqual(["held"]);
+                    expect(ref.deref() === undefined).toBe(true);
+                    done();
+                });
+            });
+        });
+    });
+
+    it("lets a keyed plain object JS owned alone go with its wrapper", function (done) {
+        if (!plainKeys) {
+            done();
+            return;
+        }
+        var watch = NSHashTable.weakObjectsHashTable();
+        var map = new WeakMap();
+        var held = [];
+        var registry = new FinalizationRegistry(function (value) {
+            held.push(value);
+        });
+        var ref;
+        (function () {
+            var obj = NSObject.new();
+            watch.addObject(obj);
+            map.set(obj, "value");
+            ref = new WeakRef(obj);
+            registry.register(obj, "held");
+        })();
+        pollUntil(function () {
+            return watch.allObjects.count === 0 && held.length > 0;
+        }, function () {
+            expect(watch.allObjects.count).toBe(0);
+            expect(held).toEqual(["held"]);
+            expect(ref.deref() === undefined).toBe(true);
+            done();
+        });
+    });
+
+    it("gives a plain object a key-only state only when a weak collection keys it", function () {
+        if (!plainKeys) {
+            return;
+        }
+        var map = new WeakMap();
+        var set = new WeakSet();
+        var registry = new FinalizationRegistry(function () {});
+        var obj = NSObject.new();
+        var before = canaryStates();
+        expect(map.has(obj)).toBe(false);
+        expect(map.get(obj)).toBeUndefined();
+        expect(map.delete(obj)).toBe(false);
+        expect(set.has(obj)).toBe(false);
+        expect(set.delete(obj)).toBe(false);
+        expect(registry.unregister(obj)).toBe(false);
+        expect(canaryStates()).toBe(before);
+        map.set(obj, 1);
+        expect(canaryStates()).toBe(before + 1);
+        set.add(obj);
+        new WeakRef(obj);
+        registry.register({}, "held", obj);
+        expect(canaryStates()).toBe(before + 1);
+        expect(registry.unregister(obj)).toBe(true);
+    });
+
+    kinds.forEach(function (kind) {
+        it("dereferences no wrapper of a released object a WeakRef returned before the release (" + kind.name + ")", function () {
+            if (!canary) {
+                return;
+            }
+            var owner = NSMutableArray.new();
+            var obj = kind.make();
+            owner.addObject(obj);
+            var ref = new WeakRef(obj);
+            expect(ref.deref() === obj).toBe(true);
+            __releaseNativeCounterpart(obj);
+            expect(ref.deref() === undefined).toBe(true);
+            var later = owner.objectAtIndex(0);
+            expect(ref.deref() === later).toBe(true);
+        });
     });
 
     // Only objects outside JS-extended classes carry the token the removal
-    // releases, and they are canaries only under scope "all".
+    // releases: canaries under scope "all", key-only states under "extended".
     it("keys a live object again after its associations are removed", function (done) {
-        if (!canary || runtime.getConfig("wrapperLifetimeScope") !== "all" ||
-            typeof objc_removeAssociatedObjects !== "function") {
+        if (!canary || typeof objc_removeAssociatedObjects !== "function") {
             done();
             return;
         }
@@ -302,7 +434,12 @@ describe("Weak collections of native objects", function () {
             owner.addObject(obj);
             before.set(obj, "before");
             expect(before.get(obj)).toBe("before");
+            var ref = new WeakRef(obj);
+            expect(ref.deref() === obj).toBe(true);
             objc_removeAssociatedObjects(obj);
+            // The WeakRef loses the object exactly when the WeakMap does: the
+            // token death signal retires the key, the weak sweep keeps it.
+            expect((ref.deref() === undefined) === (before.get(obj) === undefined)).toBe(true);
             after.set(obj, "after");
             expect(after.get(obj)).toBe("after");
         })();
@@ -500,148 +637,10 @@ describe("Weak collections of native objects", function () {
         })();
     }
 
-    it("keeps what was keyed on a natively retained object after a wrapper of it is released", function (done) {
-        if (!canary) {
-            done();
-            return;
-        }
-        var owner = NSMutableArray.new();
-        var map = new WeakMap();
-        var set = new WeakSet();
-        var cleaned = false;
-        var registry = new FinalizationRegistry(function (held) {
-            cleaned = held === "released";
-        });
-        var obj = Extended.new();
-        owner.addObject(obj);
-        map.set(obj, "value");
-        set.add(obj);
-        var ref = new WeakRef(obj);
-        registry.register(obj, "released");
-        __releaseNativeCounterpart(obj);
-
-        expect(map.get(obj)).toBe("value");
-        expect(set.has(obj)).toBe(true);
-        expect(ref.deref() === undefined).toBe(true);
-        settle(2, function () {
-            expect(map.get(obj)).toBe("value");
-            expect(set.has(obj)).toBe(true);
-            expect(ref.deref() === undefined).toBe(true);
-            var later = owner.objectAtIndex(0);
-            expect(later === obj).toBe(false);
-            expect(map.get(later)).toBe("value");
-            expect(set.has(later)).toBe(true);
-            expect(ref.deref() === later).toBe(true);
-            later = null;
-            obj = null;
-            settle(3, function () {
-                expect(cleaned).toBe(false);
-                owner.removeAllObjects();
-                pollCleaned(function () {
-                    return cleaned;
-                }, registry, function () {
-                    expect(cleaned).toBe(true);
-                    done();
-                });
-            });
-        });
-    });
-
-    it("keeps what was keyed on a native object JS owned alone while its released wrapper lives", function (done) {
-        if (!canary) {
-            done();
-            return;
-        }
-        var map = new WeakMap();
-        var cleaned = false;
-        var registry = new FinalizationRegistry(function (held) {
-            cleaned = held === "released";
-        });
-        var obj = Extended.new();
-        map.set(obj, "value");
-        var ref = new WeakRef(obj);
-        registry.register(obj, "released");
-        __releaseNativeCounterpart(obj);
-
-        expect(ref.deref() === undefined).toBe(true);
-        expect(map.get(obj)).toBe("value");
-        settle(2, function () {
-            expect(map.get(obj)).toBe("value");
-            expect(ref.deref() === undefined).toBe(true);
-            expect(cleaned).toBe(false);
-            obj = null;
-            pollCleaned(function () {
-                return cleaned;
-            }, registry, function () {
-                expect(cleaned).toBe(true);
-                done();
-            });
-        });
-    });
-
-    // __releaseNativeCounterpart frees a heavy native object early: in every
-    // mode, neither its keys nor its released wrapper may keep it alive. The
-    // weak table sees the object without retaining it.
-    it("deallocates a keyed native object JS owned alone at its release", function () {
-        var watch = NSHashTable.weakObjectsHashTable();
-        var map = new WeakMap();
-        var set = new WeakSet();
-        var registry = new FinalizationRegistry(function () {});
-        var obj = Extended.new();
-        watch.addObject(obj);
-        map.set(obj, "value");
-        set.add(obj);
-        var ref = new WeakRef(obj);
-        registry.register(obj, "held");
-        __releaseNativeCounterpart(obj);
-
-        expect(watch.allObjects.count).toBe(0);
-        expect(map.get(obj)).toBe("value");
-        expect(set.has(obj)).toBe(true);
-        expect(ref.deref() === (canary ? undefined : obj)).toBe(true);
-    });
-
-    it("deallocates a released natively retained object once native code lets go, while its wrapper is held and dereferenced", function (done) {
-        var watch = NSHashTable.weakObjectsHashTable();
-        var owner = NSMutableArray.new();
-        var map = new WeakMap();
-        var set = new WeakSet();
-        var obj = Extended.new();
-        owner.addObject(obj);
-        watch.addObject(obj);
-        map.set(obj, "value");
-        set.add(obj);
-        var ref = new WeakRef(obj);
-        __releaseNativeCounterpart(obj);
-        var expected = canary ? undefined : obj;
-
-        // Whether every dereference gave the mode's expected target.
-        function poke() {
-            var matched = true;
-            for (var i = 0; i < 10; i++) {
-                matched = ref.deref() === expected && matched;
-                map.get(obj);
-                set.has(obj);
-            }
-            return matched;
-        }
-        expect(poke()).toBe(true);
-        settle(2, function () {
-            expect(poke()).toBe(true);
-            owner.removeAllObjects();
-            expect(poke()).toBe(true);
-            expect(watch.allObjects.count).toBe(0);
-            expect(ref.deref() === expected).toBe(true);
-            expect(map.get(obj)).toBe("value");
-            expect(set.has(obj)).toBe(true);
-            done();
-        });
-    });
-
-    // A canary released before anything keyed its object is a key of its own,
+    // A wrapper released before anything keyed its object is a key of its own,
     // which nothing keyed on the object can find.
-    function releasedNeverKeyed() {
-        var obj = Extended.new();
+    function releasedNeverKeyed(kind) {
+        var obj = kind.make();
         __releaseNativeCounterpart(obj);
         return obj;
     }
@@ -650,108 +649,248 @@ describe("Weak collections of native objects", function () {
         return runtime.getWrapperLifetimeStats().releasedAccesses;
     }
 
-    it("reports a weak collection operation on a canary released before anything keyed its object", function (done) {
-        if (!canary) {
-            done();
-            return;
-        }
-        var messages = [];
-        var onReleased = function (e) {
-            if (/weak collection/.test(e.error.message)) {
-                messages.push(e.error.message);
+    kinds.forEach(function (kind) {
+        it("keeps what was keyed on a natively retained object after a wrapper of it is released (" + kind.name + ")", function (done) {
+            if (!canary) {
+                done();
+                return;
             }
-        };
-        global.addEventListener("releasednativeaccess", onReleased);
-        try {
+            var owner = NSMutableArray.new();
             var map = new WeakMap();
-            var before = releasedAccesses();
-            var kept = releasedNeverKeyed();
-            map.set(kept, 1);
-            expect(releasedAccesses()).toBe(before + 1);
-            expect(map.get(kept) === 1).toBe(true);
-            expect(releasedAccesses()).toBe(before + 1);
-            new WeakRef(releasedNeverKeyed());
-            expect(releasedAccesses()).toBe(before + 2);
-            expect(map.get(releasedNeverKeyed())).toBeUndefined();
-            expect(releasedAccesses()).toBe(before + 3);
-        } catch (e) {
-            global.removeEventListener("releasednativeaccess", onReleased);
-            throw e;
-        }
-        setTimeout(function () {
-            global.removeEventListener("releasednativeaccess", onReleased);
-            expect(messages.length).toBe(3);
-            for (var i = 0; i < messages.length; i++) {
-                expect(messages[i]).toMatch(/released by __releaseNativeCounterpart \(weak collection key/);
-            }
-            done();
-        });
-    });
-
-    it("throws for a weak collection operation on a canary released before anything keyed its object under the throw policy", function () {
-        if (!canary) {
-            return;
-        }
-        var policy = runtime.getConfig("releasedObjectPolicy");
-        runtime.setConfig("releasedObjectPolicy", "throw");
-        try {
-            var map = new WeakMap();
-            expect(function () {
-                map.set(releasedNeverKeyed(), 1);
-            }).toThrowError(ReferenceError, /weak collection key/);
-            expect(function () {
-                new WeakRef(releasedNeverKeyed());
-            }).toThrowError(ReferenceError, /weak collection key/);
-            expect(function () {
-                map.get(releasedNeverKeyed());
-            }).toThrowError(ReferenceError, /weak collection key/);
-        } finally {
-            runtime.setConfig("releasedObjectPolicy", policy);
-        }
-    });
-
-    it("gets an undefined value stored on a canary released before anything keyed its object", function (done) {
-        if (!canary) {
-            done();
-            return;
-        }
-        var map = new WeakMap();
-        var obj = releasedNeverKeyed();
-        map.set(obj, undefined);
-        var policy = runtime.getConfig("releasedObjectPolicy");
-        runtime.setConfig("releasedObjectPolicy", "throw");
-        try {
-            var before = releasedAccesses();
-            expect(map.get(obj) === undefined).toBe(true);
-            expect(map.has(obj)).toBe(true);
-            expect(releasedAccesses()).toBe(before);
-        } finally {
-            runtime.setConfig("releasedObjectPolicy", policy);
-        }
-        // Lets the report of the set() above be delivered within this spec.
-        setTimeout(done);
-    });
-
-    it("does not report a weak collection operation on a released wrapper whose object was keyed", function () {
-        var policy = runtime.getConfig("releasedObjectPolicy");
-        runtime.setConfig("releasedObjectPolicy", "throw");
-        try {
-            var obj = Extended.new();
-            var map = new WeakMap();
-            map.set(obj, 1);
+            var set = new WeakSet();
+            var cleaned = false;
+            var registry = new FinalizationRegistry(function (held) {
+                cleaned = held === "released";
+            });
+            var obj = kind.make();
+            owner.addObject(obj);
+            map.set(obj, "value");
+            set.add(obj);
+            var ref = new WeakRef(obj);
+            registry.register(obj, "released");
             __releaseNativeCounterpart(obj);
-            var before = releasedAccesses();
-            var other = new WeakMap();
-            expect(map.get(obj)).toBe(1);
-            expect(other.get(obj)).toBeUndefined();
-            other.set(obj, 2);
-            expect(other.get(obj)).toBe(2);
-            new WeakRef(obj);
-            new WeakSet().add(obj);
-            expect(releasedAccesses()).toBe(before);
-        } finally {
-            runtime.setConfig("releasedObjectPolicy", policy);
-        }
+
+            expect(map.get(obj)).toBe("value");
+            expect(set.has(obj)).toBe(true);
+            expect(ref.deref() === undefined).toBe(true);
+            settle(2, function () {
+                expect(map.get(obj)).toBe("value");
+                expect(set.has(obj)).toBe(true);
+                expect(ref.deref() === undefined).toBe(true);
+                var later = owner.objectAtIndex(0);
+                expect(later === obj).toBe(false);
+                expect(map.get(later)).toBe("value");
+                expect(set.has(later)).toBe(true);
+                expect(ref.deref() === later).toBe(true);
+                later = null;
+                obj = null;
+                settle(3, function () {
+                    expect(cleaned).toBe(false);
+                    owner.removeAllObjects();
+                    pollCleaned(function () {
+                        return cleaned;
+                    }, registry, function () {
+                        expect(cleaned).toBe(true);
+                        done();
+                    });
+                });
+            });
+        });
+
+        it("keeps what was keyed on a native object JS owned alone while its released wrapper lives (" + kind.name + ")", function (done) {
+            if (!canary) {
+                done();
+                return;
+            }
+            var map = new WeakMap();
+            var cleaned = false;
+            var registry = new FinalizationRegistry(function (held) {
+                cleaned = held === "released";
+            });
+            var obj = kind.make();
+            map.set(obj, "value");
+            var ref = new WeakRef(obj);
+            registry.register(obj, "released");
+            __releaseNativeCounterpart(obj);
+
+            expect(ref.deref() === undefined).toBe(true);
+            expect(map.get(obj)).toBe("value");
+            settle(2, function () {
+                expect(map.get(obj)).toBe("value");
+                expect(ref.deref() === undefined).toBe(true);
+                expect(cleaned).toBe(false);
+                obj = null;
+                pollCleaned(function () {
+                    return cleaned;
+                }, registry, function () {
+                    expect(cleaned).toBe(true);
+                    done();
+                });
+            });
+        });
+
+        // __releaseNativeCounterpart frees a heavy native object early: in every
+        // mode, neither its keys nor its released wrapper may keep it alive. The
+        // weak table sees the object without retaining it.
+        it("deallocates a keyed native object JS owned alone at its release (" + kind.name + ")", function () {
+            var watch = NSHashTable.weakObjectsHashTable();
+            var map = new WeakMap();
+            var set = new WeakSet();
+            var registry = new FinalizationRegistry(function () {});
+            var obj = kind.make();
+            watch.addObject(obj);
+            map.set(obj, "value");
+            set.add(obj);
+            var ref = new WeakRef(obj);
+            registry.register(obj, "held");
+            __releaseNativeCounterpart(obj);
+
+            expect(watch.allObjects.count).toBe(0);
+            expect(map.get(obj)).toBe("value");
+            expect(set.has(obj)).toBe(true);
+            expect(ref.deref() === (canary ? undefined : obj)).toBe(true);
+        });
+
+        it("deallocates a released natively retained object once native code lets go, while its wrapper is held and dereferenced (" + kind.name + ")", function (done) {
+            var watch = NSHashTable.weakObjectsHashTable();
+            var owner = NSMutableArray.new();
+            var map = new WeakMap();
+            var set = new WeakSet();
+            var obj = kind.make();
+            owner.addObject(obj);
+            watch.addObject(obj);
+            map.set(obj, "value");
+            set.add(obj);
+            var ref = new WeakRef(obj);
+            __releaseNativeCounterpart(obj);
+            var expected = canary ? undefined : obj;
+
+            // Whether every dereference gave the mode's expected target.
+            function poke() {
+                var matched = true;
+                for (var i = 0; i < 10; i++) {
+                    matched = ref.deref() === expected && matched;
+                    map.get(obj);
+                    set.has(obj);
+                }
+                return matched;
+            }
+            expect(poke()).toBe(true);
+            settle(2, function () {
+                expect(poke()).toBe(true);
+                owner.removeAllObjects();
+                expect(poke()).toBe(true);
+                expect(watch.allObjects.count).toBe(0);
+                expect(ref.deref() === expected).toBe(true);
+                expect(map.get(obj)).toBe("value");
+                expect(set.has(obj)).toBe(true);
+                done();
+            });
+        });
+
+        it("reports a weak collection operation on a wrapper released before anything keyed its object (" + kind.name + ")", function (done) {
+            if (!canary) {
+                done();
+                return;
+            }
+            var messages = [];
+            var onReleased = function (e) {
+                if (/weak collection/.test(e.error.message)) {
+                    messages.push(e.error.message);
+                }
+            };
+            global.addEventListener("releasednativeaccess", onReleased);
+            try {
+                var map = new WeakMap();
+                var before = releasedAccesses();
+                var kept = releasedNeverKeyed(kind);
+                map.set(kept, 1);
+                expect(releasedAccesses()).toBe(before + 1);
+                expect(map.get(kept) === 1).toBe(true);
+                expect(releasedAccesses()).toBe(before + 1);
+                new WeakRef(releasedNeverKeyed(kind));
+                expect(releasedAccesses()).toBe(before + 2);
+                expect(map.get(releasedNeverKeyed(kind))).toBeUndefined();
+                expect(releasedAccesses()).toBe(before + 3);
+            } catch (e) {
+                global.removeEventListener("releasednativeaccess", onReleased);
+                throw e;
+            }
+            setTimeout(function () {
+                global.removeEventListener("releasednativeaccess", onReleased);
+                expect(messages.length).toBe(3);
+                for (var i = 0; i < messages.length; i++) {
+                    expect(messages[i]).toMatch(/released by __releaseNativeCounterpart \(weak collection key/);
+                }
+                done();
+            });
+        });
+
+        it("throws for a weak collection operation on a wrapper released before anything keyed its object under the throw policy (" + kind.name + ")", function () {
+            if (!canary) {
+                return;
+            }
+            var policy = runtime.getConfig("releasedObjectPolicy");
+            runtime.setConfig("releasedObjectPolicy", "throw");
+            try {
+                var map = new WeakMap();
+                expect(function () {
+                    map.set(releasedNeverKeyed(kind), 1);
+                }).toThrowError(ReferenceError, /weak collection key/);
+                expect(function () {
+                    new WeakRef(releasedNeverKeyed(kind));
+                }).toThrowError(ReferenceError, /weak collection key/);
+                expect(function () {
+                    map.get(releasedNeverKeyed(kind));
+                }).toThrowError(ReferenceError, /weak collection key/);
+            } finally {
+                runtime.setConfig("releasedObjectPolicy", policy);
+            }
+        });
+
+        it("gets an undefined value stored on a wrapper released before anything keyed its object (" + kind.name + ")", function (done) {
+            if (!canary) {
+                done();
+                return;
+            }
+            var map = new WeakMap();
+            var obj = releasedNeverKeyed(kind);
+            map.set(obj, undefined);
+            var policy = runtime.getConfig("releasedObjectPolicy");
+            runtime.setConfig("releasedObjectPolicy", "throw");
+            try {
+                var before = releasedAccesses();
+                expect(map.get(obj) === undefined).toBe(true);
+                expect(map.has(obj)).toBe(true);
+                expect(releasedAccesses()).toBe(before);
+            } finally {
+                runtime.setConfig("releasedObjectPolicy", policy);
+            }
+            // Lets the report of the set() above be delivered within this spec.
+            setTimeout(done);
+        });
+
+        it("does not report a weak collection operation on a released wrapper whose object was keyed (" + kind.name + ")", function () {
+            var policy = runtime.getConfig("releasedObjectPolicy");
+            runtime.setConfig("releasedObjectPolicy", "throw");
+            try {
+                var obj = kind.make();
+                var map = new WeakMap();
+                map.set(obj, 1);
+                __releaseNativeCounterpart(obj);
+                var before = releasedAccesses();
+                var other = new WeakMap();
+                expect(map.get(obj)).toBe(1);
+                expect(other.get(obj)).toBeUndefined();
+                other.set(obj, 2);
+                expect(other.get(obj)).toBe(2);
+                new WeakRef(obj);
+                new WeakSet().add(obj);
+                expect(releasedAccesses()).toBe(before);
+            } finally {
+                runtime.setConfig("releasedObjectPolicy", policy);
+            }
+        });
     });
 
     it("makes no key for a call the standard collection rejects", function () {

@@ -169,7 +169,7 @@ on every write to a canary:
 | `promotions` | `"rooted"` only: weak wrappers made strong because native code retained their object |
 | `demotions` | `"rooted"` only: strong wrappers made weak at a major collection because native code no longer retained their object |
 | `queuedReleases` | `"rooted"` and `"canary"`: collected wrappers whose native object was queued for release on the runtime's thread |
-| `canaryStates` | `"canary"` only: state objects created to hold native objects' JS properties, or only to hold the key a weak collection made for the object (see [Weak collections in canary mode](#weak-collections-in-canary-mode)) |
+| `canaryStates` | `"canary"` only: state objects created to hold native objects' JS properties, or only to hold the key a weak collection made for the object, a plain object's included under scope `"extended"` (see [Weak collections in canary mode](#weak-collections-in-canary-mode)) |
 | `canaryNativeDeaths` | `"canary"` only: state objects let go of because their native object was deallocated or, with the default death signal, because `objc_removeAssociatedObjects` released its lifecycle token while the object was still alive |
 | `canaryInterceptedWrites` | `"canary"` only: writes to canaries the runtime's write handler saw. Other wrappers have no handler |
 
@@ -245,6 +245,23 @@ in the standard collections. What follows from that:
 - A key lives in the object's state, so the first `set`, `add`, `new WeakRef`
   or `register` of an object without JS properties creates a state, counted in
   `canaryStates` and `getWrapperClassCounts()`'s `states`. Lookups never do.
+- Under scope `"extended"` a plain (not JS-extended) object's wrapper is not a
+  canary, but it also dies with its JS references while the object lives on.
+  So the first `set`, `add`, `new WeakRef` or `register` of a plain object
+  gives the object a state holding only its key, with the same lifecycle
+  token a plain canary gets under `"all"`, and from then on it is keyed by
+  its lifetime exactly as a canary is, release included. Objects of a class
+  that forbids associated objects or refuses weak references, tagged pointers
+  and blocks stay keyed by their wrapper. Wrapping plain objects, calling
+  them and their properties cost nothing more. Each weak collection operation
+  on a keyed plain object asks native code for its key (about 145 ns
+  for a `WeakMap.prototype.get` hit instead of 40, Release
+  simulator build), the first keying of an object costs about 800 ns
+  more, and once any plain object was keyed a miss on one never keyed costs
+  about 126 ns instead of 107. As with canaries, a
+  `WeakMap` value that references its plain key keeps the object alive while
+  the map lives, and `objc_removeAssociatedObjects` on the object loses what
+  was keyed on it.
 - What was keyed on a native object follows the object, not a released
   wrapper of it. After `__releaseNativeCounterpart(w)`, `w` still finds the
   object's entries while JS holds it, and a wrapper native code hands back

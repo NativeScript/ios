@@ -352,6 +352,8 @@ void WrapperLifetime::Init(Isolate* isolate) {
 
 bool WrapperLifetime::InScope(id obj) { return IsInScope(obj); }
 
+bool WrapperLifetime::Excluded(id obj) { return IsTaggedPointer(obj) || IsBlock(obj); }
+
 void WrapperLifetime::Adopt(Isolate* isolate, ObjCDataWrapper* wrapper,
                             const std::shared_ptr<Persistent<Value>>& handle, id target,
                             CanaryKind kind) {

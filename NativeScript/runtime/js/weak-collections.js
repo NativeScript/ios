@@ -2,10 +2,11 @@
 
 // Canary wrapper lifetime mode only (run by WeakRef.cpp): WeakMap, WeakSet,
 // WeakRef and FinalizationRegistry key a native object by its lifetime key
-// instead of its wrapper. The wrapper is a canary that dies with its JS
-// references while the native object lives on, and a later wrapper for the same
-// object is a new JS object; keyed by the wrapper, entries and targets would be
-// lost with it. Every other value passes through unchanged.
+// instead of its wrapper. The wrapper (a canary, or under scope "extended" a
+// plain object's wrapper) dies with its JS references while the native object
+// lives on, and a later wrapper for the same object is a new JS object; keyed
+// by the wrapper, entries and targets would be lost with it. Every other value
+// passes through unchanged.
 //
 // They are subclasses of the native collections, so what subclassing shows is
 // left as it is: Object.getPrototypeOf(WeakMap.prototype) is the native
@@ -50,11 +51,12 @@ function canBeHeldWeakly(value) {
 // no state behind: the receiver is checked first with a method that cannot
 // insert anything.
 //
-// A canary is stored as a key itself only when its object can have no lifetime
-// key (a class forbidding associated objects or refusing weak references, a
-// -dealloc receiver, a released wrapper that never had one), and unwrap then
-// returns the canary too. So every method first tries the value as is and
-// unwraps it only when that misses.
+// A native object's wrapper is stored as a key itself only when its object can
+// have no lifetime key (a class forbidding associated objects or refusing weak
+// references, a tagged pointer, a block, a -dealloc receiver, a released
+// wrapper that never had one), and unwrap then returns the wrapper too. So
+// every method first tries the value as is and unwraps it only when that
+// misses.
 
 // Slots of `cache` (WeakCollectionCache in WrapperLifetimeCanary.mm): EPOCH
 // changes whenever a wrapper wrap answered may no longer be the one it
