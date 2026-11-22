@@ -16,7 +16,7 @@ LDPLUSPLUS = $SRCROOT/internal/nsld.sh
 
 // * Frameworks only debug builds use: file names separated by spaces. They are weak-linked,
 // * and only configurations based on build-debug.xcconfig embed them.
-NS_DEBUG_FRAMEWORKS = TKLiveSync.framework NativeScriptLeakProbe.framework
+NS_DEBUG_FRAMEWORKS = TKLiveSync.framework NativeScriptLeakProbe.framework NativeScriptDevTunnel.framework
 // * Debug frameworks to embed in every configuration, e.g. in App_Resources/iOS/build.xcconfig:
 // * NS_SHIP_DEBUG_FRAMEWORKS = TKLiveSync.framework
 EXCLUDED_SOURCE_FILE_NAMES[sdk=*] = $(inherited) $(NS_DEBUG_FRAMEWORKS)

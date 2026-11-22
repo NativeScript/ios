@@ -20,13 +20,14 @@ let package = Package(
     ],
     products: [
         // iOS family (iphoneos + iphonesimulator + Mac Catalyst)
-        .library(name: "NativeScript", targets: ["NativeScript", "TKLiveSync", "NativeScriptLeakProbe"]),
+        .library(name: "NativeScript", targets: ["NativeScript", "TKLiveSync", "NativeScriptLeakProbe", "NativeScriptDevTunnel"]),
         // Backwards-compatible alias for the historical product name.
-        .library(name: "NativeScriptSDK", targets: ["NativeScript", "TKLiveSync", "NativeScriptLeakProbe"]),
+        .library(name: "NativeScriptSDK", targets: ["NativeScript", "TKLiveSync", "NativeScriptLeakProbe", "NativeScriptDevTunnel"]),
     ],
     targets: [
         .binaryTarget(name: "NativeScript", path: "NativeScript.xcframework.zip"),
         .binaryTarget(name: "TKLiveSync", path: "TKLiveSync.xcframework.zip"),
         .binaryTarget(name: "NativeScriptLeakProbe", path: "NativeScriptLeakProbe.xcframework.zip"),
+        .binaryTarget(name: "NativeScriptDevTunnel", path: "NativeScriptDevTunnel.xcframework.zip"),
     ]
 )

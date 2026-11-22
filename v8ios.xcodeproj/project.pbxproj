@@ -354,6 +354,14 @@
 		A1EA4B0E0000000000000011 /* NativeScriptLeakProbe.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000001 /* NativeScriptLeakProbe.framework */; platformFilters = (ios, maccatalyst, xros, ); };
 		A1EA4B0E0000000000000012 /* NativeScriptLeakProbe.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000001 /* NativeScriptLeakProbe.framework */; platformFilters = (ios, maccatalyst, xros, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A1EA4B0E0000000000000014 /* LeakProbeSPI.h in Headers */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000013 /* LeakProbeSPI.h */; };
+		D7E7A0C00000000000000005 /* NativeScriptDevTunnel.c in Sources */ = {isa = PBXBuildFile; fileRef = D7E7A0C00000000000000002 /* NativeScriptDevTunnel.c */; };
+		D7E7A0C00000000000000015 /* nsdt_relay.c in Sources */ = {isa = PBXBuildFile; fileRef = D7E7A0C00000000000000006 /* nsdt_relay.c */; };
+		D7E7A0C00000000000000011 /* NativeScriptDevTunnel.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D7E7A0C00000000000000001 /* NativeScriptDevTunnel.framework */; platformFilters = (ios, maccatalyst, xros, ); };
+		D7E7A0C00000000000000012 /* NativeScriptDevTunnel.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D7E7A0C00000000000000001 /* NativeScriptDevTunnel.framework */; platformFilters = (ios, maccatalyst, xros, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		D7E7A0C00000000000000014 /* DevTunnelSPI.h in Headers */ = {isa = PBXBuildFile; fileRef = D7E7A0C00000000000000013 /* DevTunnelSPI.h */; };
+		D7E7A0C00000000000000018 /* DevTunnel.h in Headers */ = {isa = PBXBuildFile; fileRef = D7E7A0C00000000000000017 /* DevTunnel.h */; };
+		D7E7A0C0000000000000001A /* DevTunnel.mm in Sources */ = {isa = PBXBuildFile; fileRef = D7E7A0C00000000000000019 /* DevTunnel.mm */; };
+		D7E7A0C0000000000000001D /* TNSDevTunnel.mm in Sources */ = {isa = PBXBuildFile; fileRef = D7E7A0C0000000000000001C /* TNSDevTunnel.mm */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -413,6 +421,13 @@
 			remoteGlobalIDString = A1EA4B0E000000000000000B;
 			remoteInfo = NativeScriptLeakProbe;
 		};
+		D7E7A0C0000000000000000F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C27E277822202663009C10A3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D7E7A0C0000000000000000B;
+			remoteInfo = NativeScriptDevTunnel;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -444,6 +459,7 @@
 			files = (
 				C225378A241A41C500192740 /* TKLiveSync.framework in Embed Frameworks */,
 				A1EA4B0E0000000000000012 /* NativeScriptLeakProbe.framework in Embed Frameworks */,
+				D7E7A0C00000000000000012 /* NativeScriptDevTunnel.framework in Embed Frameworks */,
 				C2C8EE7622CE54EE001F8CEC /* NativeScript.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
@@ -908,6 +924,16 @@
 		A1EA4B0E0000000000000002 /* NativeScriptLeakProbe.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptLeakProbe.mm; sourceTree = "<group>"; };
 		A1EA4B0E0000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1EA4B0E0000000000000013 /* LeakProbeSPI.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LeakProbeSPI.h; sourceTree = "<group>"; };
+		D7E7A0C00000000000000001 /* NativeScriptDevTunnel.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NativeScriptDevTunnel.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		D7E7A0C00000000000000002 /* NativeScriptDevTunnel.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = NativeScriptDevTunnel.c; sourceTree = "<group>"; };
+		D7E7A0C00000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D7E7A0C00000000000000006 /* nsdt_relay.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = nsdt_relay.c; sourceTree = "<group>"; };
+		D7E7A0C0000000000000000A /* nsdt_relay.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = nsdt_relay.h; sourceTree = "<group>"; };
+		D7E7A0C00000000000000013 /* DevTunnelSPI.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DevTunnelSPI.h; sourceTree = "<group>"; };
+		D7E7A0C00000000000000017 /* DevTunnel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DevTunnel.h; sourceTree = "<group>"; };
+		D7E7A0C00000000000000019 /* DevTunnel.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = DevTunnel.mm; sourceTree = "<group>"; };
+		D7E7A0C0000000000000001B /* TNSDevTunnel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TNSDevTunnel.h; sourceTree = "<group>"; };
+		D7E7A0C0000000000000001C /* TNSDevTunnel.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = TNSDevTunnel.mm; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -947,6 +973,7 @@
 			files = (
 				C2253789241A41C500192740 /* TKLiveSync.framework in Frameworks */,
 				A1EA4B0E0000000000000011 /* NativeScriptLeakProbe.framework in Frameworks */,
+				D7E7A0C00000000000000011 /* NativeScriptDevTunnel.framework in Frameworks */,
 				C2C8EE7522CE54EE001F8CEC /* NativeScript.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -977,6 +1004,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1EA4B0E0000000000000006 /* NativeScript.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D7E7A0C00000000000000008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1157,6 +1191,7 @@
 				C2A5DFE62328C4B900A91A76 /* TKLiveSync */,
 				D3FA1E7A0000000000000005 /* NativeScriptDefaultMetadata */,
 				A1EA4B0E0000000000000004 /* NativeScriptLeakProbe */,
+				D7E7A0C00000000000000004 /* NativeScriptDevTunnel */,
 				C27E278122202664009C10A3 /* Products */,
 				C2FF3016225203FD00933782 /* Frameworks */,
 			);
@@ -1174,6 +1209,7 @@
 				C2253782241A41C500192740 /* TKLiveSync.framework */,
 				D3FA1E7A0000000000000001 /* NativeScriptDefaultMetadata.framework */,
 				A1EA4B0E0000000000000001 /* NativeScriptLeakProbe.framework */,
+				D7E7A0C00000000000000001 /* NativeScriptDevTunnel.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -1217,6 +1253,8 @@
 				C29374F9229FC1600075CB16 /* TestFixtures.h */,
 				C2937508229FC1600075CB16 /* TNSTestCommon.h */,
 				C29374F8229FC1600075CB16 /* TNSTestCommon.m */,
+				D7E7A0C0000000000000001B /* TNSDevTunnel.h */,
+				D7E7A0C0000000000000001C /* TNSDevTunnel.mm */,
 				4E10A9100000000000000012 /* NapiTestModule.mm */,
 				4E10A9100000000000000015 /* NapiCoverageModule.mm */,
 				4E10A9100000000000000016 /* NapiTestSupport.h */,
@@ -1571,6 +1609,9 @@
 				9E3712759A1FB55EC4BA390B /* LeakProbe.h */,
 				A1EA4B0E0000000000000013 /* LeakProbeSPI.h */,
 				8ECE36189A0C784BBCDD3B55 /* LeakProbe.mm */,
+				D7E7A0C00000000000000017 /* DevTunnel.h */,
+				D7E7A0C00000000000000013 /* DevTunnelSPI.h */,
+				D7E7A0C00000000000000019 /* DevTunnel.mm */,
 				C20AB5E526E1015200E2B41D /* OneByteStringResource.h */,
 				C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */,
 				4A5C201A2E2B000300000002 /* Performance.h */,
@@ -1700,6 +1741,25 @@
 			path = NativeScriptLeakProbe;
 			sourceTree = "<group>";
 		};
+		D7E7A0C00000000000000004 /* NativeScriptDevTunnel */ = {
+			isa = PBXGroup;
+			children = (
+				D7E7A0C00000000000000002 /* NativeScriptDevTunnel.c */,
+				D7E7A0C00000000000000016 /* src */,
+				D7E7A0C00000000000000003 /* Info.plist */,
+			);
+			path = NativeScriptDevTunnel;
+			sourceTree = "<group>";
+		};
+		D7E7A0C00000000000000016 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				D7E7A0C0000000000000000A /* nsdt_relay.h */,
+				D7E7A0C00000000000000006 /* nsdt_relay.c */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -1741,6 +1801,8 @@
 				A0636BA435F52099D6955AC5 /* WrapperLifetimeCanary.h in Headers */,
 				ADFC6948A446C61502AEE47F /* LeakProbe.h in Headers */,
 				A1EA4B0E0000000000000014 /* LeakProbeSPI.h in Headers */,
+				D7E7A0C00000000000000018 /* DevTunnel.h in Headers */,
+				D7E7A0C00000000000000014 /* DevTunnelSPI.h in Headers */,
 				6573B9E7291FE2A700B0ED7C /* jsi.h in Headers */,
 				6573B9E2291FE2A700B0ED7C /* jsi-inl.h in Headers */,
 				C2D21601248AAAD900EDC646 /* Constants.h in Headers */,
@@ -1918,6 +1980,7 @@
 				C2F4CBBC22C61CF20036B56F /* PBXTargetDependency */,
 				C2253788241A41C500192740 /* PBXTargetDependency */,
 				A1EA4B0E0000000000000010 /* PBXTargetDependency */,
+				D7E7A0C00000000000000010 /* PBXTargetDependency */,
 			);
 			name = TestRunner;
 			productName = TestRunner;
@@ -1996,6 +2059,23 @@
 			productReference = A1EA4B0E0000000000000001 /* NativeScriptLeakProbe.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		D7E7A0C0000000000000000B /* NativeScriptDevTunnel */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D7E7A0C0000000000000000C /* Build configuration list for PBXNativeTarget "NativeScriptDevTunnel" */;
+			buildPhases = (
+				D7E7A0C00000000000000007 /* Sources */,
+				D7E7A0C00000000000000008 /* Frameworks */,
+				D7E7A0C00000000000000009 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NativeScriptDevTunnel;
+			productName = NativeScriptDevTunnel;
+			productReference = D7E7A0C00000000000000001 /* NativeScriptDevTunnel.framework */;
+			productType = "com.apple.product-type.framework";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -2055,6 +2135,7 @@
 				C2253781241A41C500192740 /* TKLiveSync */,
 				D3FA1E7A0000000000000006 /* NativeScriptDefaultMetadata */,
 				A1EA4B0E000000000000000B /* NativeScriptLeakProbe */,
+				D7E7A0C0000000000000000B /* NativeScriptDevTunnel */,
 			);
 		};
 /* End PBXProject section */
@@ -2101,6 +2182,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A1EA4B0E0000000000000009 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D7E7A0C00000000000000009 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -2412,6 +2500,7 @@
 				C2937520229FC1600075CB16 /* TNSVersions.m in Sources */,
 				C293751B229FC1600075CB16 /* TNSTestNativeCallbacks.m in Sources */,
 				C293751D229FC1600075CB16 /* TNSTestCommon.m in Sources */,
+				D7E7A0C0000000000000001D /* TNSDevTunnel.mm in Sources */,
 				C293751F229FC1600075CB16 /* TNSBridgedTypes.m in Sources */,
 				68E0071A2EB0F7EC00B923AE /* TNSPointCollection.m in Sources */,
 				C2937528229FC1600075CB16 /* TNSObjCTypes.m in Sources */,
@@ -2454,6 +2543,7 @@
 				1DE238EF3BDD0EF221E13C44 /* WrapperLifetime.mm in Sources */,
 				2A9D21FFAFE7419B7E69B585 /* WrapperLifetimeCanary.mm in Sources */,
 				2CA196DC8EB148A2CB3F9C47 /* LeakProbe.mm in Sources */,
+				D7E7A0C0000000000000001A /* DevTunnel.mm in Sources */,
 				F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */,
 				A1B2C3D40000000000000004 /* WorkerInspectorClient.mm in Sources */,
 				C2DDEB9C229EAC8300345BFE /* ClassBuilder.cpp in Sources */,
@@ -2546,6 +2636,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D7E7A0C00000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D7E7A0C00000000000000005 /* NativeScriptDevTunnel.c in Sources */,
+				D7E7A0C00000000000000015 /* nsdt_relay.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -2609,6 +2708,16 @@
 			);
 			target = A1EA4B0E000000000000000B /* NativeScriptLeakProbe */;
 			targetProxy = A1EA4B0E000000000000000F /* PBXContainerItemProxy */;
+		};
+		D7E7A0C00000000000000010 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilters = (
+				ios,
+				maccatalyst,
+				xros,
+			);
+			target = D7E7A0C0000000000000000B /* NativeScriptDevTunnel */;
+			targetProxy = D7E7A0C0000000000000000F /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -3527,6 +3636,99 @@
 			};
 			name = Release;
 		};
+		D7E7A0C0000000000000000D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALLOW_TARGET_PLATFORM_SPECIALIZATION = NO;
+				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
+				CLANG_ENABLE_MODULES = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = NO;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				EXCLUDED_ARCHS = "";
+				"EXCLUDED_ARCHS[sdk=xros*]" = x86_64;
+				"EXCLUDED_ARCHS[sdk=xrsimulator*]" = x86_64;
+				GCC_C_LANGUAGE_STANDARD = c11;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = YES;
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = "DEBUG=1";
+				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
+				INFOPLIST_FILE = NativeScriptDevTunnel/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				OTHER_CFLAGS = (
+					"-Wall",
+					"-Wextra",
+					"-Werror",
+				);
+				OTHER_LDFLAGS = "-Wl,-exported_symbol,_NativeScriptDevTunnelConnect";
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScriptDevTunnel;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = "";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Debug;
+		};
+		D7E7A0C0000000000000000E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALLOW_TARGET_PLATFORM_SPECIALIZATION = NO;
+				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
+				CLANG_ENABLE_MODULES = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = NO;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				EXCLUDED_ARCHS = "";
+				"EXCLUDED_ARCHS[sdk=xros*]" = x86_64;
+				"EXCLUDED_ARCHS[sdk=xrsimulator*]" = x86_64;
+				GCC_C_LANGUAGE_STANDARD = c11;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = YES;
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
+				INFOPLIST_FILE = NativeScriptDevTunnel/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				OTHER_CFLAGS = (
+					"-Wall",
+					"-Wextra",
+					"-Werror",
+				);
+				OTHER_LDFLAGS = "-Wl,-exported_symbol,_NativeScriptDevTunnelConnect";
+				PRODUCT_BUNDLE_IDENTIFIER = org.nativescript.NativeScriptDevTunnel;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SDKROOT = "";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -3616,6 +3818,15 @@
 			buildConfigurations = (
 				A1EA4B0E000000000000000D /* Debug */,
 				A1EA4B0E000000000000000E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D7E7A0C0000000000000000C /* Build configuration list for PBXNativeTarget "NativeScriptDevTunnel" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D7E7A0C0000000000000000D /* Debug */,
+				D7E7A0C0000000000000000E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

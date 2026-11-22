@@ -60,6 +60,12 @@ _functionWithUShortPtr
 _TNSIsConfigurationDebug
 _TNSIsAddressSanitizerEnabled
 _TNSLeakProbeDeclineIsolates
+_TNSDevTunnelAvailable
+_TNSDevTunnelInfo
+_TNSDevTunnelRequest
+_TNSDevTunnelPostTunnelRequest
+_TNSDevTunnelControl
+_TNSDevTunnelRoundTrip
 _TNSClearOutput
 _TNSConstant
 _TNSConstant10_0Plus
