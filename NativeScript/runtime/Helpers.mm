@@ -1167,12 +1167,7 @@ bool tns::LiveSync(Isolate* isolate) {
 }
 
 void tns::Assert(bool condition, Isolate* isolate, std::string const& reason) {
-  if (!RuntimeConfig.IsDebug) {
-    assert(condition);
-    return;
-  }
-
-  if (condition) {
+  if (condition) [[likely]] {
     return;
   }
 
@@ -1183,25 +1178,24 @@ void tns::Assert(bool condition, Isolate* isolate, std::string const& reason) {
     }
   }
 
-  if (isolate == nullptr) {
-    Log(@"====== Assertion failed ======");
-    if (!reason.empty()) {
-      Log(@"Reason: %s", reason.c_str());
-    }
-    Log(@"Native stack trace:");
-    LogBacktrace();
-    assert(false);
-    return;
-  }
-
   Log(@"====== Assertion failed ======");
+  if (!reason.empty()) {
+    Log(@"Reason: %s", reason.c_str());
+  }
   Log(@"Native stack trace:");
   LogBacktrace();
 
-  Log(@"JavaScript stack trace:");
-  std::string stack = tns::GetStackTrace(isolate);
-  Log(@"%s", stack.c_str());
-  assert(false);
+  // Reading the JS stack needs the isolate entered on this thread.
+  if (isolate != nullptr && isolate == v8::Isolate::TryGetCurrent()) {
+    HandleScope handleScope(isolate);
+    Log(@"JavaScript stack trace:");
+    std::string stack = tns::GetStackTrace(isolate);
+    Log(@"%s", stack.c_str());
+  }
+
+  // abort(), not assert(): this must stop the process whether or not NDEBUG
+  // is defined.
+  abort();
 }
 
 void tns::StopExecutionAndLogStackTrace(v8::Isolate* isolate) { Assert(false, isolate); }
