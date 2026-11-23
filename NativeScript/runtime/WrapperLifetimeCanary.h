@@ -101,9 +101,16 @@ class WrapperLifetimeCanary {
   // anew, as it does any result whose kind differs from the template's.
   static CanaryKind NativeInstancesKind();
 
-  // Adds `unwrap` (a canary's native object -> its weak-collection key) and
-  // `wrap` (key -> live or new canary, or undefined once the object is gone)
-  // to `binding`, for the weak-collections builtin. Canary mode only.
+  // Adds `unwrap` (a canary's native object -> its weak-collection key),
+  // `wrap` (key -> live or new wrapper, or undefined once the object is gone)
+  // and `cache` (the Uint32Array that tells the builtin when a wrapper it
+  // cached from wrap is stale) to `binding`, for the weak-collections builtin.
+  // Canary mode only. Under scope "extended", a plain object (not JS-extended,
+  // not a tagged pointer or a block) gets a key-only record the first time a
+  // weak collection keys it: its wrappers are no canaries, so unwrap finds
+  // that record by the object's address, and wrap builds a plain wrapper.
+  // Nothing is attached to the object: a weak reference tells when it is
+  // gone, read by a sweep after each major collection.
   static bool RegisterWrapFunctions(v8::Local<v8::Context> context,
                                     v8::Local<v8::Object> binding);
 
@@ -118,6 +125,15 @@ class WrapperLifetimeCanary {
   // reach the state.
   static void KeepWeakCollectionKey(v8::Isolate* isolate,
                                     v8::Local<v8::Object> canary);
+
+  // KeepWeakCollectionKey for a wrapper of `object` that is not a canary,
+  // before the object is released: with the key-only record of a plain object
+  // a weak collection keyed, or with none. No-op unless the mode is canary,
+  // and for objects that can never have a key (a tagged pointer, a block,
+  // or under scope "all" anything that is not a canary).
+  static void KeepPlainWeakCollectionKey(v8::Isolate* isolate,
+                                         v8::Local<v8::Object> wrapper,
+                                         id object);
 
   // Takes a collected or released canary's reference to its record. A record
   // that died under that canary kept its state for it (it is the forwarding

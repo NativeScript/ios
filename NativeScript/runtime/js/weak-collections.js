@@ -2,16 +2,17 @@
 
 // Canary wrapper lifetime mode only (run by WeakRef.cpp): WeakMap, WeakSet,
 // WeakRef and FinalizationRegistry key a native object by its lifetime key
-// instead of its wrapper. The wrapper is a canary that dies with its JS
-// references while the native object lives on, and a later wrapper for the same
-// object is a new JS object; keyed by the wrapper, entries and targets would be
-// lost with it. Every other value passes through unchanged.
+// instead of its wrapper. The wrapper (a canary, or under scope "extended" a
+// plain object's wrapper) dies with its JS references while the native object
+// lives on, and a later wrapper for the same object is a new JS object; keyed
+// by the wrapper, entries and targets would be lost with it. Every other value
+// passes through unchanged.
 //
 // They are subclasses of the native collections, so what subclassing shows is
 // left as it is: Object.getPrototypeOf(WeakMap.prototype) is the native
 // prototype, and WeakMap.toString() is not native code.
 
-const { unwrap, wrap } = binding;
+const { unwrap, wrap, cache } = binding;
 const {
   FinalizationRegistry: NativeFinalizationRegistry,
   FinalizationRegistryPrototypeRegister,
@@ -50,15 +51,23 @@ function canBeHeldWeakly(value) {
 // no state behind: the receiver is checked first with a method that cannot
 // insert anything.
 //
-// A canary is stored as a key itself only when its object can have no lifetime
-// key (a class forbidding associated objects or refusing weak references, a
-// -dealloc receiver, a released wrapper that never had one), and unwrap then
-// returns the canary too. So every method first tries the value as is and
-// unwraps it only when that misses: plain JS keys never reach native code.
+// A native object's wrapper is stored as a key itself only when its object can
+// have no lifetime key (a class forbidding associated objects or refusing weak
+// references, a tagged pointer, a block, a -dealloc receiver, a released
+// wrapper that never had one), and unwrap then returns the wrapper too. So
+// every method first tries the value as is and unwraps it only when that
+// misses.
+
+// Slots of `cache` (WeakCollectionCache in WrapperLifetimeCanary.mm): EPOCH
+// changes whenever a wrapper wrap answered may no longer be the one it
+// answers; after unwrap(value, true, true), LIVE_CANARY says whether value is
+// the wrapper wrap answers with for the key unwrap returned.
+const EPOCH = 0;
+const LIVE_CANARY = 1;
 
 // The lifetime key value stands for, or undefined when that is value itself.
 function otherKey(value) {
-  if (!isObject(value)) {
+  if ((typeof value !== "object" || value === null) && typeof value !== "function") {
     return undefined;
   }
   const key = unwrap(value, false);
@@ -170,12 +179,26 @@ class WeakSet extends NativeWeakSet {
 }
 
 class WeakRef extends NativeWeakRef {
+  // Undefined when the target is not a lifetime key. Otherwise null, or a
+  // NativeWeakRef to the wrapper the WeakRef was made with or deref last
+  // returned, which wrap still answers with while the epoch is #epoch.
+  #wrapper = undefined;
+  #epoch = 0;
+
   constructor(target) {
-    const key = isObject(target) ? unwrap(target, true) : target;
+    const now = cache[EPOCH];
+    const key = isObject(target) ? unwrap(target, true, true) : target;
+    const live = key !== target && cache[LIVE_CANARY] !== 0;
     super(key);
     // The target itself, not only its key, stays alive until the job ends.
     if (key !== target) {
-      new NativeWeakRef(target);
+      const kept = new NativeWeakRef(target);
+      if (live) {
+        this.#wrapper = kept;
+        this.#epoch = now;
+      } else {
+        this.#wrapper = null;
+      }
     }
   }
 
@@ -188,10 +211,26 @@ class WeakRef extends NativeWeakRef {
     if (!isObject(target)) {
       return target;
     }
+    if (!(#wrapper in this)) {
+      return wrap(target);
+    }
+    const last = this.#wrapper;
+    if (last === undefined) {
+      return target;
+    }
+    const now = cache[EPOCH];
+    if (last !== null && this.#epoch === now) {
+      const live = WeakRefPrototypeDeref(last);
+      if (live !== undefined) {
+        return live;
+      }
+    }
     const result = wrap(target);
-    // The native deref already keeps a target it returns as is.
-    if (result !== target && result !== undefined) {
-      new NativeWeakRef(result);
+    if (result !== undefined) {
+      this.#wrapper = new NativeWeakRef(result);
+      this.#epoch = now;
+    } else {
+      this.#wrapper = null;
     }
     return result;
   }

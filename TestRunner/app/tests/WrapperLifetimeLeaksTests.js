@@ -140,6 +140,26 @@ describe("Wrapper lifetime leak cycles", function () {
         expect(held.length).toBe(3);
     });
 
+    it("counts the key-only state of a plain object a weak collection keyed", function () {
+        if (!canary || runtime.getConfig("wrapperLifetimeScope") !== "extended") {
+            return;
+        }
+        var obj = NSUUID.UUID();
+        // Summed over classes: the probe counts the runtime class, which
+        // -class hides for a class cluster.
+        function states() {
+            var counts = runtime.getWrapperClassCounts();
+            return Object.keys(counts).reduce(function (sum, name) {
+                return sum + counts[name].states;
+            }, 0);
+        }
+        var before = states();
+        var map = new WeakMap();
+        map.set(obj, "value");
+        expect(states()).toBe(before + 1);
+        expect(map.get(obj)).toBe("value");
+    });
+
     it("rejects a non-object argument", function () {
         expect(function () {
             runtime.findLeakCycles(true);

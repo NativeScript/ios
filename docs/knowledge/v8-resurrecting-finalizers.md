@@ -352,7 +352,8 @@ documents it as not for general use. The alternative keeps an ObjC weak referenc
 references) and sweeps the records after every major collection, so state lingers until then.
 An instance of a class that refuses weak references and is not JS-extended gets no state
 under it, in the same way. With the default, `"scope": "all"` stays experimental because that
-check reads private runtime layout; `"extended"` attaches no tokens at all. It cannot be
+check reads private runtime layout; `"extended"` attaches no tokens at all (the key-only
+records below use the weak reference). It cannot be
 rooted at canary death instead, because a state reachable only through the canary is garbage in
 the same collection. The cost: state that references its own object (a closure over `this`)
 keeps it alive. A canary built after a death is a new object, but `===` cannot tell: only one
@@ -372,12 +373,47 @@ lives while the state or the released canary does. A record whose token
 `objc_removeAssociatedObjects` already retired gets neither: the released canary then keys
 nothing, as that limitation describes. What could notice is whatever keys on the canary without keeping it. The weak collections
 don't: in canary mode a builtin (`js/weak-collections.js`) replaces `WeakMap`, `WeakSet`,
-`WeakRef` and `FinalizationRegistry` with subclasses that key an in-scope native object (a
-canary: not a plain object under `"extended"`, a tagged pointer, a block, or an object of a class
-refusing weak references or forbidding associated objects) by an opaque, frozen key held by its state, so entries and targets live
-exactly as long as the native object, and `WeakRef.prototype.deref` returns the live canary, a new
+`WeakRef` and `FinalizationRegistry` with subclasses that key a native object (a canary's, or
+under `"extended"` a plain object's; not a tagged pointer, a block, or an object of a class
+refusing weak references or, for a canary, forbidding associated objects) by an opaque, frozen key held by its state, so entries and targets live
+exactly as long as the native object, and `WeakRef.prototype.deref` returns the live wrapper, a new
 one, or `undefined` once the object is gone. Lookups never create that key, and a Proxy around a
-native object stays a key of its own. The cost is the other side of the same rooting: a `WeakMap`
+native object stays a key of its own. Under `"extended"` a plain object's wrapper is a phantom
+handle with no handlers and no state, which dies with its JS references just as a canary does, so
+the first keying of a plain object (`unwrap` with `create`) gives it a key-only record: a weak
+slot and a state holding nothing but the key, counted in `canaryStates` and in the registry's
+`records`, so the leak probe walks it like any other state. Nothing is attached to the object: no
+token, so no private class layout is read, a class forbidding associated objects is keyed like
+any other, and `objc_removeAssociatedObjects` leaves the record alone. Only a class refusing weak
+references keeps its wrapper as the key. The record is flagged `plain` and no wrapper holds it:
+wrapping a plain object never consults the registry, and `unwrap` finds the record by the
+object's address only after the canary lookups miss, behind an atomic count of plain records, so
+a weak-collection lookup costs nothing more while no plain object was ever keyed, and canary
+adoption skips the registry while every record is plain. `wrap` returns the object's `Instances`
+wrapper or builds a plain one (no adoption, no hydration). Death is the weak sweep, whatever
+`NS_CANARY_DEATH_SIGNAL` chooses for canaries: a major-GC epilogue posts `SweepPlain` (one atomic
+load while `plainRecords`, retired records included, is empty), which walks the registry's `plainRecords` list, not the
+map, and retires records whose weak slot was zeroed; a lookup that meets a zeroed slot retires
+the record at once (`RetireIfDead`). So entries keyed on a dead plain object, and its
+`FinalizationRegistry` callbacks, wait until the major collection after its deallocation (and the
+key's own collection after that). The sweep bumps no `deref` cache epoch: a live wrapper retains
+its object, so no cached wrapper outlives a swept object. Release semantics are the canary ones:
+`__releaseNativeCounterpart` on a plain wrapper copies the key, or `null`, onto it
+(`KeepPlainWeakCollectionKey`) and marks the record released; since no adoption looks the record
+up, `unwrap` or `wrap` meeting a live wrapper of the object clears the mark instead. Limitation:
+a native hand-back whose wrapper dies before any weak collection operation sees it leaves the
+record released, so `deref` returns `undefined` until a later hand-back reaches `unwrap` or
+`wrap`. Limitation: as for canaries, a `WeakMap` value referencing its plain key keeps the object
+alive while the map lives, where the wrapper key used to let it go. Measured on a Release
+simulator build (medians of launches, ns/op): a `WeakMap` hit on a keyed plain object 142 instead
+of 39 (the wrapper was the key), a miss on a never-keyed plain wrapper 124 instead of 106 once any
+plain object was keyed and unchanged (107) before, the first keying 870 instead of 154, a
+`new WeakRef` of a fresh plain object 1570 instead of 216, and a `deref` that rebuilds a dead
+plain wrapper about 1120. A major collection plus the next timer took about 500 µs with 1000
+keyed plain objects held against 370 with the same objects unkeyed, the same as a build that
+reported their deaths with tokens (540 against 385): the difference is the states and keys on the
+heap, and the sweep is below that noise. Creating plain wrappers, native calls, native property
+reads and stores, `Instances` lookups and a major collection with no plain record are unchanged. The cost is the other side of the same rooting: a `WeakMap`
 value that references its native key keeps the key, its state and so the native object alive for
 as long as the map lives, where in the other modes the entry would be collectable. Native `#private` fields are branded on the canary and do not carry over. Other
 limits: `Object.freeze`, `seal` and `preventExtensions` throw on a canary (V8 refuses them on

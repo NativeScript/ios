@@ -76,6 +76,9 @@ class WrapperLifetime {
   // of a JS-extended class.
   static bool InScope(id obj);
 
+  // A tagged pointer or a block: never in scope, whatever the scope.
+  static bool Excluded(id obj);
+
   // A newly wrapped ObjC object: `handle` is its Instances entry, registered by
   // ObjectManager::Register and holding the entry's +1 on `target`.
   // `kind`: the canary handlers the wrapper carries
