@@ -1563,7 +1563,7 @@ void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value>& 
       info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
   Local<Object> receiver = info.This();
   if (!ResolveProxyReceiver(isolate, receiver, "read native property", item->meta_->jsName(),
-                            false)) {
+                            true)) {
     return;
   }
 
@@ -1600,7 +1600,7 @@ void MetadataBuilder::SetNativeProperty(Isolate* isolate, CacheItem<PropertyMeta
   }
 
   if (!ResolveProxyReceiver(isolate, receiver, "set native property", item->meta_->jsName(),
-                            false)) {
+                            true)) {
     return;
   }
   V8SimpleValueArgs args(value);
