@@ -1733,21 +1733,6 @@ Local<Value> MetadataBuilder::InvokeMethod(Local<Context> context, const MethodM
   // TODO: Find out if the isMethodCallback property can be determined based on a
   // UITableViewController.prototype.viewDidLoad.call(this) or super.viewDidLoad() call
 
-#ifdef DEBUG
-  id value = Runtime::GetAppConfigValue("logRuntimeDetail");
-  bool logRuntimeDetail = value ? [value boolValue] : false;
-  if (logRuntimeDetail) {
-    // NOTE: stringWithFormat is slow, perhaps use different c string concatenation?
-    NSString* message = [NSString
-        stringWithFormat:@"MetadataBuilder::InvokeMethod: class {%s}, selector {%s}, "
-                         @"isInitializer {%s}, type {%s}, lib {%s}",
-                         klass ? class_getName(klass) : "<unknown>", meta->selectorAsString(),
-                         meta->isInitializer() ? "true" : "false", meta->typeName(),
-                         meta->topLevelModule()->getName()];
-    Log(@"%@", message);
-  }
-#endif
-
   try {
     return ArgConverter::Invoke(context, klass, receiver, args, meta, isMethodCallback);
   } catch (NativeScriptException& ex) {

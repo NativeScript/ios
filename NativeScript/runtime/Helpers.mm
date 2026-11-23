@@ -1198,8 +1198,6 @@ void tns::Assert(bool condition, Isolate* isolate, std::string const& reason) {
   abort();
 }
 
-void tns::StopExecutionAndLogStackTrace(v8::Isolate* isolate) { Assert(false, isolate); }
-
 namespace tns {
 Local<v8::FunctionTemplate> NewFunctionTemplate(v8::Isolate* isolate, v8::FunctionCallback callback,
                                                 Local<v8::Value> data,

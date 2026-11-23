@@ -590,8 +590,6 @@ bool LiveSync(v8::Isolate* isolate);
 void Assert(bool condition, v8::Isolate* isolate = nullptr,
             std::string const& reason = std::string());
 
-void StopExecutionAndLogStackTrace(v8::Isolate* isolate);
-
 // Helpers from Node
 inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate, const char* data, int length) {
   return v8::String::NewFromOneByte(isolate, reinterpret_cast<const uint8_t*>(data),
