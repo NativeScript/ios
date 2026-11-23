@@ -325,7 +325,17 @@ canary lives at a time, and anything still referencing the old one would have ke
 An explicit release is different: `__releaseNativeCounterpart` drops the object's
 `Caches::Instances` entry but not its state, so if the object lives on, the next native return
 of it builds a new canary with the state's properties while JS can still hold the released
-one, and `===` tells them apart. What could notice is whatever keys on the canary without keeping it. The weak collections
+one, and `===` tells them apart. What the weak collections keyed on the object follows the
+object: before the release, `WrapperLifetimeCanary::KeepWeakCollectionKey` copies the key onto
+the released canary (a private), so `unwrap` still returns it there, and marks the record
+released, so `wrap` returns the object's live canary only once native code handed the object
+back (a new canary adopted the record, which clears the mark) and `undefined` until then; it
+never builds a canary for a released record, and never returns the released one. A canary
+released with no key to copy gets `null` in that private instead, and `unwrap` reports each
+weak-collection operation that reaches it as a released-object access (`ReportReleasedObject`). The key
+lives while the state or the released canary does. A record whose token
+`objc_removeAssociatedObjects` already retired gets neither: the released canary then keys
+nothing, as that limitation describes. What could notice is whatever keys on the canary without keeping it. The weak collections
 don't: in canary mode a builtin (`js/weak-collections.js`) replaces `WeakMap`, `WeakSet`,
 `WeakRef` and `FinalizationRegistry` with subclasses that key an in-scope native object (a
 canary: not a plain object under `"extended"`, a tagged pointer, a block, or an object of a class
