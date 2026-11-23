@@ -41,6 +41,10 @@ void ScopeClassNameToIsolate(std::string& name, int isolateId) {
 struct RetainTrackedClasses {
   std::unordered_set<void*> classes;
 };
+
+void ThrowTypeError(Isolate* isolate, const std::string& message) {
+  isolate->ThrowException(Exception::TypeError(tns::ToV8String(isolate, message)));
+}
 }  // namespace
 
 Local<FunctionTemplate> ClassBuilder::GetExtendFunction(Isolate* isolate,
@@ -54,7 +58,24 @@ Local<FunctionTemplate> ClassBuilder::GetExtendFunction(Isolate* isolate,
 void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
 
-  tns::Assert(info.Length() > 0 && info[0]->IsObject() && info.This()->IsFunction(), isolate);
+  if (!info.This()->IsFunction()) {
+    ThrowTypeError(isolate, "extend() must be called on a native class constructor");
+    return;
+  }
+  Local<v8::Function> baseFunc = info.This().As<v8::Function>();
+  std::string baseClassName = tns::ToString(isolate, baseFunc->GetName());
+  if (info.Length() == 0 || !info[0]->IsObject()) {
+    ThrowTypeError(isolate, baseClassName +
+                                ".extend() expects an object with the class's members as its "
+                                "first argument");
+    return;
+  }
+  if (info.Length() > 1 && !info[1]->IsNullOrUndefined() && !info[1]->IsObject()) {
+    ThrowTypeError(isolate, baseClassName +
+                                ".extend() expects an object with the native class options "
+                                "(name, protocols, exposedMethods) as its second argument");
+    return;
+  }
 
   try {
     Local<Context> context = isolate->GetCurrentContext();
@@ -62,8 +83,6 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
     Local<Object> implementationObject = info[0].As<Object>();
-    Local<v8::Function> baseFunc = info.This().As<v8::Function>();
-    std::string baseClassName = tns::ToString(isolate, baseFunc->GetName());
 
     BaseDataWrapper* baseWrapper = tns::GetValue(isolate, baseFunc);
     if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::ObjCClass) {
@@ -78,9 +97,10 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     if (info.Length() > 1 && info[1]->IsObject()) {
       nativeSignature = info[1].As<Object>();
       Local<Value> explicitClassName;
-      tns::Assert(nativeSignature->Get(context, tns::ToV8String(isolate, "name"))
-                      .ToLocal(&explicitClassName),
-                  isolate);
+      if (!nativeSignature->Get(context, tns::ToV8String(isolate, "name"))
+               .ToLocal(&explicitClassName)) {
+        return;
+      }
       if (!explicitClassName.IsEmpty() && !explicitClassName->IsNullOrUndefined()) {
         staticClassName = tns::ToString(isolate, explicitClassName);
       }
@@ -125,8 +145,12 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         baseCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&baseProto);
     tns::Assert(success, isolate);
 
-    if (!implementationObject->SetPrototype(context, baseProto).To(&success) || !success) {
-      tns::Assert(false, isolate);
+    // A refused change comes back as Nothing with no exception pending.
+    if (!implementationObject->SetPrototype(context, baseProto).FromMaybe(false)) {
+      ThrowTypeError(isolate, baseClassName +
+                                  ".extend() could not set the prototype of its first argument, "
+                                  "which must be an extensible object");
+      return;
     }
     Local<v8::Function> superGetter;
     if (!FunctionTemplate::New(isolate, SuperAccessorGetterCallback, ext)
@@ -214,15 +238,15 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         Local<Context> context = isolate->GetCurrentContext();
 
         auto cache = Caches::Get(isolate);
-        BaseDataWrapper* wrapper = tns::GetValue(isolate, info[1].As<Object>());
-        if (!wrapper) {
-          // We are not extending a native object -> call the base __extends function
+        BaseDataWrapper* wrapper =
+            info[1]->IsObject() ? tns::GetValue(isolate, info[1].As<Object>()) : nullptr;
+        if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCClass) {
+          // Not a native class: the base __extends function's inheritance.
           Persistent<v8::Function>* poExtendsFunc = cache->OriginalExtendsFunc.get();
           tns::Assert(poExtendsFunc != nullptr, isolate);
           Local<v8::Function> originalExtendsFunc = poExtendsFunc->Get(isolate);
           Local<Value> args[] = {info[0], info[1]};
-          originalExtendsFunc->Call(context, context->Global(), info.Length(), args)
-              .ToLocalChecked();
+          (void)originalExtendsFunc->Call(context, context->Global(), 2, args);
           return;
         }
 
@@ -230,6 +254,11 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         Class baseClass = classWrapper->Klass();
         std::string baseClassName = class_getName(baseClass);
 
+        if (!info[0]->IsFunction()) {
+          ThrowTypeError(isolate,
+                         "__extends() expects a constructor function to extend " + baseClassName);
+          return;
+        }
         Local<v8::Function> extendedClassCtorFunc = info[0].As<v8::Function>();
         std::string extendedClassName = tns::ToString(isolate, extendedClassCtorFunc->GetName());
 
