@@ -107,6 +107,13 @@ declare module "ns:runtime" {
      * handler on every write.
      */
     wrapperLifetimeAllowShadowingNativeMembers: boolean;
+    /**
+     * Whether assigning a native member's name on a native object throws (see
+     * `wrapperLifetimeAllowShadowingNativeMembers`): `true` in debug builds
+     * under the `"rooted"` and `"canary"` modes unless shadowing is allowed,
+     * `false` otherwise. Fixed at startup. Read-only: `setConfig` throws.
+     */
+    wrapperLifetimeGuardsNativeMembers: boolean;
   }
 
   /**

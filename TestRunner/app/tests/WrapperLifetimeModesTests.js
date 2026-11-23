@@ -9,9 +9,9 @@ describe("Wrapper lifetime modes", function () {
     var canary = mode === "canary";
     // JS state on a natively owned object survives its wrapper's death.
     var keepsState = rooted || canary;
-    // The suite is a debug build: assigning a native method's name on a native
-    // object throws in these modes (the native member guard).
-    var guardsNativeMembers = keepsState && !runtime.getConfig("wrapperLifetimeAllowShadowingNativeMembers");
+    // Assigning a native method's name on a native object throws (the native
+    // member guard; debug builds in these modes only).
+    var guardsNativeMembers = runtime.getConfig("wrapperLifetimeGuardsNativeMembers");
 
     var Extended = (function (_super) {
         __extends(Extended, _super);

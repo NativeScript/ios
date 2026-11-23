@@ -121,6 +121,7 @@ Config keys:
 | `wrapperLifetimeMode` | `"resurrecting"` \| `"rooted"` \| `"canary"` | process-wide, read-only | the app config `"wrapperLifetime": { "mode": … }`, or `"resurrecting"` |
 | `wrapperLifetimeScope` | `"extended"` \| `"all"` | process-wide, read-only | the app config `"wrapperLifetime": { "scope": … }`, or `"extended"` |
 | `wrapperLifetimeAllowShadowingNativeMembers` | `true` \| `false` | process-wide, read-only | the app config `"wrapperLifetime": { "allowShadowingNativeMembers": … }`, or `false` (see [Native member guard](#native-member-guard) and [Plain canaries](#plain-canaries)) |
+| `wrapperLifetimeGuardsNativeMembers` | `true` \| `false` | process-wide, read-only | `true` in debug builds under the `"rooted"` and `"canary"` modes unless `wrapperLifetimeAllowShadowingNativeMembers` is `true`, else `false` (see [Native member guard](#native-member-guard)) |
 
 ```js
 const { setConfig, getConfig } = require("ns:runtime");
@@ -149,7 +150,7 @@ The `TypeError` messages are part of the contract:
 | invalid `releasedObjectPolicy` value | `'releasedObjectPolicy' must be 'report' or 'throw'` |
 | non-string `debug` value | `'debug' must be a comma-separated category string (<categories>), or '' to disable tracing` |
 | non-boolean `wrapperLifetimeWarnings` value | `'wrapperLifetimeWarnings' must be a boolean` |
-| `setConfig` of `wrapperLifetimeMode`, `wrapperLifetimeScope` or `wrapperLifetimeAllowShadowingNativeMembers` | `'<key>' is read-only; set "wrapperLifetime" in the app config` |
+| `setConfig` of `wrapperLifetimeMode`, `wrapperLifetimeScope`, `wrapperLifetimeAllowShadowingNativeMembers` or `wrapperLifetimeGuardsNativeMembers` | `'<key>' is read-only; set "wrapperLifetime" in the app config` |
 
 ### Wrapper lifetime counters
 
@@ -349,6 +350,8 @@ mirroring handler, so a shadowing property on one carries over to a new
 wrapper as it does on a JS-extended instance, at the cost of a handler on every
 write to a plain wrapper (see [Plain canaries](#plain-canaries));
 `getConfig("wrapperLifetimeAllowShadowingNativeMembers")` reads it.
+`getConfig("wrapperLifetimeGuardsNativeMembers")` reads whether the guard is
+on, which also accounts for the build and the mode.
 
 Release builds never throw and keep data properties, since the accessor costs
 every native method load. An instance shadow there is silently ignored by

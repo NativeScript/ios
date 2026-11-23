@@ -1,13 +1,12 @@
 // Debug builds in the "rooted" and "canary" modes guard native instance
 // methods, and the methods of JS-extended classes that native code calls:
 // assigning one's name on a native object throws, since native code never
-// calls that own property. The suite is a debug build; the resurrecting
-// mode and "allowShadowingNativeMembers" keep plain data properties.
+// calls that own property. Release builds, the resurrecting mode and
+// "allowShadowingNativeMembers" keep plain data properties.
 describe("Native member guard", function () {
     var runtime = require("ns:runtime");
     var mode = runtime.getConfig("wrapperLifetimeMode");
-    var guarded = (mode === "rooted" || mode === "canary") &&
-        !runtime.getConfig("wrapperLifetimeAllowShadowingNativeMembers");
+    var guarded = runtime.getConfig("wrapperLifetimeGuardsNativeMembers");
 
     function replacement() {
         return "js";
@@ -55,6 +54,24 @@ describe("Native member guard", function () {
         expect(function () {
             runtime.setConfig("wrapperLifetimeAllowShadowingNativeMembers", true);
         }).toThrowError(TypeError, /read-only/);
+    });
+
+    it("reports the guard state read-only", function () {
+        var allowShadowing = runtime.getConfig("wrapperLifetimeAllowShadowingNativeMembers");
+        // canonicalizeHttpUrlKey is exported only when RuntimeConfig.IsDebug.
+        var debugBuild = typeof require("ns:module").canonicalizeHttpUrlKey === "function";
+        expect(typeof guarded).toBe("boolean");
+        if (guarded) {
+            expect(mode === "rooted" || mode === "canary").toBe(true);
+            expect(allowShadowing).toBe(false);
+        }
+        if (debugBuild && (mode === "rooted" || mode === "canary") && !allowShadowing) {
+            expect(guarded).toBe(true);
+        }
+        expect(function () {
+            runtime.setConfig("wrapperLifetimeGuardsNativeMembers", !guarded);
+        }).toThrowError(TypeError, /read-only/);
+        expect(runtime.getConfig("wrapperLifetimeGuardsNativeMembers")).toBe(guarded);
     });
 
     it("guards native instance methods against strict and sloppy instance writes", function () {
