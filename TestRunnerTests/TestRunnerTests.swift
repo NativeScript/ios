@@ -181,6 +181,18 @@ class TestRunnerTests: XCTestCase {
                     return
                 }
 
+                if path == "/esm/revision.mjs" {
+                    // Each request of a target gets a new body: its ordinal.
+                    let target = query.isEmpty ? path : "\(path)?\(query)"
+                    let body = "export const revision = \(self.requestCounts[target] ?? 0);\n"
+                    startResponse("200 OK", [
+                        ("Content-Type", "application/javascript; charset=utf-8"),
+                        ("Cache-Control", "no-cache"),
+                    ])
+                    sendBody(body.data(using: .utf8) ?? Data())
+                    return
+                }
+
                 if path == "/esm/syntax-error.mjs" {
                     // Deliberately unparseable: pins that the loader surfaces
                     // V8's real compile error instead of a generic failure.

@@ -12,6 +12,11 @@ typealias ModuleTestServerInput = (@escaping (Data) -> Void) -> Void
 /// fallback) and the Jasmine reporter — so the HTTP surface is deliberately
 /// small: one request per connection, full body buffered before dispatch,
 /// `Connection: close` on every response.
+///
+/// Like a dev server, it answers `Cache-Control: no-cache` unless the handler
+/// sets its own: the loader caches module responses on disk, and that cache
+/// outlives the app process, so a cacheable answer could reach a later spec or
+/// a later run instead of a request.
 final class ModuleTestServer {
     typealias StartResponse = (String, [(String, String)]) -> Void
     typealias SendBody = (Data) -> Void
@@ -202,6 +207,9 @@ final class ModuleTestServer {
         var response = "HTTP/1.1 \(status)\r\n"
         for (name, value) in headers {
             response += "\(name): \(value)\r\n"
+        }
+        if !headers.contains(where: { $0.0.lowercased() == "cache-control" }) {
+            response += "Cache-Control: no-cache\r\n"
         }
         response += "Content-Length: \(body.count)\r\nConnection: close\r\n\r\n"
         var payload = Data(response.utf8)

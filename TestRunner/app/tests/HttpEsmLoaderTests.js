@@ -227,6 +227,30 @@ describe("HTTP ESM Loader", function() {
             });
         });
 
+        // The revision route answers `Cache-Control: no-cache`, as a dev
+        // server does for source modules, and numbers each response, so a
+        // re-import served from the HTTP cache would repeat revision 1.
+        it("re-imports the server's current body after invalidateModules", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var nsModule = require("ns:module");
+            var url = origin + "/esm/revision.mjs?k=invalidate";
+            import(url).then(function (first) {
+                nsModule.invalidateModules([url]);
+                return import(url).then(function (second) {
+                    expect([first.revision, second.revision]).toEqual([1, 2]);
+                    done();
+                });
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
         // The module-fetch budget is build-dependent: 30s per request attempt
         // in debug runtimes, 5s in release (HttpLoader.mm). A module whose
         // response lands between the two — the measured 5–9s dev-server
@@ -1342,7 +1366,7 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
 
         // Upstream path joins collapse `http://` to `http:/`. Every key
         // derivation repairs that before it tests the scheme, so a key that
-        // arrives collapsed — through invalidateModules or a cache-bust mark —
+        // arrives collapsed — through invalidateModules —
         // lands on the same identity the resolver produces.
         it("repairs a collapsed scheme to one identity", function () {
             checkKey("http:/h/ns/core", "http://h/ns/core");

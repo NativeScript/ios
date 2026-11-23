@@ -641,7 +641,7 @@ v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
       requestedUrl.c_str());
 
   ModuleFetchResult fetched;
-  if (!HttpFetchModule(requestedUrl, registryKey, fetched)) {
+  if (!HttpFetchModule(requestedUrl, fetched)) {
     TNS_DEBUG(Esm, "[http-esm][load][fetch-fail] request=%s key=%s status=%d", requestedUrl.c_str(),
               registryKey.c_str(), fetched.status);
     // The classifier's reason names the URL and the cause (status, MIME, or
@@ -861,7 +861,7 @@ void SetVolatilePatterns(const std::vector<std::string>& patterns) {
             (unsigned long)vocabulary->volatilePatterns.size());
 }
 
-// Check if a URL matches any volatile pattern (should bypass cache).
+// Check if a URL matches any volatile pattern (never reused from the registry).
 static bool IsVolatileUrl(const std::string& url) {
   const LoaderVocabulary* vocabulary = VocabularyForCurrentIsolate();
   if (vocabulary == nullptr) {
@@ -1651,9 +1651,7 @@ static void AsyncGraphEnqueue(const std::shared_ptr<AsyncGraphLoad>& load,
   load->pendingFetches++;
   std::shared_ptr<AsyncGraphLoad> loadRef = load;
   const std::string url = target;
-  // The canonical key is computed here, on the isolate's thread; the fetch
-  // carries it so background threads never touch per-isolate vocabulary.
-  FetchModuleBodyAsync(url, key, load->fetchDeadline, [loadRef, url](ModuleFetchResult result) {
+  FetchModuleBodyAsync(url, load->fetchDeadline, [loadRef, url](ModuleFetchResult result) {
     // Arbitrary thread. Hop to the isolate's home thread as a nestable v8
     // foreground task — thread-independent delivery, so an import() issued
     // from a background thread still lands on the isolate's own event loop,
@@ -1903,18 +1901,6 @@ void InvalidateModules(v8::Isolate* isolate, v8::Local<v8::Context> context,
     RejectAndClearInvalidatedModuleState(isolate, context, url);
     RemoveModuleFromRegistry(isolate, url);
   }
-
-  // Second layer: the OS/CFNetwork HTTP cache is outside the runtime's
-  // direct control and has been observed serving a previous save's body
-  // even with `no-store` headers + a reload-ignoring cache policy
-  // (iOS 18+/26+ Simulator). Mark every invalidated key so the NEXT
-  // network fetch of that URL carries a unique `__ns_dev_nonce` query
-  // param — CFNetwork sees a URL it has never cached and must go to
-  // origin. The nonce is transport-only; module identity stays the
-  // canonical URL.
-  // `uniqueUrls` already holds canonical registry keys, computed above on
-  // this isolate's thread — which is what the transport's mark set needs.
-  MarkKeysForCacheBust(uniqueUrls);
 
   TNS_DEBUG(Registry, "invalidate summary unique=%lu hits=%lu misses=%lu (registry now=%lu)",
             (unsigned long)uniqueUrls.size(), (unsigned long)hits, (unsigned long)misses,
@@ -2941,8 +2927,9 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       TNS_DEBUG(Esm, "[dyn-import][http-loader] trying URL %s", normalizedSpec.c_str());
       std::string key = CanonicalizeHttpUrlKey(normalizedSpec);
       // Volatile pattern check: if the URL matches any configured volatile
-      // pattern, evict the cached module so we always re-fetch. The pattern
-      // list is policy and is supplied exclusively by the dev client via
+      // pattern, evict the registered module so every import requests it
+      // again (through the HTTP cache, which the server's headers govern).
+      // The pattern list is policy and is supplied exclusively by the dev client via
       // ns:module `configureLoader({ volatilePatterns })` — the runtime
       // carries no framework or server URL vocabulary of its own. (Framework
       // strategies ship their own endpoints, e.g. Angular's `/@ng/component`

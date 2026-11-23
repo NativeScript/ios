@@ -547,8 +547,8 @@ apply, worker teardown) belongs to whatever tooling drives it.
 
 | export | description |
 |---|---|
-| `configureLoader(config)` | Installs loader policy for the calling isolate. Sections: `importMap` (`imports` + `scopes`), `volatilePatterns` (URL substrings always re-fetched), `canonicalization` (registry-keying vocabulary). Each **present** section replaces its state wholesale, an empty array included. Throws `TypeError` on any malformed input, having validated the whole config first, so a rejected call installs nothing. |
-| `invalidateModules(urls)` | Evicts the given URLs (canonicalized) from the module registry and marks them bust-next-fetch, so the next network fetch bypasses every HTTP cache layer. Takes an array of strings; throws `TypeError` otherwise. |
+| `configureLoader(config)` | Installs loader policy for the calling isolate. Sections: `importMap` (`imports` + `scopes`), `volatilePatterns` (URL substrings re-requested on every import instead of reused from the registry; see [HTTP caching](#http-caching)), `canonicalization` (registry-keying vocabulary). Each **present** section replaces its state wholesale, an empty array included. Throws `TypeError` on any malformed input, having validated the whole config first, so a rejected call installs nothing. |
+| `invalidateModules(urls)` | Evicts the given URLs (canonicalized) from the module registry, so the next import of each requests it again. That request goes through the loader's HTTP cache, so the server's caching headers decide whether it reaches the network; see [HTTP caching](#http-caching). Takes an array of strings; throws `TypeError` otherwise. |
 | `getLoadedModuleUrls()` | The **URL-like** keys currently in the module registry, as an array of strings (used to compute full-reload eviction sets). A key qualifies when it starts with `blob:` or contains `://` — plain filesystem paths are deliberately excluded, because a reload computes its eviction set from what a server can re-serve. |
 | `createRequire(filenameOrURL)` | A `require` resolving against `filenameOrURL`'s directory (a trailing slash names the directory itself). Accepts an absolute path string, a `file:` URL string, or a URL object; anything else throws `TypeError`, and an `http(s)` base is refused outright because `require()` of a dev-served module is not supported — import those. ES module graphs load under Node's `require(esm)` rule: a graph containing top-level await is refused before it evaluates. |
 | `createPumpingRequire(filenameOrURL, options?)` | Same argument contract and same resolution, but an ES module graph with top-level await is evaluated by driving the loop until it settles, instead of being refused. **Callable only from a task context.** See [Pumping requires](#pumping-requires). |
@@ -1109,6 +1109,29 @@ treats it as a network error for a module script rather than as an empty
 module. The `<essence>` in the foreign-MIME message is the normalized essence,
 not the raw header.
 
+### HTTP caching
+
+The loader fetches modules through an HTTP cache the way a browser fetches
+module scripts: the request carries no cache directives of its own, and the
+**response** headers decide what is reused. Connections are persistent.
+
+- A dev server must send `Cache-Control: no-cache` (ideally with an `ETag` or
+  `Last-Modified` validator, so an unchanged module costs a `304`) or
+  `Cache-Control: no-store` for source modules. Either one guarantees that a
+  module re-requested after `invalidateModules` reflects what the server
+  serves now.
+- Content-addressed URLs (a hash in the path or query) may be served with a
+  long `max-age` and `immutable`; they are then reused without a request,
+  across app restarts too.
+- A response with no `Cache-Control` and no `Expires` but with a
+  `Last-Modified` header is heuristically cacheable. It **can** be served
+  stale, including after an app restart. That is standard HTTP behavior, not
+  a loader bug: send explicit cache headers instead.
+
+`invalidateModules` and `volatilePatterns` act on the module registry only.
+The request they cause is an ordinary one and is answered from the HTTP cache
+whenever the server's headers allow it.
+
 ### App entries and bootstraps
 
 An app's entry can be either CommonJS or an ES module, and the choice decides
@@ -1277,6 +1300,15 @@ deadline < boot backstop. The local entry's short yield is one second with
 `return-pending` behavior and no runloop slicing; an HTTP entry instead gets the
 full deadline, throws on expiry, and does slice the runloop, because the tooling
 driving it needs the rejection reason synchronously.
+
+The async module fetch uses an ephemeral `NSURLSession` (no persistent cookies
+or credentials) with an on-disk `NSURLCache` of its own, in
+`Library/Caches/ns-module-http-cache` (8 MB memory, 256 MB disk); the loader
+never replaces or resizes the app's shared `NSURLCache`. Requests use the default
+protocol cache policy. The synchronous fallback (`NSURLConnection`) goes
+through the shared cache with the same policy. To make every module fetch go
+to the origin instead, set the session's `URLCache` to `nil` and give the
+request `NSURLRequestReloadIgnoringLocalAndRemoteCacheData`.
 
 Type declarations for the `ns:` modules live in `types/` — one `.d.ts` per
 module, referenced from `types/index.d.ts`. The `node:` shims are deliberately
