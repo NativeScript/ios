@@ -1596,7 +1596,9 @@ std::string Describe(Isolate* isolate, const std::vector<Hop>& hops, size_t firs
 constexpr int kSettleCollections = 3;
 
 // Until drained, a dead wrapper's queued retain reads as an owner of its
-// object, and a deallocated object's canary state as a root. Runs JS.
+// object, a deallocated object's canary state as a root, and an object whose
+// release waits for this thread has no wrapper, so what it owns looks owned
+// from outside. Runs JS.
 void Settle(Isolate* isolate) {
   for (int i = 0; i < kSettleCollections; i++) {
     isolate->LowMemoryNotification();

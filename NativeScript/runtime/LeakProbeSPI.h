@@ -114,8 +114,9 @@ struct Host {
   // Any thread.
   void (*destroyPoster)(Poster* poster);
 
-  // Releases the native objects wrapper lifetime modes queued for release,
-  // and lets go of the canary states of deallocated objects. Can run JS.
+  // Releases the native objects wrapper lifetime modes queued for release and
+  // those a collection or explicit release on another thread left for this
+  // one, and lets go of the canary states of deallocated objects. Can run JS.
   void (*drainReleases)(v8::Isolate* isolate);
   const char* (*lifetimeMode)();
   const char* (*lifetimeScope)();

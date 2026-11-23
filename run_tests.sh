@@ -277,6 +277,11 @@ Destination (default: the single booted simulator, else a prompt):
                           Mac (hardened runtime, ad-hoc signed, allow-jit entitlement).
                           Cannot be combined with any simulator option. Only one
                           Catalyst run per user at a time: later ones wait for it.
+      --no-xctest         With --catalyst: launch the built app directly instead of
+                          through XCUITest, so Automation Mode is not needed. The app's
+                          console goes to <test folder>/console.log and its junit report
+                          to <test folder>/test-out/junit-result.xml. No host HTTP server
+                          runs, so the specs that need one are skipped.
 
 Simulator management (no tests run):
       --create-sim        Create and boot ${SIM_PREFIX}<sim-name>, print its UDID, exit
@@ -328,6 +333,7 @@ DELETE_TARGET=""
 TEST_FOLDER=""
 CATALYST=0
 WRAPPER_LIFETIME=""
+NO_XCTEST=0
 
 set_sim_mode() {
   if [ -n "$SIM_MODE" ] && [ "$SIM_MODE" != "$1" ]; then
@@ -377,6 +383,7 @@ while [ $# -gt 0 ]; do
     --catalyst)       CATALYST=1; shift ;;
     --wrapper-lifetime|--wrapper-lifetime=*)
       take_value "--wrapper-lifetime" "$1" "${2:-}" "$has_next"; WRAPPER_LIFETIME="$OPT_VALUE"; shift "$OPT_SHIFT" ;;
+    --no-xctest)      NO_XCTEST=1; shift ;;
     -a|--asan)        ASAN=1; shift ;;
     -t|--temp-folder) TEMP_FOLDER=1; shift ;;
     -h|--help)        usage; exit 0 ;;
@@ -384,6 +391,10 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+if [ "$NO_XCTEST" -eq 1 ]; then
+  [ "$CATALYST" -eq 1 ] || die_usage "--no-xctest only applies to --catalyst."
+  [ "$ASAN" -eq 0 ] || die_usage "--no-xctest cannot be combined with --asan."
+fi
 if [ "$CATALYST" -eq 1 ]; then
   if [ -n "$SIM_MODE" ] || [ -n "$DEVICE_NAME" ] || [ -n "$DEVICE_UDID" ] || [ -n "$SIM_NAME" ] \
      || [ -n "$SIM_DEVICE_TYPE" ] || [ -n "$SIM_RUNTIME" ]; then
@@ -397,7 +408,7 @@ if [ "$CATALYST" -eq 1 ]; then
   # TestRunnerTests is a UI-testing bundle; on macOS its runner must switch the
   # session into Automation Mode, which otherwise asks for an admin password and
   # times out unattended. GitHub's macOS runner images come preconfigured.
-  if ! automationmodetool 2>/dev/null | grep -q "DOES NOT REQUIRE"; then
+  if [ "$NO_XCTEST" -eq 0 ] && ! automationmodetool 2>/dev/null | grep -q "DOES NOT REQUIRE"; then
     echo "--catalyst needs Automation Mode without authentication. Enable it once with:" >&2
     echo "  sudo automationmodetool enable-automationmode-without-authentication" >&2
     exit 1
@@ -452,6 +463,7 @@ for devices in json.load(sys.stdin)['devices'].values():
 finish_run() {
   local status=$?
   if [ "$CATALYST" -eq 1 ]; then
+    stop_direct_app
     release_catalyst_lock
     [ -n "$TEST_FOLDER" ] && echo "Test folder: $TEST_FOLDER"
     echo "Simulator: none (--catalyst ran on this Mac)"
@@ -509,6 +521,78 @@ release_catalyst_lock() {
     exec 9>&-
     CATALYST_LOCK_HELD=0
   fi
+}
+
+DIRECT_APP_PID=""
+DIRECT_TIMEOUT_SECONDS=900
+
+# SIGTERM, then SIGKILL after 5 s; returns once the app is gone.
+stop_direct_app() {
+  [ -n "$DIRECT_APP_PID" ] || return 0
+  kill -TERM "$DIRECT_APP_PID" 2>/dev/null
+  local waited=0
+  while kill -0 "$DIRECT_APP_PID" 2>/dev/null && [ "$waited" -lt 50 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  kill -KILL "$DIRECT_APP_PID" 2>/dev/null
+  wait "$DIRECT_APP_PID" 2>/dev/null
+  DIRECT_APP_PID=""
+}
+
+# --catalyst --no-xctest. The app never quits by itself; the junit report it
+# writes once the suite ends is the end marker. CFFIXED_USER_HOME moves that
+# report's ~/Documents into the test folder, and OS_ACTIVITY_DT_MODE mirrors
+# the runtime's os_log output to stderr.
+run_catalyst_directly() {
+  local build_args=(-project "$SCRIPT_DIR/v8ios.xcodeproj" -scheme TestRunner -destination "$DESTINATION")
+  xcodebuild "${build_args[@]}" "${XCODEBUILD_ARGS[@]}" build | xcpretty || return 1
+  local app
+  app=$(xcodebuild "${build_args[@]}" -showBuildSettings 2>/dev/null |
+    awk -F' = ' '/^Build settings for .* target / { mine = ($0 ~ / target TestRunner:$/) }
+      mine && $1 ~ /^ *CODESIGNING_FOLDER_PATH$/ { print $2; exit }')
+  if [ ! -x "$app/Contents/MacOS/TestRunner" ]; then
+    echo "No Mac Catalyst TestRunner.app at '$app'." >&2
+    return 1
+  fi
+
+  local home="$TEST_FOLDER/home"
+  local report="$home/Documents/junit-result.xml"
+  local log="$TEST_FOLDER/console.log"
+  mkdir -p "$home/Documents" "$TEST_FOLDER/test-out"
+  echo "Launching $app"
+  echo "Console: $log"
+  CFFIXED_USER_HOME="$home" OS_ACTIVITY_DT_MODE=1 "$app/Contents/MacOS/TestRunner" > "$log" 2>&1 &
+  DIRECT_APP_PID=$!
+
+  local deadline=$((SECONDS + DIRECT_TIMEOUT_SECONDS)) status=0
+  while [ ! -f "$report" ]; do
+    if ! kill -0 "$DIRECT_APP_PID" 2>/dev/null; then
+      wait "$DIRECT_APP_PID" || status=$?
+      DIRECT_APP_PID=""
+      echo "TestRunner exited (status $status) before the suite finished: it CRASHED. See $log and ~/Library/Logs/DiagnosticReports/TestRunner-*.ips." >&2
+      return 1
+    fi
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      echo "No junit report after ${DIRECT_TIMEOUT_SECONDS}s while TestRunner was still running: the suite HUNG. See $log." >&2
+      return 1
+    fi
+    sleep 1
+  done
+  stop_direct_app
+
+  cp "$report" "$TEST_FOLDER/test-out/junit-result.xml"
+  local summary failures
+  summary=$(grep -oE 'CONSOLE LOG: (SUCCESS|FAILURE): .*' "$log" | tail -n 1 | sed 's/^CONSOLE LOG: //')
+  echo "$summary"
+  failures=$(grep -c -e '<failure' -e '<error' "$report")
+  if [ "$failures" -ne 0 ]; then
+    echo "Failing specs:" >&2
+    grep -B1 -e '<failure' -e '<error' "$report" | grep -o 'name="[^"]*"' >&2
+    return 1
+  fi
+  # Run-level errors (a focused spec, an error outside any spec) fail no spec.
+  [ "${summary#SUCCESS: }" != "$summary" ]
 }
 
 if [ "$CATALYST" -eq 1 ]; then
@@ -592,22 +676,27 @@ if [ -n "$WRAPPER_LIFETIME" ]; then
 fi
 
 set -o pipefail
-xcodebuild -project "$SCRIPT_DIR/v8ios.xcodeproj" -scheme TestRunner \
-  -resultBundlePath "$TEST_FOLDER/test_results" \
-  -destination "$DESTINATION" \
-  "${XCODEBUILD_ARGS[@]}" \
-  build test | xcpretty
+if [ "$NO_XCTEST" -eq 1 ]; then
+  run_catalyst_directly
+  TEST_EXIT=$?
+else
+  xcodebuild -project "$SCRIPT_DIR/v8ios.xcodeproj" -scheme TestRunner \
+    -resultBundlePath "$TEST_FOLDER/test_results" \
+    -destination "$DESTINATION" \
+    "${XCODEBUILD_ARGS[@]}" \
+    build test | xcpretty
 
-TEST_EXIT=$?
+  TEST_EXIT=$?
 
-if [ $TEST_EXIT -ne 0 ]; then
-  echo "Tests failed with exit code $TEST_EXIT"
-fi
+  if [ $TEST_EXIT -ne 0 ]; then
+    echo "Tests failed with exit code $TEST_EXIT"
+  fi
 
-if command -v xcparse &>/dev/null; then
-  xcparse attachments "$TEST_FOLDER/test_results.xcresult" "$TEST_FOLDER/test-out"
-  find "$TEST_FOLDER/test-out" -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
-  find "$TEST_FOLDER/test-out" -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
+  if command -v xcparse &>/dev/null; then
+    xcparse attachments "$TEST_FOLDER/test_results.xcresult" "$TEST_FOLDER/test-out"
+    find "$TEST_FOLDER/test-out" -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
+    find "$TEST_FOLDER/test-out" -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
+  fi
 fi
 
 if [ -n "$WRAPPER_LIFETIME" ]; then

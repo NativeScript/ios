@@ -111,6 +111,7 @@ void ForEachCanaryStateHandle(Isolate* isolate, void* context,
 }
 
 void DrainReleases(Isolate* isolate) {
+  ObjectManager::RunDeferredReleases(isolate);
   WrapperLifetime::DrainReleases(isolate);
   WrapperLifetimeCanary::ReleaseDeadStates(isolate);
 }

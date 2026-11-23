@@ -136,6 +136,10 @@ class ObjectManager {
   // release over as its own retain instead of retaining again; returns whether
   // it did. Once the entry holds its reference, call ProtectIfNativelyRetained.
   static bool TakeDeferredRelease(v8::Isolate* isolate, id obj);
+  // Makes the releases waiting for the runtime's thread now, rather than from
+  // the event loop task posted for them. Only where JS may run: a release can
+  // reach a JS-implemented -dealloc. Off the runtime's thread, does nothing.
+  static void RunDeferredReleases(v8::Isolate* isolate);
   // A class that tracks native retains (ClassBuilder::TracksNativeRetains)
   // protects its wrapper when native code first retains the object past the
   // runtime's own retain. A native retain made while a release waited found no

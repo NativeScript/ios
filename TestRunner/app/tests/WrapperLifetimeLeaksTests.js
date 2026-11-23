@@ -30,6 +30,7 @@ describe("Wrapper lifetime leak cycles", function () {
     var QueuedOwned = shape("TNSLeakQueuedOwned");
     var SharedChild = shape("TNSLeakSharedChild");
     var ReleasedOwner = shape("TNSLeakReleasedOwner");
+    var DeferredShared = shape("TNSLeakDeferredShared");
     // Its operation's block names the object through `this`. Extended the
     // way TypeScript does: only such classes track native retains, which is
     // what makes "resurrecting" keep a natively owned instance's wrapper.
@@ -237,32 +238,47 @@ describe("Wrapper lifetime leak cycles", function () {
         var reports = {};
 
         beforeAll(function (done) {
+            // Each shape gets its own scope: functions created in one scope
+            // share its context, which would tie a shape's reachability to
+            // every variable the other shapes' closures capture.
             (function () {
                 var selfRef = SelfRef.new();
                 selfRef.me = selfRef;
-
+                watched.addObject(selfRef);
+            })();
+            (function () {
                 var closure = Closure.new();
                 closure.onTap = function () {
                     return closure;
                 };
-
+                watched.addObject(closure);
+            })();
+            (function () {
                 var nativeCycle = NativeCycle.new();
                 var list = NSMutableArray.new();
                 list.addObject(nativeCycle);
                 nativeCycle.list = list;
-
+                watched.addObject(nativeCycle);
+            })();
+            (function () {
                 var blockCycle = BlockCycle.new();
                 blockCycle.op = NSBlockOperation.blockOperationWithBlock(function () {
                     return blockCycle;
                 });
-
+                watched.addObject(blockCycle);
+            })();
+            (function () {
                 var ownedSelfRef = OwnedSelfRef.new();
                 ownedSelfRef.me = ownedSelfRef;
                 owner.addObject(ownedSelfRef);
-
+                watched.addObject(ownedSelfRef);
+            })();
+            (function () {
                 var weakBackRef = WeakBackRef.new();
                 weakBackRef.me = new WeakRef(weakBackRef);
-
+                watched.addObject(weakBackRef);
+            })();
+            (function () {
                 // Two non-owning pointers (NSValue's storage) explain more
                 // retains than the object has.
                 var unexplained = Unexplained.new();
@@ -271,7 +287,9 @@ describe("Wrapper lifetime leak cycles", function () {
                     NSValue.valueWithNonretainedObject(unexplained),
                     NSValue.valueWithNonretainedObject(unexplained),
                 ];
-
+                watched.addObject(unexplained);
+            })();
+            (function () {
                 // A handler on the object that owns it, naming the object: the
                 // block's strong handle on its function closes the cycle.
                 var selfHandler = SelfHandler.new();
@@ -279,7 +297,9 @@ describe("Wrapper lifetime leak cycles", function () {
                 selfHandler.addExecutionBlock(function () {
                     return selfHandler.x;
                 });
-
+                watched.addObject(selfHandler);
+            })();
+            (function () {
                 var weakHandler = WeakHandler.new();
                 weakHandler.x = 1;
                 var weakHandlerRef = new WeakRef(weakHandler);
@@ -287,16 +307,8 @@ describe("Wrapper lifetime leak cycles", function () {
                     var o = weakHandlerRef.deref();
                     return o && o.x;
                 });
-
-                [selfRef, closure, nativeCycle, blockCycle, ownedSelfRef, weakBackRef, unexplained, selfHandler, weakHandler].forEach(
-                    function (o) {
-                        watched.addObject(o);
-                    }
-                );
+                watched.addObject(weakHandler);
             })();
-            // Shapes below get their own scopes: functions created in one
-            // scope share its context, which would tie their reachability
-            // to every variable the other shapes' closures capture.
             (function () {
                 // The handler does not close over its operation; the WeakMap
                 // entry keyed by the handler does.
@@ -523,6 +535,7 @@ describe("Wrapper lifetime leak cycles", function () {
                     o.list.removeAllObjects();
                     delete o.list;
                 }
+                delete o.op;
             });
             hidden.removeAllObjects();
             holder.removeAllObjects();
@@ -576,6 +589,36 @@ describe("Wrapper lifetime leak cycles", function () {
                 done();
             });
         }, 30000);
+
+        // An explicit release on another thread of an object first wrapped on
+        // the runtime's thread waits there for an event loop task. The
+        // Atomics.waitAsync wakeup is posted to the same lane first, so the
+        // probe runs while that release still waits.
+        it("finds a cycle that an object waiting for its release on the runtime's thread shared", function (done) {
+            var other;
+            (function () {
+                var shared = DeferredShared.new();
+                shared.op = NSBlockOperation.blockOperationWithBlock(function () {
+                    return shared;
+                });
+                other = NSMutableArray.new();
+                other.addObject(shared.op);
+                watched.addObject(shared);
+            })();
+            var signal = new Int32Array(new SharedArrayBuffer(4));
+            Atomics.waitAsync(signal, 0, 0).value.then(function () {
+                var report = runtime.findLeakCycles();
+                expect(cyclesNaming(report, "TNSLeakDeferredShared").length).toBeGreaterThan(0);
+                expect(aliveNamed(watched, "TNSLeakDeferredShared")).toBe(1);
+                done();
+            }, done.fail);
+            var queue = dispatch_get_global_queue(qos_class_t.QOS_CLASS_DEFAULT, 0);
+            dispatch_async(queue, function () {
+                Atomics.notify(signal, 0);
+                __releaseNativeCounterpart(other);
+                other = null;
+            });
+        });
     });
 
     // The session owns the task, the task its completion block, and the block

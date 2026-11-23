@@ -2,6 +2,10 @@
 // methods, and the native objects attached to errors: kept while native code
 // owns them, released exactly once afterwards.
 describe("Native callback self wrappers", function () {
+    // Several full collections under ASan, on a late-suite heap, can outlast
+    // Jasmine's default async timeout.
+    var SETTLE_TIMEOUT_MS = 30000;
+
     function scrub(n) {
         return n > 0 ? scrub(n - 1) + n : 0;
     }
@@ -49,7 +53,7 @@ describe("Native callback self wrappers", function () {
             initCalls = 0;
             done();
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     // +new runs the JS-implemented init from native code, before JS has a
     // wrapper for the object.
@@ -73,7 +77,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("frees an object JS alone holds after +new ran its JS initializer", function (done) {
         var obj = JSInit.new();
@@ -87,7 +91,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("keeps the JS state of cells UIKit creates from a registered class until their superview lets them go", function (done) {
         var cellInits = 0;
@@ -134,7 +138,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("frees a managed wrapper's object once when __releaseNativeCounterpart runs on it", function (done) {
         var owner = NSMutableArray.new();
@@ -155,7 +159,7 @@ describe("Native callback self wrappers", function () {
                 });
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     // Ownership checks run in a GC prologue, where JS may not run. The
     // replacement stays installed for the rest of the run, on a class no other
@@ -187,7 +191,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     // The hook stays replaced for the rest of the run; only fixtures send it.
     var timerHook = { installed: false, run: null };
@@ -222,7 +226,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("checks who owns NSTimer.alloc()'s placeholder without sending it retainCount", function (done) {
         hookTimers(function (timer) {
@@ -236,7 +240,7 @@ describe("Native callback self wrappers", function () {
             expect(placeholder.state).toBe(1);
             done();
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("does not release an instance method's owned return that is its receiver", function (done) {
         var obj = TNSAllocLog.alloc().init();
@@ -247,7 +251,7 @@ describe("Native callback self wrappers", function () {
             expect(obj.hash > 0).toBe(true);
             done();
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("does not release what a JS copyWithZone hands to a native -copy", function (done) {
         var target = TNSAllocLog.alloc().init();
@@ -266,7 +270,7 @@ describe("Native callback self wrappers", function () {
             expect(original.hash > 0).toBe(true);
             done();
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     // The JS init runs from native code on an object JS has no wrapper for
     // yet; wrapping it must not send it a message its JS class implements.
@@ -387,7 +391,7 @@ describe("Native callback self wrappers", function () {
                 return InitReturnsOther.new();
             });
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("keeps a wrapped object a JS initializer returns instead of its receiver (new)", function (done) {
         expectInitializerResultOwnedByCaller(function () {
@@ -395,7 +399,7 @@ describe("Native callback self wrappers", function () {
                 return new InitReturnsOther();
             });
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     var InitReturnsSubstitute = TNSSubstitutingInit.extend({
         init: function () {
@@ -408,13 +412,13 @@ describe("Native callback self wrappers", function () {
         expectInitializerResultOwnedByCaller(function () {
             return InitReturnsSubstitute.new();
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("keeps the substitute a super initializer returned through a JS initializer (new)", function (done) {
         expectInitializerResultOwnedByCaller(function () {
             return new InitReturnsSubstitute();
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("reports a receiver kept from a JS method run by -dealloc as released", function (done) {
         var saved = null;
@@ -441,7 +445,7 @@ describe("Native callback self wrappers", function () {
             saved = null;
             done();
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("keeps an error's NSError while the error lives and frees it afterwards", function (done) {
         var watch = NSHashTable.weakObjectsHashTable();
@@ -463,7 +467,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("keeps an error's NSException while the error lives and frees it afterwards", function (done) {
         var watch = NSHashTable.weakObjectsHashTable();
@@ -485,7 +489,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("leaves the retain count of an immutable object whose -copy answers itself unchanged", function (done) {
         var array = NSArray.arrayWithArray([1, 2, 3]);
@@ -503,7 +507,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("frees an object JS alone holds after alloc().init() ran its JS initializer", function (done) {
         var obj = JSInit.alloc().init();
@@ -518,7 +522,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("keeps the JS state of a natively owned object whose JS initializer ran from alloc().init(), then frees it once", function (done) {
         var owner = NSMutableArray.new();
@@ -540,7 +544,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("keeps a wrapped object a JS initializer returns instead of its receiver (alloc().init())", function (done) {
         expectInitializerResultOwnedByCaller(function () {
@@ -548,13 +552,13 @@ describe("Native callback self wrappers", function () {
                 return InitReturnsOther.alloc().init();
             });
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("keeps the substitute a super initializer returned through a JS initializer (alloc().init())", function (done) {
         expectInitializerResultOwnedByCaller(function () {
             return InitReturnsSubstitute.alloc().init();
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("does not release a wrapped receiver that is initialized again", function (done) {
         var plain = TNSAllocLog.new();
@@ -580,7 +584,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     // Native code that owns what an owned-return method answers drops it. The
     // object a JS implementation answered must outlive that, and be freed
@@ -630,42 +634,42 @@ describe("Native callback self wrappers", function () {
         expectKeptThroughNativeDrop(state, function (receiver) {
             TNSOwnedReturns.copyAndDrop(receiver);
         }, 1, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("hands a native -copy the other object a JS copyWithZone answers at +1", function (done) {
         var state = ownedReturnState(TNSOwnedReturns, "NativeCallbackSelfCopyOther", "copyWithZone", [NSCopying], false);
         expectKeptThroughNativeDrop(state, function (receiver) {
             TNSOwnedReturns.copyAndDrop(receiver);
         }, 2, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("hands a native -mutableCopy the object a JS mutableCopyWithZone answers at +1", function (done) {
         var state = ownedReturnState(TNSOwnedReturns, "NativeCallbackSelfMutableCopy", "mutableCopyWithZone", [NSMutableCopying], false);
         expectKeptThroughNativeDrop(state, function (receiver) {
             TNSOwnedReturns.mutableCopyAndDrop(receiver);
         }, 2, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("hands a native caller the object a JS new-family method answers at +1", function (done) {
         var state = ownedReturnState(TNSOwnedReturns, "NativeCallbackSelfNewOther", "newChild", [], false);
         expectKeptThroughNativeDrop(state, function (receiver) {
             TNSOwnedReturns.newChildAndDrop(receiver);
         }, 2, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("hands a native caller the receiver a JS new-family method answers at +1", function (done) {
         var state = ownedReturnState(TNSOwnedReturns, "NativeCallbackSelfNewSelf", "newChild", [], true);
         expectKeptThroughNativeDrop(state, function (receiver) {
             TNSOwnedReturns.newChildAndDrop(receiver);
         }, 1, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("hands a native caller back the receiver a JS awakeAfterUsingCoder answers", function (done) {
         var state = ownedReturnState(TNSOwnedReturns, "NativeCallbackSelfAwakeSelf", "awakeAfterUsingCoder", [], true);
         expectKeptThroughNativeDrop(state, function (receiver) {
             TNSOwnedReturns.awakeAndDrop(receiver);
         }, 1, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     // The receiver is not a TNSAllocLog: its reference, consumed by the call,
     // is not given back when the JS method answers another object.
@@ -674,7 +678,7 @@ describe("Native callback self wrappers", function () {
         expectKeptThroughNativeDrop(state, function (receiver) {
             TNSOwnedReturns.awakeAndDrop(receiver);
         }, 1, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     function expectBalancedJsCopies(answersReceiver, name, done) {
         var state = ownedReturnState(TNSOwnedReturns, name, "copyWithZone", [NSCopying], answersReceiver);
@@ -699,11 +703,11 @@ describe("Native callback self wrappers", function () {
 
     it("balances copy() called from JS on a JS copyWithZone that answers its receiver", function (done) {
         expectBalancedJsCopies(true, "NativeCallbackSelfJsCopySelf", done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("balances copy() called from JS on a JS copyWithZone that answers another object", function (done) {
         expectBalancedJsCopies(false, "NativeCallbackSelfJsCopyOther", done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("hands a native caller the object a JS new-family method without metadata answers at +1", function (done) {
         var state = ownedReturnState(TNSAllocLog, "NativeCallbackSelfExposedNew", "newChild", [], false, {
@@ -712,7 +716,7 @@ describe("Native callback self wrappers", function () {
         expectKeptThroughNativeDrop(state, function (receiver) {
             TNSOwnedReturns.newChildAndDrop(receiver);
         }, 2, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     function ownedGetterState(answersReceiver, name) {
         return ownedReturnState(TNSOwnedReturns, name, "newItem", [], answersReceiver, { getter: true });
@@ -723,14 +727,14 @@ describe("Native callback self wrappers", function () {
         expectKeptThroughNativeDrop(state, function (receiver) {
             TNSOwnedReturns.newItemAndDrop(receiver);
         }, 2, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("hands a native caller the receiver a JS new-family getter answers at +1", function (done) {
         var state = ownedGetterState(true, "NativeCallbackSelfGetterSelf");
         expectKeptThroughNativeDrop(state, function (receiver) {
             TNSOwnedReturns.newItemAndDrop(receiver);
         }, 1, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     function expectBalancedGetterReads(answersReceiver, name, done) {
         var state = ownedGetterState(answersReceiver, name);
@@ -743,11 +747,11 @@ describe("Native callback self wrappers", function () {
 
     it("balances reads of a JS new-family getter that answers another object", function (done) {
         expectBalancedGetterReads(false, "NativeCallbackSelfGetterReadsOther", done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("balances reads of a JS new-family getter that answers its receiver", function (done) {
         expectBalancedGetterReads(true, "NativeCallbackSelfGetterReadsSelf", done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     // The replacements stay installed for the rest of the run, on a class no
     // other spec uses, and answer what `swizzled.answer` gives them.
@@ -779,14 +783,14 @@ describe("Native callback self wrappers", function () {
         expectKeptThroughNativeDrop(state, function (receiver) {
             TNSOwnedReturns.newChildAndDrop(receiver);
         }, 2, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("hands a native caller the receiver a JS replacement of a new-family method answers at +1", function (done) {
         var state = swizzledState(true);
         expectKeptThroughNativeDrop(state, function (receiver) {
             TNSOwnedReturns.newChildAndDrop(receiver);
         }, 1, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("hands a native caller the other object a JS replacement of a new-family getter answers at +1", function (done) {
         var state = swizzledState(false);
@@ -794,7 +798,7 @@ describe("Native callback self wrappers", function () {
             TNSOwnedReturns.newItemAndDrop(receiver);
             expect(TNSOwnedReturns.readNewItemOf(receiver)).toBe(state.result);
         }, 2, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("frees once an object whose native -init ran a JS method on it (alloc().init())", function (done) {
         var hooks = 0;
@@ -816,7 +820,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     // -unarchiver:didDecodeObject: takes over the object it is given
     // (NS_RELEASES_ARGUMENT) and answers an owned one.
@@ -896,7 +900,7 @@ describe("Native callback self wrappers", function () {
 
     it("decodes without an unarchiver delegate", function (done) {
         expectBalancedDecode(null, null, 0, 2, expectDecodedRoot(TNSCodingAllocLog), done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     [
         { Delegate: DecodeDelegate, suffix: "" },
@@ -908,7 +912,7 @@ describe("Native callback self wrappers", function () {
             expectBalancedDecode(Delegate, function (object) {
                 return object;
             }, 0, 2, expectDecodedRoot(TNSCodingAllocLog), done);
-        });
+        }, SETTLE_TIMEOUT_MS);
 
         it("releases the objects a JS unarchiver delegate replaces" + variant.suffix, function (done) {
             expectBalancedDecode(Delegate, function (object) {
@@ -917,14 +921,14 @@ describe("Native callback self wrappers", function () {
                 expectDecodedRoot(TNSAllocLog)(root);
                 expect(root.objectAtIndex(0) instanceof TNSCodingAllocLog).toBe(false);
             }, done);
-        });
+        }, SETTLE_TIMEOUT_MS);
 
         // The unarchiver keeps an object its delegate answers nil for.
         it("releases the objects a JS unarchiver delegate answers nil for" + variant.suffix, function (done) {
             expectBalancedDecode(Delegate, function (object) {
                 return null;
             }, 0, 2, expectDecodedRoot(TNSCodingAllocLog), done);
-        });
+        }, SETTLE_TIMEOUT_MS);
     });
 
     it("gives a native unarchiver delegate called from JS the reference it takes over", function (done) {
@@ -953,7 +957,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     // JS receives these as primitives, so only the native side sees their
     // reference counts.
@@ -997,25 +1001,25 @@ describe("Native callback self wrappers", function () {
         expectPrimitivesRetainedAsBefore(function (holder, index) {
             return holder.newObjectAt(index);
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("leaves unowned results JS receives as primitives retained as they were", function (done) {
         expectPrimitivesRetainedAsBefore(function (holder, index) {
             return holder.objectAt(index);
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("releases owned C function results JS receives as a string, a number and a date", function (done) {
         expectPrimitivesRetainedAsBefore(function (holder, index) {
             return TNSOwnedPrimitivesRetainedObjectAt(holder, index);
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("leaves unowned C function results JS receives as primitives retained as they were", function (done) {
         expectPrimitivesRetainedAsBefore(function (holder, index) {
             return TNSOwnedPrimitivesObjectAt(holder, index);
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     function copiesAsStringState(name, answer) {
         var state = { answer: answer };
@@ -1041,7 +1045,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     // The NSString made for the JS string is never visible to JS, so only the
     // answers are checked.
@@ -1077,13 +1081,13 @@ describe("Native callback self wrappers", function () {
         expectNativeBlocksFreedOnce(function (holder, value) {
             return holder.retainedBlockAnswering(value);
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("frees a native block an unowned method answers once JS drops it", function (done) {
         expectNativeBlocksFreedOnce(function (holder, value) {
             return holder.blockAnswering(value);
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     // A JS function handed to native code becomes a block that keeps the
     // function, and what it captures, alive until the block is freed.
@@ -1116,13 +1120,13 @@ describe("Native callback self wrappers", function () {
         expectJsBlockRoundTrips(function (holder, fn) {
             return holder.retainedBlockFrom(fn);
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("answers the JS function a block an unowned method hands back was made for", function (done) {
         expectJsBlockRoundTrips(function (holder, fn) {
             return holder.blockFrom(fn);
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     // Once the autorelease pool has drained, the stored reference is the
     // block's only one, so dropping it runs the block's dispose helper while
@@ -1148,7 +1152,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("frees what a JS function given to dispatch_block_create captures once JS drops the block", function (done) {
         var state = { calls: 0 };
@@ -1171,7 +1175,7 @@ describe("Native callback self wrappers", function () {
                 done();
             });
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     // A plain JS object reaches native code as a DictionaryAdapter whose
     // handle keeps the object alive, so the object outlives the adapter only
@@ -1208,7 +1212,7 @@ describe("Native callback self wrappers", function () {
             keeper.drop();
             expectCollected(state, done);
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("frees the adapter for a fresh plain object a JS copyWithZone answers", function (done) {
         var state = freshObjectState();
@@ -1219,7 +1223,7 @@ describe("Native callback self wrappers", function () {
         }, { name: "NativeCallbackSelfCopyPlainObject", protocols: [NSCopying] });
         TNSOwnedReturns.copyAndDrop(Klass.new());
         expectCollected(state, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("frees the adapter for a fresh plain object a JS new-family method answers", function (done) {
         var state = freshObjectState();
@@ -1230,7 +1234,7 @@ describe("Native callback self wrappers", function () {
         }, { name: "NativeCallbackSelfNewPlainObject" });
         TNSOwnedReturns.newChildAndDrop(Klass.new());
         expectCollected(state, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("frees the adapter for a fresh plain object a JS initializer answers", function (done) {
         var state = freshObjectState();
@@ -1241,7 +1245,7 @@ describe("Native callback self wrappers", function () {
         }, { name: "NativeCallbackSelfInitPlainObject" });
         TNSOwnedReturns.allocInitAndDrop(Klass.class());
         expectCollected(state, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     function expectConstructedFreshObject(name, construct, done) {
         var state = freshObjectState();
@@ -1262,19 +1266,19 @@ describe("Native callback self wrappers", function () {
         expectConstructedFreshObject("NativeCallbackSelfNewOperatorPlainObject", function (Klass) {
             return new Klass();
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("answers from alloc().init() the fresh plain object a JS initializer answers", function (done) {
         expectConstructedFreshObject("NativeCallbackSelfAllocInitPlainObject", function (Klass) {
             return Klass.alloc().init();
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("answers from new() the fresh plain object a JS initializer answers", function (done) {
         expectConstructedFreshObject("NativeCallbackSelfNewMethodPlainObject", function (Klass) {
             return Klass.new();
         }, done);
-    });
+    }, SETTLE_TIMEOUT_MS);
 
     it("balances the adapter for a plain object a JS copyWithZone answers twice", function (done) {
         var state = { weak: null };
@@ -1296,5 +1300,5 @@ describe("Native callback self wrappers", function () {
             keeper.drop();
             expectCollected(state, done);
         });
-    });
+    }, SETTLE_TIMEOUT_MS);
 });
