@@ -40,11 +40,14 @@ struct ObjectWeakCallbackState {
   ObjectWeakCallbackState* prev_ = nullptr;
   ObjectWeakCallbackState* next_ = nullptr;
 
-  // Set while one of the two owning sites is disposing this handle's value.
-  // Disposal releases the native counterpart, whose -dealloc can re-enter JS
-  // and reach __releaseNativeCounterpart for this very handle; retiring it
-  // there would free the state under the frame that owns it. Retirement
-  // observes the flag and leaves the handle to that frame.
+  // Set while one of the two owning sites is disposing this handle's value,
+  // or while __releaseNativeCounterpart writes a canary's weak collection key
+  // before retiring the registration it adopted. Disposal releases the native
+  // counterpart, whose -dealloc can re-enter JS and reach
+  // __releaseNativeCounterpart for this very handle, and the key write can
+  // run a collection whose finalizers do; retiring it there would free the
+  // state under the frame that owns it. Retirement observes the flag and
+  // leaves the handle to that frame.
   bool disposing_ = false;
 
   // Set when WrapperLifetime adopted this registration (an ObjC object wrapper
@@ -73,13 +76,16 @@ class ObjectManager {
   // getWrapperLifetimeStats().
   struct LifetimeStats {
     // An ObjC wrapper's finalizer refused disposal because native code still
-    // retains its object (IsGcProtected), keeping the wrapper alive.
+    // retains its object (IsGcProtected, or an OwnershipState wrapper whose
+    // object is natively owned), keeping the wrapper alive.
     uint64_t resurrections = 0;
     // An ObjC wrapper's finalizer released its native object.
     uint64_t collected = 0;
     // __releaseNativeCounterpart released a native object.
     uint64_t releasedExplicitly = 0;
-    // JS handed a released wrapper to native code or used it as a receiver.
+    // A released wrapper was used: as a native argument, collection element or
+    // return value, as a receiver (toString included), or through a released
+    // pointer, reference or struct.
     uint64_t releasedAccesses = 0;
     // A finalized ObjC wrapper carried JS properties while something other
     // than the wrapper still retained its object, and whether that object was
@@ -98,6 +104,9 @@ class ObjectManager {
     uint64_t canaryNativeDeaths = 0;
     // Canary mode: writes the canary handlers saw.
     uint64_t canaryInterceptedWrites = 0;
+    // Canary mode: of those, native property writes whose setter the write
+    // handler found in its cache rather than along the prototype chain.
+    uint64_t canaryCachedNativeWrites = 0;
   };
   static LifetimeStats* GetLifetimeStats(v8::Isolate* isolate);
 
@@ -130,6 +139,10 @@ class ObjectManager {
   // release over as its own retain instead of retaining again; returns whether
   // it did. Once the entry holds its reference, call ProtectIfNativelyRetained.
   static bool TakeDeferredRelease(v8::Isolate* isolate, id obj);
+  // Makes the releases waiting for the runtime's thread now, rather than from
+  // the event loop task posted for them. Only where JS may run: a release can
+  // reach a JS-implemented -dealloc. Off the runtime's thread, does nothing.
+  static void RunDeferredReleases(v8::Isolate* isolate);
   // A class that tracks native retains (ClassBuilder::TracksNativeRetains)
   // protects its wrapper when native code first retains the object past the
   // runtime's own retain. A native retain made while a release waited found no

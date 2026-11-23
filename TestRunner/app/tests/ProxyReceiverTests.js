@@ -67,6 +67,20 @@ describe(module.id, function () {
         expect(result.toString()).toBe("x");
     });
 
+    it("reads and writes a native instance property through a proxied class constructor as a class-side call", function () {
+        var descriptor = findAccessor(TNSBaseInterface.prototype, "baseProperty");
+        var proxy = new Proxy(TNSBaseInterface, {});
+
+        TNSClearOutput();
+        descriptor.set.call(proxy, 1);
+        descriptor.get.call(proxy);
+        var output = TNSGetOutput();
+        TNSClearOutput();
+
+        expect(output).toBe("static setBaseProperty: calledstatic baseProperty called");
+        expect(findAccessor(NSObject.prototype, "description").get.call(new Proxy(NSString, {}))).toBe("NSString");
+    });
+
     it("passes a proxied native object as a method argument", function () {
         var array = NSMutableArray.alloc().init();
         var object = NSObject.alloc().init();
@@ -142,6 +156,12 @@ describe(module.id, function () {
         }).toThrowError(TypeError, /not a native object/);
         expect(function () {
             NSString.stringWithString.call(new Proxy(function () {}, {}), "x");
+        }).toThrowError(TypeError, /not a native object/);
+        expect(function () {
+            findAccessor(NSObject.prototype, "description").get.call(new Proxy(function () {}, {}));
+        }).toThrowError(TypeError, /not a native object/);
+        expect(function () {
+            findAccessor(NSOperation.prototype, "name").set.call(new Proxy(function () {}, {}), "x");
         }).toThrowError(TypeError, /not a native object/);
     });
 

@@ -739,8 +739,10 @@ void NativeMessagePort::Drain() {
       break;
     }
     // Per message, not per drain: a handler's microtasks run before the next
-    // message arrives, which is what both browsers and Node observe.
+    // message arrives, which is what both browsers and Node observe - and a
+    // rejection it leaves unhandled is reported before the next handler runs.
     isolate->PerformMicrotaskCheckpoint();
+    PromiseRejectionTracker::DrainIfPending(isolate);
   }
 
   if (reschedule && this->data_ != nullptr) {

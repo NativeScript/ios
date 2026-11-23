@@ -13,6 +13,7 @@
 #include "Helpers.h"
 #include "LeakProbe.h"
 #include "Runtime.h"
+#include "RuntimeConfig.h"
 #import "TNSDerivedClass.h"
 #include "WrapperLifetimeCanary.h"
 
@@ -55,6 +56,16 @@ void ReadConfig() {
           [scope UTF8String]);
     }
   }
+  id allowShadowing = ((NSDictionary*)config)[@"allowShadowingNativeMembers"];
+  if (allowShadowing != nil && ![allowShadowing isKindOfClass:[NSNumber class]]) {
+    Log("NativeScript: wrapperLifetime allowShadowingNativeMembers must be a boolean; using "
+        "false.");
+  } else if (allowShadowing != nil) {
+    detail::allowShadowingNativeMembers = [allowShadowing boolValue];
+  }
+  detail::guardsNativeMembers = RuntimeConfig.IsDebug &&
+                                GetWrapperLifetimeMode() != WrapperLifetimeMode::kResurrecting &&
+                                !detail::allowShadowingNativeMembers;
 }
 
 // Per-isolate state of the rooted mode.
@@ -265,7 +276,8 @@ void PrologueCallback(Isolate* isolate, GCType type, GCCallbackFlags) {
   }
 }
 
-void ReleaseQueued(const std::shared_ptr<Caches>& cache, ObjectWeakCallbackState* state) {
+void ReleaseQueued(Isolate* isolate, const std::shared_ptr<Caches>& cache,
+                   ObjectWeakCallbackState* state) {
   id target = state->lifetimeTarget_;
   // A wrapper built for the object after this one died owns the entry now.
   auto it = cache->Instances.find(target);
@@ -274,7 +286,9 @@ void ReleaseQueued(const std::shared_ptr<Caches>& cache, ObjectWeakCallbackState
   }
   delete state->lifetimeWrapper_;
   std::atomic<uint64_t>* counter = state->runtimeRetains_;
+  std::shared_ptr<CanaryRecord> record = std::move(state->canaryRecord_);
   delete state;
+  WrapperLifetimeCanary::DropRecord(isolate, std::move(record));
   DropRuntimeRetain(target, counter);
   [target release];
 }
@@ -302,7 +316,7 @@ void ReleaseAll(Isolate* isolate, RootedState* rooted) {
     if (rooted->releases.empty()) {
       WrapperLifetime::pendingReleaseIsolates_.fetch_sub(1, std::memory_order_relaxed);
     }
-    ReleaseQueued(cache, state);
+    ReleaseQueued(isolate, cache, state);
   }
 }
 
@@ -338,9 +352,11 @@ void WrapperLifetime::Init(Isolate* isolate) {
 
 bool WrapperLifetime::InScope(id obj) { return IsInScope(obj); }
 
+bool WrapperLifetime::Excluded(id obj) { return IsTaggedPointer(obj) || IsBlock(obj); }
+
 void WrapperLifetime::Adopt(Isolate* isolate, ObjCDataWrapper* wrapper,
                             const std::shared_ptr<Persistent<Value>>& handle, id target,
-                            bool intercepted) {
+                            CanaryKind kind) {
   if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kResurrecting || target == nil) {
     return;
   }
@@ -361,12 +377,15 @@ void WrapperLifetime::Adopt(Isolate* isolate, ObjCDataWrapper* wrapper,
   wrapper->SetLifetimeState(state);
   if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary) {
     state->lifetimeCanary_ = IsInScope(target);
-    // A canary without the handlers would lose its JS properties when it dies.
-    tns::Assert(!state->lifetimeCanary_ || intercepted, isolate);
+#ifdef DEBUG
+    // A canary without its kind's handlers would lose its JS properties when it
+    // dies.
+    tns::Assert(!state->lifetimeCanary_ || kind == WrapperLifetimeCanary::KindOf(target), isolate);
+#endif
     if (state->lifetimeCanary_) {
       state->canaryRecord_ = WrapperLifetimeCanary::Find(isolate, target);
       if (state->canaryRecord_ != nullptr) {
-        WrapperLifetimeCanary::Hydrate(isolate, handle->Get(isolate).As<Object>());
+        WrapperLifetimeCanary::Hydrate(isolate, handle->Get(isolate).As<Object>(), kind);
       }
     }
     MakeWeak(state);
@@ -425,6 +444,17 @@ void WrapperLifetime::DrainReleases(Isolate* isolate) {
     return;
   }
   ReleaseAll(isolate, rooted);
+}
+
+void WrapperLifetime::ForEachQueuedRelease(Isolate* isolate,
+                                           const std::function<void(id object)>& visit) {
+  RootedState* rooted = Caches::ExistingStateFor<RootedState>(isolate);
+  if (rooted == nullptr) {
+    return;
+  }
+  for (ObjectWeakCallbackState* state : rooted->releases) {
+    visit(state->lifetimeTarget_);
+  }
 }
 
 void WrapperLifetime::DrainForTeardown(Isolate* isolate) {

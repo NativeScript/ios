@@ -277,6 +277,11 @@ Destination (default: the single booted simulator, else a prompt):
                           Mac (hardened runtime, ad-hoc signed, allow-jit entitlement).
                           Cannot be combined with any simulator option. Only one
                           Catalyst run per user at a time: later ones wait for it.
+      --no-xctest         With --catalyst: launch the built app directly instead of
+                          through XCUITest, so Automation Mode is not needed. The app's
+                          console goes to <test folder>/console.log and its junit report
+                          to <test folder>/test-out/junit-result.xml. No host HTTP server
+                          runs, so the specs that need one are skipped.
 
 Simulator management (no tests run):
       --create-sim        Create and boot ${SIM_PREFIX}<sim-name>, print its UDID, exit
@@ -294,12 +299,22 @@ Simulator options:
                           (default: newest installed)
 
 Run options:
+  -c, --configuration <c> Build configuration: Debug or Release (default: the scheme's,
+                          Debug). Release also builds TestRunner with IsDebug off.
   -a, --asan              Run under AddressSanitizer (-enableAddressSanitizer YES)
+      --wrapper-lifetime <mode>[:<scope>]
+                          Run the suite under a wrapper lifetime mode: the built app's
+                          package.json gets "wrapperLifetime": { mode, scope } (the
+                          source TestRunner/app/package.json is not modified), and the
+                          run fails unless the suite reports that mode.
+                          mode: resurrecting | rooted | canary
+                          scope: extended | all (default: extended)
   -t, --temp-folder       Write results to a random temp folder instead of build/tests/<udid>
   -h, --help              Show this help
 
 Results go to build/tests/<udid> (one simulator can only run one suite at a time),
-or build/tests/catalyst with --catalyst.
+or build/tests/catalyst with --catalyst. The exit status is non-zero when the build or
+XCTest fails, or when the junit report is missing or records a failing spec.
 EOF
 }
 
@@ -320,6 +335,9 @@ SIM_RUNTIME=""
 DELETE_TARGET=""
 TEST_FOLDER=""
 CATALYST=0
+WRAPPER_LIFETIME=""
+NO_XCTEST=0
+CONFIGURATION=""
 
 set_sim_mode() {
   if [ -n "$SIM_MODE" ] && [ "$SIM_MODE" != "$1" ]; then
@@ -367,6 +385,11 @@ while [ $# -gt 0 ]; do
     --list-sims)   set_sim_mode "list-sims"; shift ;;
     --delete-sims) set_sim_mode "delete-sims"; shift ;;
     --catalyst)       CATALYST=1; shift ;;
+    --wrapper-lifetime|--wrapper-lifetime=*)
+      take_value "--wrapper-lifetime" "$1" "${2:-}" "$has_next"; WRAPPER_LIFETIME="$OPT_VALUE"; shift "$OPT_SHIFT" ;;
+    --no-xctest)      NO_XCTEST=1; shift ;;
+    -c|--configuration|--configuration=*)
+      take_value "--configuration" "$1" "${2:-}" "$has_next"; CONFIGURATION="$OPT_VALUE"; shift "$OPT_SHIFT" ;;
     -a|--asan)        ASAN=1; shift ;;
     -t|--temp-folder) TEMP_FOLDER=1; shift ;;
     -h|--help)        usage; exit 0 ;;
@@ -374,6 +397,10 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+if [ "$NO_XCTEST" -eq 1 ]; then
+  [ "$CATALYST" -eq 1 ] || die_usage "--no-xctest only applies to --catalyst."
+  [ "$ASAN" -eq 0 ] || die_usage "--no-xctest cannot be combined with --asan."
+fi
 if [ "$CATALYST" -eq 1 ]; then
   if [ -n "$SIM_MODE" ] || [ -n "$DEVICE_NAME" ] || [ -n "$DEVICE_UDID" ] || [ -n "$SIM_NAME" ] \
      || [ -n "$SIM_DEVICE_TYPE" ] || [ -n "$SIM_RUNTIME" ]; then
@@ -387,7 +414,7 @@ if [ "$CATALYST" -eq 1 ]; then
   # TestRunnerTests is a UI-testing bundle; on macOS its runner must switch the
   # session into Automation Mode, which otherwise asks for an admin password and
   # times out unattended. GitHub's macOS runner images come preconfigured.
-  if ! automationmodetool 2>/dev/null | grep -q "DOES NOT REQUIRE"; then
+  if [ "$NO_XCTEST" -eq 0 ] && ! automationmodetool 2>/dev/null | grep -q "DOES NOT REQUIRE"; then
     echo "--catalyst needs Automation Mode without authentication. Enable it once with:" >&2
     echo "  sudo automationmodetool enable-automationmode-without-authentication" >&2
     exit 1
@@ -407,9 +434,27 @@ if { [ -n "$SIM_DEVICE_TYPE" ] || [ -n "$SIM_RUNTIME" ]; } && [ "$CREATES_SIM" -
   die_usage "--device-type and --runtime only apply when a simulator may be created."
 fi
 if [ -n "$SIM_MODE" ] && [ "$SIM_MODE" != "temp-sim" ] && [ "$SIM_MODE" != "keep-sim" ]; then
-  if [ "$ASAN" -eq 1 ] || [ "$TEMP_FOLDER" -eq 1 ]; then
-    die_usage "--asan and --temp-folder do not apply to --$SIM_MODE."
+  if [ "$ASAN" -eq 1 ] || [ "$TEMP_FOLDER" -eq 1 ] || [ -n "$WRAPPER_LIFETIME" ] \
+     || [ -n "$CONFIGURATION" ]; then
+    die_usage "--asan, --temp-folder, --wrapper-lifetime and --configuration do not apply to --$SIM_MODE."
   fi
+fi
+case "$CONFIGURATION" in
+  ""|Debug|Release) ;;
+  *) die_usage "--configuration: unknown configuration '$CONFIGURATION' (Debug or Release)." ;;
+esac
+if [ -n "$WRAPPER_LIFETIME" ]; then
+  WL_MODE="${WRAPPER_LIFETIME%%:*}"
+  WL_SCOPE="extended"
+  [[ "$WRAPPER_LIFETIME" == *:* ]] && WL_SCOPE="${WRAPPER_LIFETIME#*:}"
+  case "$WL_MODE" in
+    resurrecting|rooted|canary) ;;
+    *) die_usage "--wrapper-lifetime: unknown mode '$WL_MODE' (resurrecting, rooted or canary)." ;;
+  esac
+  case "$WL_SCOPE" in
+    extended|all) ;;
+    *) die_usage "--wrapper-lifetime: unknown scope '$WL_SCOPE' (extended or all)." ;;
+  esac
 fi
 
 sim_label() {
@@ -429,6 +474,7 @@ for devices in json.load(sys.stdin)['devices'].values():
 finish_run() {
   local status=$?
   if [ "$CATALYST" -eq 1 ]; then
+    stop_direct_app
     release_catalyst_lock
     [ -n "$TEST_FOLDER" ] && echo "Test folder: $TEST_FOLDER"
     echo "Simulator: none (--catalyst ran on this Mac)"
@@ -486,6 +532,78 @@ release_catalyst_lock() {
     exec 9>&-
     CATALYST_LOCK_HELD=0
   fi
+}
+
+DIRECT_APP_PID=""
+DIRECT_TIMEOUT_SECONDS=900
+
+# SIGTERM, then SIGKILL after 5 s; returns once the app is gone.
+stop_direct_app() {
+  [ -n "$DIRECT_APP_PID" ] || return 0
+  kill -TERM "$DIRECT_APP_PID" 2>/dev/null
+  local waited=0
+  while kill -0 "$DIRECT_APP_PID" 2>/dev/null && [ "$waited" -lt 50 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  kill -KILL "$DIRECT_APP_PID" 2>/dev/null
+  wait "$DIRECT_APP_PID" 2>/dev/null
+  DIRECT_APP_PID=""
+}
+
+# --catalyst --no-xctest. The app never quits by itself; the junit report it
+# writes once the suite ends is the end marker. CFFIXED_USER_HOME moves that
+# report's ~/Documents into the test folder, and OS_ACTIVITY_DT_MODE mirrors
+# the runtime's os_log output to stderr.
+run_catalyst_directly() {
+  local build_args=(-project "$SCRIPT_DIR/v8ios.xcodeproj" -scheme TestRunner -destination "$DESTINATION")
+  xcodebuild "${build_args[@]}" "${XCODEBUILD_ARGS[@]}" build | xcpretty || return 1
+  local app
+  app=$(xcodebuild "${build_args[@]}" "${XCODEBUILD_ARGS[@]}" -showBuildSettings 2>/dev/null |
+    awk -F' = ' '/^Build settings for .* target / { mine = ($0 ~ / target TestRunner:$/) }
+      mine && $1 ~ /^ *CODESIGNING_FOLDER_PATH$/ { print $2; exit }')
+  if [ ! -x "$app/Contents/MacOS/TestRunner" ]; then
+    echo "No Mac Catalyst TestRunner.app at '$app'." >&2
+    return 1
+  fi
+
+  local home="$TEST_FOLDER/home"
+  local report="$home/Documents/junit-result.xml"
+  local log="$TEST_FOLDER/console.log"
+  mkdir -p "$home/Documents" "$TEST_FOLDER/test-out"
+  echo "Launching $app"
+  echo "Console: $log"
+  CFFIXED_USER_HOME="$home" OS_ACTIVITY_DT_MODE=1 "$app/Contents/MacOS/TestRunner" > "$log" 2>&1 &
+  DIRECT_APP_PID=$!
+
+  local deadline=$((SECONDS + DIRECT_TIMEOUT_SECONDS)) status=0
+  while [ ! -f "$report" ]; do
+    if ! kill -0 "$DIRECT_APP_PID" 2>/dev/null; then
+      wait "$DIRECT_APP_PID" || status=$?
+      DIRECT_APP_PID=""
+      echo "TestRunner exited (status $status) before the suite finished: it CRASHED. See $log and ~/Library/Logs/DiagnosticReports/TestRunner-*.ips." >&2
+      return 1
+    fi
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      echo "No junit report after ${DIRECT_TIMEOUT_SECONDS}s while TestRunner was still running: the suite HUNG. See $log." >&2
+      return 1
+    fi
+    sleep 1
+  done
+  stop_direct_app
+
+  cp "$report" "$TEST_FOLDER/test-out/junit-result.xml"
+  local summary failures
+  summary=$(grep -oE 'CONSOLE LOG: (SUCCESS|FAILURE): .*' "$log" | tail -n 1 | sed 's/^CONSOLE LOG: //')
+  echo "$summary"
+  failures=$(grep -c -e '<failure' -e '<error' "$report")
+  if [ "$failures" -ne 0 ]; then
+    echo "Failing specs:" >&2
+    grep -B1 -e '<failure' -e '<error' "$report" | grep -o 'name="[^"]*"' >&2
+    return 1
+  fi
+  # Run-level errors (a focused spec, an error outside any spec) fail no spec.
+  [ "${summary#SUCCESS: }" != "$summary" ]
 }
 
 if [ "$CATALYST" -eq 1 ]; then
@@ -558,28 +676,72 @@ fi
 echo "Test folder: $TEST_FOLDER"
 
 XCODEBUILD_ARGS=()
+if [ -n "$CONFIGURATION" ]; then
+  echo "Configuration: $CONFIGURATION"
+  XCODEBUILD_ARGS+=(-configuration "$CONFIGURATION")
+fi
 if [ "$ASAN" -eq 1 ]; then
   echo "AddressSanitizer: enabled"
   XCODEBUILD_ARGS+=(-enableAddressSanitizer YES)
 fi
-
-set -o pipefail
-xcodebuild -project "$SCRIPT_DIR/v8ios.xcodeproj" -scheme TestRunner \
-  -resultBundlePath "$TEST_FOLDER/test_results" \
-  -destination "$DESTINATION" \
-  "${XCODEBUILD_ARGS[@]}" \
-  build test | xcpretty
-
-TEST_EXIT=$?
-
-if [ $TEST_EXIT -ne 0 ]; then
-  echo "Tests failed with exit code $TEST_EXIT"
+if [ -n "$WRAPPER_LIFETIME" ]; then
+  echo "Wrapper lifetime: $WL_MODE/$WL_SCOPE"
+  # Read by the TestRunner target's "Apply Test App Config" build phase.
+  XCODEBUILD_ARGS+=("NS_TEST_WRAPPER_LIFETIME=$WL_MODE:$WL_SCOPE")
 fi
 
-if command -v xcparse &>/dev/null; then
-  xcparse attachments "$TEST_FOLDER/test_results.xcresult" "$TEST_FOLDER/test-out"
-  find "$TEST_FOLDER/test-out" -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
-  find "$TEST_FOLDER/test-out" -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
+set -o pipefail
+if [ "$NO_XCTEST" -eq 1 ]; then
+  run_catalyst_directly
+  TEST_EXIT=$?
+else
+  xcodebuild -project "$SCRIPT_DIR/v8ios.xcodeproj" -scheme TestRunner \
+    -resultBundlePath "$TEST_FOLDER/test_results" \
+    -destination "$DESTINATION" \
+    "${XCODEBUILD_ARGS[@]}" \
+    build test | xcpretty
+
+  TEST_EXIT=$?
+
+  if [ $TEST_EXIT -ne 0 ]; then
+    echo "Tests failed with exit code $TEST_EXIT"
+  fi
+
+fi
+
+# XCTest passes once the app delivers its junit report, whatever the report
+# says, so failing specs only show up here.
+if [ -d "$TEST_FOLDER/test_results.xcresult" ]; then
+  if command -v xcparse &>/dev/null; then
+    xcparse attachments "$TEST_FOLDER/test_results.xcresult" "$TEST_FOLDER/test-out"
+  else
+    "$SCRIPT_DIR/scripts/export-test-attachments.sh" --result "$TEST_FOLDER/test_results.xcresult" \
+      --output "$TEST_FOLDER/test-out" >/dev/null
+  fi
+fi
+JUNIT_REPORTS=()
+while IFS= read -r -d '' report; do
+  JUNIT_REPORTS+=("$report")
+done < <(find "$TEST_FOLDER/test-out" -maxdepth 1 -name "*junit*.xml" -print0 2>/dev/null)
+if [ "${#JUNIT_REPORTS[@]}" -eq 0 ]; then
+  echo "No junit report found in $TEST_FOLDER/test-out"
+  [ $TEST_EXIT -ne 0 ] || TEST_EXIT=1
+else
+  for report in "${JUNIT_REPORTS[@]}"; do
+    npx junit-cli-report-viewer "$report"
+  done
+  for report in "${JUNIT_REPORTS[@]}"; do
+    if ! npx verify-junit-xml "$report"; then
+      [ $TEST_EXIT -ne 0 ] || TEST_EXIT=1
+    fi
+  done
+fi
+
+if [ -n "$WRAPPER_LIFETIME" ]; then
+  if ! "$SCRIPT_DIR/scripts/check-wrapper-lifetime-report.sh" --reports "$TEST_FOLDER/test-out" \
+       --expect "$WL_MODE/$WL_SCOPE"; then
+    [ $TEST_EXIT -ne 0 ] || TEST_EXIT=1
+  fi
 fi
 
 exit $TEST_EXIT

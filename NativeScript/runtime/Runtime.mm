@@ -510,9 +510,11 @@ void Runtime::Init() {
   Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
   context->Enter();
 
-  // Drain tracked unhandled promise rejections once per runloop turn, just
-  // before the loop sleeps. The info pointer is the isolate; the callback
-  // re-validates liveness because the isolate may be torn down between turns.
+  // The event loop drains tracked unhandled promise rejections after each of
+  // its tasks; this observer catches rejections from JS entered any other way
+  // (native callbacks, NSTimer blocks) once per runloop turn, just before the
+  // loop sleeps. The info pointer is the isolate; the callback re-validates
+  // liveness because the isolate may be torn down between turns.
   CFRunLoopObserverContext observerContext = {0, isolate, nullptr, nullptr, nullptr};
   rejectionObserver_ =
       CFRunLoopObserverCreate(kCFAllocatorDefault, kCFRunLoopBeforeWaiting, /*repeats*/ true,
@@ -808,20 +810,7 @@ void Runtime::DrainRejectionsObserver(CFRunLoopObserverRef observer, CFRunLoopAc
   if (!Runtime::IsAlive(isolate)) {
     return;
   }
-  auto cache = Caches::Get(isolate);
-  // HasPending is an atomic read: OnReject can run on any thread holding the
-  // v8::Locker, so pending_ itself must only be touched under the lock below.
-  if (!cache->IsValid() || cache->PromiseRejections == nullptr ||
-      !cache->PromiseRejections->HasPending()) {
-    return;
-  }
-
-  v8::Locker locker(isolate);
-  Isolate::Scope isolate_scope(isolate);
-  HandleScope handle_scope(isolate);
-  Local<Context> context = cache->GetContext();
-  Context::Scope context_scope(context);
-  cache->PromiseRejections->Drain(context);
+  PromiseRejectionTracker::DrainIfPending(isolate);
 }
 
 bool Runtime::IsAlive(const Isolate* isolate) {

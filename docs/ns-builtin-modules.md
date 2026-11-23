@@ -120,6 +120,8 @@ Config keys:
 | `wrapperLifetimeWarnings` | `true` \| `false` | process-wide (main-isolate writes only; read live by every isolate); no effect in the `"rooted"` and `"canary"` modes | the app config `"wrapperLifetime": { "warnings": … }`, or on in debug builds |
 | `wrapperLifetimeMode` | `"resurrecting"` \| `"rooted"` \| `"canary"` | process-wide, read-only | the app config `"wrapperLifetime": { "mode": … }`, or `"resurrecting"` |
 | `wrapperLifetimeScope` | `"extended"` \| `"all"` | process-wide, read-only | the app config `"wrapperLifetime": { "scope": … }`, or `"extended"` |
+| `wrapperLifetimeAllowShadowingNativeMembers` | `true` \| `false` | process-wide, read-only | the app config `"wrapperLifetime": { "allowShadowingNativeMembers": … }`, or `false` (see [Native member guard](#native-member-guard) and [Plain canaries](#plain-canaries)) |
+| `wrapperLifetimeGuardsNativeMembers` | `true` \| `false` | process-wide, read-only | `true` in debug builds under the `"rooted"` and `"canary"` modes unless `wrapperLifetimeAllowShadowingNativeMembers` is `true`, else `false` (see [Native member guard](#native-member-guard)) |
 
 ```js
 const { setConfig, getConfig } = require("ns:runtime");
@@ -148,29 +150,31 @@ The `TypeError` messages are part of the contract:
 | invalid `releasedObjectPolicy` value | `'releasedObjectPolicy' must be 'report' or 'throw'` |
 | non-string `debug` value | `'debug' must be a comma-separated category string (<categories>), or '' to disable tracing` |
 | non-boolean `wrapperLifetimeWarnings` value | `'wrapperLifetimeWarnings' must be a boolean` |
-| `setConfig` of `wrapperLifetimeMode` or `wrapperLifetimeScope` | `'<key>' is read-only; set "wrapperLifetime" in the app config` |
+| `setConfig` of `wrapperLifetimeMode`, `wrapperLifetimeScope`, `wrapperLifetimeAllowShadowingNativeMembers` or `wrapperLifetimeGuardsNativeMembers` | `'<key>' is read-only; set "wrapperLifetime" in the app config` |
 
 ### Wrapper lifetime counters
 
 `getWrapperLifetimeStats()` returns counters for the calling isolate, kept in
 every build. Most cost an increment only on finalizer, GC-callback and error
 paths or when a state object is created; `canaryInterceptedWrites` costs one
-on every write to a canary:
+on every write to a canary, and `canaryCachedNativeWrites` one on each such
+write the cache below places:
 
 | counter | counts |
 |---|---|
-| `resurrections` | finalizers that kept a wrapper alive because native code still retained its object (JS-extended classes) |
+| `resurrections` | finalizers that kept an ObjC wrapper alive because native code still retained its object: a JS-extended class's instance, or a wrapper the runtime keeps strong while native code owns its object |
 | `collected` | finalizers that released their native object |
 | `releasedExplicitly` | native objects released through `__releaseNativeCounterpart` |
-| `releasedAccesses` | times JS passed a released wrapper to native code, used it as a method receiver, or touched a released pointer, reference or struct |
+| `releasedAccesses` | uses of a released wrapper: as a native argument, collection element or return value, as a method receiver or `toString()` receiver, as a weak collection key in `"canary"` mode when it was released before anything keyed its object (see [Weak collections in canary mode](#weak-collections-in-canary-mode)), and reads or writes through a released pointer, reference or struct |
 | `stateLostCandidates` | collected wrappers carrying JS properties whose object was still retained by something else (only while `wrapperLifetimeWarnings` is on) |
 | `stateLostConfirmed` | candidates whose object was still alive a runloop turn later, once releases queued for the runtime thread ran; each class is also reported once in the log |
 | `promotions` | `"rooted"` only: weak wrappers made strong because native code retained their object |
 | `demotions` | `"rooted"` only: strong wrappers made weak at a major collection because native code no longer retained their object |
 | `queuedReleases` | `"rooted"` and `"canary"`: collected wrappers whose native object was queued for release on the runtime's thread |
-| `canaryStates` | `"canary"` only: state objects created to hold native objects' JS properties |
+| `canaryStates` | `"canary"` only: state objects created to hold native objects' JS properties, or only to hold the key a weak collection made for the object, a plain object's included under scope `"extended"` (see [Weak collections in canary mode](#weak-collections-in-canary-mode)) |
 | `canaryNativeDeaths` | `"canary"` only: state objects let go of because their native object was deallocated or, with the default death signal, because `objc_removeAssociatedObjects` released its lifecycle token while the object was still alive |
 | `canaryInterceptedWrites` | `"canary"` only: writes to canaries the runtime's write handler saw. Other wrappers have no handler |
+| `canaryCachedNativeWrites` | `"canary"` only: of those writes, native property writes whose setter the handler found from an earlier write of the same name through an object with the same prototype, without looking the name up along the prototype chain |
 
 A wrapper whose native object was released keeps its JS identity. Passing it
 to native code follows `releasedObjectPolicy`: under `"report"` the argument
@@ -181,6 +185,180 @@ or return value becomes `nil` (`NSNull` inside a collection) and a
 `"throw"`. An `NSNull` element still breaks native code that expects a typed
 value there (an attributes dictionary holding a released `UIColor`, say); the
 event names the element so the cause can be found.
+
+### Plain canaries
+
+Under `"canary"` with scope `"all"`, a wrapper of a plain (not JS-extended)
+native object keeps its JS properties in the object's state only: a
+non-masking handler answers every read, write, `in`, `delete`, enumeration and
+`Object.defineProperty` of them from the state, so a new wrapper for the object
+needs no copy, while each access to such a property costs a native call.
+JS-extended instances keep the mirroring handler (properties live on the
+wrapper too and are copied onto a new one), because `this.onTap =
+this.onTap.bind(this)` and other writes over names their prototype has must
+carry over.
+
+V8 calls a non-masking handler only for names absent from the object and its
+prototype chain, so on a plain wrapper:
+
+- an assignment or `Object.defineProperty` over an inherited data property (a
+  native method, `toString`, `valueOf`, `constructor`, a member JS added to a
+  prototype) creates an own property of that wrapper alone, gone once a new
+  wrapper replaces it. Native code never sees such a property either way: it
+  sends the message, which runs the class's implementation. In debug builds the
+  assignment throws for the members the native member guard covers;
+- `delete` of an inherited name deletes nothing and returns `true`;
+- a property kept in the state before the prototype chain gets the same name
+  (JS adds it to a native prototype, or a later wrapper of the object has a
+  different prototype) is hidden by the inherited one: reads and
+  `hasOwnProperty` see that one and new writes land on the wrapper, while
+  `Object.keys` still lists the name;
+- native property writes run the native setter with no handler involved.
+
+A handler sees the object it is installed on, not the receiver of the access.
+So an accessor property kept in the state and reached through another
+receiver (a Proxy around the wrapper, `Reflect.get` or `Reflect.set` with a
+receiver, `Object.create(wrapper)`) runs its getter with the wrapper itself as
+`this`, and a write through such a receiver never runs its setter: through a
+Proxy it fails (a `TypeError` in strict code), and on an object inheriting
+from the wrapper it defines an own data property there. Data properties work
+through all of them. Under `allowShadowingNativeMembers` the accessor is a
+real property of the wrapper and behaves as on any object.
+
+`allowShadowingNativeMembers` (see [Native member guard](#native-member-guard))
+gives plain wrappers the mirroring handler instead.
+
+### Weak collections in canary mode
+
+In the `"canary"` mode a wrapper dies with its JS references while its native
+object lives on, and the next wrapper for that object is a new JS object. So
+the runtime replaces `WeakMap`, `WeakSet`, `WeakRef` and
+`FinalizationRegistry` with subclasses that key a native object by a key that
+lives exactly as long as the object, rather than by its current wrapper.
+Entries and targets survive a wrapper change, and `WeakRef.prototype.deref`
+returns the live wrapper, a new one, or `undefined` once the object is gone.
+Every other value, a Proxy around a native object included, is its own key as
+in the standard collections. What follows from that:
+
+- They are subclasses, and it shows: `Object.getPrototypeOf(WeakMap.prototype)`
+  is the standard prototype, and `WeakMap.toString()` is not native code.
+- `deref` builds a wrapper when the old one died, and that wrapper holds the
+  native object strongly until it dies in turn. A `WeakRef` dereferenced on
+  every frame or event may keep its object from ever being released.
+- A key lives in the object's state, so the first `set`, `add`, `new WeakRef`
+  or `register` of an object without JS properties creates a state, counted in
+  `canaryStates` and `getWrapperClassCounts()`'s `states`. Lookups never do.
+- Under scope `"extended"` a plain (not JS-extended) object's wrapper is not a
+  canary, but it also dies with its JS references while the object lives on.
+  So the first `set`, `add`, `new WeakRef` or `register` of a plain object
+  gives the object a state holding only its key, and from then on it is keyed
+  by its lifetime as a canary is, release included. Nothing is attached to
+  the object: the runtime holds a weak reference to it and checks it after
+  each major garbage collection, so what was keyed on a plain object that
+  was deallocated stays until the next major collection (its
+  `FinalizationRegistry` callbacks run after that), and
+  `objc_removeAssociatedObjects` does not affect it. Objects of a class that
+  refuses weak references, tagged pointers and blocks stay keyed by their
+  wrapper. Wrapping plain objects, calling them and their properties cost
+  nothing more, and so does a major collection while no plain object is
+  keyed. Each weak collection operation on a keyed plain object asks native
+  code for its key (about 142 ns for a `WeakMap.prototype.get` hit instead of
+  39, Release simulator build), the first keying of an object costs about
+  700 ns more, once any plain object was keyed a miss on one never keyed
+  costs about 124 ns instead of 106, and with 1000 keyed plain objects a
+  major collection takes about 130 µs more than with the same objects
+  unkeyed, for their keys and states on the heap. Limitations: as with
+  canaries, a `WeakMap` value that references its plain key keeps the object
+  alive while the map lives; and if native code hands a released object back
+  and that wrapper dies before any weak collection operation sees it,
+  `deref` keeps returning `undefined` until native code hands it back again.
+- What was keyed on a native object follows the object, not a released
+  wrapper of it. After `__releaseNativeCounterpart(w)`, `w` still finds the
+  object's entries while JS holds it, and a wrapper native code hands back
+  later finds them too. `deref` returns `undefined` until native code hands
+  the object back, and a `FinalizationRegistry` callback runs only once the
+  object is gone and `w` is collected. If the release deallocated the object,
+  the callback runs once `w` is collected. A wrapper released before anything
+  keyed its object is a plain key from then on: entries made through it don't
+  reach the object, and `new WeakRef(w).deref()` returns `w`. Each weak
+  collection operation that has to look such a wrapper up is a released-object
+  access: it counts in `releasedAccesses` and follows `releasedObjectPolicy`
+  (a `releasednativeaccess` event, then the plain-key behavior, under
+  `"report"`; a `ReferenceError` under `"throw"`). A lookup that finds the
+  wrapper itself as a key does not count.
+- A prototype set later with `Object.setPrototypeOf` or `__proto__` is not
+  state: a later wrapper has its class's prototype again.
+
+### Native member guard
+
+Native code never calls a JS own property of a native object: it sends the
+message, which runs the class's implementation. So `view.layoutSubviews = fn`
+on an instance changes what JS callers get and nothing else. In debug builds
+(`RuntimeConfig.IsDebug`) under the `"rooted"` and `"canary"` modes, either
+scope, such an assignment throws a `TypeError` that names the method, the
+object's class, the mode and the escape hatch.
+
+Guarded, on the prototype of every native class (and of the bindings for
+protocols the metadata does not list for a class):
+
+- native instance methods, including those of the class's protocols;
+- `toString`;
+- `NSArray`'s `Symbol.iterator`.
+
+Guarded too, on the prototype level of a JS-extended class (an `extend()`
+implementation object, or an `__extends` or `@NativeClass` class's prototype)
+that defines them: the methods native code calls through the function the
+class captured when it was built. Those are exposed methods (`exposedMethods`
+in an `extend()` signature, `ObjCExposedMethods`), methods overriding a native
+method or implementing a protocol's, and a `Symbol.iterator` the class
+enumerates natively with. Native code calls the class's implementation, so an
+instance's own property of that name is never seen by it. The accessor pair
+is installed when the level is built: when `extend()` returns, and at the
+class's first use (its `+initialize`) for `__extends` and `@NativeClass`.
+
+Not guarded: `constructor`, static methods (they live on the constructor),
+native properties (already accessor pairs whose setter calls native code), and
+the other methods a JS-extended class defines (JS-only methods stay writable
+data properties).
+
+A guarded member is an accessor pair on its class's prototype instead of a data
+property: `Object.getOwnPropertyDescriptor(UIView.prototype, "setNeedsLayout")`
+has `get` and `set` (enumerable and configurable, as the data property was)
+and no `value` or `writable`, and so does a JS-extended class's prototype for
+the names above, e.g. `layoutSubviews` on a `UIView` subclass's prototype. The getter returns the same function every time,
+so `obj.m === obj.m`, `typeof`, `in`, `.call`, `.bind` and `super.m` read as
+before. The setter throws when the receiver is a native object, a released
+one or a Proxy around one, and otherwise creates the own data property an
+assignment would. So these still work:
+
+- assigning on the class's prototype, `Klass.prototype.m = fn`, which replaces
+  the native implementation as before; the name is a plain data property from
+  then on and no longer guarded. On a JS-extended class's prototype this
+  changes what JS callers get only: native code keeps calling the function the
+  class captured;
+- overriding on a subclass prototype (`__extends`, `extend()`,
+  `@NativeClass`), and `_super.prototype.m.call(this)`;
+- assigning on an object that merely inherits from a native one
+  (`Object.create(obj)`).
+
+`Object.defineProperty(obj, "m", …)` still defines an own property on a native
+object: use it for a JS-only member that native code is not meant to see.
+Class fields have define semantics and bypass the guard the same way.
+
+`"wrapperLifetime": { "allowShadowingNativeMembers": true }` in the app config
+turns the guard off, leaving data properties as in the `"resurrecting"` mode,
+and under `"canary"` with scope `"all"` also keeps plain wrappers on the
+mirroring handler, so a shadowing property on one carries over to a new
+wrapper as it does on a JS-extended instance, at the cost of a handler on every
+write to a plain wrapper (see [Plain canaries](#plain-canaries));
+`getConfig("wrapperLifetimeAllowShadowingNativeMembers")` reads it.
+`getConfig("wrapperLifetimeGuardsNativeMembers")` reads whether the guard is
+on, which also accounts for the build and the mode.
+
+Release builds never throw and keep data properties, since the accessor costs
+every native method load. An instance shadow there is silently ignored by
+native code, and it can be lost when the object's wrapper is collected and
+rebuilt.
 
 ### Leak diagnostics
 
@@ -199,20 +377,25 @@ it in other builds, add `NativeScriptLeakProbe.framework` to
 `wrappers`, the rooted-`strong` ones and the canary `states`. It is cheap;
 compare it before and after repeating a journey to find classes that grow.
 
-`findLeakCycles(options)` takes a heap snapshot and reports the cycles. The
-snapshot carries the native objects the runtime wraps or keeps state for, the
-native objects they own (strong ivars, collection and block storage), and the
-runtime's cross-heap edges: `ns:retain` (wrapper → object), `ns:owned`
-(object → wrapper, for a wrapper kept strong because native code owns its
-object: rooted-strong, or a wrapper no lifetime mode adopted whose handle the
-runtime keeps strong), `ns:state` (canary object → state),
-`ns:block-callback` (JS block → function) and `ns:adapter` (collection adapter
-→ JS object). A native object counts as owned from outside when its retain
-count exceeds the retains found in that graph; everything else is marked from
-the V8 roots, and cycles among what stays unmarked are reported. A `WeakMap`
-value is marked only once both its key and its map are. Every heap snapshot,
-DevTools' included, carries the runtime's edges while the framework is
-embedded, except `ns:block-callback`: only `findLeakCycles` walks native
+`findLeakCycles(options)` takes a heap snapshot and reports the cycles. It
+first runs three full collections, each followed by the releases the wrapper
+lifetime modes queue for dead wrappers and by letting go of the state of
+deallocated canary objects, so that neither reads as an owner; those releases
+can run JS-implemented `-dealloc` methods. The snapshot carries the native
+objects the runtime wraps or keeps state for, the native objects they own
+(strong ivars, collection and block storage), and the runtime's cross-heap
+edges: `ns:retain` (wrapper → object), `ns:owned` (object → wrapper, for a
+wrapper kept strong because native code owns its object: rooted-strong, or a
+wrapper no lifetime mode adopted whose handle the runtime keeps strong),
+`ns:kept` (object → wrapper, for a `"resurrecting"` wrapper whose collection
+is refused while native code retains its object), `ns:state` (canary object →
+state), `ns:block-callback` (JS block → function) and `ns:adapter` (collection
+adapter → JS object). A native object counts as owned from outside when its
+retain count exceeds the retains found in that graph; everything else is
+marked from the V8 roots, and cycles among what stays unmarked are reported. A
+`WeakMap` value is marked only once both its key and its map are. Every heap
+snapshot, DevTools' included, carries the runtime's edges while the framework
+is embedded, except `ns:block-callback`: only `findLeakCycles` walks native
 memory, which is where it finds JS blocks.
 
 | option | effect |
@@ -261,7 +444,9 @@ missed rather than misreported:
   count is read from its ivars): another thread could free them while the
   probe calls it;
 - the contents of `NSHashTable`, `NSMapTable` and `NSPointerArray`, whose
-  storage may be weak: what they retain counts as owned from outside.
+  storage may be weak: what they retain counts as owned from outside;
+- a JS block whose last release started on another thread while the probe
+  ran: until its disposal finishes, its function counts as a root.
 
 Some leaks are held from a root rather than by a cycle alone, and are not
 reported even when strict. Before iOS 26, UIKit's gesture environment retains
@@ -281,9 +466,9 @@ also:
   path: `org.nativescript.wrapperLifetime.counts` (class counts after full
   collections), `org.nativescript.wrapperLifetime.findLeakCycles`,
   `org.nativescript.wrapperLifetime.findLeakCycles.strict` and
-  `org.nativescript.wrapperLifetime.findLeakCycles.inspect` (after full
-  collections, inspecting the class-name prefixes listed one per line in
-  `ns-wrapper-lifetime-inspect.txt` in the temporary directory).
+  `org.nativescript.wrapperLifetime.findLeakCycles.inspect` (inspecting the
+  class-name prefixes listed one per line in `ns-wrapper-lifetime-inspect.txt`
+  in the temporary directory).
 
 Remote-module security (`security.allowRemoteModules`,
 `security.remoteModuleAllowlist`) is **not** part of this surface. Those

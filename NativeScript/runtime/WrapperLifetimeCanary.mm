@@ -3,6 +3,7 @@
 #include <dlfcn.h>
 #include <objc/message.h>
 #include <objc/runtime.h>
+#include <algorithm>
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -31,7 +32,9 @@
 //   sweep after every major collection, so state lingers until then.
 // An object the chosen signal cannot watch (a class forbidding associated
 // objects, or refusing weak references) gets no state: its JS properties stay
-// on the canary and the weak collections key its wrapper.
+// on the canary and the weak collections key its wrapper. The key-only records
+// of plain objects under scope "extended" always use the weak reference
+// (SweepPlain), whatever this chooses for canaries.
 #define NS_CANARY_DEATH_ASSOCIATION 1
 #define NS_CANARY_DEATH_WEAK_SWEEP 2
 #ifndef NS_CANARY_DEATH_SIGNAL
@@ -67,6 +70,21 @@ struct CanaryRecord {
   // record whose object became a weak-collection key (Wrap reads it).
   id object = nil;
   bool weakSet = false;
+  // __releaseNativeCounterpart released a wrapper of the object, and since
+  // then no canary adopted the record or, for a plain record, no live wrapper
+  // of the object reached unwrap or wrap. Isolate thread only.
+  bool released = false;
+  // Its object's canaries forward (WrapperLifetimeCanary::Forwards): the state
+  // is their only copy of the object's properties.
+  bool forwards = false;
+  // The key-only record of a plain object under scope "extended" (PlainRecord):
+  // its state holds nothing but the weak collections' key, no wrapper holds
+  // it, nothing reports its object's death, and its weak slot is always set
+  // (SweepPlain reads it).
+  bool plain = false;
+  // The object's address: after the record died, only a canary holding the
+  // record keeps the object alive (ForEachState reads it then).
+  void* address = nullptr;
 
   ~CanaryRecord() { objc_destroyWeak(&object); }
 
@@ -80,19 +98,55 @@ struct CanaryRecord {
 
 namespace {
 
+// What the weak-collections builtin reads through a Uint32Array over `slots`
+// (RegisterWrapFunctions). It drops every wrapper it cached from wrap once
+// kEpoch changes, which can happen on any thread. After an unwrap that asked
+// (UnwrapCallback), kLiveCanary is 1 when the value is a live canary standing
+// for the key it answered: the wrapper wrap answers with for that key.
+struct WeakCollectionCache {
+  enum Slot { kEpoch, kLiveCanary, kSlotCount };
+  std::atomic<uint32_t> slots[kSlotCount];
+
+  // A wrapper wrap answered may no longer be the one it answers.
+  void Invalidate() { slots[kEpoch].fetch_add(1, std::memory_order_release); }
+  void SetLiveCanary(bool live) {
+    slots[kLiveCanary].store(live ? 1 : 0, std::memory_order_relaxed);
+  }
+};
+
+using RecordMap = std::unordered_map<void*, std::shared_ptr<CanaryRecord>>;
+
 // Per-isolate. Shared with the tokens associated with native objects, which
 // can be deallocated on any thread and after the isolate is gone.
 struct CanaryRegistry {
   std::mutex mutex;
-  std::unordered_map<void*, std::shared_ptr<CanaryRecord>> records;
+  RecordMap records;
   // Records whose token was deallocated; their handles are reset on the
   // runtime's thread.
   std::vector<std::shared_ptr<CanaryRecord>> dead;
+  // Dead forwarding records a live canary still held when they were drained
+  // (ReleaseStates). Isolate thread only.
+  std::vector<std::shared_ptr<CanaryRecord>> orphaned;
   bool closed = false;
   bool drainPosted = false;
   bool sweepPosted = false;
+  bool plainSweepPosted = false;
   // Lets wrapper creation skip the lookup while no object has state.
   std::atomic<size_t> count{0};
+  // The plain records among them: lets a weak collection lookup of a plain
+  // wrapper skip the registry while no plain object was keyed.
+  std::atomic<size_t> plainCount{0};
+  // Every plain record in `records`, and retired ones until the next
+  // SweepPlain drops them: what that sweep walks instead of the whole map.
+  std::vector<std::shared_ptr<CanaryRecord>> plainRecords;
+  // plainRecords' size, which lets the sweep after a major collection skip
+  // the registry: a lookup can retire the last plain record, which then waits
+  // in plainRecords with plainCount at zero. Written under the mutex, read
+  // without it.
+  std::atomic<size_t> plainTracked{0};
+  // Outlives the registry while the builtin's array does.
+  std::shared_ptr<WeakCollectionCache> weakCollectionCache =
+      std::make_shared<WeakCollectionCache>();
   Isolate* isolate = nullptr;
   std::weak_ptr<EventLoop> loop;
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
@@ -102,13 +156,260 @@ struct CanaryRegistry {
 #endif
 };
 
+// Native property writes the mirroring setter ran the native setter of, by the
+// name written and the receiver's prototype, so a later write of the name
+// through an object with that prototype skips the prototype chain lookup.
+// Positive entries only: a name with no entry costs one read of the name tags.
+//
+// A hit rechecks everything the lookup it replaces read, except where the name
+// resolves:
+// - the receiver and each prototype below the setter's owner lack the name;
+// - each prototype up to the owner is the one the entry was made with, which
+//   also catches setPrototypeOf anywhere on that chain;
+// - the owner still has an accessor for the name, and its NativeSetters entry
+//   was not forgotten since (the owner's handlers forget it when JS assigns or
+//   defines the name there).
+// Native class prototypes get the same per-name recheck as JS ones: a [[Set]]
+// that starts elsewhere can define a data property on one, as its receiver,
+// without reaching its handlers.
+// Sets are picked by addresses, which a moving collection may change; such an
+// entry just misses until it is evicted.
+class NativeWriteCache {
+ public:
+  // The native setter a write of `property` to `holder` runs, or null when it
+  // has no current entry. `holder`'s prototype is read once and only after the
+  // name tags matched.
+  NativeSetter* Find(Local<Context> context, Local<Object> holder, Local<v8::Name> property) {
+    uint32_t tag = NameTag(property);
+    const uint32_t* tags = nameTags_[NameSet(tag)];
+    for (size_t way = 0; way < kNameWays; way++) {
+      if (tags[way] == tag) {
+        return Check(context, holder, property, tag);
+      }
+    }
+    return nullptr;
+  }
+
+  // After a write of `property` to `holder` found `setter` on `owner`, a
+  // native class prototype on holder's prototype chain.
+  void Fill(Isolate* isolate, Local<Object> holder, Local<Object> owner, Local<v8::Name> property,
+            NativeSetter* setter);
+
+  void Reset() { entries_.reset(); }
+
+ private:
+  // The holder's prototype first, the owner last.
+  static constexpr size_t kMaxLevels = 8;
+  struct Entry {
+    Global<v8::Name> name;
+    // Weak: the cache keeps no prototype alive.
+    Global<Object> levels[kMaxLevels];
+    uint8_t levelCount = 0;
+    NativeSetter* setter = nullptr;
+  };
+
+  // The low half of a name's tagged address: never 0, and only a filter, as a
+  // name can move or its address be reused.
+  static uint32_t NameTag(Local<v8::Name> name) {
+    return static_cast<uint32_t>(v8::internal::ValueHelper::ValueAsAddress(*name));
+  }
+  static constexpr size_t kNameSets = 32;
+  static constexpr size_t kNameWays = 4;
+  static size_t NameSet(uint32_t tag) { return ((tag >> 3) ^ (tag >> 9)) & (kNameSets - 1); }
+  static constexpr size_t kEntrySets = 64;
+  static constexpr size_t kEntryWays = 4;
+  static size_t EntrySet(uint32_t tag, Local<Value> prototype) {
+    auto address = static_cast<uint32_t>(v8::internal::ValueHelper::ValueAsAddress(*prototype));
+    uint32_t mixed = (address ^ tag) * 0x9E3779B1u;
+    return (mixed >> 26) & (kEntrySets - 1);
+  }
+
+  NativeSetter* Check(Local<Context> context, Local<Object> holder, Local<v8::Name> property,
+                      uint32_t tag);
+
+  // The tags of the names entries were made for. One name has entries for
+  // many prototypes (a property every UIView subclass inherits).
+  uint32_t nameTags_[kNameSets][kNameWays] = {};
+  uint8_t nameVictims_[kNameSets] = {};
+  struct Table {
+    Entry entries[kEntrySets][kEntryWays];
+    uint8_t victims[kEntrySets] = {};
+  };
+  std::unique_ptr<Table> entries_;
+};
+
 struct CanaryState {
   std::shared_ptr<CanaryRegistry> registry = std::make_shared<CanaryRegistry>();
   // The weak collections' key for a native object hangs off its state, and
-  // names the object it stands for.
+  // names the object it stands for. A released canary holds a copy.
   Global<Private> keyOfState;
   Global<Private> objectOfKey;
+  ObjectManager::LifetimeStats* stats = nullptr;
+  // Set while the runtime copies properties between a canary and its state,
+  // so the canary's handlers let those defines through. The copy runs no JS,
+  // so only its own defines reach a handler meanwhile.
+  bool copyingProperties = false;
+  NativeWriteCache nativeWrites;
 };
+
+// Under the registry mutex: marks the record died and moves it from the map to
+// `dead`. Every removal from the map goes through here, so the counts stay
+// exact. Returns the iterator after it.
+RecordMap::iterator RetireRecord(CanaryRegistry* registry, RecordMap::iterator it,
+                                 std::vector<std::shared_ptr<CanaryRecord>>& dead) {
+  it->second->died.store(true, std::memory_order_release);
+  if (it->second->plain) {
+    registry->plainCount.fetch_sub(1, std::memory_order_relaxed);
+  }
+  // Release: Find reads count first (acquire) and then plainCount.
+  registry->count.fetch_sub(1, std::memory_order_release);
+  dead.push_back(std::move(it->second));
+  return registry->records.erase(it);
+}
+
+NativeSetter* NativeWriteCache::Check(Local<Context> context, Local<Object> holder,
+                                      Local<v8::Name> property, uint32_t tag) {
+  if (entries_ == nullptr) {
+    return nullptr;
+  }
+  Local<Value> prototype = holder->GetPrototype();
+  if (!prototype->IsObject()) {
+    return nullptr;
+  }
+  Entry* set = entries_->entries[EntrySet(tag, prototype)];
+  for (size_t way = 0; way < kEntryWays; way++) {
+    Entry& entry = set[way];
+    if (entry.name != property || entry.levels[0] != prototype) {
+      continue;
+    }
+    if (holder->HasRealNamedProperty(context, property).FromMaybe(true)) {
+      return nullptr;
+    }
+    Local<Object> level = prototype.As<Object>();
+    size_t last = entry.levelCount - 1;
+    for (size_t i = 0; i < last; i++) {
+      if (level->HasRealNamedProperty(context, property).FromMaybe(true)) {
+        return nullptr;
+      }
+      Local<Value> next = level->GetPrototype();
+      if (entry.levels[i + 1] != next) {
+        return nullptr;
+      }
+      level = next.As<Object>();
+    }
+    if (!level->HasRealNamedCallbackProperty(context, property).FromMaybe(false)) {
+      return nullptr;
+    }
+    return entry.setter;
+  }
+  return nullptr;
+}
+
+void NativeWriteCache::Fill(Isolate* isolate, Local<Object> holder, Local<Object> owner,
+                            Local<v8::Name> property, NativeSetter* setter) {
+  Local<Object> levels[kMaxLevels];
+  uint8_t levelCount = 0;
+  Local<Value> next = holder->GetPrototype();
+  while (true) {
+    // A Proxy's traps and another wrapper's handlers answer for their own
+    // properties, which no recheck here reads.
+    if (!next->IsObject() || next->IsProxy() || levelCount == kMaxLevels) {
+      return;
+    }
+    Local<Object> level = next.As<Object>();
+    if (level == owner) {
+      levels[levelCount++] = level;
+      break;
+    }
+    if (level->InternalFieldCount() > 0) {
+      return;
+    }
+    levels[levelCount++] = level;
+    next = level->GetPrototype();
+  }
+  if (entries_ == nullptr) {
+    entries_ = std::make_unique<Table>();
+  }
+  uint32_t tag = NameTag(property);
+  size_t nameIndex = NameSet(tag);
+  uint32_t* tags = nameTags_[nameIndex];
+  if (std::find(tags, tags + kNameWays, tag) == tags + kNameWays) {
+    uint32_t* slot = std::find(tags, tags + kNameWays, 0u);
+    if (slot == tags + kNameWays) {
+      slot = &tags[nameVictims_[nameIndex]];
+      nameVictims_[nameIndex] = (nameVictims_[nameIndex] + 1) % kNameWays;
+    }
+    *slot = tag;
+  }
+  size_t index = EntrySet(tag, levels[0]);
+  Entry* set = entries_->entries[index];
+  Entry* entry = nullptr;
+  for (size_t way = 0; way < kEntryWays && entry == nullptr; way++) {
+    if (set[way].name == property && set[way].levels[0] == levels[0]) {
+      entry = &set[way];
+    }
+  }
+  for (size_t way = 0; way < kEntryWays && entry == nullptr; way++) {
+    if (set[way].levels[0].IsEmpty()) {
+      entry = &set[way];
+    }
+  }
+  if (entry == nullptr) {
+    entry = &set[entries_->victims[index]];
+    entries_->victims[index] = (entries_->victims[index] + 1) % kEntryWays;
+  }
+  entry->name.Reset(isolate, property);
+  for (size_t i = 0; i < kMaxLevels; i++) {
+    if (i < levelCount) {
+      entry->levels[i].Reset(isolate, levels[i]);
+      entry->levels[i].SetWeak();
+    } else {
+      entry->levels[i].Reset();
+    }
+  }
+  entry->levelCount = levelCount;
+  entry->setter = setter;
+}
+
+// Isolate thread. Lets go of orphaned records no canary holds any more, and
+// of those whose state a canary took over. Only the list's own reference is
+// left then, so each handle is reset on this thread.
+void SweepOrphaned(CanaryRegistry* registry) {
+  std::vector<std::shared_ptr<CanaryRecord>>& orphaned = registry->orphaned;
+  for (auto it = orphaned.begin(); it != orphaned.end();) {
+    if (it->use_count() > 1 && !(*it)->state.IsEmpty()) {
+      ++it;
+      continue;
+    }
+    (*it)->state.Reset();
+    it = orphaned.erase(it);
+  }
+}
+
+// Isolate thread. Lets go of the state of `dead` records, except that of a
+// forwarding record a canary still holds: the record died under the live
+// canary (its object's associations were removed), and its state stays the
+// canary's only copy of the object's properties until the canary's next write
+// moves it to a new record (StateForWrite). Such a record waits in `orphaned`
+// until no canary holds it. Besides canaries, only a JS-implemented -dealloc
+// (MarkDying, on the deallocating thread, also for a plain class whose
+// -dealloc JS replaced) holds a record outside the registry; such a record is
+// dying, and no canary can hold it, as a canary retains its object.
+void ReleaseStates(CanaryRegistry* registry, std::vector<std::shared_ptr<CanaryRecord>>& dead) {
+  ObjectManager::LifetimeStats* stats = ObjectManager::GetLifetimeStats(registry->isolate);
+  for (std::shared_ptr<CanaryRecord>& record : dead) {
+    if (record->forwards && !record->dying.load(std::memory_order_acquire) &&
+        !record->state.IsEmpty() && record.use_count() > 1) {
+      registry->orphaned.push_back(std::move(record));
+    } else {
+      record->state.Reset();
+    }
+    if (stats != nullptr) {
+      stats->canaryNativeDeaths++;
+    }
+  }
+  SweepOrphaned(registry);
+}
 
 void DrainDead(const std::shared_ptr<CanaryRegistry>& registry) {
   std::vector<std::shared_ptr<CanaryRecord>> dead;
@@ -120,13 +421,7 @@ void DrainDead(const std::shared_ptr<CanaryRegistry>& registry) {
     }
     dead.swap(registry->dead);
   }
-  ObjectManager::LifetimeStats* stats = ObjectManager::GetLifetimeStats(registry->isolate);
-  for (std::shared_ptr<CanaryRecord>& record : dead) {
-    record->state.Reset();
-    if (stats != nullptr) {
-      stats->canaryNativeDeaths++;
-    }
-  }
+  ReleaseStates(registry.get(), dead);
 }
 
 // From a reporter's -dealloc, on whichever thread deallocates the object. With
@@ -148,17 +443,19 @@ void NativeDied(const std::shared_ptr<CanaryRegistry>& registry, void* object,
     if (it == registry->records.end() || (expected != nullptr && it->second.get() != expected)) {
       return;
     }
+    // A record held outside the registry and not dying is a live canary's (its
+    // associations were removed): wrap no longer answers with that canary.
+    // A transient copy elsewhere bumps it spuriously, which only costs a refill.
+    if (!it->second->dying.load(std::memory_order_acquire) && it->second.use_count() > 1) {
+      registry->weakCollectionCache->Invalidate();
+    }
     // Erased now, inside the object's -dealloc: an object later allocated at
     // this address must not find this record.
-    it->second->died.store(true, std::memory_order_release);
-    registry->dead.push_back(std::move(it->second));
-    registry->records.erase(it);
-    registry->count.fetch_sub(1, std::memory_order_relaxed);
-    if (registry->drainPosted) {
-      return;
+    RetireRecord(registry.get(), it, registry->dead);
+    if (!registry->drainPosted) {
+      loop = registry->loop.lock();
+      registry->drainPosted = loop != nullptr;
     }
-    loop = registry->loop.lock();
-    registry->drainPosted = loop != nullptr;
   }
   // A post dropped at shutdown is fine: teardown resets every handle.
   if (loop != nullptr && !loop->PostInternal([registry]() { DrainDead(registry); })) {
@@ -218,13 +515,35 @@ void ReportDyingRecordsDied(const DyingRecords& dying, void* object) {
 
 // Not a message: a root class without -conformsToProtocol: would crash under
 // scope "all". Walks the superclasses for key-value observing's subclass.
+// Cached per class and thread, as every wrap under scope "all" asks and the
+// walk costs tens of nanoseconds a class: the answer for a class is fixed
+// before it has instances (ClassBuilder adds TNSDerivedClass to a class it
+// creates first thing). A class disposed with objc_disposeClassPair and
+// another allocated at its address would read the old answer.
 bool IsExtendedInstance(id object) {
-  for (Class cls = object_getClass(object); cls != nil; cls = class_getSuperclass(cls)) {
+  Class klass = object_getClass(object);
+  thread_local std::unordered_map<Class, bool> extendedClasses;
+  auto cached = extendedClasses.find(klass);
+  if (cached != extendedClasses.end()) {
+    return cached->second;
+  }
+  bool extended = false;
+  for (Class cls = klass; cls != nil; cls = class_getSuperclass(cls)) {
     if (class_conformsToProtocol(cls, @protocol(TNSDerivedClass))) {
-      return true;
+      extended = true;
+      break;
     }
   }
-  return false;
+  extendedClasses.emplace(klass, extended);
+  return extended;
+}
+
+// Plain canaries forward unless the app config allows shadowing native members,
+// which only the mirroring handlers capture.
+bool PlainCanariesForward() {
+  return GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary &&
+         GetWrapperLifetimeScope() == WrapperLifetimeScope::kAll &&
+         !GetAllowShadowingNativeMembers();
 }
 
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
@@ -272,26 +591,12 @@ void Sweep(const std::shared_ptr<CanaryRegistry>& registry) {
         ++it;
         continue;
       }
-      it->second->died.store(true, std::memory_order_release);
-      dead.push_back(std::move(it->second));
-      it = registry->records.erase(it);
-      registry->count.fetch_sub(1, std::memory_order_relaxed);
+      it = RetireRecord(registry.get(), it, dead);
     }
   }
-  ObjectManager::LifetimeStats* stats = ObjectManager::GetLifetimeStats(registry->isolate);
-  for (std::shared_ptr<CanaryRecord>& record : dead) {
-    record->state.Reset();
-    if (stats != nullptr) {
-      stats->canaryNativeDeaths++;
-    }
-  }
+  ReleaseStates(registry.get(), dead);
 }
 #endif
-
-std::shared_ptr<CanaryRegistry> RegistryFor(Isolate* isolate) {
-  CanaryState* state = Caches::StateFor<CanaryState>(isolate);
-  return state != nullptr ? state->registry : nullptr;
-}
 
 }  // namespace
 
@@ -347,15 +652,11 @@ bool Usable(const std::shared_ptr<CanaryRecord>& record) {
 // Under the registry mutex: a record whose object is gone but which no sweep
 // has reached yet is moved out, so an object now at that address starts over.
 // True when it was; the caller then owes the registry a drain (PostDrain).
-bool RetireIfDead(CanaryRegistry* registry,
-                  std::unordered_map<void*, std::shared_ptr<CanaryRecord>>::iterator it) {
+bool RetireIfDead(CanaryRegistry* registry, RecordMap::iterator it) {
   if (it->second->ObjectAlive() && !it->second->dying.load(std::memory_order_acquire)) {
     return false;
   }
-  it->second->died.store(true, std::memory_order_release);
-  registry->dead.push_back(std::move(it->second));
-  registry->records.erase(it);
-  registry->count.fetch_sub(1, std::memory_order_relaxed);
+  RetireRecord(registry, it, registry->dead);
   return true;
 }
 
@@ -376,6 +677,20 @@ void PostDrain(const std::shared_ptr<CanaryRegistry>& registry) {
   }
 }
 
+// After `object`'s first record in `registry` went into the map, for an object
+// whose class's own -dealloc does not report it. ForbidsAssociatedObjects must
+// have cleared the object.
+void AttachToken(const std::shared_ptr<CanaryRegistry>& registry, id object) {
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
+  TNSCanaryLifecycleToken* token = [[TNSCanaryLifecycleToken alloc] init];
+  token->registry_ = registry;
+  token->object_ = (__bridge void*)object;
+  objc_setAssociatedObject(object, &registry->associationKey, token,
+                           OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+  [token release];
+#endif
+}
+
 // The record a receiver lent to JS from -dealloc reads: its object's record,
 // dying or not. Such a receiver is never adopted, so it has no canary state.
 std::shared_ptr<CanaryRecord> BorrowedRecord(Isolate* isolate, Local<Object> holder) {
@@ -394,12 +709,6 @@ std::shared_ptr<CanaryRecord> BorrowedRecord(Isolate* isolate, Local<Object> hol
   return it != state->registry->records.end() ? it->second : nullptr;
 }
 
-// Set while this thread copies properties between a canary and its state, so
-// the canary's handlers let those defines through. Per thread rather than per
-// isolate: the copy runs no JS, so only its own defines reach an interceptor
-// on this thread meanwhile.
-thread_local bool copyingProperties_ = false;
-
 Local<Value> DescriptorField(Isolate* isolate, Local<Context> context, Local<Object> descriptor,
                              const char* name) {
   Local<Value> value;
@@ -410,13 +719,17 @@ Local<Value> DescriptorField(Isolate* isolate, Local<Context> context, Local<Obj
 
 // Copies `from`'s own string- and symbol-keyed properties onto `to`, with their
 // attributes; an accessor keeps its functions, which run with whichever object
-// they are reached through as `this`.
+// they are reached through as `this`. With `keepExisting`, a name `to` already
+// owns keeps its property.
 void CopyOwnProperties(Isolate* isolate, Local<Context> context, Local<Object> from,
-                       Local<Object> to) {
+                       Local<Object> to, bool keepExisting = false) {
+  CanaryState* canaryState = Caches::ExistingStateFor<CanaryState>(isolate);
   HandleScope scope(isolate);
   TryCatch tc(isolate);
-  bool wasCopying = copyingProperties_;
-  copyingProperties_ = true;
+  bool wasCopying = canaryState != nullptr && canaryState->copyingProperties;
+  if (canaryState != nullptr) {
+    canaryState->copyingProperties = true;
+  }
   Local<v8::Array> names;
   if (from->GetPropertyNames(context, KeyCollectionMode::kOwnOnly, PropertyFilter::ALL_PROPERTIES,
                              IndexFilter::kSkipIndices, KeyConversionMode::kConvertToString)
@@ -427,6 +740,9 @@ void CopyOwnProperties(Isolate* isolate, Local<Context> context, Local<Object> f
         continue;
       }
       Local<v8::Name> key = name.As<v8::Name>();
+      if (keepExisting && to->HasRealNamedProperty(context, key).FromMaybe(true)) {
+        continue;
+      }
       if (!from->HasRealNamedCallbackProperty(context, key).FromMaybe(true)) {
         PropertyAttribute attributes;
         Local<Value> value;
@@ -451,7 +767,9 @@ void CopyOwnProperties(Isolate* isolate, Local<Context> context, Local<Object> f
       (void)to->DefineProperty(context, key, accessor);
     }
   }
-  copyingProperties_ = wasCopying;
+  if (canaryState != nullptr) {
+    canaryState->copyingProperties = wasCopying;
+  }
 }
 
 // The state object of the holder, if it has one.
@@ -466,33 +784,37 @@ bool ExistingState(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
   return true;
 }
 
-// The state object of the holder, created on its first write.
-bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
-  ObjectWeakCallbackState* canary = CanaryOf(isolate, holder);
-  if (canary == nullptr) {
-    // A -dealloc receiver writes to its object's existing state only.
-    return ExistingState(isolate, holder, out);
-  }
+// The state object of the canary `holder`, created on its first write.
+bool StateForWrite(Isolate* isolate, CanaryState* canaryState, Local<Object> holder,
+                   ObjectWeakCallbackState* canary, Local<Object>* out) {
   if (canary->canaryRecord_ == nullptr ||
       canary->canaryRecord_->died.load(std::memory_order_acquire)) {
-    std::shared_ptr<CanaryRegistry> registry = RegistryFor(isolate);
-    if (registry == nullptr) {
+    // No new record once the isolate's teardown began.
+    if (Caches::StateFor<CanaryState>(isolate) == nullptr) {
       return false;
     }
+    std::shared_ptr<CanaryRegistry> registry = canaryState->registry;
     id object = canary->lifetimeTarget_;
-    // The record died under a live canary (its token was removed): the
-    // canary's properties seed the new state.
-    bool replacesDied = canary->canaryRecord_ != nullptr;
+    // The record died under a live canary (its token was removed): a
+    // forwarding canary's new record takes over the dead record's state
+    // object, weak-collection key included; a mirroring canary's own
+    // properties seed a new one.
+    std::shared_ptr<CanaryRecord> previous = canary->canaryRecord_;
     // A JS-extended class's own -dealloc reports its instances' deaths.
     bool extended = IsExtendedInstance(object);
+    bool forwards = !extended && PlainCanariesForward();
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
     if (!extended && ForbidsAssociatedObjects(object)) {
       return false;
     }
 #endif
+    bool takesOver = forwards && previous != nullptr && !previous->state.IsEmpty();
     // Allocated before the lock: a collection this allocation starts can run
     // callbacks (the weak sweep's, a finalizer's -dealloc) that take it.
-    Local<Object> freshState = Object::New(isolate, Null(isolate), nullptr, nullptr, 0);
+    Local<Object> freshState;
+    if (!takesOver) {
+      freshState = Object::New(isolate, Null(isolate), nullptr, nullptr, 0);
+    }
     bool created = false;
     bool retired = false;
     {
@@ -508,6 +830,8 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
       if (slot == nullptr) {
         auto record = std::make_shared<CanaryRecord>();
         record->reportsDeath = extended || NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION;
+        record->forwards = forwards;
+        record->address = (__bridge void*)object;
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
         if (!record->reportsDeath) {
           if (objc_initWeakOrNil(&record->object, object) == nil) {
@@ -518,7 +842,17 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
           record->weakSet = true;
         }
 #endif
-        record->state.Reset(isolate, freshState);
+        if (takesOver) {
+          record->state = std::move(previous->state);
+          // The weak collections reach the record of a key's object through
+          // this slot (WrapCallback). The canary retains the object.
+          if (previous->weakSet && !record->weakSet &&
+              objc_initWeakOrNil(&record->object, object) != nil) {
+            record->weakSet = true;
+          }
+        } else {
+          record->state.Reset(isolate, freshState);
+        }
         slot = std::move(record);
         registry->count.fetch_add(1, std::memory_order_relaxed);
         created = true;
@@ -529,23 +863,16 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
       PostDrain(registry);
     }
     if (created) {
-#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_ASSOCIATION
       if (!extended) {
-        TNSCanaryLifecycleToken* token = [[TNSCanaryLifecycleToken alloc] init];
-        token->registry_ = registry;
-        token->object_ = (__bridge void*)object;
-        objc_setAssociatedObject(object, &registry->associationKey, token,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        [token release];
+        AttachToken(registry, object);
       }
-#endif
-      if (ObjectManager::LifetimeStats* stats = ObjectManager::GetLifetimeStats(isolate)) {
-        stats->canaryStates++;
+      if (canaryState->stats != nullptr && !takesOver) {
+        canaryState->stats->canaryStates++;
       }
-      if (replacesDied) {
+      if (previous != nullptr && !forwards) {
         CopyOwnProperties(isolate, isolate->GetCurrentContext(), holder, freshState);
       }
-    } else if (Usable(canary->canaryRecord_)) {
+    } else if (!forwards && Usable(canary->canaryRecord_)) {
       // Joined state another wrapper of the object wrote: the canary mirrors it.
       CopyOwnProperties(isolate, isolate->GetCurrentContext(),
                         Local<Object>::New(isolate, canary->canaryRecord_->state), holder);
@@ -556,6 +883,17 @@ bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
   }
   *out = Local<Object>::New(isolate, canary->canaryRecord_->state);
   return true;
+}
+
+// The state object of the holder, created on its first write.
+bool StateForWrite(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
+  ObjectWeakCallbackState* canary = CanaryOf(isolate, holder);
+  if (canary == nullptr) {
+    // A -dealloc receiver writes to its object's existing state only.
+    return ExistingState(isolate, holder, out);
+  }
+  CanaryState* canaryState = Caches::StateFor<CanaryState>(isolate);
+  return canaryState != nullptr && StateForWrite(isolate, canaryState, holder, canary, out);
 }
 
 bool HasOwn(Local<Context> context, Local<Object> state, Local<v8::Name> property) {
@@ -576,7 +914,7 @@ Local<Object> OwnerOf(Local<Context> context, Local<Object> holder, Local<v8::Na
   return object;
 }
 
-// The handlers mirror: each copies its write into the state and declines, so
+// The mirroring handlers: each copies its write into the state and declines, so
 // V8 also applies it to the canary, where reads find a real own property and
 // never call into C++. There is no getter, query, enumerator or descriptor
 // callback for the same reason. The handlers are masking, so they also see
@@ -585,11 +923,12 @@ Local<Object> OwnerOf(Local<Context> context, Local<Object> holder, Local<v8::Na
 // becomes state. V8 calls the setter only when the canary is the receiver.
 Intercepted Setter(Local<v8::Name> property, Local<Value> value,
                    const PropertyCallbackInfo<v8::Boolean>& info) {
+  Isolate* isolate = info.GetIsolate();
+  CanaryState* canaryState = Caches::ExistingStateFor<CanaryState>(isolate);
   // v8::Object::DefineOwnProperty reaches the setter, not the definer.
-  if (copyingProperties_) {
+  if (canaryState == nullptr || canaryState->copyingProperties) {
     return Intercepted::kNo;
   }
-  Isolate* isolate = info.GetIsolate();
   Local<Object> holder = info.Holder();
   ObjectWeakCallbackState* canary = CanaryOf(isolate, holder);
   std::shared_ptr<CanaryRecord> borrowed;
@@ -599,7 +938,8 @@ Intercepted Setter(Local<v8::Name> property, Local<Value> value,
       return Intercepted::kNo;
     }
   }
-  if (ObjectManager::LifetimeStats* stats = ObjectManager::GetLifetimeStats(isolate)) {
+  ObjectManager::LifetimeStats* stats = canaryState->stats;
+  if (stats != nullptr) {
     stats->canaryInterceptedWrites++;
   }
   CanaryRecord* record = canary != nullptr ? canary->canaryRecord_.get() : borrowed.get();
@@ -613,6 +953,17 @@ Intercepted Setter(Local<v8::Name> property, Local<Value> value,
         (void)state->Set(context, property, value);
       }
       return Intercepted::kNo;
+    }
+  }
+  // The setter can run JS, a collection or a -dealloc: neither the canary nor
+  // its record is touched after it.
+  if (NativeSetter* setter = canaryState->nativeWrites.Find(context, holder, property)) {
+    if (MetadataBuilder::RunNativeSetter(isolate, setter, holder, value)) {
+      if (stats != nullptr) {
+        stats->canaryCachedNativeWrites++;
+      }
+      info.GetReturnValue().Set(true);
+      return Intercepted::kYes;
     }
   }
   // Searches the prototype chain too: absent there means a new name.
@@ -638,9 +989,14 @@ Intercepted Setter(Local<v8::Name> property, Local<Value> value,
       return Intercepted::kNo;
     }
     if (accessor.FromJust()) {
-      // The setter can run JS, a collection or a -dealloc: neither the canary
-      // nor its record is touched after it.
-      if (MetadataBuilder::TrySetNativeProperty(isolate, context, owner, property, holder, value)) {
+      NativeSetter* setter =
+          owner != holder ? MetadataBuilder::FindNativeSetter(isolate, context, owner, property)
+                          : nullptr;
+      if (setter == nullptr) {
+        return Intercepted::kNo;
+      }
+      canaryState->nativeWrites.Fill(isolate, holder, owner, property, setter);
+      if (MetadataBuilder::RunNativeSetter(isolate, setter, holder, value)) {
         info.GetReturnValue().Set(true);
         return Intercepted::kYes;
       }
@@ -648,8 +1004,12 @@ Intercepted Setter(Local<v8::Name> property, Local<Value> value,
     }
   }
   Local<Object> state;
-  if (!StateForWrite(isolate, holder, &state)) {
+  if (canary != nullptr ? !StateForWrite(isolate, canaryState, holder, canary, &state)
+                        : !Usable(borrowed)) {
     return Intercepted::kNo;
+  }
+  if (canary == nullptr) {
+    state = Local<Object>::New(isolate, borrowed->state);
   }
   if (!HasOwn(context, state, property)) {
     (void)state->CreateDataProperty(context, property, value);
@@ -672,16 +1032,224 @@ Intercepted Deleter(Local<v8::Name> property, const PropertyCallbackInfo<v8::Boo
 // receiver that lacks `x` reach here.
 Intercepted Definer(Local<v8::Name> property, const PropertyDescriptor& descriptor,
                     const PropertyCallbackInfo<v8::Boolean>& info) {
-  if (copyingProperties_) {
+  Isolate* isolate = info.GetIsolate();
+  CanaryState* canaryState = Caches::ExistingStateFor<CanaryState>(isolate);
+  if (canaryState == nullptr || canaryState->copyingProperties) {
     return Intercepted::kNo;
   }
-  Isolate* isolate = info.GetIsolate();
+  Local<Object> holder = info.Holder();
+  ObjectWeakCallbackState* canary = CanaryOf(isolate, holder);
   Local<Object> state;
-  if (StateForWrite(isolate, info.Holder(), &state)) {
+  if (canary != nullptr ? StateForWrite(isolate, canaryState, holder, canary, &state)
+                        : ExistingState(isolate, holder, &state)) {
     (void)state->DefineProperty(isolate->GetCurrentContext(), property,
                                 const_cast<PropertyDescriptor&>(descriptor));
   }
   return Intercepted::kNo;
+}
+
+// The forwarding handlers: the state is the only copy of the canary's
+// properties, so every access to them is answered from it and intercepted.
+// Non-masking: V8 calls them only for names absent from the canary and its
+// prototype chain, so native calls and native property writes never reach C++
+// here.
+
+// The state the forwarding handlers read: the canary's record's, also once
+// that record died under the live canary, until the canary's next write
+// carries it over to a new record (StateForWrite); or the record of a receiver
+// lent to JS from -dealloc.
+bool ForwardedState(Isolate* isolate, Local<Object> holder, Local<Object>* out) {
+  // Copying the state onto the canary (KeepWeakCollectionKey) must find no
+  // current property, or V8 skips defining an identical one.
+  CanaryState* canaryState = Caches::ExistingStateFor<CanaryState>(isolate);
+  if (canaryState == nullptr || canaryState->copyingProperties) {
+    return false;
+  }
+  ObjectWeakCallbackState* canary = CanaryOf(isolate, holder);
+  if (canary == nullptr) {
+    std::shared_ptr<CanaryRecord> borrowed = BorrowedRecord(isolate, holder);
+    if (!Usable(borrowed)) {
+      return false;
+    }
+    *out = Local<Object>::New(isolate, borrowed->state);
+    return true;
+  }
+  CanaryRecord* record = canary->canaryRecord_.get();
+  if (record == nullptr || record->state.IsEmpty()) {
+    return false;
+  }
+  *out = Local<Object>::New(isolate, record->state);
+  return true;
+}
+
+Intercepted ForwardGetter(Local<v8::Name> property, const PropertyCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<Object> state;
+  if (!ForwardedState(isolate, info.Holder(), &state)) {
+    return Intercepted::kNo;
+  }
+  Local<Context> context = isolate->GetCurrentContext();
+  if (!HasOwn(context, state, property)) {
+    return Intercepted::kNo;
+  }
+  Local<Value> value;
+  // An accessor runs with the canary as `this` (interceptors see the holder,
+  // not the receiver).
+  if (state->Get(context, property, info.Holder()).ToLocal(&value)) {
+    info.GetReturnValue().Set(value);
+  }
+  return Intercepted::kYes;
+}
+
+Intercepted ForwardSetter(Local<v8::Name> property, Local<Value> value,
+                          const PropertyCallbackInfo<v8::Boolean>& info) {
+  Isolate* isolate = info.GetIsolate();
+  CanaryState* canaryState = Caches::ExistingStateFor<CanaryState>(isolate);
+  // v8::Object::DefineOwnProperty reaches the setter, not the definer.
+  if (canaryState == nullptr || canaryState->copyingProperties) {
+    return Intercepted::kNo;
+  }
+  Local<Object> holder = info.Holder();
+  ObjectWeakCallbackState* canary = CanaryOf(isolate, holder);
+  Local<Object> state;
+  if (canary != nullptr ? !StateForWrite(isolate, canaryState, holder, canary, &state)
+                        : !ExistingState(isolate, holder, &state)) {
+    return Intercepted::kNo;
+  }
+  if (canaryState->stats != nullptr) {
+    canaryState->stats->canaryInterceptedWrites++;
+  }
+  Local<Context> context = isolate->GetCurrentContext();
+  // v8::Object::Set reports success for a write [[Set]] rejects, so a
+  // read-only property and an accessor without a setter are checked here: the
+  // false return makes V8 throw in strict code.
+  PropertyAttribute attributes;
+  if (!state->GetRealNamedPropertyAttributes(context, property).To(&attributes)) {
+    Maybe<bool> created = state->CreateDataProperty(context, property, value);
+    if (created.IsJust()) {
+      info.GetReturnValue().Set(created.FromJust());
+    }
+    return Intercepted::kYes;
+  }
+  if ((attributes & ReadOnly) != 0) {
+    info.GetReturnValue().Set(false);
+    return Intercepted::kYes;
+  }
+  if (!state->HasRealNamedCallbackProperty(context, property).FromMaybe(false)) {
+    Maybe<bool> set = state->Set(context, property, value);
+    if (set.IsJust()) {
+      info.GetReturnValue().Set(set.FromJust());
+    }
+    return Intercepted::kYes;
+  }
+  Local<Value> descriptor;
+  Local<Value> setter;
+  if (!state->GetOwnPropertyDescriptor(context, property).ToLocal(&descriptor) ||
+      !descriptor->IsObject() ||
+      !descriptor.As<Object>()->Get(context, tns::ToV8String(isolate, "set")).ToLocal(&setter)) {
+    return Intercepted::kYes;
+  }
+  if (!setter->IsFunction()) {
+    info.GetReturnValue().Set(false);
+    return Intercepted::kYes;
+  }
+  // An accessor runs with the canary as `this`.
+  Local<Value> argv[] = {value};
+  if (!setter.As<v8::Function>()->Call(context, holder, 1, argv).IsEmpty()) {
+    info.GetReturnValue().Set(true);
+  }
+  return Intercepted::kYes;
+}
+
+Intercepted ForwardQuery(Local<v8::Name> property, const PropertyCallbackInfo<v8::Integer>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<Object> state;
+  if (!ForwardedState(isolate, info.Holder(), &state)) {
+    return Intercepted::kNo;
+  }
+  Local<Context> context = isolate->GetCurrentContext();
+  if (!HasOwn(context, state, property)) {
+    return Intercepted::kNo;
+  }
+  PropertyAttribute attributes;
+  if (state->GetPropertyAttributes(context, property).To(&attributes)) {
+    info.GetReturnValue().Set(v8::Integer::New(isolate, attributes));
+  }
+  return Intercepted::kYes;
+}
+
+Intercepted ForwardDeleter(Local<v8::Name> property,
+                           const PropertyCallbackInfo<v8::Boolean>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<Object> state;
+  if (!ForwardedState(isolate, info.Holder(), &state)) {
+    return Intercepted::kNo;
+  }
+  Local<Context> context = isolate->GetCurrentContext();
+  if (!HasOwn(context, state, property)) {
+    return Intercepted::kNo;
+  }
+  bool deleted;
+  if (state->Delete(context, property).To(&deleted)) {
+    info.GetReturnValue().Set(deleted);
+  }
+  return Intercepted::kYes;
+}
+
+void ForwardEnumerator(const PropertyCallbackInfo<v8::Array>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<Object> state;
+  if (!ForwardedState(isolate, info.Holder(), &state)) {
+    return;
+  }
+  Local<v8::Array> names;
+  if (state
+          ->GetPropertyNames(isolate->GetCurrentContext(), KeyCollectionMode::kOwnOnly,
+                             PropertyFilter::ALL_PROPERTIES, IndexFilter::kSkipIndices)
+          .ToLocal(&names)) {
+    info.GetReturnValue().Set(names);
+  }
+}
+
+Intercepted ForwardDefiner(Local<v8::Name> property, const PropertyDescriptor& descriptor,
+                           const PropertyCallbackInfo<v8::Boolean>& info) {
+  Isolate* isolate = info.GetIsolate();
+  CanaryState* canaryState = Caches::ExistingStateFor<CanaryState>(isolate);
+  if (canaryState == nullptr || canaryState->copyingProperties) {
+    return Intercepted::kNo;
+  }
+  Local<Object> holder = info.Holder();
+  ObjectWeakCallbackState* canary = CanaryOf(isolate, holder);
+  Local<Object> state;
+  if (canary != nullptr ? !StateForWrite(isolate, canaryState, holder, canary, &state)
+                        : !ExistingState(isolate, holder, &state)) {
+    return Intercepted::kNo;
+  }
+  bool defined;
+  if (state
+          ->DefineProperty(isolate->GetCurrentContext(), property,
+                           const_cast<PropertyDescriptor&>(descriptor))
+          .To(&defined)) {
+    info.GetReturnValue().Set(defined);
+  }
+  return Intercepted::kYes;
+}
+
+Intercepted ForwardDescriptor(Local<v8::Name> property, const PropertyCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<Object> state;
+  if (!ForwardedState(isolate, info.Holder(), &state)) {
+    return Intercepted::kNo;
+  }
+  Local<Context> context = isolate->GetCurrentContext();
+  if (!HasOwn(context, state, property)) {
+    return Intercepted::kNo;
+  }
+  Local<Value> descriptor;
+  if (state->GetOwnPropertyDescriptor(context, property).ToLocal(&descriptor)) {
+    info.GetReturnValue().Set(descriptor);
+  }
+  return Intercepted::kYes;
 }
 
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
@@ -711,63 +1279,303 @@ void PostSweepAfterGC(Isolate* isolate, GCType, GCCallbackFlags) {
 }
 #endif
 
-// unwrap(value, create): the weak collections' key for a canary's native
-// object, a frozen, null-prototype object that lives exactly as long as the
-// object's state, that is, until the native object is deallocated. Lookups pass
-// `create` false and never make one: with no key yet, no entry can be keyed by
-// it. The value itself for anything that is not a canary, a Proxy included (it
-// is a key of its own, as in every other mode).
+// Scope "extended" only: the object of a live wrapper that is no canary and
+// holds a reference to its object (not a -dealloc receiver or a collection
+// adapter's claim). Nil otherwise. Under "all" every object such a wrapper can
+// key by is a canary's. Whether the object can have a plain record is
+// PlainRecord's to check.
+id PlainObjectOf(Isolate* isolate, Local<Object> holder) {
+  if (GetWrapperLifetimeScope() != WrapperLifetimeScope::kExtended ||
+      (holder->InternalFieldCount() > 1 && holder->GetInternalField(1).As<Value>()->IsString())) {
+    return nil;
+  }
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, holder);
+  if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCObject) {
+    return nil;
+  }
+  ObjCDataWrapper* objcWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+  ObjectWeakCallbackState* lifetime = objcWrapper->LifetimeState();
+  if (objcWrapper->IsBorrowed() || objcWrapper->IsAdapterClaim() ||
+      (lifetime != nullptr && lifetime->lifetimeCanary_)) {
+    return nil;
+  }
+  return objcWrapper->Data();
+}
+
+// A plain record can be made for `object`: not JS-extended, a tagged pointer
+// or a block.
+bool CanHavePlainRecord(id object) {
+  return object != nil && !WrapperLifetime::Excluded(object) && !IsExtendedInstance(object);
+}
+
+// Isolate thread, with `object` retained by a live wrapper. Its plain record:
+// the one it has, or with `create` a new one, whose state holds only the key
+// UnwrapCallback then adds. Null without one, and when it can get none
+// (CanHavePlainRecord, a class refusing weak references, a closed registry).
+// Nothing is attached to the object: SweepPlain finds it gone after a major
+// collection, and lookups find it gone at once (RetireIfDead). Lookups cost
+// one atomic load while no plain record exists, and skip the class checks: a
+// live plain record at the object's address was made for that object.
+std::shared_ptr<CanaryRecord> PlainRecord(Isolate* isolate,
+                                          const std::shared_ptr<CanaryRegistry>& registry,
+                                          id object, bool create) {
+  void* address = (__bridge void*)object;
+  if (registry->plainCount.load(std::memory_order_relaxed) > 0) {
+    std::shared_ptr<CanaryRecord> existing;
+    bool retired = false;
+    {
+      std::lock_guard<std::mutex> lock(registry->mutex);
+      if (registry->closed) {
+        return nullptr;
+      }
+      auto it = registry->records.find(address);
+      if (it != registry->records.end()) {
+        retired = RetireIfDead(registry.get(), it);
+        if (!retired) {
+          existing = it->second;
+        }
+      }
+    }
+    if (retired) {
+      PostDrain(registry);
+    }
+    if (existing != nullptr) {
+      // A canary's record at a plain object's address is a stale one: no key.
+      return existing->plain ? existing : nullptr;
+    }
+  }
+  if (!create || !CanHavePlainRecord(object)) {
+    return nullptr;
+  }
+  auto record = std::make_shared<CanaryRecord>();
+  record->plain = true;
+  record->address = address;
+  // The only death signal: SweepPlain, and wrap, read the object through it.
+  if (objc_initWeakOrNil(&record->object, object) == nil) {
+    return nullptr;
+  }
+  record->weakSet = true;
+  // Allocated before the lock: a collection this allocation starts can run
+  // callbacks that take it.
+  record->state.Reset(isolate, Object::New(isolate, Null(isolate), nullptr, nullptr, 0));
+  bool retired = false;
+  {
+    std::lock_guard<std::mutex> lock(registry->mutex);
+    if (registry->closed) {
+      return nullptr;
+    }
+    // The lookup above is skipped while no plain record exists: a dead
+    // canary's record can still hold the address.
+    auto existing = registry->records.find(address);
+    if (existing != registry->records.end()) {
+      retired = RetireIfDead(registry.get(), existing);
+      if (!retired) {
+        return existing->second->plain ? existing->second : nullptr;
+      }
+    }
+    registry->records.emplace(address, record);
+    registry->plainRecords.push_back(record);
+    registry->plainTracked.store(registry->plainRecords.size(), std::memory_order_relaxed);
+    registry->count.fetch_add(1, std::memory_order_relaxed);
+    registry->plainCount.fetch_add(1, std::memory_order_relaxed);
+  }
+  if (retired) {
+    PostDrain(registry);
+  }
+  if (ObjectManager::LifetimeStats* stats = ObjectManager::GetLifetimeStats(isolate)) {
+    stats->canaryStates++;
+  }
+  return record;
+}
+
+// Whether `wrapper` is the one wrap answers with for `object` while it lives:
+// the object's Instances entry.
+bool IsCachedWrapper(Isolate* isolate, id object, Local<Value> wrapper) {
+  std::shared_ptr<Persistent<Value>> cached =
+      ArgConverter::FindCachedInstance(isolate, Caches::Get(isolate), object);
+  return cached != nullptr && !cached->IsEmpty() && cached->Get(isolate)->StrictEquals(wrapper);
+}
+
+// Isolate thread, as an event loop task. Retires the plain records whose
+// object is gone, and drops retired ones from plainRecords. No deref cache
+// epoch bump: a live wrapper retains its object, so no wrapper wrap answered
+// with outlives a plain record's object.
+void SweepPlain(const std::shared_ptr<CanaryRegistry>& registry) {
+  std::vector<std::shared_ptr<CanaryRecord>> dead;
+  {
+    std::lock_guard<std::mutex> lock(registry->mutex);
+    registry->plainSweepPosted = false;
+    if (registry->closed) {
+      return;
+    }
+    std::vector<std::shared_ptr<CanaryRecord>>& plain = registry->plainRecords;
+    for (size_t i = 0; i < plain.size();) {
+      CanaryRecord* record = plain[i].get();
+      bool gone = record->died.load(std::memory_order_acquire);
+      if (!gone && !record->ObjectAlive()) {
+        auto it = registry->records.find(record->address);
+        if (it != registry->records.end() && it->second.get() == record) {
+          RetireRecord(registry.get(), it, dead);
+        }
+        gone = true;
+      }
+      if (gone) {
+        plain[i] = std::move(plain.back());
+        plain.pop_back();
+      } else {
+        i++;
+      }
+    }
+    registry->plainTracked.store(plain.size(), std::memory_order_relaxed);
+  }
+  ReleaseStates(registry.get(), dead);
+}
+
+// Scope "extended": posts SweepPlain when a major collection ends, behind the
+// release drain the collection queued, so objects it released are gone by
+// then. Only an atomic load while plainRecords is empty.
+void PostPlainSweepAfterGC(Isolate* isolate, GCType, GCCallbackFlags) {
+  CanaryState* state = Caches::ExistingStateFor<CanaryState>(isolate);
+  if (state == nullptr || state->registry->plainTracked.load(std::memory_order_relaxed) == 0) {
+    return;
+  }
+  std::shared_ptr<CanaryRegistry> registry = state->registry;
+  std::shared_ptr<EventLoop> loop = registry->loop.lock();
+  {
+    std::lock_guard<std::mutex> lock(registry->mutex);
+    if (registry->plainSweepPosted || loop == nullptr) {
+      return;
+    }
+    registry->plainSweepPosted = true;
+  }
+  if (!loop->PostInternal([registry]() { SweepPlain(registry); })) {
+    std::lock_guard<std::mutex> lock(registry->mutex);
+    registry->plainSweepPosted = false;
+  }
+}
+
+// unwrap(value, create, reportLive): the weak collections' key for a canary's
+// native object, or a plain wrapper's (PlainObjectOf), a frozen,
+// null-prototype object that lives as long as the object's state, that is,
+// until the native object is deallocated, or as long as a released wrapper of
+// the object holding a copy. Lookups pass `create` false and never make one:
+// with no key yet, no entry can be keyed by it. The value itself for anything
+// else, a Proxy included (it is a key of its own, as in every other mode).
+// With `reportLive`, also sets WeakCollectionCache::kLiveCanary.
 void UnwrapCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Value> value = info[0];
   bool create = info[1]->IsTrue();
+  bool reportLive = info[2]->IsTrue();
   info.GetReturnValue().Set(value);
   CanaryState* canaryState = Caches::StateFor<CanaryState>(isolate);
   Local<Object> state;
-  if (canaryState == nullptr || !value->IsObject() || value->IsProxy()) {
-    return;
+  if (reportLive && canaryState != nullptr) {
+    canaryState->registry->weakCollectionCache->SetLiveCanary(false);
   }
-  if (create ? !StateForWrite(isolate, value.As<Object>(), &state)
-             : !ExistingState(isolate, value.As<Object>(), &state)) {
+  // Canaries and -dealloc receivers have internal fields; for any other object
+  // the wrapper lookups below would each read a private property to find no
+  // canary.
+  if (canaryState == nullptr || !value->IsObject() || value->IsProxy() ||
+      value.As<Object>()->InternalFieldCount() == 0) {
     return;
   }
   Local<Context> context = isolate->GetCurrentContext();
   Local<Private> keyOfState = canaryState->keyOfState.Get(isolate);
   Local<Value> key;
+  bool found = create ? StateForWrite(isolate, value.As<Object>(), &state)
+                      : ExistingState(isolate, value.As<Object>(), &state);
+  std::shared_ptr<CanaryRecord> plain;
+  id plainObject = nil;
+  if (!found && (create || canaryState->registry->plainCount.load(std::memory_order_relaxed) > 0)) {
+    plainObject = PlainObjectOf(isolate, value.As<Object>());
+    if (plainObject != nil) {
+      plain = PlainRecord(isolate, canaryState->registry, plainObject, create);
+      found = Usable(plain);
+    }
+    if (found) {
+      // A live wrapper of the object: native code handed it back since any
+      // release.
+      plain->released = false;
+      state = Local<Object>::New(isolate, plain->state);
+    }
+  }
+  if (!found) {
+    // A released wrapper keeps its key itself, or null when it had none
+    // (KeepWeakCollectionKey).
+    if (!value.As<Object>()->GetPrivate(context, keyOfState).ToLocal(&key)) {
+      return;
+    }
+    if (key->IsObject()) {
+      info.GetReturnValue().Set(key);
+    } else if (key->IsNull()) {
+      // Such a canary is a key of its own, which nothing keyed on its object
+      // can find: a released-object access.
+      ReleasedReason reason = tns::GetReleasedReason(value);
+      if (reason != ReleasedReason::kNone) {
+        tns::ReportReleasedObject(
+            isolate, value, reason,
+            "weak collection key: WeakMap, WeakSet, WeakRef or FinalizationRegistry", true);
+      }
+    }
+    return;
+  }
+  auto answer = [&](Local<Value> found) {
+    if (reportLive) {
+      canaryState->registry->weakCollectionCache->SetLiveCanary(
+          plain != nullptr ? IsCachedWrapper(isolate, plainObject, value)
+                           : CanaryOf(isolate, value.As<Object>()) != nullptr);
+    }
+    info.GetReturnValue().Set(found);
+  };
   if (state->GetPrivate(context, keyOfState).ToLocal(&key) && key->IsObject()) {
-    info.GetReturnValue().Set(key);
+    answer(key);
     return;
   }
   if (!create) {
     return;
   }
-  ObjectWeakCallbackState* canary = CanaryOf(isolate, value.As<Object>());
-  if (canary == nullptr) {
-    // A receiver lent to JS from -dealloc: its object is going away.
-    return;
+  CanaryRecord* record = plain.get();
+  id target = plainObject;
+  if (record == nullptr) {
+    ObjectWeakCallbackState* canary = CanaryOf(isolate, value.As<Object>());
+    if (canary == nullptr) {
+      // A receiver lent to JS from -dealloc: its object is going away.
+      return;
+    }
+    record = canary->canaryRecord_.get();
+    target = canary->lifetimeTarget_;
   }
-  CanaryRecord* record = canary->canaryRecord_.get();
   if (!record->weakSet) {
-    if (objc_initWeakOrNil(&record->object, canary->lifetimeTarget_) == nil) {
+    if (objc_initWeakOrNil(&record->object, target) == nil) {
       return;
     }
     record->weakSet = true;
   }
   Local<Object> newKey = Object::New(isolate, Null(isolate), nullptr, nullptr, 0);
-  uint64_t address = reinterpret_cast<uintptr_t>((__bridge void*)canary->lifetimeTarget_);
+  uint64_t address = reinterpret_cast<uintptr_t>((__bridge void*)target);
   if (!newKey
            ->SetPrivate(context, canaryState->objectOfKey.Get(isolate),
                         BigInt::NewFromUnsigned(isolate, address))
            .FromMaybe(false) ||
-      !newKey->SetIntegrityLevel(context, IntegrityLevel::kFrozen).FromMaybe(false) ||
-      !state->SetPrivate(context, keyOfState, newKey).FromMaybe(false)) {
+      !newKey->SetIntegrityLevel(context, IntegrityLevel::kFrozen).FromMaybe(false)) {
     return;
   }
-  info.GetReturnValue().Set(newKey);
+  // Making the key can allocate, and the finalizers of a collection that starts
+  // there can run JS that keys the object first: one object, one key.
+  if (state->GetPrivate(context, keyOfState).ToLocal(&key) && key->IsObject()) {
+    answer(key);
+    return;
+  }
+  if (!state->SetPrivate(context, keyOfState, newKey).FromMaybe(false)) {
+    return;
+  }
+  answer(newKey);
 }
 
-// The object a key stands for: its live canary or a new one, or undefined once
-// the native object is gone. Anything that is not a key passes through.
+// The object a key stands for: its live wrapper or a new one (a canary, or for
+// a plain record a plain wrapper), or undefined once the native object is
+// gone. Anything that is not a key passes through.
 void WrapCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Value> value = info[0];
@@ -815,8 +1623,19 @@ void WrapCallback(const FunctionCallbackInfo<Value>& info) {
   std::shared_ptr<Persistent<Value>> cached =
       ArgConverter::FindCachedInstance(isolate, cache, object);
   if (cached != nullptr && !cached->IsEmpty()) {
+    // A plain record learns here, or in unwrap, that native code handed its
+    // object back: wrapping a plain object never looks the registry up.
+    if (record->plain) {
+      record->released = false;
+    }
     [object release];
     info.GetReturnValue().Set(cached->Get(isolate));
+    return;
+  }
+  if (record->released) {
+    // Released by JS and not handed back by native code: JS holds no wrapper
+    // of it until native code returns it.
+    [object release];
     return;
   }
   ObjCDataWrapper* wrapper = new ObjCDataWrapper(object);
@@ -824,6 +1643,57 @@ void WrapCallback(const FunctionCallbackInfo<Value>& info) {
   tns::DeleteWrapperIfUnused(isolate, result, wrapper);
   [object release];
   info.GetReturnValue().Set(result);
+}
+
+// KeepWeakCollectionKey's write onto `wrapper`, a wrapper of the object whose
+// record `currentRecord` reads.
+template <typename CurrentRecord>
+void WriteWeakCollectionKey(Isolate* isolate, CanaryState* canaryState, Local<Object> wrapper,
+                            const CurrentRecord& currentRecord) {
+  HandleScope scope(isolate);
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Private> keyOfState = canaryState->keyOfState.Get(isolate);
+  auto keyOf = [&](const std::shared_ptr<CanaryRecord>& record) {
+    Local<Value> key;
+    if (Usable(record) &&
+        Local<Object>::New(isolate, record->state)->GetPrivate(context, keyOfState).ToLocal(&key) &&
+        key->IsObject()) {
+      return key;
+    }
+    return Local<Value>(v8::Null(isolate));
+  };
+  // The write can allocate, and the finalizers of a collection that starts
+  // there can run JS that gives the object a record or its record a key: the
+  // write repeats, a bounded number of times, until it stores the current key.
+  constexpr int kMaxWrites = 4;
+  std::shared_ptr<CanaryRecord> record = currentRecord();
+  if (record != nullptr && record->forwards && !record->state.IsEmpty()) {
+    // A name the prototype chain has never reaches a forwarding canary's
+    // handlers, so a property the canary owns is newer than the state's.
+    CopyOwnProperties(isolate, context, Local<Object>::New(isolate, record->state), wrapper, true);
+  }
+  Local<Value> copy = keyOf(record);
+  for (int writes = 1;; writes++) {
+    // Private symbols bypass the canary's handlers.
+    (void)wrapper->SetPrivate(context, keyOfState, copy);
+    std::shared_ptr<CanaryRecord> current = currentRecord();
+    if (!Usable(current) || writes == kMaxWrites) {
+      break;
+    }
+    Local<Value> currentCopy = keyOf(current);
+    if (current == record && currentCopy->StrictEquals(copy)) {
+      break;
+    }
+    record = std::move(current);
+    copy = currentCopy;
+  }
+  // Last, with nothing that allocates after it: whichever record the object
+  // has now is the one the release leaves behind.
+  if (std::shared_ptr<CanaryRecord> current = currentRecord()) {
+    current->released = true;
+  }
+  // wrap hands out no wrapper of the object now.
+  canaryState->registry->weakCollectionCache->Invalidate();
 }
 
 }  // namespace
@@ -837,6 +1707,7 @@ void WrapperLifetimeCanary::Init(Isolate* isolate) {
     return;
   }
   state->registry->isolate = isolate;
+  state->stats = ObjectManager::GetLifetimeStats(isolate);
   state->keyOfState.Reset(isolate, Private::New(isolate));
   state->objectOfKey.Reset(isolate, Private::New(isolate));
   if (Runtime* runtime = Runtime::GetRuntime(isolate)) {
@@ -849,16 +1720,59 @@ void WrapperLifetimeCanary::Init(Isolate* isolate) {
 #if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
   isolate->AddGCEpilogueCallback(PostSweepAfterGC, kGCTypeMarkSweepCompact);
 #endif
+  if (GetWrapperLifetimeScope() == WrapperLifetimeScope::kExtended) {
+    isolate->AddGCEpilogueCallback(PostPlainSweepAfterGC, kGCTypeMarkSweepCompact);
+  }
 }
 
 bool WrapperLifetimeCanary::RegisterWrapFunctions(Local<Context> context, Local<Object> binding) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   Local<v8::Function> unwrap;
   Local<v8::Function> wrap;
+  CanaryState* state = Caches::StateFor<CanaryState>(isolate);
+  if (state == nullptr) {
+    return false;
+  }
+  auto* owner = new std::shared_ptr<WeakCollectionCache>(state->registry->weakCollectionCache);
+  std::unique_ptr<BackingStore> store = ArrayBuffer::NewBackingStore(
+      (*owner)->slots, sizeof((*owner)->slots),
+      [](void*, size_t, void* data) {
+        delete static_cast<std::shared_ptr<WeakCollectionCache>*>(data);
+      },
+      owner);
+  Local<v8::Uint32Array> cache = v8::Uint32Array::New(ArrayBuffer::New(isolate, std::move(store)),
+                                                      0, WeakCollectionCache::kSlotCount);
   return v8::Function::New(context, UnwrapCallback).ToLocal(&unwrap) &&
          v8::Function::New(context, WrapCallback).ToLocal(&wrap) &&
          binding->Set(context, tns::ToV8String(isolate, "unwrap"), unwrap).FromMaybe(false) &&
-         binding->Set(context, tns::ToV8String(isolate, "wrap"), wrap).FromMaybe(false);
+         binding->Set(context, tns::ToV8String(isolate, "wrap"), wrap).FromMaybe(false) &&
+         binding->Set(context, tns::ToV8String(isolate, "cache"), cache).FromMaybe(false);
+}
+
+void WrapperLifetimeCanary::KeepWeakCollectionKey(Isolate* isolate, Local<Object> canary) {
+  CanaryState* canaryState = Caches::StateFor<CanaryState>(isolate);
+  if (canaryState == nullptr || canaryState->keyOfState.IsEmpty()) {
+    return;
+  }
+  WriteWeakCollectionKey(isolate, canaryState, canary, [&]() {
+    ObjectWeakCallbackState* state = CanaryOf(isolate, canary);
+    return state != nullptr ? state->canaryRecord_ : std::shared_ptr<CanaryRecord>();
+  });
+}
+
+void WrapperLifetimeCanary::KeepPlainWeakCollectionKey(Isolate* isolate, Local<Object> wrapper,
+                                                       id object) {
+  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary ||
+      GetWrapperLifetimeScope() != WrapperLifetimeScope::kExtended || !CanHavePlainRecord(object)) {
+    return;
+  }
+  CanaryState* canaryState = Caches::StateFor<CanaryState>(isolate);
+  if (canaryState == nullptr || canaryState->keyOfState.IsEmpty()) {
+    return;
+  }
+  WriteWeakCollectionKey(isolate, canaryState, wrapper, [&]() {
+    return PlainRecord(isolate, canaryState->registry, object, false);
+  });
 }
 
 void WrapperLifetimeCanary::InstallDeallocHook(Class extendedClass) {
@@ -900,8 +1814,15 @@ IMP WrapperLifetimeCanary::WrapDealloc(SEL selector, IMP imp) {
   });
 }
 
-void WrapperLifetimeCanary::ConfigureInstanceTemplate(Local<ObjectTemplate> instanceTemplate) {
-  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
+void WrapperLifetimeCanary::ConfigureInstanceTemplate(Local<ObjectTemplate> instanceTemplate,
+                                                      CanaryKind kind) {
+  if (kind == CanaryKind::kNone || GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
+    return;
+  }
+  if (Forwards(kind)) {
+    instanceTemplate->SetHandler(NamedPropertyHandlerConfiguration(
+        ForwardGetter, ForwardSetter, ForwardQuery, ForwardDeleter, ForwardEnumerator,
+        ForwardDefiner, ForwardDescriptor, Local<Value>(), PropertyHandlerFlags::kNonMasking));
     return;
   }
   instanceTemplate->SetHandler(
@@ -909,18 +1830,27 @@ void WrapperLifetimeCanary::ConfigureInstanceTemplate(Local<ObjectTemplate> inst
                                         nullptr, Local<Value>(), PropertyHandlerFlags::kNone));
 }
 
-bool WrapperLifetimeCanary::Intercepts(id object) {
-  return GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary &&
-         WrapperLifetime::InScope(object);
+bool WrapperLifetimeCanary::Forwards(CanaryKind kind) {
+  return kind == CanaryKind::kPlain && PlainCanariesForward();
 }
 
-bool WrapperLifetimeCanary::NativeInstancesIntercept() {
-  return GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary &&
-         GetWrapperLifetimeScope() == WrapperLifetimeScope::kAll;
+CanaryKind WrapperLifetimeCanary::KindOf(id object) {
+  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary ||
+      !WrapperLifetime::InScope(object)) {
+    return CanaryKind::kNone;
+  }
+  return IsExtendedInstance(object) ? CanaryKind::kExtended : CanaryKind::kPlain;
 }
 
-void WrapperLifetimeCanary::Hydrate(Isolate* isolate, Local<Object> wrapper) {
-  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
+CanaryKind WrapperLifetimeCanary::NativeInstancesKind() {
+  return GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary &&
+                 GetWrapperLifetimeScope() == WrapperLifetimeScope::kAll
+             ? CanaryKind::kPlain
+             : CanaryKind::kNone;
+}
+
+void WrapperLifetimeCanary::Hydrate(Isolate* isolate, Local<Object> wrapper, CanaryKind kind) {
+  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary || Forwards(kind)) {
     return;
   }
   HandleScope scope(isolate);
@@ -935,9 +1865,29 @@ void WrapperLifetimeCanary::Hydrate(Isolate* isolate, Local<Object> wrapper) {
   CopyOwnProperties(isolate, context, state, wrapper);
 }
 
+void WrapperLifetimeCanary::DropRecord(Isolate* isolate, std::shared_ptr<CanaryRecord> record) {
+  if (record == nullptr || !record->forwards || !record->died.load(std::memory_order_acquire)) {
+    return;
+  }
+  record.reset();
+  CanaryState* state = Caches::ExistingStateFor<CanaryState>(isolate);
+  if (state == nullptr || state->registry->orphaned.empty()) {
+    return;
+  }
+  SweepOrphaned(state->registry.get());
+}
+
 std::shared_ptr<CanaryRecord> WrapperLifetimeCanary::Find(Isolate* isolate, id object) {
   CanaryState* state = Caches::StateFor<CanaryState>(isolate);
-  if (state == nullptr || state->registry->count.load(std::memory_order_relaxed) == 0) {
+  if (state == nullptr) {
+    return nullptr;
+  }
+  // Only canary records count: plain records never cost a canary's wrapping.
+  // Records are added on this thread only, and RetireRecord drops a plain one
+  // from plainCount before releasing it from count, so `count` read first
+  // equals plainCount only when no canary record exists.
+  size_t records = state->registry->count.load(std::memory_order_acquire);
+  if (records == 0 || records == state->registry->plainCount.load(std::memory_order_relaxed)) {
     return nullptr;
   }
   {
@@ -948,6 +1898,7 @@ std::shared_ptr<CanaryRecord> WrapperLifetimeCanary::Find(Isolate* isolate, id o
     }
     std::shared_ptr<CanaryRecord> record = it->second;
     if (!RetireIfDead(state->registry.get(), it)) {
+      record->released = false;
       return record;
     }
   }
@@ -960,6 +1911,7 @@ void WrapperLifetimeCanary::CloseForTeardown(Isolate* isolate) {
   if (state == nullptr) {
     return;
   }
+  state->nativeWrites.Reset();
   std::lock_guard<std::mutex> lock(state->registry->mutex);
   state->registry->closed = true;
   for (auto& entry : state->registry->records) {
@@ -968,12 +1920,18 @@ void WrapperLifetimeCanary::CloseForTeardown(Isolate* isolate) {
   for (std::shared_ptr<CanaryRecord>& record : state->registry->dead) {
     record->state.Reset();
   }
+  for (std::shared_ptr<CanaryRecord>& record : state->registry->orphaned) {
+    record->state.Reset();
+  }
+  state->registry->plainRecords.clear();
+  state->registry->plainTracked.store(0, std::memory_order_relaxed);
 }
 
 void WrapperLifetimeCanary::ForEachState(
     Isolate* isolate, const std::function<void(id object, Local<Object> state)>& visit) {
   CanaryState* state = Caches::StateFor<CanaryState>(isolate);
-  if (state == nullptr || state->registry->count.load(std::memory_order_relaxed) == 0) {
+  if (state == nullptr || (state->registry->count.load(std::memory_order_relaxed) == 0 &&
+                           state->registry->orphaned.empty())) {
     return;
   }
   std::vector<std::pair<id, std::shared_ptr<CanaryRecord>>> live;
@@ -1009,6 +1967,15 @@ void WrapperLifetimeCanary::ForEachState(
       }
     }
   }
+  // Isolate thread only, as is the list: a record held by a canary has a live
+  // object, retained by that canary.
+  for (const std::shared_ptr<CanaryRecord>& record : state->registry->orphaned) {
+    if (record.use_count() < 2 || record->state.IsEmpty() ||
+        record->dying.load(std::memory_order_acquire)) {
+      continue;
+    }
+    live.emplace_back([(__bridge id)record->address retain], record);
+  }
   // Read before any visit, whose release can run JS. Only this thread resets
   // state handles.
   std::vector<Local<Object>> states;
@@ -1019,6 +1986,56 @@ void WrapperLifetimeCanary::ForEachState(
   for (size_t i = 0; i < live.size(); i++) {
     visit(live[i].first, states[i]);
   }
+}
+
+void WrapperLifetimeCanary::ForEachStateHandle(
+    Isolate* isolate, const std::function<void(Local<Object> state)>& visit) {
+  CanaryState* state = Caches::ExistingStateFor<CanaryState>(isolate);
+  if (state == nullptr) {
+    return;
+  }
+  // Not gated on the live count: dead records outlast it.
+  std::vector<Local<Object>> handles;
+  {
+    std::lock_guard<std::mutex> lock(state->registry->mutex);
+    if (state->registry->closed) {
+      return;
+    }
+    for (auto& entry : state->registry->records) {
+      if (!entry.second->state.IsEmpty()) {
+        handles.push_back(entry.second->state.Get(isolate));
+      }
+    }
+    for (const std::shared_ptr<CanaryRecord>& record : state->registry->dead) {
+      if (!record->state.IsEmpty()) {
+        handles.push_back(record->state.Get(isolate));
+      }
+    }
+  }
+  // Isolate thread only, as is the list.
+  for (const std::shared_ptr<CanaryRecord>& record : state->registry->orphaned) {
+    if (!record->state.IsEmpty()) {
+      handles.push_back(record->state.Get(isolate));
+    }
+  }
+  for (Local<Object> handle : handles) {
+    visit(handle);
+  }
+}
+
+void WrapperLifetimeCanary::ReleaseDeadStates(Isolate* isolate) {
+  if (GetWrapperLifetimeMode() != WrapperLifetimeMode::kCanary) {
+    return;
+  }
+  CanaryState* state = Caches::ExistingStateFor<CanaryState>(isolate);
+  if (state == nullptr) {
+    return;
+  }
+#if NS_CANARY_DEATH_SIGNAL == NS_CANARY_DEATH_WEAK_SWEEP
+  Sweep(state->registry);
+#else
+  DrainDead(state->registry);
+#endif
 }
 
 }  // namespace tns
