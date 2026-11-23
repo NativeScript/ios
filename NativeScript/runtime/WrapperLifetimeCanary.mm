@@ -1292,13 +1292,16 @@ void UnwrapCallback(const FunctionCallbackInfo<Value>& info) {
     }
     return;
   }
-  if (state->GetPrivate(context, keyOfState).ToLocal(&key) && key->IsObject()) {
+  auto answer = [&](Local<Value> found) {
     if (reportLive) {
       canaryState->registry->weakCollectionCache->SetLiveCanary(
           plain != nullptr ? IsCachedWrapper(isolate, plainObject, value)
                            : CanaryOf(isolate, value.As<Object>()) != nullptr);
     }
-    info.GetReturnValue().Set(key);
+    info.GetReturnValue().Set(found);
+  };
+  if (state->GetPrivate(context, keyOfState).ToLocal(&key) && key->IsObject()) {
+    answer(key);
     return;
   }
   if (!create) {
@@ -1327,15 +1330,19 @@ void UnwrapCallback(const FunctionCallbackInfo<Value>& info) {
            ->SetPrivate(context, canaryState->objectOfKey.Get(isolate),
                         BigInt::NewFromUnsigned(isolate, address))
            .FromMaybe(false) ||
-      !newKey->SetIntegrityLevel(context, IntegrityLevel::kFrozen).FromMaybe(false) ||
-      !state->SetPrivate(context, keyOfState, newKey).FromMaybe(false)) {
+      !newKey->SetIntegrityLevel(context, IntegrityLevel::kFrozen).FromMaybe(false)) {
     return;
   }
-  if (reportLive) {
-    canaryState->registry->weakCollectionCache->SetLiveCanary(
-        plain == nullptr || IsCachedWrapper(isolate, plainObject, value));
+  // Making the key can allocate, and the finalizers of a collection that starts
+  // there can run JS that keys the object first: one object, one key.
+  if (state->GetPrivate(context, keyOfState).ToLocal(&key) && key->IsObject()) {
+    answer(key);
+    return;
   }
-  info.GetReturnValue().Set(newKey);
+  if (!state->SetPrivate(context, keyOfState, newKey).FromMaybe(false)) {
+    return;
+  }
+  answer(newKey);
 }
 
 // The object a key stands for: its live wrapper or a new one (a canary, or for
