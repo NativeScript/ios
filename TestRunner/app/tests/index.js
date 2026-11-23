@@ -132,6 +132,7 @@ require("./ApiTests");
 require("./SuperAliasTests");
 require("./ProtocolBindingTests");
 require("./ProxyReceiverTests");
+require("./InvalidReceiverTests");
 require("./NsRuntimeTests");
 require("./NsWorkerThreadsTests");
 require("./NsUrlTests");
