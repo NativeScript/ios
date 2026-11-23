@@ -268,6 +268,7 @@ void GetWrapperLifetimeStatsCallback(const FunctionCallbackInfo<Value>& info) {
       {"canaryStates", stats->canaryStates},
       {"canaryNativeDeaths", stats->canaryNativeDeaths},
       {"canaryInterceptedWrites", stats->canaryInterceptedWrites},
+      {"canaryCachedNativeWrites", stats->canaryCachedNativeWrites},
   };
   for (const auto& [name, value] : fields) {
     result

@@ -145,6 +145,8 @@ declare module "ns:runtime" {
     canaryNativeDeaths: number;
     /** `"canary"` only: writes to canaries the runtime's write handler saw. */
     canaryInterceptedWrites: number;
+    /** `"canary"` only: of those writes, native property writes whose setter the handler found from an earlier write of the same name through an object with the same prototype, without looking the name up along the prototype chain. */
+    canaryCachedNativeWrites: number;
   }
 
   /** Live native object wrappers of one class in the calling isolate. */

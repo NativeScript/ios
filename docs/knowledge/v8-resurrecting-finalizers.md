@@ -272,10 +272,19 @@ to the canary without calling the definer: a name that resolves to an inherited 
 native property, a JS getter/setter) or a read-only data member never becomes state. When the
 first object on the chain with the name is a native class prototype that still records a
 native setter for it, the handler runs that setter itself
-(`MetadataBuilder::TrySetNativeProperty`, the same code as the accessor's setter callback).
+(`MetadataBuilder::FindNativeSetter`/`RunNativeSetter`, the same code as the accessor's setter
+callback).
 Everything else is left to V8: a JS accessor, a read-only member, a native property without a
 setter, and a name JS assigned or defined on that prototype, which its own setter and definer
-interceptors forget for good. The state is rooted from its first write until the native
+interceptors forget for good. The handler caches the setter it found by the name and the
+receiver's prototype (`NativeWriteCache`), so a later write of that name through an object with
+that prototype skips the chain lookup. A hit rechecks that the receiver and every prototype
+below the setter's owner still lack the name, that each prototype up to the owner is the one
+the entry was made with, and that the owner still has an accessor whose setter was not
+forgotten. Native class prototypes get the per-name recheck too: a `[[Set]]` that starts
+elsewhere and has the prototype as its receiver (`Reflect.set({}, name, v, proto)`) defines a
+data property there without reaching the prototype's interceptors. A name with no entry costs one read of
+a small table of name tags. The state is rooted from its first write until the native
 object is deallocated (or, with the default death signal below, until its
 token is released), and stays the source of truth: a canary built later
 for the same object, or the receiver a JS-implemented `-dealloc` runs with, gets the state's

@@ -104,6 +104,9 @@ class ObjectManager {
     uint64_t canaryNativeDeaths = 0;
     // Canary mode: writes the canary handlers saw.
     uint64_t canaryInterceptedWrites = 0;
+    // Canary mode: of those, native property writes whose setter the write
+    // handler found in its cache rather than along the prototype chain.
+    uint64_t canaryCachedNativeWrites = 0;
   };
   static LifetimeStats* GetLifetimeStats(v8::Isolate* isolate);
 
