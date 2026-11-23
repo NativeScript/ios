@@ -1041,4 +1041,17 @@ describe("Weak collections of native objects", function () {
         expect(TNSGetOutput()).toBe("only");
         TNSClearOutput();
     });
+
+    it("enumerates natively a JS class whose implementation is a Proxy over an object inheriting its iterator", function () {
+        var Iterated = NSObject.extend(new Proxy(Object.create({
+            [Symbol.iterator]: function* () {
+                yield "proxied";
+            }
+        }), {}), { name: "WrapperLifetimeWeakCollectionsProxiedIterator" });
+        var obj = Iterated.alloc().init();
+        TNSClearOutput();
+        TNSObjCTypes.alloc().init().methodWithNSArray(obj);
+        expect(TNSGetOutput()).toBe("proxied");
+        TNSClearOutput();
+    });
 });

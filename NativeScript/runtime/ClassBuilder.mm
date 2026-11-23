@@ -118,10 +118,12 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     // Probed before the native class is registered, so a refusal leaves no class
     // holding the requested name. The original prototype goes back right away:
     // member discovery below reads through it. A refused change comes back as
-    // Nothing with no exception pending.
+    // Nothing with no exception pending. Not for a Proxy: GetPrototype() does not
+    // reach its target, so the restore would drop the target's prototype.
     Local<Value> originalProto = implementationObject->GetPrototype();
-    if (!implementationObject->SetPrototype(context, baseProto).FromMaybe(false) ||
-        !implementationObject->SetPrototype(context, originalProto).FromMaybe(false)) {
+    if (!implementationObject->IsProxy() &&
+        (!implementationObject->SetPrototype(context, baseProto).FromMaybe(false) ||
+         !implementationObject->SetPrototype(context, originalProto).FromMaybe(false))) {
       ThrowTypeError(isolate, baseClassName +
                                   ".extend() could not set the prototype of its first argument, "
                                   "which must be an extensible object");
