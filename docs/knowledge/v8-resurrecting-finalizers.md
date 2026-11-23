@@ -392,7 +392,7 @@ a weak-collection lookup costs nothing more while no plain object was ever keyed
 adoption skips the registry while every record is plain. `wrap` returns the object's `Instances`
 wrapper or builds a plain one (no adoption, no hydration). Death is the weak sweep, whatever
 `NS_CANARY_DEATH_SIGNAL` chooses for canaries: a major-GC epilogue posts `SweepPlain` (one atomic
-load while there is no plain record), which walks the registry's `plainRecords` list, not the
+load while `plainRecords`, retired records included, is empty), which walks the registry's `plainRecords` list, not the
 map, and retires records whose weak slot was zeroed; a lookup that meets a zeroed slot retires
 the record at once (`RetireIfDead`). So entries keyed on a dead plain object, and its
 `FinalizationRegistry` callbacks, wait until the major collection after its deallocation (and the
