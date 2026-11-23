@@ -276,7 +276,8 @@ void PrologueCallback(Isolate* isolate, GCType type, GCCallbackFlags) {
   }
 }
 
-void ReleaseQueued(const std::shared_ptr<Caches>& cache, ObjectWeakCallbackState* state) {
+void ReleaseQueued(Isolate* isolate, const std::shared_ptr<Caches>& cache,
+                   ObjectWeakCallbackState* state) {
   id target = state->lifetimeTarget_;
   // A wrapper built for the object after this one died owns the entry now.
   auto it = cache->Instances.find(target);
@@ -285,7 +286,9 @@ void ReleaseQueued(const std::shared_ptr<Caches>& cache, ObjectWeakCallbackState
   }
   delete state->lifetimeWrapper_;
   std::atomic<uint64_t>* counter = state->runtimeRetains_;
+  std::shared_ptr<CanaryRecord> record = std::move(state->canaryRecord_);
   delete state;
+  WrapperLifetimeCanary::DropRecord(isolate, std::move(record));
   DropRuntimeRetain(target, counter);
   [target release];
 }
@@ -313,7 +316,7 @@ void ReleaseAll(Isolate* isolate, RootedState* rooted) {
     if (rooted->releases.empty()) {
       WrapperLifetime::pendingReleaseIsolates_.fetch_sub(1, std::memory_order_relaxed);
     }
-    ReleaseQueued(cache, state);
+    ReleaseQueued(isolate, cache, state);
   }
 }
 
@@ -351,7 +354,7 @@ bool WrapperLifetime::InScope(id obj) { return IsInScope(obj); }
 
 void WrapperLifetime::Adopt(Isolate* isolate, ObjCDataWrapper* wrapper,
                             const std::shared_ptr<Persistent<Value>>& handle, id target,
-                            bool intercepted) {
+                            CanaryKind kind) {
   if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kResurrecting || target == nil) {
     return;
   }
@@ -372,12 +375,15 @@ void WrapperLifetime::Adopt(Isolate* isolate, ObjCDataWrapper* wrapper,
   wrapper->SetLifetimeState(state);
   if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary) {
     state->lifetimeCanary_ = IsInScope(target);
-    // A canary without the handlers would lose its JS properties when it dies.
-    tns::Assert(!state->lifetimeCanary_ || intercepted, isolate);
+#ifdef DEBUG
+    // A canary without its kind's handlers would lose its JS properties when it
+    // dies.
+    tns::Assert(!state->lifetimeCanary_ || kind == WrapperLifetimeCanary::KindOf(target), isolate);
+#endif
     if (state->lifetimeCanary_) {
       state->canaryRecord_ = WrapperLifetimeCanary::Find(isolate, target);
       if (state->canaryRecord_ != nullptr) {
-        WrapperLifetimeCanary::Hydrate(isolate, handle->Get(isolate).As<Object>());
+        WrapperLifetimeCanary::Hydrate(isolate, handle->Get(isolate).As<Object>(), kind);
       }
     }
     MakeWeak(state);

@@ -63,6 +63,13 @@ declare module "ns:runtime" {
      *   it lives, and one whose class forbids associated objects (or, under
      *   the alternative death signal, refuses weak references) gets none.
      *   Native property writes still reach the native setter. Writes cost more than in the other modes; reads do not.
+     *   Under scope `"all"`, a plain (not JS-extended) object's properties are
+     *   kept in its state object only, so reading one costs a native call and a
+     *   new wrapper needs no copy; an instance assignment or
+     *   `Object.defineProperty` over a name its prototype chain has (a native
+     *   method, `toString`, `valueOf`, a member JS added to a prototype) stays
+     *   on that wrapper and is gone with it. `wrapperLifetimeAllowShadowingNativeMembers`
+     *   makes plain objects' wrappers keep such properties too.
      *   WeakMap, WeakSet, WeakRef and FinalizationRegistry key such native
      *   objects by their lifetime in this mode, so they carry over too; a
      *   WeakMap value that references its own native key keeps that object
@@ -90,6 +97,11 @@ declare module "ns:runtime" {
      * on a native object throws a `TypeError`, since native code never calls
      * a JS own property of a native object; `true` turns that off. Those members are then accessor pairs on their class's prototype.
      * Release builds and the `"resurrecting"` mode never throw.
+     * Under `"canary"` with scope `"all"`, `true` also gives a plain (not
+     * JS-extended) object's wrapper the mirroring handler JS-extended
+     * instances' wrappers have, so JS properties over a name its prototype
+     * chain has carry over to a new wrapper too, at the cost of a write
+     * handler on every write.
      */
     wrapperLifetimeAllowShadowingNativeMembers: boolean;
   }

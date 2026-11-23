@@ -8,6 +8,7 @@
 #include "DataWrapper.h"
 #include "Helpers.h"
 #include "ObjectManager.h"
+#include "WrapperLifetimeCanary.h"
 
 namespace tns {
 
@@ -77,11 +78,11 @@ class WrapperLifetime {
 
   // A newly wrapped ObjC object: `handle` is its Instances entry, registered by
   // ObjectManager::Register and holding the entry's +1 on `target`.
-  // `intercepted`: the wrapper carries the canary handlers
-  // (WrapperLifetimeCanary::Intercepts).
+  // `kind`: the canary handlers the wrapper carries
+  // (WrapperLifetimeCanary::KindOf).
   static void Adopt(v8::Isolate* isolate, ObjCDataWrapper* wrapper,
                     const std::shared_ptr<v8::Persistent<v8::Value>>& handle,
-                    id target, bool intercepted);
+                    id target, CanaryKind kind);
 
   // The object crossed the JS/native boundary: native code returned it to JS,
   // or received it as a receiver, argument, return value of a JS-implemented

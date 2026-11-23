@@ -113,7 +113,7 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, ext);
     extendedClassCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
     WrapperLifetimeCanary::ConfigureInstanceTemplate(
-        extendedClassCtorFuncTemplate->InstanceTemplate());
+        extendedClassCtorFuncTemplate->InstanceTemplate(), CanaryKind::kExtended);
 
     Local<v8::Function> extendClassCtorFunc;
     if (!extendedClassCtorFuncTemplate->GetFunction(context).ToLocal(&extendClassCtorFunc)) {
@@ -180,7 +180,7 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
         info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
     Class klass = item->data_;
 
-    ArgConverter::ConstructObject(context, info, klass, nullptr, true);
+    ArgConverter::ConstructObject(context, info, klass, nullptr, CanaryKind::kExtended);
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
   }
