@@ -626,10 +626,14 @@ describe("HTTP ESM Loader", function() {
                     done();
                     return;
                 }
-                // Termination delays spread across the fetch and the
-                // multi-megabyte background compile that follows it.
-                var delaysMs = [0, 10, 20, 40, 60, 90, 130, 180];
-                var remaining = delaysMs.length;
+                var MODULE_LINES = 40000;
+                // The sweep terminates worker n at n * STEP of a calibrated
+                // import's duration, from 0 to slightly past its end. The
+                // background compile occupies only part of that duration, and
+                // where it starts depends on the machine, so the points cover
+                // all of it.
+                var STEPS = 23;
+                var STEP = 0.05;
 
                 function importOnMain() {
                     import(bigUrl(origin, "big-after-workers", LINES)).then(function (mod) {
@@ -638,27 +642,71 @@ describe("HTTP ESM Loader", function() {
                     }).catch(failWith(done));
                 }
 
-                function settle(worker) {
-                    worker.terminate();
-                    if (--remaining === 0) {
-                        importOnMain();
+                // Calls onFetching when the worker's import is issued and
+                // onSettled when it settles, each at most once; a worker
+                // that errors counts as settled.
+                function startWorker(k, onFetching, onSettled) {
+                    var worker = new Worker("./httpImportSettleWorker.js");
+                    var fetching = false;
+                    var settled = false;
+                    function settle() {
+                        if (!settled) {
+                            settled = true;
+                            onSettled(worker);
+                        }
                     }
-                }
-
-                delaysMs.forEach(function (delayMs, i) {
-                    var worker = new Worker("./httpImportTerminateWorker.js");
-                    worker.onmessage = function () {
-                        setTimeout(function () {
-                            settle(worker);
-                        }, delayMs);
+                    worker.onmessage = function (msg) {
+                        if (msg.data === "fetching" && !fetching) {
+                            fetching = true;
+                            onFetching(worker);
+                        } else if (msg.data === "settled") {
+                            settle();
+                        }
                     };
                     worker.onerror = function (error) {
-                        fail("worker " + i + " errored: " + formatError(error));
-                        settle(worker);
+                        fail("worker " + k + " errored: " + formatError(error));
+                        settle();
                     };
-                    worker.postMessage(bigUrl(origin, "big-worker-" + i, 40000));
+                    worker.postMessage(bigUrl(origin, k, MODULE_LINES));
+                }
+
+                // One worker at a time, so each compile has the pool to itself
+                // as the calibration import did. A worker moves the sweep on
+                // at its termination point or when it settles, whichever
+                // comes first; a terminated worker never settles.
+                function sweep(durationMs, step) {
+                    if (step === STEPS) {
+                        importOnMain();
+                        return;
+                    }
+                    var ended = false;
+                    function next(worker) {
+                        if (ended) {
+                            return;
+                        }
+                        ended = true;
+                        worker.terminate();
+                        sweep(durationMs, step + 1);
+                    }
+                    startWorker("big-worker-" + step, function (worker) {
+                        setTimeout(function () {
+                            next(worker);
+                        }, durationMs * step * STEP);
+                    }, next);
+                }
+
+                var fetchingAt = 0;
+                startWorker("big-worker-calibration", function () {
+                    fetchingAt = Date.now();
+                }, function (worker) {
+                    worker.terminate();
+                    if (fetchingAt === 0) {
+                        importOnMain();
+                        return;
+                    }
+                    sweep(Date.now() - fetchingAt, 0);
                 });
-            });
+            }, 60000);
         });
 
         // The import map is process-wide, so every spec here installs its own
