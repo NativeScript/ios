@@ -2093,4 +2093,72 @@ describe(module.id, function () {
         // baseMethod: is declared in the base class (TNSBaseInterface)
         expect(TNSDerivedInterface.prototype.hasOwnProperty('baseMethod')).toBe(false);
     });
+
+    it("throws a TypeError for invalid extend() arguments", function () {
+        expect(function () {
+            NSObject.extend();
+        }).toThrowError(TypeError, /^NSObject\.extend\(\) expects an object with the class's members as its first argument$/);
+        expect(function () {
+            NSObject.extend(1);
+        }).toThrowError(TypeError, /first argument/);
+        expect(function () {
+            NSObject.extend({}, 1);
+        }).toThrowError(TypeError, /^NSObject\.extend\(\) expects an object with the native class options \(name, protocols, exposedMethods\) as its second argument$/);
+        var unbound = NSObject.extend;
+        expect(function () {
+            unbound({});
+        }).toThrowError(TypeError, "extend() must be called on a native class constructor");
+        expect(function () {
+            NSObject.extend(Object.freeze({}));
+        }).toThrowError(TypeError, /^NSObject\.extend\(\) could not set the prototype of its first argument, which must be an extensible object$/);
+    });
+
+    it("leaves a requested class name free when extend() rejects its first argument", function () {
+        expect(function () {
+            NSObject.extend(Object.freeze({}), { name: "TNSExtendRetryAfterFrozen" });
+        }).toThrowError(TypeError, /extensible object/);
+        var Retried = NSObject.extend({}, { name: "TNSExtendRetryAfterFrozen" });
+        expect(NSStringFromClass(Retried)).toBe("TNSExtendRetryAfterFrozen");
+    });
+
+    it("propagates an exception thrown while reading extend() options", function () {
+        expect(function () {
+            NSObject.extend({}, {
+                get name() {
+                    throw new Error("name getter");
+                }
+            });
+        }).toThrowError(Error, "name getter");
+    });
+
+    it("accepts null or undefined extend() options", function () {
+        expect(NSObject.extend({}, null).new() instanceof NSObject).toBe(true);
+        expect(NSObject.extend({}, undefined).new() instanceof NSObject).toBe(true);
+    });
+
+    it("throws a TypeError when __extends is given a native class and no constructor", function () {
+        expect(function () {
+            __extends({}, NSObject);
+        }).toThrowError(TypeError, "__extends() expects a constructor function to extend NSObject");
+    });
+
+    it("gives __extends plain JS inheritance for a base that is not a native class", function () {
+        var instance = NSObject.new();
+        instance.extend = Math.max;
+        function Child() {}
+        __extends(Child, instance);
+        expect(Object.getPrototypeOf(Child)).toBe(instance);
+        expect(instance.isEqual(instance)).toBe(true);
+
+        function Thrower() {}
+        var base = {
+            extend: Math.max,
+            get boom() {
+                throw new Error("boom getter");
+            }
+        };
+        expect(function () {
+            __extends(Thrower, base);
+        }).toThrowError(Error, "boom getter");
+    });
 });

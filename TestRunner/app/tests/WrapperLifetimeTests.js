@@ -94,8 +94,8 @@ describe("Wrapper lifetime", function () {
             } catch (e) {
                 error = e;
             }
-            expect(error).not.toBeNull();
-            expect(String(error && error.message)).not.toMatch(/native object was released/);
+            expect(error instanceof TypeError).toBe(true);
+            expect(String(error && error.message)).toMatch(/receiver that has no native object/);
             expect(stats().releasedAccesses).toBe(before.releasedAccesses);
             expect(url.pathname).toBe("/path");
         });

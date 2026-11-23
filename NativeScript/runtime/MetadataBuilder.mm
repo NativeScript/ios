@@ -78,6 +78,26 @@ bool ResolveProxyReceiver(Isolate* isolate, Local<Object>& receiver, const char*
   return true;
 }
 
+// The receiver an instance member dispatches on. A native class constructor
+// makes it a class-side call: the result is empty and `klass` becomes that
+// class. Any other receiver is returned as is, and ArgConverter::Invoke rejects
+// one that is not a native object.
+Local<Object> InstanceMemberReceiver(Isolate* isolate, Local<Object> receiver, Class& klass) {
+  if (receiver->InternalFieldCount() > 0 || !receiver->IsFunction()) {
+    return receiver;
+  }
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, receiver);
+  if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCClass) {
+    return receiver;
+  }
+  klass = static_cast<ObjCClassWrapper*>(wrapper)->Klass();
+  return Local<Object>();
+}
+
+void ThrowTypeError(Isolate* isolate, const std::string& message) {
+  isolate->ThrowException(Exception::TypeError(tns::ToV8String(isolate, message)));
+}
+
 // Internal field layout: see StructWrapper. The parent<->view cycle is plain
 // JS, so the collector can reclaim it.
 constexpr int kStructParentField = StructWrapper::kParentField;
@@ -1215,7 +1235,7 @@ void MetadataBuilder::RegisterInstanceMethods(
       Caches::Get(isolate)->registerCacheBoundObject(item);
       Local<External> ext = External::New(isolate, item, v8::kExternalPointerTypeTagDefault);
       Local<FunctionTemplate> instanceMethodTemplate =
-          FunctionTemplate::New(isolate, MethodCallback, ext);
+          FunctionTemplate::New(isolate, InstanceMethodCallback, ext);
       proto->Set(tns::ToV8String(isolate, methodMeta->jsName()), instanceMethodTemplate);
       if (guarded != nullptr) {
         guarded->push_back(methodMeta->jsName());
@@ -1421,13 +1441,27 @@ void MetadataBuilder::RegisterStaticProtocols(
 void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
-  tns::Assert(info.IsConstructCall(), isolate);
   try {
     CacheItem<BaseClassMeta>* item = static_cast<CacheItem<BaseClassMeta>*>(
         info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
-    Class klass = objc_getClass(item->meta_->name());
+    const BaseClassMeta* meta = item->meta_;
+    if (!info.IsConstructCall()) {
+      ThrowTypeError(isolate, std::string("Class constructor ") + meta->jsName() +
+                                  " cannot be invoked without 'new'");
+      return;
+    }
+    if (meta->type() == MetaType::ProtocolType) {
+      ThrowTypeError(isolate,
+                     std::string("Cannot construct ") + meta->jsName() + ": it is a protocol");
+      return;
+    }
+    Class klass = objc_getClass(meta->name());
+    if (klass == nil) {
+      throw NativeScriptException(std::string("Cannot construct ") + meta->jsName() +
+                                  ": the class is not available at runtime");
+    }
 
-    const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(item->meta_);
+    const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
     ArgConverter::ConstructObject(context, info, klass, interfaceMeta,
                                   WrapperLifetimeCanary::NativeInstancesKind());
   } catch (NativeScriptException& ex) {
@@ -1437,7 +1471,10 @@ void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>
 
 void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
-  tns::Assert(info.Length() == 0, isolate);
+  if (info.Length() != 0) {
+    ThrowTypeError(isolate, "alloc() takes no arguments");
+    return;
+  }
 
   try {
     Local<Object> thiz = info.This();
@@ -1499,17 +1536,34 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
   }
 }
 
+void MetadataBuilder::InstanceMethodCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  CacheItem<MethodMeta>* item = static_cast<CacheItem<MethodMeta>*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+
+  Local<Object> thiz = info.This();
+  if (!ResolveProxyReceiver(isolate, thiz, "call native method", item->meta_->jsName(), true)) {
+    return;
+  }
+
+  V8FunctionCallbackArgs args(info);
+  Class klass = item->ResolveClass();
+  Local<Object> receiver = InstanceMemberReceiver(isolate, thiz, klass);
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Value> result =
+      MetadataBuilder::InvokeMethod(context, item->meta_, receiver, args, klass, true);
+  if (!result.IsEmpty()) {
+    info.GetReturnValue().Set(result);
+  }
+}
+
 void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(
       info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
   Local<Object> receiver = info.This();
   if (!ResolveProxyReceiver(isolate, receiver, "read native property", item->meta_->jsName(),
-                            false)) {
-    return;
-  }
-
-  if (receiver->InternalFieldCount() < 1) {
+                            true)) {
     return;
   }
 
@@ -1520,9 +1574,11 @@ void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value>& 
   }
 
   V8EmptyValueArgs args;
+  Class klass = item->ResolveClass();
+  Local<Object> target = InstanceMemberReceiver(isolate, receiver, klass);
   Local<Context> context = isolate->GetCurrentContext();
-  Local<Value> result = MetadataBuilder::InvokeMethod(context, item->meta_->getter(), receiver,
-                                                      args, item->ResolveClass(), true);
+  Local<Value> result =
+      MetadataBuilder::InvokeMethod(context, item->meta_->getter(), target, args, klass, true);
   if (!result.IsEmpty()) {
     info.GetReturnValue().Set(result);
   }
@@ -1544,13 +1600,14 @@ void MetadataBuilder::SetNativeProperty(Isolate* isolate, CacheItem<PropertyMeta
   }
 
   if (!ResolveProxyReceiver(isolate, receiver, "set native property", item->meta_->jsName(),
-                            false)) {
+                            true)) {
     return;
   }
   V8SimpleValueArgs args(value);
+  Class klass = item->ResolveClass();
+  Local<Object> target = InstanceMemberReceiver(isolate, receiver, klass);
   Local<Context> context = isolate->GetCurrentContext();
-  MetadataBuilder::InvokeMethod(context, item->meta_->setter(), receiver, args,
-                                item->ResolveClass(), true);
+  MetadataBuilder::InvokeMethod(context, item->meta_->setter(), target, args, klass, true);
 }
 
 void MetadataBuilder::GuardNativeCalledMethods(Local<Context> context, Local<Object> prototype,
@@ -1732,21 +1789,6 @@ Local<Value> MetadataBuilder::InvokeMethod(Local<Context> context, const MethodM
                                            bool isMethodCallback) {
   // TODO: Find out if the isMethodCallback property can be determined based on a
   // UITableViewController.prototype.viewDidLoad.call(this) or super.viewDidLoad() call
-
-#ifdef DEBUG
-  id value = Runtime::GetAppConfigValue("logRuntimeDetail");
-  bool logRuntimeDetail = value ? [value boolValue] : false;
-  if (logRuntimeDetail) {
-    // NOTE: stringWithFormat is slow, perhaps use different c string concatenation?
-    NSString* message = [NSString
-        stringWithFormat:@"MetadataBuilder::InvokeMethod: class {%s}, selector {%s}, "
-                         @"isInitializer {%s}, type {%s}, lib {%s}",
-                         klass ? class_getName(klass) : "<unknown>", meta->selectorAsString(),
-                         meta->isInitializer() ? "true" : "false", meta->typeName(),
-                         meta->topLevelModule()->getName()];
-    Log(@"%@", message);
-  }
-#endif
 
   try {
     return ArgConverter::Invoke(context, klass, receiver, args, meta, isMethodCallback);

@@ -12,7 +12,6 @@
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
-#include "RuntimeConfig.h"
 #include "WrapperLifetime.h"
 #include "WrapperLifetimeCanary.h"
 
@@ -135,6 +134,18 @@ Persistent<v8::Function>* ArgConverter::EmptyInstanceFunction(Isolate* isolate, 
   return Caches::Get(isolate)->EmptyObjCtorFunc.get();
 }
 
+[[noreturn]] static void ThrowInvalidReceiver(Isolate* isolate, Class klass, const MethodMeta* meta,
+                                              const std::string& receiverDescription) {
+  const char* selectorStr = meta ? meta->selectorAsString() : "<unknown>";
+  const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
+  const char* classNameStr = klass ? class_getName(klass) : "<unknown>";
+  std::string message = std::string("Cannot call method '") + jsNameStr + "' on " +
+                        receiverDescription + " (class: " + classNameStr +
+                        ", selector: " + selectorStr + ").";
+  throw NativeScriptException(isolate, v8::Exception::TypeError(tns::ToV8String(isolate, message)),
+                              message);
+}
+
 Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Object> receiver,
                                   V8Args& args, const MethodMeta* meta, bool isMethodCallback) {
   Isolate* isolate = v8::Isolate::GetCurrent();
@@ -154,21 +165,10 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
         tns::ThrowReleasedObject(isolate, releasedReason,
                                  std::string("method '") + jsNameStr + "' receiver");
       }
-      // During fast view churn like HMR in development, JS objects can outlive their
-      // native wrappers briefly. In Debug, throw a catchable JS error instead of crashing.
-      // In Release, assert so crash reporting can capture unexpected cases.
-      if (RuntimeConfig.IsDebug) {
-        const char* selectorStr = meta ? meta->selectorAsString() : "<unknown>";
-        const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
-        const char* classNameStr = klass ? class_getName(klass) : "<unknown>";
-        std::string errMsg = std::string("Cannot call method '") + jsNameStr +
-                             "' on a disposed native object (class: " + classNameStr +
-                             ", selector: " + selectorStr +
-                             "). This can happen during HMR or fast view churn.";
-        throw NativeScriptException(isolate, errMsg);
-      } else {
-        tns::Assert(false, isolate);
-      }
+      ThrowInvalidReceiver(isolate, klass, meta,
+                           receiver->InternalFieldCount() > 0
+                               ? "a receiver that has no native object"
+                               : "a receiver that is not a native object");
     }
 
     if (wrapper->Type() == WrapperType::ObjCAllocObject) {
@@ -183,18 +183,9 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
       // For extended classes we will call the base method
       callSuper = isMethodCallback && it != cache->ClassPrototypes.end();
     } else {
-      if (RuntimeConfig.IsDebug) {
-        const char* selectorStr = meta ? meta->selectorAsString() : "<unknown>";
-        const char* jsNameStr = meta ? meta->jsName() : "<unknown>";
-        const char* classNameStr = klass ? class_getName(klass) : "<unknown>";
-        std::string errMsg = std::string("Unexpected receiver wrapper type ") +
-                             std::to_string((int)wrapper->Type()) + " for method '" + jsNameStr +
-                             "' (class: " + classNameStr + ", selector: " + selectorStr +
-                             "). This can happen during HMR or fast view churn.";
-        throw NativeScriptException(isolate, errMsg);
-      } else {
-        tns::Assert(false, isolate);
-      }
+      ThrowInvalidReceiver(isolate, klass, meta,
+                           "a receiver that is not a native object instance (wrapper type " +
+                               std::to_string((int)wrapper->Type()) + ")");
     }
   }
 

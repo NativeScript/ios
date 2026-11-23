@@ -87,6 +87,8 @@ class MetadataBuilder {
       const v8::FunctionCallbackInfo<v8::Value>& info);
   static void AllocCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
   static void MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+  static void InstanceMethodCallback(
+      const v8::FunctionCallbackInfo<v8::Value>& info);
   static void CFunctionCallback(
       const v8::FunctionCallbackInfo<v8::Value>& info);
   static void PropertyGetterCallback(

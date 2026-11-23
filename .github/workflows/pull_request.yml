@@ -289,9 +289,10 @@ jobs:
           # attempt's bundle out of it first.
           on_retry_command: rm -rf $TEST_FOLDER-attempt1; mv $TEST_FOLDER $TEST_FOLDER-attempt1 2>/dev/null || true
       - name: Extract test results
+        # run_tests.sh extracts the report itself; extracting again would collide.
         if: ${{ !cancelled() }}
         run: |
-          if [ -d "$TEST_FOLDER/test_results.xcresult" ]; then
+          if [ -d "$TEST_FOLDER/test_results.xcresult" ] && ! ls "$TEST_FOLDER"/test-out/*junit*.xml >/dev/null 2>&1; then
             ./scripts/export-test-attachments.sh --result "$TEST_FOLDER/test_results.xcresult" --output "$TEST_FOLDER/test-out"
           fi
       - name: Test report summary

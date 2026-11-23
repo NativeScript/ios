@@ -299,6 +299,8 @@ Simulator options:
                           (default: newest installed)
 
 Run options:
+  -c, --configuration <c> Build configuration: Debug or Release (default: the scheme's,
+                          Debug). Release also builds TestRunner with IsDebug off.
   -a, --asan              Run under AddressSanitizer (-enableAddressSanitizer YES)
       --wrapper-lifetime <mode>[:<scope>]
                           Run the suite under a wrapper lifetime mode: the built app's
@@ -311,7 +313,8 @@ Run options:
   -h, --help              Show this help
 
 Results go to build/tests/<udid> (one simulator can only run one suite at a time),
-or build/tests/catalyst with --catalyst.
+or build/tests/catalyst with --catalyst. The exit status is non-zero when the build or
+XCTest fails, or when the junit report is missing or records a failing spec.
 EOF
 }
 
@@ -334,6 +337,7 @@ TEST_FOLDER=""
 CATALYST=0
 WRAPPER_LIFETIME=""
 NO_XCTEST=0
+CONFIGURATION=""
 
 set_sim_mode() {
   if [ -n "$SIM_MODE" ] && [ "$SIM_MODE" != "$1" ]; then
@@ -384,6 +388,8 @@ while [ $# -gt 0 ]; do
     --wrapper-lifetime|--wrapper-lifetime=*)
       take_value "--wrapper-lifetime" "$1" "${2:-}" "$has_next"; WRAPPER_LIFETIME="$OPT_VALUE"; shift "$OPT_SHIFT" ;;
     --no-xctest)      NO_XCTEST=1; shift ;;
+    -c|--configuration|--configuration=*)
+      take_value "--configuration" "$1" "${2:-}" "$has_next"; CONFIGURATION="$OPT_VALUE"; shift "$OPT_SHIFT" ;;
     -a|--asan)        ASAN=1; shift ;;
     -t|--temp-folder) TEMP_FOLDER=1; shift ;;
     -h|--help)        usage; exit 0 ;;
@@ -428,10 +434,15 @@ if { [ -n "$SIM_DEVICE_TYPE" ] || [ -n "$SIM_RUNTIME" ]; } && [ "$CREATES_SIM" -
   die_usage "--device-type and --runtime only apply when a simulator may be created."
 fi
 if [ -n "$SIM_MODE" ] && [ "$SIM_MODE" != "temp-sim" ] && [ "$SIM_MODE" != "keep-sim" ]; then
-  if [ "$ASAN" -eq 1 ] || [ "$TEMP_FOLDER" -eq 1 ] || [ -n "$WRAPPER_LIFETIME" ]; then
-    die_usage "--asan, --temp-folder and --wrapper-lifetime do not apply to --$SIM_MODE."
+  if [ "$ASAN" -eq 1 ] || [ "$TEMP_FOLDER" -eq 1 ] || [ -n "$WRAPPER_LIFETIME" ] \
+     || [ -n "$CONFIGURATION" ]; then
+    die_usage "--asan, --temp-folder, --wrapper-lifetime and --configuration do not apply to --$SIM_MODE."
   fi
 fi
+case "$CONFIGURATION" in
+  ""|Debug|Release) ;;
+  *) die_usage "--configuration: unknown configuration '$CONFIGURATION' (Debug or Release)." ;;
+esac
 if [ -n "$WRAPPER_LIFETIME" ]; then
   WL_MODE="${WRAPPER_LIFETIME%%:*}"
   WL_SCOPE="extended"
@@ -548,7 +559,7 @@ run_catalyst_directly() {
   local build_args=(-project "$SCRIPT_DIR/v8ios.xcodeproj" -scheme TestRunner -destination "$DESTINATION")
   xcodebuild "${build_args[@]}" "${XCODEBUILD_ARGS[@]}" build | xcpretty || return 1
   local app
-  app=$(xcodebuild "${build_args[@]}" -showBuildSettings 2>/dev/null |
+  app=$(xcodebuild "${build_args[@]}" "${XCODEBUILD_ARGS[@]}" -showBuildSettings 2>/dev/null |
     awk -F' = ' '/^Build settings for .* target / { mine = ($0 ~ / target TestRunner:$/) }
       mine && $1 ~ /^ *CODESIGNING_FOLDER_PATH$/ { print $2; exit }')
   if [ ! -x "$app/Contents/MacOS/TestRunner" ]; then
@@ -665,6 +676,10 @@ fi
 echo "Test folder: $TEST_FOLDER"
 
 XCODEBUILD_ARGS=()
+if [ -n "$CONFIGURATION" ]; then
+  echo "Configuration: $CONFIGURATION"
+  XCODEBUILD_ARGS+=(-configuration "$CONFIGURATION")
+fi
 if [ "$ASAN" -eq 1 ]; then
   echo "AddressSanitizer: enabled"
   XCODEBUILD_ARGS+=(-enableAddressSanitizer YES)
@@ -692,18 +707,37 @@ else
     echo "Tests failed with exit code $TEST_EXIT"
   fi
 
-  if command -v xcparse &>/dev/null; then
-    xcparse attachments "$TEST_FOLDER/test_results.xcresult" "$TEST_FOLDER/test-out"
-    find "$TEST_FOLDER/test-out" -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx junit-cli-report-viewer
-    find "$TEST_FOLDER/test-out" -name "*junit*.xml" -maxdepth 1 -print0 | xargs -n 1 -0 npx verify-junit-xml
-  fi
 fi
 
-if [ -n "$WRAPPER_LIFETIME" ]; then
-  if ! ls "$TEST_FOLDER"/test-out/*junit*.xml >/dev/null 2>&1 && [ -d "$TEST_FOLDER/test_results.xcresult" ]; then
+# XCTest passes once the app delivers its junit report, whatever the report
+# says, so failing specs only show up here.
+if [ -d "$TEST_FOLDER/test_results.xcresult" ]; then
+  if command -v xcparse &>/dev/null; then
+    xcparse attachments "$TEST_FOLDER/test_results.xcresult" "$TEST_FOLDER/test-out"
+  else
     "$SCRIPT_DIR/scripts/export-test-attachments.sh" --result "$TEST_FOLDER/test_results.xcresult" \
       --output "$TEST_FOLDER/test-out" >/dev/null
   fi
+fi
+JUNIT_REPORTS=()
+while IFS= read -r -d '' report; do
+  JUNIT_REPORTS+=("$report")
+done < <(find "$TEST_FOLDER/test-out" -maxdepth 1 -name "*junit*.xml" -print0 2>/dev/null)
+if [ "${#JUNIT_REPORTS[@]}" -eq 0 ]; then
+  echo "No junit report found in $TEST_FOLDER/test-out"
+  [ $TEST_EXIT -ne 0 ] || TEST_EXIT=1
+else
+  for report in "${JUNIT_REPORTS[@]}"; do
+    npx junit-cli-report-viewer "$report"
+  done
+  for report in "${JUNIT_REPORTS[@]}"; do
+    if ! npx verify-junit-xml "$report"; then
+      [ $TEST_EXIT -ne 0 ] || TEST_EXIT=1
+    fi
+  done
+fi
+
+if [ -n "$WRAPPER_LIFETIME" ]; then
   if ! "$SCRIPT_DIR/scripts/check-wrapper-lifetime-report.sh" --reports "$TEST_FOLDER/test-out" \
        --expect "$WL_MODE/$WL_SCOPE"; then
     [ $TEST_EXIT -ne 0 ] || TEST_EXIT=1

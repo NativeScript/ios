@@ -188,4 +188,41 @@ describe("Constructing Objective-C classes with new operator", function () {
             expect(url).toEqual(jasmine.any(NSURL));
         });
     });
+
+    it("throws a TypeError when a native class constructor is called without new", function () {
+        expect(function () {
+            NSObject();
+        }).toThrowError(TypeError, "Class constructor NSObject cannot be invoked without 'new'");
+        expect(function () {
+            Reflect.apply(NSMutableArray, undefined, []);
+        }).toThrowError(TypeError, "Class constructor NSMutableArray cannot be invoked without 'new'");
+        expect(new NSObject() instanceof NSObject).toBe(true);
+    });
+
+    it("throws a TypeError when a protocol is constructed", function () {
+        expect(function () {
+            new NSCopying();
+        }).toThrowError(TypeError, "Cannot construct NSCopying: it is a protocol");
+    });
+
+    it("keeps TypeScript-compiled subclasses of native classes constructible", function () {
+        var Sub = (function (_super) {
+            __extends(Sub, _super);
+            function Sub() {
+                return _super !== null && _super.apply(this, arguments) || this;
+            }
+            Sub.prototype.answer = function () { return 42; };
+            return Sub;
+        }(NSObject));
+        var sub = new Sub();
+        expect(sub instanceof NSObject).toBe(true);
+        expect(sub.answer()).toBe(42);
+    });
+
+    it("throws a TypeError when alloc is given arguments", function () {
+        expect(function () {
+            NSObject.alloc(1);
+        }).toThrowError(TypeError, "alloc() takes no arguments");
+        expect(NSObject.alloc().init() instanceof NSObject).toBe(true);
+    });
 });

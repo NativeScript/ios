@@ -182,9 +182,6 @@ class Interop {
       BaseCall* call);
 
  private:
-  static void ExecuteWriteValueDebugValidationsIfInDebug(
-      v8::Local<v8::Context> context, const TypeEncoding* typeEncoding,
-      void* dest, v8::Local<v8::Value> arg);
   static std::pair<IMP, ffi_closure*> CreateMethodInternal(
       const uint8_t initialParamIndex, const uint8_t argsCount,
       const TypeEncoding* typeEncoding, FFIMethodCallback callback,
