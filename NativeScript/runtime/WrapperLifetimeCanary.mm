@@ -1126,19 +1126,28 @@ std::shared_ptr<CanaryRecord> PlainRecord(Isolate* isolate,
   // Allocated before the lock: a collection this allocation starts can run
   // callbacks that take it.
   record->state.Reset(isolate, Object::New(isolate, Null(isolate), nullptr, nullptr, 0));
+  bool retired = false;
   {
     std::lock_guard<std::mutex> lock(registry->mutex);
     if (registry->closed) {
       return nullptr;
     }
-    std::shared_ptr<CanaryRecord>& slot = registry->records[address];
-    if (slot != nullptr) {
-      return slot->plain ? slot : nullptr;
+    // The lookup above is skipped while no plain record exists: a dead
+    // canary's record can still hold the address.
+    auto existing = registry->records.find(address);
+    if (existing != registry->records.end()) {
+      retired = RetireIfDead(registry.get(), existing);
+      if (!retired) {
+        return existing->second->plain ? existing->second : nullptr;
+      }
     }
-    slot = record;
+    registry->records.emplace(address, record);
     registry->plainRecords.push_back(record);
     registry->count.fetch_add(1, std::memory_order_relaxed);
     registry->plainCount.fetch_add(1, std::memory_order_relaxed);
+  }
+  if (retired) {
+    PostDrain(registry);
   }
   if (ObjectManager::LifetimeStats* stats = ObjectManager::GetLifetimeStats(isolate)) {
     stats->canaryStates++;
