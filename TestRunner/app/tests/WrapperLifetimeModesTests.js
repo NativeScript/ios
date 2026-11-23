@@ -1766,6 +1766,22 @@ describe("Wrapper lifetime modes", function () {
             expect(Object.keys(obj)).toEqual(["fixed", "plain"]);
         });
 
+        // A name the prototype chain gained after the first write never reaches
+        // a forwarding canary's handlers again: later writes land on the canary.
+        it("keeps a released plain canary's latest write to a name its prototype gained", function () {
+            var obj = TNSAllocLog.new();
+            obj.wrapperLifetimeLateInherited = 1;
+            TNSAllocLog.prototype.wrapperLifetimeLateInherited = 0;
+            try {
+                obj.wrapperLifetimeLateInherited = 2;
+                expect(obj.wrapperLifetimeLateInherited).toBe(2);
+                __releaseNativeCounterpart(obj);
+                expect(obj.wrapperLifetimeLateInherited).toBe(2);
+            } finally {
+                delete TNSAllocLog.prototype.wrapperLifetimeLateInherited;
+            }
+        });
+
         // Third-party code can strip a live object's associations, which ends
         // its record. A forwarding canary keeps reading that record's state,
         // and its next write carries it over to a new record.

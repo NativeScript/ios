@@ -472,9 +472,10 @@ Local<Value> DescriptorField(Isolate* isolate, Local<Context> context, Local<Obj
 
 // Copies `from`'s own string- and symbol-keyed properties onto `to`, with their
 // attributes; an accessor keeps its functions, which run with whichever object
-// they are reached through as `this`.
+// they are reached through as `this`. With `keepExisting`, a name `to` already
+// owns keeps its property.
 void CopyOwnProperties(Isolate* isolate, Local<Context> context, Local<Object> from,
-                       Local<Object> to) {
+                       Local<Object> to, bool keepExisting = false) {
   HandleScope scope(isolate);
   TryCatch tc(isolate);
   bool wasCopying = copyingProperties_;
@@ -489,6 +490,9 @@ void CopyOwnProperties(Isolate* isolate, Local<Context> context, Local<Object> f
         continue;
       }
       Local<v8::Name> key = name.As<v8::Name>();
+      if (keepExisting && to->HasRealNamedProperty(context, key).FromMaybe(true)) {
+        continue;
+      }
       if (!from->HasRealNamedCallbackProperty(context, key).FromMaybe(true)) {
         PropertyAttribute attributes;
         Local<Value> value;
@@ -1191,7 +1195,9 @@ void WrapperLifetimeCanary::KeepWeakCollectionKey(Isolate* isolate, Local<Object
   constexpr int kMaxWrites = 4;
   std::shared_ptr<CanaryRecord> record = currentRecord();
   if (record != nullptr && record->forwards && !record->state.IsEmpty()) {
-    CopyOwnProperties(isolate, context, Local<Object>::New(isolate, record->state), canary);
+    // A name the prototype chain has never reaches a forwarding canary's
+    // handlers, so a property the canary owns is newer than the state's.
+    CopyOwnProperties(isolate, context, Local<Object>::New(isolate, record->state), canary, true);
   }
   Local<Value> copy = keyOf(record);
   for (int writes = 1;; writes++) {
