@@ -110,6 +110,8 @@ constexpr const char* kWrapperLifetimeModeKey = "wrapperLifetimeMode";
 constexpr const char* kWrapperLifetimeScopeKey = "wrapperLifetimeScope";
 constexpr const char* kWrapperLifetimeAllowShadowingKey =
     "wrapperLifetimeAllowShadowingNativeMembers";
+constexpr const char* kWrapperLifetimeGuardsNativeMembersKey =
+    "wrapperLifetimeGuardsNativeMembers";
 
 void ThrowTypeError(Isolate* isolate, const std::string& message) {
   isolate->ThrowException(
@@ -149,7 +151,8 @@ void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
     return;
   }
   if (key == kWrapperLifetimeModeKey || key == kWrapperLifetimeScopeKey ||
-      key == kWrapperLifetimeAllowShadowingKey) {
+      key == kWrapperLifetimeAllowShadowingKey ||
+      key == kWrapperLifetimeGuardsNativeMembersKey) {
     ThrowTypeError(
         isolate,
         "'" + key +
@@ -232,6 +235,10 @@ void GetConfigCallback(const FunctionCallbackInfo<Value>& info) {
   }
   if (key == kWrapperLifetimeAllowShadowingKey) {
     info.GetReturnValue().Set(tns::GetAllowShadowingNativeMembers());
+    return;
+  }
+  if (key == kWrapperLifetimeGuardsNativeMembersKey) {
+    info.GetReturnValue().Set(tns::GuardsNativeMembers());
     return;
   }
   ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
