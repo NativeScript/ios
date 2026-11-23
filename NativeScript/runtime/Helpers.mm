@@ -16,6 +16,7 @@
 #include <sstream>
 #include <vector>
 #include "Caches.h"
+#include "Checks.h"
 #include "ErrorEvents.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
@@ -1166,27 +1167,23 @@ bool tns::LiveSync(Isolate* isolate) {
   return true;
 }
 
-void tns::Assert(bool condition, Isolate* isolate, std::string const& reason) {
-  if (condition) [[likely]] {
-    return;
+void tns::Fatal(const char* location, const std::string& message) {
+  // A check failing while this reports (say, inside the JS stack walk) must
+  // not recurse.
+  static thread_local bool reporting = false;
+  if (reporting) {
+    abort();
   }
+  reporting = true;
 
-  if (isolate == nullptr) {
-    Runtime* runtime = Runtime::GetCurrentRuntime();
-    if (runtime != nullptr) {
-      isolate = runtime->GetIsolate();
-    }
-  }
-
-  Log(@"====== Assertion failed ======");
-  if (!reason.empty()) {
-    Log(@"Reason: %s", reason.c_str());
-  }
+  Log(@"====== Fatal error ======");
+  Log(@"Location: %s", location != nullptr ? location : "<unknown location>");
+  Log(@"Message: %s", message.c_str());
   Log(@"Native stack trace:");
   LogBacktrace();
 
   // Reading the JS stack needs the isolate entered on this thread.
-  if (isolate != nullptr && isolate == v8::Isolate::TryGetCurrent()) {
+  if (Isolate* isolate = v8::Isolate::TryGetCurrent()) {
     HandleScope handleScope(isolate);
     Log(@"JavaScript stack trace:");
     std::string stack = tns::GetStackTrace(isolate);
@@ -1196,6 +1193,17 @@ void tns::Assert(bool condition, Isolate* isolate, std::string const& reason) {
   // abort(), not assert(): this must stop the process whether or not NDEBUG
   // is defined.
   abort();
+}
+
+void tns::Assert(bool condition, Isolate* isolate, std::string const& reason, const char* file,
+                 int line) {
+  (void)isolate;
+  if (condition) [[likely]] {
+    return;
+  }
+  std::string location =
+      std::string(file != nullptr ? file : "<unknown location>") + ":" + std::to_string(line);
+  tns::Fatal(location.c_str(), reason.empty() ? "assertion failed" : reason);
 }
 
 namespace tns {

@@ -354,6 +354,7 @@
 		A1EA4B0E0000000000000011 /* NativeScriptLeakProbe.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000001 /* NativeScriptLeakProbe.framework */; platformFilters = (ios, maccatalyst, xros, ); };
 		A1EA4B0E0000000000000012 /* NativeScriptLeakProbe.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000001 /* NativeScriptLeakProbe.framework */; platformFilters = (ios, maccatalyst, xros, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A1EA4B0E0000000000000014 /* LeakProbeSPI.h in Headers */ = {isa = PBXBuildFile; fileRef = A1EA4B0E0000000000000013 /* LeakProbeSPI.h */; };
+		4426A118ED82F704A1361CE0 /* Checks.h in Headers */ = {isa = PBXBuildFile; fileRef = A139A5040624EECB430D25A8 /* Checks.h */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -908,6 +909,7 @@
 		A1EA4B0E0000000000000002 /* NativeScriptLeakProbe.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeScriptLeakProbe.mm; sourceTree = "<group>"; };
 		A1EA4B0E0000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1EA4B0E0000000000000013 /* LeakProbeSPI.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LeakProbeSPI.h; sourceTree = "<group>"; };
+		A139A5040624EECB430D25A8 /* Checks.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Checks.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1570,6 +1572,7 @@
 				CB7C1CED65B5F547091F0B28 /* WrapperLifetimeCanary.mm */,
 				9E3712759A1FB55EC4BA390B /* LeakProbe.h */,
 				A1EA4B0E0000000000000013 /* LeakProbeSPI.h */,
+				A139A5040624EECB430D25A8 /* Checks.h */,
 				8ECE36189A0C784BBCDD3B55 /* LeakProbe.mm */,
 				C20AB5E526E1015200E2B41D /* OneByteStringResource.h */,
 				C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */,
@@ -1741,6 +1744,7 @@
 				A0636BA435F52099D6955AC5 /* WrapperLifetimeCanary.h in Headers */,
 				ADFC6948A446C61502AEE47F /* LeakProbe.h in Headers */,
 				A1EA4B0E0000000000000014 /* LeakProbeSPI.h in Headers */,
+				4426A118ED82F704A1361CE0 /* Checks.h in Headers */,
 				6573B9E7291FE2A700B0ED7C /* jsi.h in Headers */,
 				6573B9E2291FE2A700B0ED7C /* jsi-inl.h in Headers */,
 				C2D21601248AAAD900EDC646 /* Constants.h in Headers */,

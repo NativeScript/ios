@@ -4,6 +4,7 @@
 #include <cstdlib>
 
 #include "NapiThreadSafeFunction.h"
+#include "runtime/Checks.h"
 #include "runtime/Helpers.h"
 #include "runtime/NativeScriptException.h"
 #include "runtime/Runtime.h"
@@ -187,10 +188,7 @@ Local<Private> NapiPrivateKey(Local<Context> context, NapiPrivateKeySlot slot) {
 namespace v8impl {
 
 void OnFatalError(const char* location, const char* message) {
-  Log(@"NativeScript Node-API fatal error: %s%s%s", message,
-      location != nullptr ? " at " : "", location != nullptr ? location : "");
-  tns::LogBacktrace();
-  abort();
+  tns::Fatal(location, std::string("Node-API: ") + (message != nullptr ? message : ""));
 }
 
 }  // namespace v8impl

@@ -587,8 +587,11 @@ std::string GetSmartStackTrace(v8::Isolate* isolate, v8::TryCatch* tryCatch = nu
 
 bool LiveSync(v8::Isolate* isolate);
 
+// Legacy: new code uses NS_CHECK / NS_DCHECK / NS_UNREACHABLE (Checks.h), or
+// throws for a condition JS can reach.
 void Assert(bool condition, v8::Isolate* isolate = nullptr,
-            std::string const& reason = std::string());
+            std::string const& reason = std::string(), const char* file = __builtin_FILE(),
+            int line = __builtin_LINE());
 
 // Helpers from Node
 inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate, const char* data, int length) {
