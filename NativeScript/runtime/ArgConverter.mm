@@ -1505,7 +1505,7 @@ Intercepted ArgConverter::IndexedPropertySetterCallback(
     return v8::Intercepted::kNo;
   }
 
-  BaseDataWrapper* itemWrapper = tns::GetValue(isolate, value);
+  BaseDataWrapper* itemWrapper = tns::GetValueForMarshalling(isolate, value);
   if (itemWrapper == nullptr || itemWrapper->Type() != WrapperType::ObjCObject) {
     return v8::Intercepted::kNo;
   }

@@ -841,6 +841,10 @@ describe("GC finalizer callbacks", function () {
                         }
                     }
                     expect(handleReleased).toBe(true);
+                    var element = NSObject.new();
+                    var array = NSMutableArray.arrayWithObject(element);
+                    array[0] = object;
+                    expect(array.objectAtIndex(0)).toBe(element);
                     expect(interop.bufferFromData(bytes)).toBeUndefined();
                 });
             };
