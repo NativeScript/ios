@@ -133,12 +133,16 @@ struct CanaryRegistry {
   // Lets wrapper creation skip the lookup while no object has state.
   std::atomic<size_t> count{0};
   // The plain records among them: lets a weak collection lookup of a plain
-  // wrapper, and the sweep after a major collection, skip the registry while
-  // no plain object was keyed.
+  // wrapper skip the registry while no plain object was keyed.
   std::atomic<size_t> plainCount{0};
   // Every plain record in `records`, and retired ones until the next
   // SweepPlain drops them: what that sweep walks instead of the whole map.
   std::vector<std::shared_ptr<CanaryRecord>> plainRecords;
+  // plainRecords' size, which lets the sweep after a major collection skip
+  // the registry: a lookup can retire the last plain record, which then waits
+  // in plainRecords with plainCount at zero. Written under the mutex, read
+  // without it.
+  std::atomic<size_t> plainTracked{0};
   // Outlives the registry while the builtin's array does.
   std::shared_ptr<WeakCollectionCache> weakCollectionCache =
       std::make_shared<WeakCollectionCache>();
@@ -1143,6 +1147,7 @@ std::shared_ptr<CanaryRecord> PlainRecord(Isolate* isolate,
     }
     registry->records.emplace(address, record);
     registry->plainRecords.push_back(record);
+    registry->plainTracked.store(registry->plainRecords.size(), std::memory_order_relaxed);
     registry->count.fetch_add(1, std::memory_order_relaxed);
     registry->plainCount.fetch_add(1, std::memory_order_relaxed);
   }
@@ -1193,16 +1198,17 @@ void SweepPlain(const std::shared_ptr<CanaryRegistry>& registry) {
         i++;
       }
     }
+    registry->plainTracked.store(plain.size(), std::memory_order_relaxed);
   }
   ReleaseStates(registry.get(), dead);
 }
 
 // Scope "extended": posts SweepPlain when a major collection ends, behind the
 // release drain the collection queued, so objects it released are gone by
-// then. Only an atomic load while no plain record exists.
+// then. Only an atomic load while plainRecords is empty.
 void PostPlainSweepAfterGC(Isolate* isolate, GCType, GCCallbackFlags) {
   CanaryState* state = Caches::ExistingStateFor<CanaryState>(isolate);
-  if (state == nullptr || state->registry->plainCount.load(std::memory_order_relaxed) == 0) {
+  if (state == nullptr || state->registry->plainTracked.load(std::memory_order_relaxed) == 0) {
     return;
   }
   std::shared_ptr<CanaryRegistry> registry = state->registry;
@@ -1681,6 +1687,7 @@ void WrapperLifetimeCanary::CloseForTeardown(Isolate* isolate) {
     record->state.Reset();
   }
   state->registry->plainRecords.clear();
+  state->registry->plainTracked.store(0, std::memory_order_relaxed);
 }
 
 void WrapperLifetimeCanary::ForEachState(
