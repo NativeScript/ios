@@ -13,6 +13,7 @@
 #include "Helpers.h"
 #include "LeakProbe.h"
 #include "Runtime.h"
+#include "RuntimeConfig.h"
 #import "TNSDerivedClass.h"
 #include "WrapperLifetimeCanary.h"
 
@@ -55,6 +56,16 @@ void ReadConfig() {
           [scope UTF8String]);
     }
   }
+  id allowShadowing = ((NSDictionary*)config)[@"allowShadowingNativeMembers"];
+  if (allowShadowing != nil && ![allowShadowing isKindOfClass:[NSNumber class]]) {
+    Log("NativeScript: wrapperLifetime allowShadowingNativeMembers must be a boolean; using "
+        "false.");
+  } else if (allowShadowing != nil) {
+    detail::allowShadowingNativeMembers = [allowShadowing boolValue];
+  }
+  detail::guardsNativeMembers = RuntimeConfig.IsDebug &&
+                                GetWrapperLifetimeMode() != WrapperLifetimeMode::kResurrecting &&
+                                !detail::allowShadowingNativeMembers;
 }
 
 // Per-isolate state of the rooted mode.

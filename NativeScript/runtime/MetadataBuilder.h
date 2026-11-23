@@ -44,6 +44,20 @@ class MetadataBuilder {
                                    v8::Local<v8::Name> property,
                                    v8::Local<v8::Object> receiver,
                                    v8::Local<v8::Value> value);
+  // Where the native member guard is on (GuardsNativeMembers): turns each
+  // of `names`, and Symbol.iterator with `iterator`, an own method of
+  // `prototype`, a prototype level of a JS-extended class, that native code
+  // calls through the function the class captured, into an accessor pair
+  // whose getter returns that same function, so reads and `super` loads
+  // resolve as before. Assigning the name on a native object throws.
+  static void GuardNativeCalledMethods(v8::Local<v8::Context> context,
+                                       v8::Local<v8::Object> prototype,
+                                       const std::vector<std::string>& names,
+                                       bool iterator);
+  // The method behind an accessor pair GuardNativeCalledMethods installed,
+  // given its getter; empty for any other value.
+  static v8::Local<v8::Value> GuardedNativeCalledMethod(
+      v8::Local<v8::Context> context, v8::Local<v8::Value> getter);
 
  private:
   // The binding of an object whose static type adds protocols to `meta`: a
@@ -111,11 +125,13 @@ class MetadataBuilder {
   static void RegisterAllocMethod(
       v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> ctorFuncTemplate,
       const InterfaceMeta* interfaceMeta);
+  // `guarded`, when given, records the JS name of each method installed.
   static void RegisterInstanceMethods(
       v8::Local<v8::Context> context,
       v8::Local<v8::FunctionTemplate> ctorFuncTemplate,
       const BaseClassMeta* meta, KnownUnknownClassPair pair,
-      robin_hood::unordered_map<std::string, uint8_t>& names);
+      robin_hood::unordered_map<std::string, uint8_t>& names,
+      std::vector<std::string>* guarded = nullptr);
   // `setters`, when given, records each accessor pair installed.
   static void RegisterInstanceProperties(
       v8::Local<v8::Context> context,
@@ -130,13 +146,15 @@ class MetadataBuilder {
       const BaseClassMeta* meta, std::string className,
       KnownUnknownClassPair pair,
       robin_hood::unordered_map<std::string, uint8_t>& names,
-      NativeSetters* setters = nullptr);
+      NativeSetters* setters = nullptr,
+      std::vector<std::string>* guarded = nullptr);
   static void RegisterAdditionalProtocols(
       v8::Local<v8::Context> context,
       v8::Local<v8::FunctionTemplate> ctorFuncTemplate,
       KnownUnknownClassPair pair,
       const std::vector<std::string>& additionalProtocols,
-      robin_hood::unordered_map<std::string, uint8_t>& names);
+      robin_hood::unordered_map<std::string, uint8_t>& names,
+      std::vector<std::string>* guarded = nullptr);
   static void RegisterStaticMethods(
       v8::Local<v8::Context> context, v8::Local<v8::Function> ctorFunc,
       const BaseClassMeta* meta, KnownUnknownClassPair pair,

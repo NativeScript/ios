@@ -95,6 +95,30 @@ void functionThrowsException() {
 }
 @end
 
+@implementation TNSNativeMemberGuard
+- (int)value:(int)x {
+  return x + 1;
+}
+- (int)other:(int)x {
+  return x + 2;
+}
+- (int)nested:(int)x {
+  return x + 3;
+}
++ (int)callValue:(TNSNativeMemberGuard*)object with:(int)x {
+  return [object value:x];
+}
++ (int)callOther:(TNSNativeMemberGuard*)object with:(int)x {
+  return [object other:x];
+}
++ (int)callNested:(TNSNativeMemberGuard*)object with:(int)x {
+  return [object nested:x];
+}
+@end
+
+@implementation TNSNativeMemberGuardChild
+@end
+
 @implementation TNSPropertyMethodConflictClass
 
 @end
