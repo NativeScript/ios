@@ -94,6 +94,10 @@ Local<Object> InstanceMemberReceiver(Isolate* isolate, Local<Object> receiver, C
   return Local<Object>();
 }
 
+void ThrowTypeError(Isolate* isolate, const std::string& message) {
+  isolate->ThrowException(Exception::TypeError(tns::ToV8String(isolate, message)));
+}
+
 // Internal field layout: see StructWrapper. The parent<->view cycle is plain
 // JS, so the collector can reclaim it.
 constexpr int kStructParentField = StructWrapper::kParentField;
@@ -1437,13 +1441,27 @@ void MetadataBuilder::RegisterStaticProtocols(
 void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
-  tns::Assert(info.IsConstructCall(), isolate);
   try {
     CacheItem<BaseClassMeta>* item = static_cast<CacheItem<BaseClassMeta>*>(
         info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
-    Class klass = objc_getClass(item->meta_->name());
+    const BaseClassMeta* meta = item->meta_;
+    if (!info.IsConstructCall()) {
+      ThrowTypeError(isolate, std::string("Class constructor ") + meta->jsName() +
+                                  " cannot be invoked without 'new'");
+      return;
+    }
+    if (meta->type() == MetaType::ProtocolType) {
+      ThrowTypeError(isolate,
+                     std::string("Cannot construct ") + meta->jsName() + ": it is a protocol");
+      return;
+    }
+    Class klass = objc_getClass(meta->name());
+    if (klass == nil) {
+      throw NativeScriptException(std::string("Cannot construct ") + meta->jsName() +
+                                  ": the class is not available at runtime");
+    }
 
-    const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(item->meta_);
+    const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
     ArgConverter::ConstructObject(context, info, klass, interfaceMeta,
                                   WrapperLifetimeCanary::NativeInstancesKind());
   } catch (NativeScriptException& ex) {
@@ -1453,7 +1471,10 @@ void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>
 
 void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
-  tns::Assert(info.Length() == 0, isolate);
+  if (info.Length() != 0) {
+    ThrowTypeError(isolate, "alloc() takes no arguments");
+    return;
+  }
 
   try {
     Local<Object> thiz = info.This();
