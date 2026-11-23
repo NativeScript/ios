@@ -165,7 +165,10 @@ Local<Value> ArgConverter::Invoke(Local<Context> context, Class klass, Local<Obj
         tns::ThrowReleasedObject(isolate, releasedReason,
                                  std::string("method '") + jsNameStr + "' receiver");
       }
-      ThrowInvalidReceiver(isolate, klass, meta, "a receiver that has no native object");
+      ThrowInvalidReceiver(isolate, klass, meta,
+                           receiver->InternalFieldCount() > 0
+                               ? "a receiver that has no native object"
+                               : "a receiver that is not a native object");
     }
 
     if (wrapper->Type() == WrapperType::ObjCAllocObject) {
