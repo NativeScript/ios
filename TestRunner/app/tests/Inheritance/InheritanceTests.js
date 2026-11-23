@@ -2113,6 +2113,14 @@ describe(module.id, function () {
         }).toThrowError(TypeError, /^NSObject\.extend\(\) could not set the prototype of its first argument, which must be an extensible object$/);
     });
 
+    it("leaves a requested class name free when extend() rejects its first argument", function () {
+        expect(function () {
+            NSObject.extend(Object.freeze({}), { name: "TNSExtendRetryAfterFrozen" });
+        }).toThrowError(TypeError, /extensible object/);
+        var Retried = NSObject.extend({}, { name: "TNSExtendRetryAfterFrozen" });
+        expect(NSStringFromClass(Retried)).toBe("TNSExtendRetryAfterFrozen");
+    });
+
     it("propagates an exception thrown while reading extend() options", function () {
         expect(function () {
             NSObject.extend({}, {

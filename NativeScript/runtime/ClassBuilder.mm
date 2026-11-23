@@ -108,6 +108,26 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     auto cache = Caches::Get(isolate);
     auto isolateId = cache->getIsolateId();
 
+    Local<v8::Function> baseCtorFunc =
+        cache->CtorFuncs.find(item->meta_->name())->second->Get(isolate);
+    Local<Value> baseProto;
+    bool success =
+        baseCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&baseProto);
+    tns::Assert(success, isolate);
+
+    // Probed before the native class is registered, so a refusal leaves no class
+    // holding the requested name. The original prototype goes back right away:
+    // member discovery below reads through it. A refused change comes back as
+    // Nothing with no exception pending.
+    Local<Value> originalProto = implementationObject->GetPrototype();
+    if (!implementationObject->SetPrototype(context, baseProto).FromMaybe(false) ||
+        !implementationObject->SetPrototype(context, originalProto).FromMaybe(false)) {
+      ThrowTypeError(isolate, baseClassName +
+                                  ".extend() could not set the prototype of its first argument, "
+                                  "which must be an extensible object");
+      return;
+    }
+
     ScopeClassNameToIsolate(staticClassName, isolateId);
     Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, staticClassName, isolateId);
     tns::Assert(extendedClass != nil, isolate);
@@ -123,9 +143,6 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
                                          implementationObject);
     }
 
-    Local<v8::Function> baseCtorFunc =
-        cache->CtorFuncs.find(item->meta_->name())->second->Get(isolate);
-
     CacheItem* cacheItem = new CacheItem(nullptr, extendedClass);
     Caches::Get(isolate)->registerCacheBoundObject(cacheItem);
     Local<External> ext = External::New(isolate, cacheItem, v8::kExternalPointerTypeTagDefault);
@@ -140,12 +157,6 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
       tns::Assert(false, isolate);
     }
 
-    Local<Value> baseProto;
-    bool success =
-        baseCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&baseProto);
-    tns::Assert(success, isolate);
-
-    // A refused change comes back as Nothing with no exception pending.
     if (!implementationObject->SetPrototype(context, baseProto).FromMaybe(false)) {
       ThrowTypeError(isolate, baseClassName +
                                   ".extend() could not set the prototype of its first argument, "
