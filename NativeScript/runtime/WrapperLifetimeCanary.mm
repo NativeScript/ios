@@ -958,10 +958,10 @@ Intercepted Setter(Local<v8::Name> property, Local<Value> value,
   // The setter can run JS, a collection or a -dealloc: neither the canary nor
   // its record is touched after it.
   if (NativeSetter* setter = canaryState->nativeWrites.Find(context, holder, property)) {
-    if (stats != nullptr) {
-      stats->canaryCachedNativeWrites++;
-    }
     if (MetadataBuilder::RunNativeSetter(isolate, setter, holder, value)) {
+      if (stats != nullptr) {
+        stats->canaryCachedNativeWrites++;
+      }
       info.GetReturnValue().Set(true);
       return Intercepted::kYes;
     }

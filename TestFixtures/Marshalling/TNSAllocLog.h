@@ -158,8 +158,9 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index);
 
 // Targets for the canary write handler's native setter cache: `depth` is
 // declared three classes above each leaf. Specs that change a prototype use
-// the Shadow classes, so the others keep an unchanged chain. `dropped` and
-// `reflected` each belong to the one spec that changes them on the prototype.
+// the Shadow classes, so the others keep an unchanged chain. `dropped`,
+// `reflected` and `forgotten` each belong to the one spec that changes them on
+// the prototype.
 @interface TNSCanaryCacheBase : NSObject
 
 @property(nonatomic) NSInteger depth;
@@ -177,6 +178,7 @@ id TNSOwnedPrimitivesObjectAt(TNSOwnedPrimitives* holder, NSUInteger index);
 @property(nonatomic) NSInteger depth;
 @property(nonatomic) NSInteger dropped;
 @property(nonatomic) NSInteger reflected;
+@property(nonatomic) NSInteger forgotten;
 
 @end
 

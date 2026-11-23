@@ -1748,6 +1748,27 @@ describe("Wrapper lifetime modes", function () {
                 }
             });
 
+            it("writes the native property without the cache after JS assigns its name on the prototype that has it", function () {
+                var proto = TNSCanaryCacheShadowBase.prototype;
+                var forgotten = Object.getOwnPropertyDescriptor(proto, "forgotten").get;
+                var obj = extend(TNSCanaryCacheShadowLeaf).new();
+                obj.forgotten = 1;
+                expectCached(function () {
+                    obj.forgotten = 2;
+                }, true);
+                expect(forgotten.call(obj)).toBe(2);
+                // The prototype is no native instance: its native setter may throw.
+                try {
+                    proto.forgotten = 5;
+                } catch (e) {}
+                expect(typeof Object.getOwnPropertyDescriptor(proto, "forgotten").set).toBe("function");
+                expectCached(function () {
+                    obj.forgotten = 3;
+                }, false);
+                expect(forgotten.call(obj)).toBe(3);
+                expect(hasOwn(obj, "forgotten")).toBe(false);
+            });
+
             it("follows a prototype chain changed under a cached write", function () {
                 var obj = extend(TNSCanaryCacheShadowLeaf).new();
                 warm(obj, shadowDepthOf, true);
