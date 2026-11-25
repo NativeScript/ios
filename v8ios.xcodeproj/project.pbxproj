@@ -340,6 +340,8 @@
 		F1F30E772B58FC74006A62C0 /* URLImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = F1F30E732B58FC74006A62C0 /* URLImpl.h */; };
 		F1F30E8B2B58FE28006A62C0 /* ada.h in Headers */ = {isa = PBXBuildFile; fileRef = F1F30E872B58FE28006A62C0 /* ada.h */; };
 		F1F30E8C2B58FE28006A62C0 /* ada.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F1F30E882B58FE28006A62C0 /* ada.cpp */; settings = {COMPILER_FLAGS = "-Wno-unused-function -fvisibility=hidden"; }; };
+		AD1D0A000000000000000003 /* system_idna.h in Headers */ = {isa = PBXBuildFile; fileRef = AD1D0A000000000000000001 /* system_idna.h */; };
+		AD1D0A000000000000000004 /* system_idna.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AD1D0A000000000000000002 /* system_idna.cpp */; };
 		F6191AAE29C0FCE8003F588F /* JsV8InspectorClient.h in Headers */ = {isa = PBXBuildFile; fileRef = F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */; };
 		F6191AB029C0FCE8003F588F /* JsV8InspectorClient.mm in Sources */ = {isa = PBXBuildFile; fileRef = F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */; };
 		A1B2C3D40000000000000003 /* WorkerInspectorClient.h in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000001 /* WorkerInspectorClient.h */; };
@@ -893,6 +895,8 @@
 		F1F30E732B58FC74006A62C0 /* URLImpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLImpl.h; sourceTree = "<group>"; };
 		F1F30E872B58FE28006A62C0 /* ada.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ada.h; sourceTree = "<group>"; };
 		F1F30E882B58FE28006A62C0 /* ada.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ada.cpp; sourceTree = "<group>"; };
+		AD1D0A000000000000000001 /* system_idna.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = system_idna.h; sourceTree = "<group>"; };
+		AD1D0A000000000000000002 /* system_idna.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = system_idna.cpp; sourceTree = "<group>"; };
 		F6191AA629C0FCE7003F588F /* JsV8InspectorClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = JsV8InspectorClient.h; sourceTree = "<group>"; };
 		F6191AA829C0FCE7003F588F /* JsV8InspectorClient.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = JsV8InspectorClient.mm; sourceTree = "<group>"; };
 		A1B2C3D40000000000000001 /* WorkerInspectorClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WorkerInspectorClient.h; sourceTree = "<group>"; };
@@ -1670,6 +1674,8 @@
 			children = (
 				F1F30E872B58FE28006A62C0 /* ada.h */,
 				F1F30E882B58FE28006A62C0 /* ada.cpp */,
+				AD1D0A000000000000000001 /* system_idna.h */,
+				AD1D0A000000000000000002 /* system_idna.cpp */,
 			);
 			path = ada;
 			sourceTree = "<group>";
@@ -1727,6 +1733,7 @@
 				C2DDEBA4229EAC8300345BFE /* Runtime.h in Headers */,
 				F1CB51842D5C37100042555E /* URLPatternImpl.h in Headers */,
 				F1F30E8B2B58FE28006A62C0 /* ada.h in Headers */,
+				AD1D0A000000000000000003 /* system_idna.h in Headers */,
 				C2DDEB8D229EAC8300345BFE /* Common.h in Headers */,
 				C247C17122F82842001D2CA2 /* v8config.h in Headers */,
 				6573B9CD291FE29F00B0ED7C /* V8Runtime.h in Headers */,
@@ -2438,6 +2445,7 @@
 				4E10A9100000000000000203 /* NodeApiEmbed.mm in Sources */,
 				4E10A9100000000000000204 /* NapiRuntime.mm in Sources */,
 				F1F30E8C2B58FE28006A62C0 /* ada.cpp in Sources */,
+				AD1D0A000000000000000004 /* system_idna.cpp in Sources */,
 				C20AB5E626E1015300E2B41D /* OneByteStringResource.cpp in Sources */,
 				6573B9CE291FE29F00B0ED7C /* JSIV8ValueConverter.cpp in Sources */,
 				C2DDEB92229EAC8300345BFE /* WeakRef.cpp in Sources */,
