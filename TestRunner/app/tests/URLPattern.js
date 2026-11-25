@@ -46,6 +46,17 @@ describe("URLPattern", function () {
     expect(pattern.hostname).toBe("google.com");
   });
 
+  it("accepts non-ASCII group names", function () {
+    const pattern = new URLPattern({ pathname: "/:caf\u00E9/:\u540D\u524D" });
+    const result = pattern.exec({ pathname: "/a/b" });
+    expect(result.pathname.groups["caf\u00E9"]).toBe("a");
+    expect(result.pathname.groups["\u540D\u524D"]).toBe("b");
+  });
+
+  it("rejects a group name that does not start with an identifier start", function () {
+    expect(() => new URLPattern({ pathname: "/:\u0663x" })).toThrowError(TypeError);
+  });
+
   it("test() matches a URL against a pattern with a capture group", function () {
     const pattern = new URLPattern("https://example.com/books/:id");
     expect(pattern.test("https://example.com/books/123")).toBe(true);
