@@ -33,6 +33,7 @@
 #include "NsBuiltinModules.h"
 #include "Runtime.h"  // for GetAppConfigValue
 #include "RuntimeConfig.h"
+#include "ada/ada.h"
 
 // Do NOT pull all v8 symbols into namespace here; String would clash with
 // other typedefs inside the NativeScript codebase. We refer to v8 symbols
@@ -1546,22 +1547,52 @@ static std::string UnresolvedModuleMessage(const ModuleResolution& resolution) {
   return "Cannot find module '" + resolution.specifier + "' (tried " + resolution.attempted + ")";
 }
 
-// RFC 3986 scheme followed by ':' — a specifier with one is an absolute URL,
-// never a bare name.
-static bool HasUrlScheme(const std::string& spec) {
-  if (spec.empty() || !isalpha(static_cast<unsigned char>(spec[0]))) {
-    return false;
+// The WHATWG URL parse of `input` against `base` (none when empty) — the
+// parser behind JS `new URL()`, so a module's URL is spelled the way script
+// computes it. Empty when the input does not parse.
+static std::string ParseUrlHref(const std::string& input, const std::string& base) {
+  if (base.empty()) {
+    auto url = ada::parse<ada::url_aggregator>(input, nullptr);
+    return url ? std::string(url->get_href()) : std::string();
   }
-  for (size_t i = 1; i < spec.size(); i++) {
-    const unsigned char c = static_cast<unsigned char>(spec[i]);
-    if (c == ':') {
-      return true;
-    }
-    if (!isalnum(c) && c != '+' && c != '-' && c != '.') {
-      return false;
-    }
+  auto baseUrl = ada::parse<ada::url_aggregator>(base, nullptr);
+  if (!baseUrl) {
+    return std::string();
   }
-  return false;
+  auto url = ada::parse<ada::url_aggregator>(input, &baseUrl.value());
+  return url ? std::string(url->get_href()) : std::string();
+}
+
+static bool IsHttpHref(const std::string& href) {
+  return StartsWith(href, "http://") || StartsWith(href, "https://");
+}
+
+struct UrlSpecifier {
+  enum class Kind {
+    kHttpUrl,   // an http(s) URL
+    kOtherUrl,  // an absolute URL with another scheme
+    kInvalid,   // a relative form that does not parse against the base
+    kBare,      // neither relative nor an absolute URL
+  };
+  Kind kind = Kind::kBare;
+  std::string href;  // kHttpUrl, kOtherUrl
+};
+
+// HTML "resolve a module specifier", import map aside, against an importer
+// whose URL is `baseUrl`. Only '/', './' and '../' prefixes are relative
+// ('//host/x' is a '/' form); '.x', '.' and '..' are bare.
+static UrlSpecifier ResolveModuleSpecifierAgainstUrl(const std::string& spec,
+                                                     const std::string& baseUrl) {
+  UrlSpecifier result;
+  const bool relative = StartsWith(spec, "/") || StartsWith(spec, "./") || StartsWith(spec, "../");
+  result.href = ParseUrlHref(spec, relative ? baseUrl : std::string());
+  if (result.href.empty()) {
+    result.kind = relative ? UrlSpecifier::Kind::kInvalid : UrlSpecifier::Kind::kBare;
+  } else {
+    result.kind =
+        IsHttpHref(result.href) ? UrlSpecifier::Kind::kHttpUrl : UrlSpecifier::Kind::kOtherUrl;
+  }
+  return result;
 }
 
 static std::string BlockedFromHttpMessage(const std::string& rawSpec,
@@ -1663,6 +1694,48 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
 
   result.specifier = spec;
 
+  // An HTTP importer resolves the way a browser does and reaches the
+  // filesystem only explicitly: through an import-map entry (whatever its
+  // target, handled below) or a file:// URL. Every other form is refused
+  // here, before anything is probed on disk.
+  const bool referrerIsHttp =
+      StartsWith(referrerKey, "http://") || StartsWith(referrerKey, "https://");
+  if (referrerIsHttp && !mappedByImportMap) {
+    const UrlSpecifier url = ResolveModuleSpecifierAgainstUrl(spec, referrerKey);
+    switch (url.kind) {
+      case UrlSpecifier::Kind::kHttpUrl:
+        TNS_DEBUG(Esm, "[resolver][http-importer] base=%s spec=%s -> %s", referrerKey.c_str(),
+                  spec.c_str(), url.href.c_str());
+        result.kind = ModuleResolution::Kind::kHttp;
+        result.url = url.href;
+        return result;
+      case UrlSpecifier::Kind::kInvalid:
+        result.blocked = BlockedFromHttpMessage(
+            rawSpec, referrerKey, "it does not form an http(s) URL against the importer's URL.");
+        return result;
+      case UrlSpecifier::Kind::kBare:
+        if (spec[0] == '~') {
+          result.blocked = BlockedFromHttpMessage(
+              rawSpec, referrerKey,
+              "app-relative \"~/\" paths are not available to modules loaded over HTTP (use a "
+              "file:// URL, an import-map entry, or createRequire).");
+        } else {
+          result.blocked = BlockedFromHttpMessage(
+              rawSpec, referrerKey,
+              "it is not in the import map (bare specifiers from an HTTP module must be "
+              "mapped).");
+        }
+        return result;
+      case UrlSpecifier::Kind::kOtherUrl:
+        if (StartsWith(spec, "file://")) {
+          break;
+        }
+        // Not a file (blob:, data:, …); import() serves blob: itself.
+        result.attempted = spec;
+        return result;
+    }
+  }
+
   if (StartsWith(spec, "http://") || StartsWith(spec, "https://")) {
     result.kind = ModuleResolution::Kind::kHttp;
     result.url = spec;
@@ -1683,58 +1756,17 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
     baseDir = RuntimeConfig.ApplicationPath + "/";
   }
 
-  // A referrer fetched over HTTP makes its relative and root-absolute imports
-  // HTTP too, the way a browser resolves them.
-  const bool referrerIsHttp =
-      StartsWith(referrerKey, "http://") || StartsWith(referrerKey, "https://");
+  // An HTTP importer's relative or root-absolute import-map target resolves
+  // against the importer's URL.
   if (referrerIsHttp && (specIsRelative || specIsRootAbs)) {
-    std::string resolvedHttp;
-    @autoreleasepool {
-      NSString* baseStr = [NSString stringWithUTF8String:referrerKey.c_str()];
-      NSString* specStr = [NSString stringWithUTF8String:spec.c_str()];
-      if (baseStr && specStr) {
-        NSURL* baseURL = [NSURL URLWithString:baseStr];
-        NSURL* rel = [NSURL URLWithString:specStr relativeToURL:baseURL];
-        NSURL* absURL = [rel absoluteURL];
-        if (absURL) {
-          NSString* absStr = [absURL absoluteString];
-          if (absStr) {
-            resolvedHttp = std::string([absStr UTF8String] ?: "");
-          }
-        }
-      }
-    }
-    if (StartsWith(resolvedHttp, "http://") || StartsWith(resolvedHttp, "https://")) {
+    const std::string resolvedHttp = ParseUrlHref(spec, referrerKey);
+    if (IsHttpHref(resolvedHttp)) {
       TNS_DEBUG(Esm, "[resolver][http-rel] base=%s spec=%s -> %s", referrerKey.c_str(),
                 spec.c_str(), resolvedHttp.c_str());
       result.kind = ModuleResolution::Kind::kHttp;
       result.url = resolvedHttp;
       return result;
     }
-  }
-
-  // An HTTP importer reaches the filesystem only explicitly: through an
-  // import-map entry (whatever its target) or a file:// URL. Every other form
-  // is refused here, before anything is probed on disk.
-  if (referrerIsHttp && !mappedByImportMap && !StartsWith(spec, "file://")) {
-    if (specIsRelative || specIsRootAbs) {
-      result.blocked = BlockedFromHttpMessage(
-          rawSpec, referrerKey, "it does not form an http(s) URL against the importer's URL.");
-    } else if (spec[0] == '~') {
-      result.blocked = BlockedFromHttpMessage(
-          rawSpec, referrerKey,
-          "app-relative \"~/\" paths are not available to modules loaded over HTTP (use a "
-          "file:// URL, an import-map entry, or createRequire).");
-    } else if (!HasUrlScheme(spec)) {
-      result.blocked = BlockedFromHttpMessage(
-          rawSpec, referrerKey,
-          "it is not in the import map (bare specifiers from an HTTP module must be mapped).");
-    } else {
-      // Another URL scheme (blob:, data:, …): not a file, and import() serves
-      // blob: itself.
-      result.attempted = spec;
-    }
-    return result;
   }
 
   // A query or fragment is URL syntax, never part of a file name, so
@@ -3052,15 +3084,21 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // a local module — while scopes are matched against the registry key, an
       // absolute app path. Canonicalizing the origin alone stops at `/app/…`
       // and matches no scope, so the origin goes through the same resolution
-      // the registry keys by first.
+      // the registry keys by first. An HTTP module's origin is its URL
+      // already, and an identity: it must not go through the import map.
       const std::string resourceName(*resourceUtf8);
-      const ModuleResolution referrer = ResolveSpecifierToPath(resourceName, std::string());
-      if (referrer.kind == ModuleResolution::Kind::kFile) {
-        dynamicReferrerKey = CanonicalizeRegistryKey(referrer.path);
-      } else if (referrer.kind == ModuleResolution::Kind::kHttp) {
-        dynamicReferrerKey = CanonicalizeRegistryKey(referrer.url);
+      const std::string resourceUrl = RepairCollapsedUrlScheme(resourceName);
+      if (IsHttpHref(resourceUrl)) {
+        dynamicReferrerKey = CanonicalizeRegistryKey(resourceUrl);
       } else {
-        dynamicReferrerKey = CanonicalizeRegistryKey(resourceName);
+        const ModuleResolution referrer = ResolveSpecifierToPath(resourceName, std::string());
+        if (referrer.kind == ModuleResolution::Kind::kFile) {
+          dynamicReferrerKey = CanonicalizeRegistryKey(referrer.path);
+        } else if (referrer.kind == ModuleResolution::Kind::kHttp) {
+          dynamicReferrerKey = CanonicalizeRegistryKey(referrer.url);
+        } else {
+          dynamicReferrerKey = CanonicalizeRegistryKey(resourceName);
+        }
       }
     }
   }

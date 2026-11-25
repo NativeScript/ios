@@ -946,20 +946,34 @@ unmodified where a shim exists:
 
 ### Specifier resolution
 
-`import` and `import()` resolve a specifier the same way, by the kind of the
-importing module. `ns:`/`node:` builtins resolve first, and the
-[import map](#import-maps-and-scopes) is consulted next for every importer;
-the table covers a specifier the map does not match.
+A specifier resolves by the kind of the importing module. `ns:`/`node:`
+builtins resolve first, and the [import map](#import-maps-and-scopes) is
+consulted next for every importer; the table covers a specifier the map does
+not match.
 
 | specifier | file importer | http(s) importer |
 |---|---|---|
 | `./x`, `../x` | the importer's directory on disk | the importer's URL, query kept |
+| `.x`, `.`, `..` | the importer's directory on disk; the app root for `import()` | refused: bare, it needs an import-map entry |
 | `/x` | the app root | the importer's origin, query kept |
 | `//host/x` | the app root | the importer's scheme, query kept |
 | `~/x` | the app root | refused |
 | bare (`pkg`, `pkg/x`) | the app root | refused: it needs an import-map entry |
 | `file:///app/x` | the app root | the app root |
-| `http(s)://…` | fetched | fetched |
+| `http(s)://…` | fetched (lowercase scheme only) | fetched |
+
+An http(s) importer's specifiers follow the HTML module-specifier rules and
+are resolved with the WHATWG URL parser, the one behind `new URL()`: dot
+segments, `\`, the case of the scheme and host, and default ports are
+normalized as a browser does, so `new URL(spec, importerUrl).href` names the
+same module as `spec`.
+
+`import` and `import()` resolve alike, with two exceptions for `import()`:
+from a file module it drops the specifier's query and fragment before the
+import-map lookup (a static `import 'pkg?x'` looks up `pkg?x`, `import('pkg?x')`
+looks up `pkg`), and an import-map target that is not an http(s) URL is looked
+up in the top-level `imports` once more, so a target that is itself a key is
+followed to that key's target.
 
 On disk, the query and fragment are dropped and a missing extension or a
 directory is completed with `.mjs`, `.js`, `/index.mjs`, `/index.js`, in that

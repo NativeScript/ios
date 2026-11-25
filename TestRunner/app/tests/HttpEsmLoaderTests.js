@@ -1681,6 +1681,170 @@ describe("HTTP ESM Loader", function() {
                 done();
             });
         });
+
+        function rejectionMessage(promise) {
+            return promise.then(function () {
+                return "resolved";
+            }, function (error) {
+                return String((error && error.message) || error);
+            });
+        }
+
+        it("stays an HTTP importer when the import map maps its own URL to a file",
+           function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var importerUrl = origin + "/esm/resolve/self-mapped/importer.mjs";
+            var mod;
+            import(importerUrl).then(function (loaded) {
+                mod = loaded;
+                var imports = {};
+                imports[importerUrl] = "~/tests/esm/http-importer/self-mapped.mjs";
+                nsModule.configureLoader({ importMap: { imports: imports } });
+                return mod.load("./target.mjs?k=self");
+            }).then(function (target) {
+                expect([target.path, target.query])
+                    .toEqual(["/esm/resolve/self-mapped/target.mjs", "k=self"]);
+                return rejectionMessage(mod.load("tests/esm/http-importer/self-mapped-bare.mjs"));
+            }).then(function (bareMessage) {
+                expect(bareMessage).toContain("not in the import map");
+                return rejectionMessage(mod.load("~/tests/esm/http-importer/self-mapped-tilde.mjs"));
+            }).then(function (tildeMessage) {
+                expect(tildeMessage).toContain("\"~/\" paths are not available");
+                expect(globalThis.__nsHttpImporterDiskRead_selfMappedBare).toBeUndefined();
+                expect(globalThis.__nsHttpImporterDiskRead_selfMappedTilde).toBeUndefined();
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("refuses a static import of a dot-prefixed bare specifier", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var spec = ".hidden/static.mjs";
+            expectRefused(
+                import(origin + "/esm/resolve/static.mjs?spec=" + encodeURIComponent(spec)),
+                done,
+                function (message) {
+                    expect(message).toContain("\"" + spec + "\"");
+                    expect(message).toContain("not in the import map");
+                });
+        });
+
+        it("refuses a dynamic import of '.x', '.' and '..' as bare specifiers", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            importer(origin, "dot-bare/dir").then(function (mod) {
+                return Promise.all([".hidden/dynamic.mjs", ".", ".."].map(function (spec) {
+                    return rejectionMessage(mod.load(spec));
+                }));
+            }).then(function (messages) {
+                messages.forEach(function (message) {
+                    expect(message).toContain("not in the import map");
+                });
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        // `new URL()` and the loader share the WHATWG URL parser, so every
+        // spelling of one URL names one module.
+        it("imports one module for every spelling of its URL from import()", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var importerUrl = origin + "/esm/resolve/identity/importer.mjs";
+            import(importerUrl).then(function (mod) {
+                return Promise.all([
+                    mod.load("./x.mjs?v=1"),
+                    mod.load("./sub/../x.mjs?v=1"),
+                    mod.load("/esm/resolve/identity/./x.mjs?v=1"),
+                    import(origin + "/esm/resolve/identity/x.mjs?v=1"),
+                    import(new URL("./x.mjs?v=1", importerUrl).href),
+                ]);
+            }).then(function (namespaces) {
+                expect(namespaces[0].query).toBe("v=1");
+                namespaces.forEach(function (ns) {
+                    expect(ns).toBe(namespaces[0]);
+                });
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("imports one module for every spelling of its URL from a static import", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            function staticImporter(spec) {
+                return import(origin + "/esm/resolve/static.mjs?spec=" + encodeURIComponent(spec));
+            }
+            Promise.all([
+                staticImporter("./identity-static/x.mjs?v=1"),
+                staticImporter("/esm/resolve/identity-static/./x.mjs?v=1"),
+                import(origin + "/esm/resolve/identity-static/x.mjs?v=1"),
+            ]).then(function (namespaces) {
+                expect(namespaces[2].query).toBe("v=1");
+                expect(namespaces[0].dep).toBe(namespaces[2]);
+                expect(namespaces[1].dep).toBe(namespaces[2]);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("normalizes a specifier the way the WHATWG URL parser does", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            importer(origin, "norm").then(function (mod) {
+                return Promise.all([
+                    mod.load("/esm/resolve/norm/./a/../dots.mjs"),
+                    mod.load("../../../../../esm/resolve/norm/climb.mjs"),
+                    mod.load("./sub\\back.mjs"),
+                    mod.load(origin.replace(/^http:/, "HTTP:") + "/esm/resolve/norm/upper.mjs"),
+                ]);
+            }).then(function (mods) {
+                expect(mods.map(function (m) { return m.path; })).toEqual([
+                    "/esm/resolve/norm/dots.mjs",
+                    "/esm/resolve/norm/climb.mjs",
+                    "/esm/resolve/norm/sub/back.mjs",
+                    "/esm/resolve/norm/upper.mjs",
+                ]);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
     });
 
     describe("URL Key Canonicalization", function () {
