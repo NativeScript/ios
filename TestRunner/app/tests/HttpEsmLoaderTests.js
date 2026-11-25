@@ -1731,7 +1731,7 @@ describe("HTTP ESM Loader", function() {
                 done();
                 return;
             }
-            var spec = ".hidden/static.mjs";
+            var spec = ".hidden/dep.mjs";
             expectRefused(
                 import(origin + "/esm/resolve/static.mjs?spec=" + encodeURIComponent(spec)),
                 done,

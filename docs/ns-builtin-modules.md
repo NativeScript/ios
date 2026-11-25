@@ -965,15 +965,15 @@ not match.
 An http(s) importer's specifiers follow the HTML module-specifier rules and
 are resolved with the WHATWG URL parser, the one behind `new URL()`: dot
 segments, `\`, the case of the scheme and host, and default ports are
-normalized as a browser does, so `new URL(spec, importerUrl).href` names the
-same module as `spec`.
+normalized as a browser does. A `spec` that resolves to an http(s) URL
+therefore names the same module as `new URL(spec, importerUrl).href`.
 
 `import` and `import()` resolve alike, with two exceptions for `import()`:
 from a file module it drops the specifier's query and fragment before the
 import-map lookup (a static `import 'pkg?x'` looks up `pkg?x`, `import('pkg?x')`
-looks up `pkg`), and an import-map target that is not an http(s) URL is looked
-up in the top-level `imports` once more, so a target that is itself a key is
-followed to that key's target.
+looks up `pkg`), and an import-map target that does not resolve to an http(s)
+URL is looked up in the top-level `imports` once more, so a target that is
+itself a key is followed to that key's target.
 
 On disk, the query and fragment are dropped and a missing extension or a
 directory is completed with `.mjs`, `.js`, `/index.mjs`, `/index.js`, in that
