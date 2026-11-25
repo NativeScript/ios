@@ -4,6 +4,8 @@
 #include <unicode/uchar.h>
 #include <unicode/uidna.h>
 
+#include "ada.h"
+
 // Autolinks libicucore so that turning the flag on is the only switch.
 __asm__(".linker_option \"-licucore\"");
 
@@ -36,6 +38,10 @@ std::string SystemIdnaToAscii(std::string_view input) {
       }
     }
     return lower;
+  }
+  // ada bounds the non-ASCII inputs it converts; keep the same limit.
+  if (input.size() > ada::idna::max_domain_input_bytes) {
+    return {};
   }
 
   // CheckHyphens and VerifyDnsLength are off for URLs, and ICU has no options
