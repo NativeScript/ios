@@ -101,6 +101,12 @@ describe("URL", function () {
     expect(URL.canParse("http://[", "https://a.test/")).toBe(false);
   });
 
+  it("canParse stringifies its arguments and ignores an undefined base", function () {
+    expect(URL.canParse(new URL("https://a.test/x"))).toBe(true);
+    expect(URL.canParse("page", new URL("https://a.test/dir/"))).toBe(true);
+    expect(URL.canParse("https://a.test/", undefined)).toBe(true);
+  });
+
   it("converts internationalized hostnames to ASCII", function () {
     expect(new URL("https://B\u00FCcher.example/").hostname).toBe("xn--bcher-kva.example");
     expect(new URL("https://\u4F8B\u3048.\u30C6\u30B9\u30C8/").hostname).toBe("xn--r8jz45g.xn--zckzah");

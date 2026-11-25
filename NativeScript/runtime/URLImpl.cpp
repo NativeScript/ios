@@ -466,7 +466,7 @@ void URLImpl::CanParse(const v8::FunctionCallbackInfo<v8::Value>& info) {
   bool value;
   auto isolate = info.GetIsolate();
   auto url_string = tns::ToString(isolate, info[0]);
-  if (info.Length() > 1) {
+  if (info.Length() > 1 && !info[1]->IsUndefined()) {
     auto base =
         ada::parse<url_aggregator>(tns::ToString(isolate, info[1]), nullptr);
     value = base && ada::parse<url_aggregator>(url_string, &base.value());
