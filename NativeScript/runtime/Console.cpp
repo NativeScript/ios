@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <iomanip>
-#include <regex>
 #include <string>
 #include <vector>
 
@@ -69,13 +68,72 @@ bool isErrorMessage(const std::string& line) {
   return line.find("Error") != std::string::npos;
 }
 
+namespace {
+
+// The character classes of ECMAScript-grammar std::regex on char: \s, the
+// line terminators `.` stops at, and \d.
+bool IsSpace(char c) { return c == ' ' || (c >= '\t' && c <= '\r'); }
+bool IsLineEnd(char c) { return c == '\n' || c == '\r'; }
+bool IsDigit(char c) { return c >= '0' && c <= '9'; }
+
+// Whether ":<digits>:<digits>" starts at `i`.
+bool LineColumnAt(const std::string& s, size_t i) {
+  for (int part = 0; part < 2; part++) {
+    if (i >= s.size() || s[i] != ':') return false;
+    size_t digits = ++i;
+    while (i < s.size() && IsDigit(s[i])) i++;
+    if (i == digits) return false;
+  }
+  return true;
+}
+
+// From a ")" at `close`, the ':' that starts the ":<digits>:<digits>" ending
+// right before it, or npos.
+size_t LineColumnBefore(const std::string& s, size_t close) {
+  size_t i = close;
+  for (int part = 0; part < 2; part++) {
+    size_t end = i;
+    while (i > 0 && IsDigit(s[i - 1])) i--;
+    if (i == end || i == 0 || s[i - 1] != ':') return std::string::npos;
+    i--;
+  }
+  return i;
+}
+
+}  // namespace
+
+// Whether the text contains a frame in either V8 style, as the regexes
+//   \s+at\s+.*\(.+?:\d+:\d+\)     "    at foo (/path/to/file.ts:123:45)"
+//   \s+at\s+[^\s\(\)]+:\d+:\d+    "    at /path/to/file.ts:123:45"
+// would find it.
 bool isStackFrame(const std::string& line) {
-  // Recognize both styles:
-  //   "    at foo (/path/to/file.ts:123:45)"  -> with parentheses
-  //   "    at /path/to/file.ts:123:45"        -> bare location
-  static const std::regex withParens(R"(\s+at\s+.*\(.+?:\d+:\d+\))");
-  static const std::regex bare(R"(\s+at\s+[^\s\(\)]+:\d+:\d+)");
-  return std::regex_search(line, withParens) || std::regex_search(line, bare);
+  for (size_t at = line.find("at", 1); at != std::string::npos;
+       at = line.find("at", at + 1)) {
+    if (!IsSpace(line[at - 1])) continue;
+    size_t begin = at + 2;
+    if (begin >= line.size() || !IsSpace(line[begin])) continue;
+    while (begin < line.size() && IsSpace(line[begin])) begin++;
+
+    size_t name_end = begin;
+    while (name_end < line.size() && !IsSpace(line[name_end]) &&
+           line[name_end] != '(' && line[name_end] != ')') {
+      name_end++;
+    }
+    for (size_t colon = begin + 1; colon < name_end; colon++) {
+      if (LineColumnAt(line, colon)) return true;
+    }
+
+    size_t first_paren = std::string::npos;
+    for (size_t i = begin; i < line.size() && !IsLineEnd(line[i]); i++) {
+      if (line[i] == '(' && first_paren == std::string::npos) {
+        first_paren = i;
+      } else if (line[i] == ')' && first_paren != std::string::npos) {
+        size_t colon = LineColumnBefore(line, i);
+        if (colon != std::string::npos && colon >= first_paren + 2) return true;
+      }
+    }
+  }
+  return false;
 }
 
 void Console::LogCallback(const FunctionCallbackInfo<Value>& args) {
