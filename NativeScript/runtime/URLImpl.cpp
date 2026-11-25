@@ -4,6 +4,8 @@
 
 #include "URLImpl.h"
 
+#include <optional>
+
 #include "Caches.h"
 #include "Helpers.h"
 #include "ModuleBinding.hpp"
@@ -22,7 +24,7 @@ struct URLConstructorState {
 
 }  // namespace
 
-URLImpl::URLImpl(url_aggregator url) : url_(url) {}
+URLImpl::URLImpl(url_aggregator url) : url_(std::move(url)) {}
 
 void URLImpl::Init(v8::Isolate* isolate,
                    v8::Local<v8::ObjectTemplate> globalTemplate) {
@@ -113,84 +115,41 @@ void URLImpl::Ctor(const v8::FunctionCallbackInfo<v8::Value>& args) {
     return;
   }
 
-  url_aggregator url;
-
   auto url_string = tns::ToString(isolate, args[0]);
 
+  std::optional<std::string> base_string;
   if (count > 1) {
     if (args[1]->IsString()) {
-      auto base_string = tns::ToString(isolate, args[1].As<v8::String>());
-      std::string_view base_string_view(base_string.data(),
-                                        base_string.length());
-
-      if (!can_parse(url_string, &base_string_view)) {
-        isolate->ThrowException(
-            v8::Exception::TypeError(ToV8String(isolate, "")));
-        return;
-      }
-      auto base_url =
-          ada::parse<ada::url_aggregator>(base_string_view, nullptr);
-
-      auto result =
-          ada::parse<ada::url_aggregator>(url_string, &base_url.value());
-
-      if (result) {
-        url = result.value();
-      } else {
-        isolate->ThrowException(
-            v8::Exception::TypeError(ToV8String(isolate, "")));
-        return;
-      }
+      base_string = tns::ToString(isolate, args[1].As<v8::String>());
     } else if (args[1]->IsObject()) {
-      auto base_string =
-          tns::ToString(isolate, args[1]->ToString(context).ToLocalChecked());
-      std::string_view base_string_view(base_string.data(),
-                                        base_string.length());
-      if (!can_parse(std::string_view(url_string.data(), url_string.length()),
-                     &base_string_view)) {
-        isolate->ThrowException(
-            v8::Exception::TypeError(ToV8String(isolate, "")));
+      v8::Local<v8::String> base;
+      if (!args[1]->ToString(context).ToLocal(&base)) {
         return;
       }
-
-      auto base_url =
-          ada::parse<ada::url_aggregator>(base_string_view, nullptr);
-
-      auto result =
-          ada::parse<ada::url_aggregator>(url_string, &base_url.value());
-
-      if (result) {
-        url = result.value();
-      } else {
-        isolate->ThrowException(
-            v8::Exception::TypeError(ToV8String(isolate, "")));
-        return;
-      }
-    } else {
-      // treat 2nd arg as undefined otherwise.
-      auto result = ada::parse<ada::url_aggregator>(url_string, nullptr);
-      if (result) {
-        url = result.value();
-      } else {
-        isolate->ThrowException(
-            v8::Exception::TypeError(ToV8String(isolate, "")));
-        return;
-      }
+      base_string = tns::ToString(isolate, base);
     }
-  } else {
-    auto result = ada::parse<ada::url_aggregator>(url_string, nullptr);
-    if (result) {
-      url = result.value();
-    } else {
-      isolate->ThrowException(
-          v8::Exception::TypeError(ToV8String(isolate, "")));
-      return;
+    // Any other 2nd argument is treated as undefined.
+  }
+
+  auto parse = [&]() {
+    if (!base_string) {
+      return ada::parse<url_aggregator>(url_string, nullptr);
     }
+    auto base = ada::parse<url_aggregator>(*base_string, nullptr);
+    if (!base) {
+      return base;
+    }
+    return ada::parse<url_aggregator>(url_string, &base.value());
+  };
+  auto result = parse();
+  if (!result) {
+    isolate->ThrowException(v8::Exception::TypeError(ToV8String(isolate, "")));
+    return;
   }
 
   auto ret = args.This();
 
-  auto urlImpl = new URLImpl(url);
+  auto urlImpl = new URLImpl(std::move(result.value()));
 
   ret->SetAlignedPointerInInternalField(0, urlImpl,
                                         v8::kEmbedderDataTypeTagDefault);
@@ -502,17 +461,17 @@ void URLImpl::ToString(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void URLImpl::CanParse(const v8::FunctionCallbackInfo<v8::Value>& info) {
+  // ada::parse rather than ada::can_parse: the constructor already links it,
+  // and can_parse pulls in a second instantiation of ada's parser.
   bool value;
-  auto count = info.Length();
-
   auto isolate = info.GetIsolate();
-  if (count > 1) {
-    auto url_string = tns::ToString(isolate, info[0]);
-    auto base_string = tns::ToString(isolate, info[1]);
-    std::string_view base_string_view(base_string.data(), base_string.length());
-    value = can_parse(url_string, &base_string_view);
+  auto url_string = tns::ToString(isolate, info[0]);
+  if (info.Length() > 1 && !info[1]->IsUndefined()) {
+    auto base =
+        ada::parse<url_aggregator>(tns::ToString(isolate, info[1]), nullptr);
+    value = base && ada::parse<url_aggregator>(url_string, &base.value());
   } else {
-    value = can_parse(tns::ToString(isolate, info[0]).c_str(), nullptr);
+    value = ada::parse<url_aggregator>(url_string, nullptr).has_value();
   }
 
   info.GetReturnValue().Set(value);

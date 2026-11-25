@@ -1,6 +1,7 @@
 /* auto-generated on 2026-11-19 15:19:30 -0500. Do not edit! */
 /* begin file src/ada.cpp */
 #include "ada.h"
+#include "system_idna.h"
 /* begin file src/checkers.cpp */
 
 #include <algorithm>
@@ -7119,6 +7120,9 @@ bool valid_name_code_point(char32_t code_point, bool first) {
     return false;
   }
 
+#if NS_ADA_SYSTEM_IDNA
+  return tns::SystemIsNameCodePoint(code_point, first);
+#else
   if (!ensure_tables() || id_start == nullptr || id_continue == nullptr) {
     return false;
   }
@@ -7136,6 +7140,7 @@ bool valid_name_code_point(char32_t code_point, bool first) {
       [](const auto& range) { return range[1]; });  // project to range-high
 
   return iter != ranges.end() && code_point >= (*iter)[0];
+#endif
 }
 }  // namespace ada::idna
 /* end file src/identifier.cpp */
@@ -7818,7 +7823,11 @@ bool to_ascii(std::optional<std::string>& out, const std::string_view plain,
     input = percent_decoded_buffer;
   }
   // input is a non-empty UTF-8 string, must be percent decoded
+#if NS_ADA_SYSTEM_IDNA
+  std::string idna_ascii = tns::SystemIdnaToAscii(input);
+#else
   std::string idna_ascii = ada::idna::to_ascii(input);
+#endif
   if (idna_ascii.empty() || contains_forbidden_domain_code_point(
                                 idna_ascii.data(), idna_ascii.size())) {
     return false;
