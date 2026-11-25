@@ -946,47 +946,43 @@ unmodified where a shim exists:
 
 ### Specifier resolution
 
-A specifier resolves by the kind of the importing module. `ns:`/`node:`
-builtins resolve first, and the [import map](#import-maps-and-scopes) is
-consulted next for every importer; the table covers a specifier the map does
-not match.
+A module loaded over http(s) resolves the specifiers it imports, with `import`
+and `import()` alike, as below. `ns:`/`node:` builtins resolve first, and the
+[import map](#import-maps-and-scopes) is consulted next; the table covers a
+specifier the map does not match.
 
-| specifier | file importer | http(s) importer |
-|---|---|---|
-| `./x`, `../x` | the importer's directory on disk | the importer's URL, query kept |
-| `.x`, `.`, `..` | the importer's directory on disk; the app root for `import()` | refused: bare, it needs an import-map entry |
-| `/x` | the app root | the importer's origin, query kept |
-| `//host/x` | the app root | the importer's scheme, query kept |
-| `~/x` | the app root | refused |
-| bare (`pkg`, `pkg/x`) | the app root | refused: it needs an import-map entry |
-| `file:///app/x` | the app root | the app root |
-| `http(s)://…` | fetched (lowercase scheme only) | fetched |
+| specifier | from an http(s) importer |
+|---|---|
+| `./x`, `../x` | the importer's URL, query kept |
+| `/x` | the importer's origin, query kept |
+| `//host/x` | the importer's scheme, query kept |
+| `http(s)://…` | that URL |
+| `file:///app/x` | the app root, on disk |
+| `~/x` | refused |
+| bare (`pkg`, `pkg/x`) | refused: it needs an import-map entry |
 
-An http(s) importer's specifiers follow the HTML module-specifier rules and
-are resolved with the WHATWG URL parser, the one behind `new URL()`: dot
-segments, `\`, the case of the scheme and host, and default ports are
-normalized as a browser does. A `spec` that resolves to an http(s) URL
-therefore names the same module as `new URL(spec, importerUrl).href`.
+Only `/`, `./` and `../` prefixes are relative: `.x`, `.` and `..` are bare
+specifiers and are refused without an import-map entry. Specifiers follow the
+HTML module-specifier rules and are resolved with the WHATWG URL parser, the
+one behind `new URL()`: dot segments, `\`, the case of the scheme and host, and
+default ports are normalized as a browser does. A specifier that resolves to an
+http(s) URL therefore names the same module as
+`new URL(specifier, importerUrl).href`.
 
-`import` and `import()` resolve alike, with two exceptions for `import()`:
-from a file module it drops the specifier's query and fragment before the
-import-map lookup (a static `import 'pkg?x'` looks up `pkg?x`, `import('pkg?x')`
-looks up `pkg`), and an import-map target that does not resolve to an http(s)
-URL is looked up in the top-level `imports` once more, so a target that is
-itself a key is followed to that key's target.
-
-On disk, the query and fragment are dropped and a missing extension or a
-directory is completed with `.mjs`, `.js`, `/index.mjs`, `/index.js`, in that
-order. An import-map target is never refused — an entry is explicit
-configuration, so it may point an HTTP module at a `~/` path — though a
-relative or root-relative target still resolves against an HTTP importer's
-URL. From an HTTP importer, a specifier with any other URL scheme (`data:`,
-`file:/x`) is never looked up on disk; `import()` of a `blob:nativescript/…`
-URL loads from the blob store whatever the importer. A refused specifier fails
+An import-map entry is never refused — it is explicit configuration, so it may
+point an HTTP module at a `~/` path — though a relative or root-relative target
+still resolves against the importer's URL. A specifier with any other URL
+scheme (`data:`, `file:/x`) is never looked up on disk, and `import()` of a
+`blob:nativescript/…` URL loads from the blob store. A refused specifier fails
 before anything is fetched or read from disk, with an `Error` whose message
 names the specifier, the importer and what to use instead;
 `createRequire(<file path>)` is the explicit way for an HTTP module to reach
 CommonJS or ES modules on disk.
+
+From a file module, a static `import 'pkg?x'` looks `pkg?x` up in the import
+map, while `import('pkg?x')` drops the query and looks up `pkg`. An import-map
+target should not itself be a key of the map: `import()` may look a target up
+a second time.
 
 ### The `require()` specifier
 
