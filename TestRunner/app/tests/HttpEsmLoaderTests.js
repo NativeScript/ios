@@ -1682,6 +1682,75 @@ describe("HTTP ESM Loader", function() {
             });
         });
 
+        it("resolves a relative import-map target against the importer's URL", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            nsModule.configureLoader({
+                importMap: { imports: { "ns-http-importer-relative": "./mapped-target.mjs?k=map" } },
+            });
+            Promise.all([
+                importer(origin, "map-relative").then(function (mod) {
+                    return mod.load("ns-http-importer-relative");
+                }),
+                import(origin + "/esm/resolve/static.mjs?spec=ns-http-importer-relative"),
+            ]).then(function (namespaces) {
+                expect([namespaces[0].path, namespaces[0].query])
+                    .toEqual(["/esm/resolve/map-relative/mapped-target.mjs", "k=map"]);
+                expect([namespaces[1].dep.path, namespaces[1].dep.query])
+                    .toEqual(["/esm/resolve/mapped-target.mjs", "k=map"]);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("imports a blob:nativescript URL", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            // The bare test realm has no Blob; createObjectURL needs an
+            // instance carrying `type`, and the loader only calls `.text()`.
+            var previousBlob = globalThis.Blob;
+            globalThis.Blob = function Blob(parts, options) {
+                this._text = (parts || []).join("");
+                this.type = (options && options.type) || "";
+            };
+            globalThis.Blob.prototype.text = function () {
+                return Promise.resolve(this._text);
+            };
+            var url = URL.createObjectURL(
+                new Blob(["export const name = 'http-importer-blob';\n"],
+                         { type: "text/javascript" }),
+                { ext: ".mjs" });
+            function cleanUp() {
+                URL.revokeObjectURL(url);
+                if (typeof previousBlob === "undefined") {
+                    delete globalThis.Blob;
+                } else {
+                    globalThis.Blob = previousBlob;
+                }
+            }
+            importer(origin, "blob").then(function (mod) {
+                return mod.load(url);
+            }).then(function (ns) {
+                cleanUp();
+                expect(ns.name).toBe("http-importer-blob");
+                done();
+            }).catch(function (error) {
+                cleanUp();
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
         function rejectionMessage(promise) {
             return promise.then(function () {
                 return "resolved";
@@ -1818,6 +1887,53 @@ describe("HTTP ESM Loader", function() {
             });
         });
 
+        // `LOCALHOST` reaches the same server as the canonical origin but is
+        // spelled the way the parser would not spell it.
+        it("keeps the importer's origin as written in the URLs it resolves", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var written = origin.replace("127.0.0.1", "LOCALHOST");
+            var childUrl = written + "/esm/resolve/authority/x.mjs";
+            var direct;
+            import(childUrl).then(function (ns) {
+                direct = ns;
+                return Promise.all([
+                    importer(written, "authority").then(function (mod) {
+                        return Promise.all([
+                            mod.load("./x.mjs"),
+                            mod.load("/esm/resolve/authority/x.mjs"),
+                        ]);
+                    }),
+                    import(written + "/esm/resolve/authority/static.mjs?spec=" +
+                           encodeURIComponent("./x.mjs")),
+                    importer(origin, "authority-own").then(function (mod) {
+                        return Promise.all([
+                            mod.load(childUrl.replace(/^http:/, "")),
+                            mod.load(childUrl.replace(/^http:/, "HTTP:")),
+                        ]);
+                    }),
+                ]);
+            }).then(function (results) {
+                expect(results[0][0]).toBe(direct);
+                expect(results[0][1]).toBe(direct);
+                expect(results[1].dep).toBe(direct);
+                expect(results[2][0]).toBe(direct);
+                expect(results[2][1]).toBe(direct);
+                expect(direct.url).toBe(childUrl);
+                expect(nsModule.getLoadedModuleUrls()).toContain(childUrl);
+                nsModule.invalidateModules([childUrl]);
+                expect(nsModule.getLoadedModuleUrls()).not.toContain(childUrl);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
         it("normalizes a specifier the way the WHATWG URL parser does", function (done) {
             var origin = getHostOrigin();
             if (!origin) {
@@ -1839,6 +1955,37 @@ describe("HTTP ESM Loader", function() {
                     "/esm/resolve/norm/sub/back.mjs",
                     "/esm/resolve/norm/upper.mjs",
                 ]);
+                expect(mods[3].url).toBe(origin + "/esm/resolve/norm/upper.mjs");
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+    });
+
+    describe("import-map lookup of a query from a file module", function () {
+        var nsModule = require("ns:module");
+
+        afterEach(function () {
+            nsModule.configureLoader({ importMap: { imports: {} } });
+        });
+
+        it("looks a static import's query up in the map and drops an import()'s", function (done) {
+            nsModule.configureLoader({
+                importMap: {
+                    imports: {
+                        "ns-query-map-pkg": "~/tests/esm/query-map/stripped.mjs",
+                        "ns-query-map-pkg?x": "~/tests/esm/query-map/literal.mjs",
+                    },
+                },
+            });
+            Promise.all([
+                import("~/tests/esm/query-map/static-importer.mjs"),
+                import("ns-query-map-pkg?x"),
+            ]).then(function (namespaces) {
+                expect(namespaces[0].dep.name).toBe("literal");
+                expect(namespaces[1].name).toBe("stripped");
                 done();
             }).catch(function (error) {
                 expect("rejected: " + formatError(error)).toBe("resolved");

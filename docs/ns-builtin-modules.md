@@ -963,11 +963,15 @@ specifier the map does not match.
 
 Only `/`, `./` and `../` prefixes are relative: `.x`, `.` and `..` are bare
 specifiers and are refused without an import-map entry. Specifiers follow the
-HTML module-specifier rules and are resolved with the WHATWG URL parser, the
-one behind `new URL()`: dot segments, `\`, the case of the scheme and host, and
-default ports are normalized as a browser does. A specifier that resolves to an
-http(s) URL therefore names the same module as
-`new URL(specifier, importerUrl).href`.
+HTML module-specifier rules: the WHATWG URL parser, the one behind
+`new URL()`, decides whether a specifier is relative, an absolute URL or bare,
+and produces the path, query and fragment, so dot segments and `\` resolve and
+the scheme is lowercased as in a browser. The authority (userinfo, host and
+port) keeps its spelling from the importer's URL, or from the specifier when it
+names one (`//host/x`, `http(s)://…`). A specifier that resolves to an http(s)
+URL therefore names the same module as `new URL(specifier, importerUrl).href`
+whenever that authority is already spelled the way `new URL()` spells it (a
+lowercase host, no default port).
 
 An import-map entry is never refused — it is explicit configuration, so it may
 point an HTTP module at a `~/` path — though a relative or root-relative target

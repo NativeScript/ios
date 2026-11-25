@@ -1547,24 +1547,74 @@ static std::string UnresolvedModuleMessage(const ModuleResolution& resolution) {
   return "Cannot find module '" + resolution.specifier + "' (tried " + resolution.attempted + ")";
 }
 
-// The WHATWG URL parse of `input` against `base` (none when empty) — the
-// parser behind JS `new URL()`, so a module's URL is spelled the way script
-// computes it. Empty when the input does not parse.
-static std::string ParseUrlHref(const std::string& input, const std::string& base) {
-  if (base.empty()) {
-    auto url = ada::parse<ada::url_aggregator>(input, nullptr);
-    return url ? std::string(url->get_href()) : std::string();
-  }
-  auto baseUrl = ada::parse<ada::url_aggregator>(base, nullptr);
-  if (!baseUrl) {
-    return std::string();
-  }
-  auto url = ada::parse<ada::url_aggregator>(input, &baseUrl.value());
-  return url ? std::string(url->get_href()) : std::string();
-}
-
 static bool IsHttpHref(const std::string& href) {
   return StartsWith(href, "http://") || StartsWith(href, "https://");
+}
+
+// The authority (userinfo, host, port) of an absolute or scheme-relative URL
+// exactly as written, or empty when `url` does not spell one plainly.
+static std::string WrittenAuthority(const std::string& url) {
+  size_t start = 0;
+  if (StartsWith(url, "//")) {
+    start = 2;
+  } else {
+    const size_t colon = url.find(':');
+    if (colon == std::string::npos || url.compare(colon, 3, "://") != 0) {
+      return std::string();
+    }
+    start = colon + 3;
+  }
+  const size_t end = url.find_first_of("/?#", start);
+  std::string authority = url.substr(start, end == std::string::npos ? end : end - start);
+  for (const char c : authority) {
+    if (static_cast<unsigned char>(c) <= 0x20 || c == '\\') {
+      return std::string();
+    }
+  }
+  return authority;
+}
+
+// `input` parsed with the WHATWG URL parser (the one behind JS `new URL()`):
+// as an absolute URL when `base` is empty, otherwise as a path- or
+// scheme-relative reference against `base`. Empty when it does not parse.
+//
+// An http(s) result keeps its authority as written by whichever string
+// supplied it: tooling compares module URLs against the origin string it was
+// configured with, so that spelling is part of a module's identity until every
+// loader entry point canonicalizes. The parser's own href is used whenever the
+// written authority would not name the same URL.
+static std::string ParseUrlHref(const std::string& input, const std::string& base) {
+  ada::result<ada::url_aggregator> url;
+  if (base.empty()) {
+    url = ada::parse<ada::url_aggregator>(input, nullptr);
+  } else {
+    auto baseUrl = ada::parse<ada::url_aggregator>(base, nullptr);
+    if (!baseUrl) {
+      return std::string();
+    }
+    url = ada::parse<ada::url_aggregator>(input, &baseUrl.value());
+  }
+  if (!url) {
+    return std::string();
+  }
+  const std::string href(url->get_href());
+  if (!IsHttpHref(href)) {
+    return href;
+  }
+
+  const std::string authority =
+      WrittenAuthority(base.empty() || StartsWith(input, "//") ? input : base);
+  if (authority.empty()) {
+    return href;
+  }
+  const std::string written = std::string(url->get_protocol()) + "//" + authority +
+                              std::string(url->get_pathname()) + std::string(url->get_search()) +
+                              std::string(url->get_hash());
+  auto reparsed = ada::parse<ada::url_aggregator>(written, nullptr);
+  if (!reparsed || reparsed->get_href() != url->get_href()) {
+    return href;
+  }
+  return written;
 }
 
 struct UrlSpecifier {

@@ -135,7 +135,7 @@ class TestRunnerTests: XCTestCase {
                 // `…/importer.mjs` exports `load(spec)`, an import() issued
                 // from its own URL; `…/static.mjs` statically imports the
                 // specifier in its `spec` param; any other path answers with
-                // the request target it was reached at.
+                // the request target it was reached at and its import.meta.url.
                 if path.hasPrefix("/esm/resolve/") {
                     let body: String
                     if path.hasSuffix("/importer.mjs") {
@@ -149,7 +149,8 @@ class TestRunnerTests: XCTestCase {
                         body = "export * as dep from \"\(jsStringLiteral(spec))\";\n"
                     } else {
                         body = "export const path = \"\(jsStringLiteral(path))\";\n" +
-                               "export const query = \"\(jsStringLiteral(query))\";\n"
+                               "export const query = \"\(jsStringLiteral(query))\";\n" +
+                               "export const url = import.meta.url;\n"
                     }
                     startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
                     sendBody(body.data(using: .utf8) ?? Data())
