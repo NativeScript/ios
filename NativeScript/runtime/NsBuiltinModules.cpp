@@ -108,6 +108,10 @@ constexpr const char* kWrapperLifetimeWarningsKey = "wrapperLifetimeWarnings";
 // Read-only: the lifetime mode is fixed at startup from the app config.
 constexpr const char* kWrapperLifetimeModeKey = "wrapperLifetimeMode";
 constexpr const char* kWrapperLifetimeScopeKey = "wrapperLifetimeScope";
+constexpr const char* kWrapperLifetimeAllowShadowingKey =
+    "wrapperLifetimeAllowShadowingNativeMembers";
+constexpr const char* kWrapperLifetimeGuardsNativeMembersKey =
+    "wrapperLifetimeGuardsNativeMembers";
 
 void ThrowTypeError(Isolate* isolate, const std::string& message) {
   isolate->ThrowException(
@@ -146,7 +150,9 @@ void SetConfigCallback(const FunctionCallbackInfo<Value>& info) {
     }
     return;
   }
-  if (key == kWrapperLifetimeModeKey || key == kWrapperLifetimeScopeKey) {
+  if (key == kWrapperLifetimeModeKey || key == kWrapperLifetimeScopeKey ||
+      key == kWrapperLifetimeAllowShadowingKey ||
+      key == kWrapperLifetimeGuardsNativeMembersKey) {
     ThrowTypeError(
         isolate,
         "'" + key +
@@ -227,6 +233,14 @@ void GetConfigCallback(const FunctionCallbackInfo<Value>& info) {
         tns::WrapperLifetimeScopeName(tns::GetWrapperLifetimeScope())));
     return;
   }
+  if (key == kWrapperLifetimeAllowShadowingKey) {
+    info.GetReturnValue().Set(tns::GetAllowShadowingNativeMembers());
+    return;
+  }
+  if (key == kWrapperLifetimeGuardsNativeMembersKey) {
+    info.GetReturnValue().Set(tns::GuardsNativeMembers());
+    return;
+  }
   ThrowTypeError(isolate, "Unknown runtime config key: '" + key + "'");
 }
 
@@ -254,6 +268,7 @@ void GetWrapperLifetimeStatsCallback(const FunctionCallbackInfo<Value>& info) {
       {"canaryStates", stats->canaryStates},
       {"canaryNativeDeaths", stats->canaryNativeDeaths},
       {"canaryInterceptedWrites", stats->canaryInterceptedWrites},
+      {"canaryCachedNativeWrites", stats->canaryCachedNativeWrites},
   };
   for (const auto& [name, value] : fields) {
     result

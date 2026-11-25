@@ -9,6 +9,7 @@
 #include "FastEnumerationAdapter.h"
 #include "Helpers.h"
 #include "Interop.h"
+#include "MetadataBuilder.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
@@ -40,6 +41,10 @@ void ScopeClassNameToIsolate(std::string& name, int isolateId) {
 struct RetainTrackedClasses {
   std::unordered_set<void*> classes;
 };
+
+void ThrowTypeError(Isolate* isolate, const std::string& message) {
+  isolate->ThrowException(Exception::TypeError(tns::ToV8String(isolate, message)));
+}
 }  // namespace
 
 Local<FunctionTemplate> ClassBuilder::GetExtendFunction(Isolate* isolate,
@@ -53,7 +58,24 @@ Local<FunctionTemplate> ClassBuilder::GetExtendFunction(Isolate* isolate,
 void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
 
-  tns::Assert(info.Length() > 0 && info[0]->IsObject() && info.This()->IsFunction(), isolate);
+  if (!info.This()->IsFunction()) {
+    ThrowTypeError(isolate, "extend() must be called on a native class constructor");
+    return;
+  }
+  Local<v8::Function> baseFunc = info.This().As<v8::Function>();
+  std::string baseClassName = tns::ToString(isolate, baseFunc->GetName());
+  if (info.Length() == 0 || !info[0]->IsObject()) {
+    ThrowTypeError(isolate, baseClassName +
+                                ".extend() expects an object with the class's members as its "
+                                "first argument");
+    return;
+  }
+  if (info.Length() > 1 && !info[1]->IsNullOrUndefined() && !info[1]->IsObject()) {
+    ThrowTypeError(isolate, baseClassName +
+                                ".extend() expects an object with the native class options "
+                                "(name, protocols, exposedMethods) as its second argument");
+    return;
+  }
 
   try {
     Local<Context> context = isolate->GetCurrentContext();
@@ -61,8 +83,6 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
 
     Local<Object> implementationObject = info[0].As<Object>();
-    Local<v8::Function> baseFunc = info.This().As<v8::Function>();
-    std::string baseClassName = tns::ToString(isolate, baseFunc->GetName());
 
     BaseDataWrapper* baseWrapper = tns::GetValue(isolate, baseFunc);
     if (baseWrapper != nullptr && baseWrapper->Type() == WrapperType::ObjCClass) {
@@ -77,15 +97,38 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
     if (info.Length() > 1 && info[1]->IsObject()) {
       nativeSignature = info[1].As<Object>();
       Local<Value> explicitClassName;
-      tns::Assert(nativeSignature->Get(context, tns::ToV8String(isolate, "name"))
-                      .ToLocal(&explicitClassName),
-                  isolate);
+      if (!nativeSignature->Get(context, tns::ToV8String(isolate, "name"))
+               .ToLocal(&explicitClassName)) {
+        return;
+      }
       if (!explicitClassName.IsEmpty() && !explicitClassName->IsNullOrUndefined()) {
         staticClassName = tns::ToString(isolate, explicitClassName);
       }
     }
     auto cache = Caches::Get(isolate);
     auto isolateId = cache->getIsolateId();
+
+    Local<v8::Function> baseCtorFunc =
+        cache->CtorFuncs.find(item->meta_->name())->second->Get(isolate);
+    Local<Value> baseProto;
+    bool success =
+        baseCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&baseProto);
+    tns::Assert(success, isolate);
+
+    // Probed before the native class is registered, so a refusal leaves no class
+    // holding the requested name. The original prototype goes back right away:
+    // member discovery below reads through it. A refused change comes back as
+    // Nothing with no exception pending. Not for a Proxy: GetPrototype() does not
+    // reach its target, so the restore would drop the target's prototype.
+    Local<Value> originalProto = implementationObject->GetPrototype();
+    if (!implementationObject->IsProxy() &&
+        (!implementationObject->SetPrototype(context, baseProto).FromMaybe(false) ||
+         !implementationObject->SetPrototype(context, originalProto).FromMaybe(false))) {
+      ThrowTypeError(isolate, baseClassName +
+                                  ".extend() could not set the prototype of its first argument, "
+                                  "which must be an extensible object");
+      return;
+    }
 
     ScopeClassNameToIsolate(staticClassName, isolateId);
     Class extendedClass = ClassBuilder::GetExtendedClass(baseClassName, staticClassName, isolateId);
@@ -102,9 +145,6 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
                                          implementationObject);
     }
 
-    Local<v8::Function> baseCtorFunc =
-        cache->CtorFuncs.find(item->meta_->name())->second->Get(isolate);
-
     CacheItem* cacheItem = new CacheItem(nullptr, extendedClass);
     Caches::Get(isolate)->registerCacheBoundObject(cacheItem);
     Local<External> ext = External::New(isolate, cacheItem, v8::kExternalPointerTypeTagDefault);
@@ -112,20 +152,18 @@ void ClassBuilder::ExtendCallback(const FunctionCallbackInfo<Value>& info) {
         FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, ext);
     extendedClassCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
     WrapperLifetimeCanary::ConfigureInstanceTemplate(
-        extendedClassCtorFuncTemplate->InstanceTemplate());
+        extendedClassCtorFuncTemplate->InstanceTemplate(), CanaryKind::kExtended);
 
     Local<v8::Function> extendClassCtorFunc;
     if (!extendedClassCtorFuncTemplate->GetFunction(context).ToLocal(&extendClassCtorFunc)) {
       tns::Assert(false, isolate);
     }
 
-    Local<Value> baseProto;
-    bool success =
-        baseCtorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&baseProto);
-    tns::Assert(success, isolate);
-
-    if (!implementationObject->SetPrototype(context, baseProto).To(&success) || !success) {
-      tns::Assert(false, isolate);
+    if (!implementationObject->SetPrototype(context, baseProto).FromMaybe(false)) {
+      ThrowTypeError(isolate, baseClassName +
+                                  ".extend() could not set the prototype of its first argument, "
+                                  "which must be an extensible object");
+      return;
     }
     Local<v8::Function> superGetter;
     if (!FunctionTemplate::New(isolate, SuperAccessorGetterCallback, ext)
@@ -179,7 +217,7 @@ void ClassBuilder::ExtendedClassConstructorCallback(const FunctionCallbackInfo<V
         info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
     Class klass = item->data_;
 
-    ArgConverter::ConstructObject(context, info, klass, nullptr, true);
+    ArgConverter::ConstructObject(context, info, klass, nullptr, CanaryKind::kExtended);
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
   }
@@ -213,15 +251,15 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         Local<Context> context = isolate->GetCurrentContext();
 
         auto cache = Caches::Get(isolate);
-        BaseDataWrapper* wrapper = tns::GetValue(isolate, info[1].As<Object>());
-        if (!wrapper) {
-          // We are not extending a native object -> call the base __extends function
+        BaseDataWrapper* wrapper =
+            info[1]->IsObject() ? tns::GetValue(isolate, info[1].As<Object>()) : nullptr;
+        if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCClass) {
+          // Not a native class: the base __extends function's inheritance.
           Persistent<v8::Function>* poExtendsFunc = cache->OriginalExtendsFunc.get();
           tns::Assert(poExtendsFunc != nullptr, isolate);
           Local<v8::Function> originalExtendsFunc = poExtendsFunc->Get(isolate);
           Local<Value> args[] = {info[0], info[1]};
-          originalExtendsFunc->Call(context, context->Global(), info.Length(), args)
-              .ToLocalChecked();
+          (void)originalExtendsFunc->Call(context, context->Global(), 2, args);
           return;
         }
 
@@ -229,6 +267,11 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
         Class baseClass = classWrapper->Klass();
         std::string baseClassName = class_getName(baseClass);
 
+        if (!info[0]->IsFunction()) {
+          ThrowTypeError(isolate,
+                         "__extends() expects a constructor function to extend " + baseClassName);
+          return;
+        }
         Local<v8::Function> extendedClassCtorFunc = info[0].As<v8::Function>();
         std::string extendedClassName = tns::ToString(isolate, extendedClassCtorFunc->GetName());
 
@@ -638,6 +681,9 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
                                         Local<Value> exposedMethods, Local<Value> exposedProtocols,
                                         Local<Object> implementationObject) {
   Isolate* isolate = v8::Isolate::GetCurrent();
+  // The methods native code calls: exposed ones, and those implementing a
+  // native class's or protocol's method.
+  std::vector<std::string> nativeCalled;
   std::vector<const ProtocolMeta*> protocols;
   if (!exposedProtocols.IsEmpty() && exposedProtocols->IsArray()) {
     Local<v8::Array> protocolsArray = exposedProtocols.As<v8::Array>();
@@ -711,6 +757,7 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
 
       std::string methodNameStr = tns::ToString(isolate, methodName);
       SEL selector = sel_registerName(methodNameStr.c_str());
+      nativeCalled.push_back(methodNameStr);
 
       // TODO: Investigate and maybe find a way to free this
       // Currently this is added to the meta cache by the Interop::CreateMethod
@@ -755,6 +802,7 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
 
   const Meta* m = ArgConverter::FindMeta(extendedClass);
   if (m == nullptr) {
+    MetadataBuilder::GuardNativeCalledMethods(context, implementationObject, nativeCalled, false);
     return;
   }
 
@@ -828,19 +876,24 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
                   .ToLocal(&setter);
     tns::Assert(success, isolate);
 
+    Local<Value> method;
     if ((!getter.IsEmpty() || !setter.IsEmpty()) &&
         (getter->IsFunction() || setter->IsFunction())) {
-      std::vector<const PropertyMeta*> propertyMetas;
-      VisitProperties(methodName, extendedClassMeta, propertyMetas, protocols);
-      ExposeProperties(isolate, extendedClass, propertyMetas, getter, setter);
-      continue;
+      // A method an earlier pass over this prototype turned into an accessor
+      // pair: +initialize also runs for a subclass that does not implement it.
+      method = MetadataBuilder::GuardedNativeCalledMethod(context, getter);
+      if (method.IsEmpty()) {
+        std::vector<const PropertyMeta*> propertyMetas;
+        VisitProperties(methodName, extendedClassMeta, propertyMetas, protocols);
+        ExposeProperties(isolate, extendedClass, propertyMetas, getter, setter);
+        continue;
+      }
+    } else {
+      success = propertyDescriptor.As<Object>()
+                    ->Get(context, tns::ToV8String(isolate, "value"))
+                    .ToLocal(&method);
+      tns::Assert(success, isolate);
     }
-
-    Local<Value> method;
-    success = propertyDescriptor.As<Object>()
-                  ->Get(context, tns::ToV8String(isolate, "value"))
-                  .ToLocal(&method);
-    tns::Assert(success, isolate);
 
     if (method.IsEmpty() || !method->IsFunction()) {
       continue;
@@ -848,6 +901,9 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
 
     std::vector<const MethodMeta*> methodMetas;
     VisitMethods(extendedClass, methodName, extendedClassMeta, methodMetas, protocols);
+    if (!methodMetas.empty()) {
+      nativeCalled.push_back(methodName);
+    }
 
     for (int j = 0; j < methodMetas.size(); j++) {
       const MethodMeta* methodMeta = methodMetas[j];
@@ -868,6 +924,10 @@ void ClassBuilder::ExposeDynamicMethods(Local<Context> context, Class extendedCl
                           typeInfo.c_str());
     }
   }
+
+  MetadataBuilder::GuardNativeCalledMethods(
+      context, implementationObject, nativeCalled,
+      ownsIterator && !symbolIterator.IsEmpty() && symbolIterator->IsFunction());
 }
 
 void ClassBuilder::VisitProperties(std::string propertyName, const BaseClassMeta* meta,

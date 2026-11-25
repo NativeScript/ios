@@ -17,6 +17,7 @@
 #include "Helpers.h"
 #include "Runtime.h"
 #include "WrapperLifetime.h"
+#include "WrapperLifetimeCanary.h"
 
 // Exported by libobjc; not declared in a public header for MRC code.
 extern "C" id objc_initWeak(id* location, id value);
@@ -573,6 +574,15 @@ bool ObjectManager::TakeDeferredRelease(Isolate* isolate, id obj) {
   return true;
 }
 
+void ObjectManager::RunDeferredReleases(Isolate* isolate) {
+  if (!OnRuntimeThreadOf(isolate)) {
+    return;
+  }
+  if (DeferredReleases* pending = Caches::ExistingStateFor<DeferredReleases>(isolate)) {
+    DrainDeferredReleases(pending);
+  }
+}
+
 void ObjectManager::ProtectIfNativelyRetained(Isolate* isolate, id obj, ObjCDataWrapper* wrapper) {
   // Only a wrapper the class's -release unprotects again may be protected.
   if (ClassBuilder::TracksNativeRetains(isolate, object_getClass(obj)) && [obj retainCount] > 1) {
@@ -822,6 +832,7 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
   if (data != nil) {
     std::shared_ptr<Caches> cache = Caches::Get(isolate);
     auto it = cache->Instances.find(data);
+    bool canary = false;
     if (ObjectWeakCallbackState* managed = objcWrapper->OwnershipState()) {
       // The handle ReconcileOwnership manages is this wrapper's own, whatever
       // Instances maps the object to now.
@@ -840,8 +851,23 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
       // An adopted wrapper (WrapperLifetime) owns its registration whether or not
       // the Instances entry still names it, and its handle may be strong.
       if (adopted->disposing_) {
-        // The teardown walk owns this state and releases the object.
+        // Another frame owns this state and releases the object: the teardown
+        // walk, or an outer call still writing the canary's key below.
         return;
+      }
+      canary = adopted->lifetimeCanary_;
+      if (canary) {
+        // Before the release below, which can run the object's -dealloc. The
+        // write can allocate, and the finalizers of the collection that
+        // triggers can run JS that calls this builtin on the same wrapper.
+        adopted->disposing_ = true;
+        WrapperLifetimeCanary::KeepWeakCollectionKey(isolate, value.As<Object>());
+        // The wrapper first: a release that got through would have freed it.
+        if (tns::GetValue(isolate, value) != wrapper || objcWrapper->LifetimeState() != adopted) {
+          return;
+        }
+        // Those finalizers can also have changed Instances.
+        it = cache->Instances.find(data);
       }
       if (it != cache->Instances.end() && it->second == adopted->target_) {
         cache->Instances.erase(it);
@@ -850,7 +876,9 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
       WrapperLifetime::Forget(isolate, adopted);
       objcWrapper->SetLifetimeState(nullptr);
       UnlinkRegistered(adopted);
+      std::shared_ptr<CanaryRecord> record = std::move(adopted->canaryRecord_);
       delete adopted;
+      WrapperLifetimeCanary::DropRecord(isolate, std::move(record));
     } else if (it != cache->Instances.end()) {
       std::shared_ptr<Persistent<Value>> handle = it->second;
       bool wasWeak = handle->IsWeak();
@@ -873,6 +901,17 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
         UnlinkRegistered(state);
         ForgetOwnership(isolate, state);
         delete state;
+      }
+    }
+
+    if (!canary && !objcWrapper->IsAdapterClaim()) {
+      // Before the release below, which can run the object's -dealloc. The
+      // write can allocate, and the finalizers of the collection that
+      // triggers can run JS that calls this builtin on the same wrapper: a
+      // release that got through freed the wrapper.
+      WrapperLifetimeCanary::KeepPlainWeakCollectionKey(isolate, value.As<Object>(), data);
+      if (tns::GetValue(isolate, value) != wrapper) {
+        return;
       }
     }
 

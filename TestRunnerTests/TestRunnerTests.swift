@@ -216,6 +216,72 @@ class TestRunnerTests: XCTestCase {
                     return
                 }
 
+                // ── Generated modules of a requested size ──────────
+                // /esm/big.mjs: `lines` real declarations whose evaluation
+                // folds into `total`, so a value depends on the whole body.
+                //   k        module id (also the evaluation counter's key)
+                //   unicode  1 adds non-ASCII string literals (strs/first/last)
+                //   error    1 ends the body with a syntax error at line lines+3
+                //   nest     appends an array literal nested `nest` deep
+                //   delayMs  answers after a delay
+                // /esm/big-parent.mjs?k=…&child=<encoded big.mjs query>
+                // statically imports that big.mjs and re-exports it as `child`.
+                if path == "/esm/big.mjs" || path == "/esm/big-parent.mjs" {
+                    var params = [String: String]()
+                    for pair in query.split(separator: "&") {
+                        let kv = pair.split(separator: "=", maxSplits: 1)
+                        let value = kv.count > 1 ? String(kv[1]) : ""
+                        params[String(kv[0])] = value.removingPercentEncoding ?? value
+                    }
+                    let key = String((params["k"] ?? "x").filter { $0.isLetter || $0.isNumber || $0 == "-" })
+                    let delayMs = Int(params["delayMs"] ?? "") ?? 0
+                    var body = ""
+                    if path == "/esm/big-parent.mjs" {
+                        let child = (params["child"] ?? "").replacingOccurrences(of: "\"", with: "")
+                        body = "export * as child from \"./big.mjs?\(child)\";\n" +
+                               "export const parent = \"\(key)\";\n"
+                    } else {
+                        let lines = Int(params["lines"] ?? "") ?? 0
+                        let unicode = params["unicode"] == "1"
+                        body.reserveCapacity(lines * 96 + 256)
+                        body += "let acc = 0;\nconst strs = [];\n"
+                        for i in 0..<lines {
+                            body += "function f\(i)(x) { return (x * 3 + \(i)) % 1000; } acc += f\(i)(\(i));"
+                            if unicode {
+                                body += " strs.push(\"café 日本語 😀 \(i)\");"
+                            }
+                            body += "\n"
+                        }
+                        if let depth = Int(params["nest"] ?? ""), depth > 0 {
+                            body += "export const deep = " + String(repeating: "[", count: depth) +
+                                    String(repeating: "]", count: depth) + ";\n"
+                        }
+                        if params["error"] == "1" {
+                            body += "export const broken = ;\n"
+                        }
+                        body += """
+                        const evaluations = globalThis.__nsBigModuleEvaluations || (globalThis.__nsBigModuleEvaluations = {});
+                        evaluations["\(key)"] = (evaluations["\(key)"] || 0) + 1;
+                        export const id = "\(key)";
+                        export const count = \(lines);
+                        export const total = acc;
+                        export const first = strs[0];
+                        export const last = strs[strs.length - 1];
+                        export const joinedLength = strs.join("").length;
+
+                        """
+                        body += "export const bytes = \(body.utf8.count);\n"
+                    }
+                    let data = body.data(using: .utf8) ?? Data()
+                    DispatchQueue.global(qos: .utility).asyncAfter(
+                        deadline: .now() + Double(delayMs) / 1000.0
+                    ) {
+                        startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
+                        sendBody(data)
+                    }
+                    return
+                }
+
                 if path == "/esm/timeout.mjs" {
                     // Delay the response without blocking request handling.
                     // The loader still hits its client-side timeout when

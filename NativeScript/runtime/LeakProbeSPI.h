@@ -23,16 +23,20 @@
 namespace tns {
 namespace leakprobe {
 
-constexpr uint32_t kVersion = 2;
+constexpr uint32_t kVersion = 3;
 
 constexpr const char* kConnectSymbol = "NativeScriptLeakProbeConnect";
 
-// One entry of an isolate's native object -> wrapper map. The runtime has not
-// dereferenced `object`, which another thread may have freed.
+// One entry of an isolate's native object -> wrapper map, or an object whose
+// only runtime retains are queued ones (`wrapper` empty). The runtime has not
+// dereferenced `object`, which another thread may have freed unless `queued`.
 struct Instance {
   void* object;
   // Empty once the wrapper is gone.
   v8::Local<v8::Value> wrapper;
+  // Retains the runtime still holds on `object` for wrappers that died, until
+  // the next drain (Host::drainReleases) on this isolate's thread.
+  uint32_t queued;
   // `wrapper` wraps an Objective-C object; the fields below are meaningful
   // only then.
   bool objc;
@@ -44,6 +48,10 @@ struct Instance {
   // The map holds the wrapper through the strong handle the runtime keeps for
   // a JS-extended object native code also retains.
   bool reconciledStrong;
+  // The map holds the wrapper through a weak handle whose disposal is refused
+  // while native code retains the object ("resurrecting"): the object keeps
+  // the wrapper alive.
+  bool resurrects;
 };
 
 struct LifetimeStats {
@@ -75,6 +83,12 @@ struct Host {
   void (*forEachCanaryState)(v8::Isolate* isolate, void* context,
                              void (*visit)(void* context, id object,
                                            v8::Local<v8::Object> state));
+  // Every canary state handle the runtime holds, those forEachCanaryState
+  // skips included: states of objects being deallocated, and of deallocated
+  // objects until the next drain lets go of them.
+  void (*forEachCanaryStateHandle)(v8::Isolate* isolate, void* context,
+                                   void (*visit)(void* context,
+                                                 v8::Local<v8::Object> state));
   // Whether the runtime made `block` (alive) for JS.
   bool (*isJSBlock)(const void* block);
   // The JS function a JS block made for this isolate calls; empty for other
@@ -100,7 +114,9 @@ struct Host {
   // Any thread.
   void (*destroyPoster)(Poster* poster);
 
-  // Releases the native objects wrapper lifetime modes queued for release.
+  // Releases the native objects wrapper lifetime modes queued for release and
+  // those a collection or explicit release on another thread left for this
+  // one, and lets go of the canary states of deallocated objects. Can run JS.
   void (*drainReleases)(v8::Isolate* isolate);
   const char* (*lifetimeMode)();
   const char* (*lifetimeScope)();

@@ -2,11 +2,13 @@
 #define WrapperLifetime_h
 
 #include <atomic>
+#include <functional>
 
 #include "Common.h"
 #include "DataWrapper.h"
 #include "Helpers.h"
 #include "ObjectManager.h"
+#include "WrapperLifetimeCanary.h"
 
 namespace tns {
 
@@ -43,6 +45,8 @@ inline WrapperLifetimeMode wrapperLifetimeMode =
     WrapperLifetimeMode::kResurrecting;
 inline WrapperLifetimeScope wrapperLifetimeScope =
     WrapperLifetimeScope::kExtended;
+inline bool allowShadowingNativeMembers = false;
+inline bool guardsNativeMembers = false;
 }  // namespace detail
 
 inline WrapperLifetimeMode GetWrapperLifetimeMode() {
@@ -51,6 +55,15 @@ inline WrapperLifetimeMode GetWrapperLifetimeMode() {
 inline WrapperLifetimeScope GetWrapperLifetimeScope() {
   return detail::wrapperLifetimeScope;
 }
+// "wrapperLifetime": { "allowShadowingNativeMembers": true } in the app config.
+inline bool GetAllowShadowingNativeMembers() {
+  return detail::allowShadowingNativeMembers;
+}
+// Debug builds in the "rooted" and "canary" modes, unless shadowing is
+// allowed: assigning a native instance method's name on a native object
+// throws instead of creating an own property native code never calls
+// (MetadataBuilder's native member guard).
+inline bool GuardsNativeMembers() { return detail::guardsNativeMembers; }
 const char* WrapperLifetimeModeName(WrapperLifetimeMode mode);
 const char* WrapperLifetimeScopeName(WrapperLifetimeScope scope);
 
@@ -63,13 +76,16 @@ class WrapperLifetime {
   // of a JS-extended class.
   static bool InScope(id obj);
 
+  // A tagged pointer or a block: never in scope, whatever the scope.
+  static bool Excluded(id obj);
+
   // A newly wrapped ObjC object: `handle` is its Instances entry, registered by
   // ObjectManager::Register and holding the entry's +1 on `target`.
-  // `intercepted`: the wrapper carries the canary handlers
-  // (WrapperLifetimeCanary::Intercepts).
+  // `kind`: the canary handlers the wrapper carries
+  // (WrapperLifetimeCanary::KindOf).
   static void Adopt(v8::Isolate* isolate, ObjCDataWrapper* wrapper,
                     const std::shared_ptr<v8::Persistent<v8::Value>>& handle,
-                    id target, bool intercepted);
+                    id target, CanaryKind kind);
 
   // The object crossed the JS/native boundary: native code returned it to JS,
   // or received it as a receiver, argument, return value of a JS-implemented
@@ -93,6 +109,11 @@ class WrapperLifetime {
   // Releases the native objects of wrappers that died. Runs only where JS may
   // run: release can reach a JS-implemented -dealloc.
   static void DrainReleases(v8::Isolate* isolate);
+
+  // Calls `visit` with the object of each dead wrapper whose release
+  // DrainReleases has yet to make, once per queued retain.
+  static void ForEachQueuedRelease(v8::Isolate* isolate,
+                                   const std::function<void(id object)>& visit);
 
   // JS->native call entry: a long synchronous stretch of JS must not hold dead
   // objects until it yields. The gate is process-wide; while another isolate

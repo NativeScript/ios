@@ -7,15 +7,17 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: ./scripts/wait-for-simulator.sh --name <device name> [--timeout <seconds>]"
+  echo "Usage: ./scripts/wait-for-simulator.sh --name <device name> [--timeout <seconds>] [--boot]"
   echo ""
   echo "  --name <name>        simulator device name, e.g. \"iPhone 16 Pro\""
   echo "  --timeout <seconds>  give up after this long (default: 300)"
+  echo "  --boot               once found, start booting it in the background and return"
   echo "  -h, --help           show this help"
 }
 
 NAME=""
 TIMEOUT=300
+BOOT=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --name)
@@ -34,6 +36,10 @@ while [ $# -gt 0 ]; do
       ;;
     --timeout=*)
       TIMEOUT="${1#--timeout=}"
+      shift
+      ;;
+    --boot)
+      BOOT=1
       shift
       ;;
     -h|--help)
@@ -79,6 +85,12 @@ while :; do
   found="$(find_device || true)"
   if [ -n "$found" ]; then
     echo "Found simulator \"$NAME\": $found (after ${SECONDS}s)"
+    if [ "$BOOT" -eq 1 ]; then
+      # Detached so later steps (the build) run while it boots; xcodebuild
+      # waits for a booting device on its own.
+      nohup xcrun simctl bootstatus "${found%% *}" -b > /dev/null 2>&1 &
+      echo "Booting ${found%% *} in the background"
+    fi
     exit 0
   fi
   if [ "$SECONDS" -ge "$deadline" ]; then

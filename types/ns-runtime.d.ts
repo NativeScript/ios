@@ -53,7 +53,8 @@ declare module "ns:runtime" {
      *   the runtime's thread.
      * - `"canary"`: no resurrection. A wrapper in scope dies with its JS
      *   references; JS properties set on it, including ones that shadow a
-     *   prototype member (a rebound class method, a field called `copy`), are
+     *   prototype member (a rebound JS method, or a native method where
+     *   `wrapperLifetimeAllowShadowingNativeMembers` lets one be assigned), are
      *   also copied to a state object kept until the native object is
      *   deallocated, and a wrapper built for the object later gets them back
      *   with their attributes while that state object lives. An object that
@@ -62,8 +63,18 @@ declare module "ns:runtime" {
      *   it lives, and one whose class forbids associated objects (or, under
      *   the alternative death signal, refuses weak references) gets none.
      *   Native property writes still reach the native setter. Writes cost more than in the other modes; reads do not.
+     *   Under scope `"all"`, a plain (not JS-extended) object's properties are
+     *   kept in its state object only, so reading one costs a native call and a
+     *   new wrapper needs no copy; an instance assignment or
+     *   `Object.defineProperty` over a name its prototype chain has (a native
+     *   method, `toString`, `valueOf`, a member JS added to a prototype) stays
+     *   on that wrapper and is gone with it. `wrapperLifetimeAllowShadowingNativeMembers`
+     *   makes plain objects' wrappers keep such properties too.
      *   WeakMap, WeakSet, WeakRef and FinalizationRegistry key such native
-     *   objects by their lifetime in this mode, so they carry over too; a
+     *   objects by their lifetime in this mode, so they carry over too, and
+     *   under scope `"extended"` also key plain objects by their lifetime once
+     *   they first key one (a state holding only the key; nothing is attached
+     *   to the object, whose death is found after a major collection); a
      *   WeakMap value that references its own native key keeps that object
      *   alive while the map lives. Native `#private` fields and index-keyed
      *   properties do not.
@@ -78,6 +89,31 @@ declare module "ns:runtime" {
      * - `"all"`: every ObjC object wrapper except blocks and tagged pointers.
      */
     wrapperLifetimeScope: "extended" | "all";
+    /**
+     * From the app config `"wrapperLifetime": { "allowShadowingNativeMembers": ... }`,
+     * `false` by default. Read-only: `setConfig` throws.
+     *
+     * In debug builds under the `"rooted"` and `"canary"` modes, assigning a
+     * native instance method's name (or `toString`, or an NSArray's
+     * `Symbol.iterator`, or a JS-extended class's method that native code
+     * calls: an exposed method, a native override, a protocol implementation)
+     * on a native object throws a `TypeError`, since native code never calls
+     * a JS own property of a native object; `true` turns that off. Those members are then accessor pairs on their class's prototype.
+     * Release builds and the `"resurrecting"` mode never throw.
+     * Under `"canary"` with scope `"all"`, `true` also gives a plain (not
+     * JS-extended) object's wrapper the mirroring handler JS-extended
+     * instances' wrappers have, so JS properties over a name its prototype
+     * chain has carry over to a new wrapper too, at the cost of a write
+     * handler on every write.
+     */
+    wrapperLifetimeAllowShadowingNativeMembers: boolean;
+    /**
+     * Whether assigning a native member's name on a native object throws (see
+     * `wrapperLifetimeAllowShadowingNativeMembers`): `true` in debug builds
+     * under the `"rooted"` and `"canary"` modes unless shadowing is allowed,
+     * `false` otherwise. Fixed at startup. Read-only: `setConfig` throws.
+     */
+    wrapperLifetimeGuardsNativeMembers: boolean;
   }
 
   /**
@@ -103,12 +139,14 @@ declare module "ns:runtime" {
     demotions: number;
     /** `"rooted"` and `"canary"`: collected wrappers whose native object was queued for release. */
     queuedReleases: number;
-    /** `"canary"` only: state objects created for native objects' JS properties. */
+    /** `"canary"` only: state objects created for native objects' JS properties, or only for the key a weak collection made for one. */
     canaryStates: number;
     /** `"canary"` only: state objects let go of because their native object was deallocated, or because `objc_removeAssociatedObjects` released its lifecycle token. */
     canaryNativeDeaths: number;
     /** `"canary"` only: writes to canaries the runtime's write handler saw. */
     canaryInterceptedWrites: number;
+    /** `"canary"` only: of those writes, native property writes whose setter the handler found from an earlier write of the same name through an object with the same prototype, without looking the name up along the prototype chain. */
+    canaryCachedNativeWrites: number;
   }
 
   /** Live native object wrappers of one class in the calling isolate. */

@@ -12,6 +12,7 @@
 
 namespace tns {
 
+struct NativeSetter;
 struct NativeSetters;
 
 class MetadataBuilder {
@@ -32,18 +33,35 @@ class MetadataBuilder {
                                                  void* data,
                                                  StructStorage storage,
                                                  v8::Local<v8::Object> parent);
-  // Runs the setter of `owner`'s native property `property` on `receiver`, as
-  // the property's accessor would, and returns true. Returns false, having
-  // run nothing, unless `owner` is a native class's prototype, still holding
-  // the accessor pair it was built with for `property`, which has a setter.
-  // The caller establishes that `owner` is where `receiver`'s prototype chain
-  // finds `property`. Only canary mode records the accessors this needs.
-  static bool TrySetNativeProperty(v8::Isolate* isolate,
-                                   v8::Local<v8::Context> context,
-                                   v8::Local<v8::Object> owner,
-                                   v8::Local<v8::Name> property,
-                                   v8::Local<v8::Object> receiver,
-                                   v8::Local<v8::Value> value);
+  // Canary mode: the setter of `owner`'s native property `property`, when
+  // `owner` is a native class's prototype still holding the accessor pair it
+  // was built with for `property`, which has a setter; null otherwise. The
+  // caller establishes that `owner` is where a receiver's prototype chain
+  // finds `property`. The result stays valid for the isolate's lifetime.
+  static NativeSetter* FindNativeSetter(v8::Isolate* isolate,
+                                        v8::Local<v8::Context> context,
+                                        v8::Local<v8::Object> owner,
+                                        v8::Local<v8::Name> property);
+  // Runs `setter` on `receiver`, as the property's accessor would, and
+  // returns true; false, having run nothing, once JS has assigned or defined
+  // the property on its prototype since FindNativeSetter.
+  static bool RunNativeSetter(v8::Isolate* isolate, NativeSetter* setter,
+                              v8::Local<v8::Object> receiver,
+                              v8::Local<v8::Value> value);
+  // Where the native member guard is on (GuardsNativeMembers): turns each
+  // of `names`, and Symbol.iterator with `iterator`, an own method of
+  // `prototype`, a prototype level of a JS-extended class, that native code
+  // calls through the function the class captured, into an accessor pair
+  // whose getter returns that same function, so reads and `super` loads
+  // resolve as before. Assigning the name on a native object throws.
+  static void GuardNativeCalledMethods(v8::Local<v8::Context> context,
+                                       v8::Local<v8::Object> prototype,
+                                       const std::vector<std::string>& names,
+                                       bool iterator);
+  // The method behind an accessor pair GuardNativeCalledMethods installed,
+  // given its getter; empty for any other value.
+  static v8::Local<v8::Value> GuardedNativeCalledMethod(
+      v8::Local<v8::Context> context, v8::Local<v8::Value> getter);
 
  private:
   // The binding of an object whose static type adds protocols to `meta`: a
@@ -69,6 +87,8 @@ class MetadataBuilder {
       const v8::FunctionCallbackInfo<v8::Value>& info);
   static void AllocCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
   static void MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+  static void InstanceMethodCallback(
+      const v8::FunctionCallbackInfo<v8::Value>& info);
   static void CFunctionCallback(
       const v8::FunctionCallbackInfo<v8::Value>& info);
   static void PropertyGetterCallback(
@@ -111,11 +131,13 @@ class MetadataBuilder {
   static void RegisterAllocMethod(
       v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> ctorFuncTemplate,
       const InterfaceMeta* interfaceMeta);
+  // `guarded`, when given, records the JS name of each method installed.
   static void RegisterInstanceMethods(
       v8::Local<v8::Context> context,
       v8::Local<v8::FunctionTemplate> ctorFuncTemplate,
       const BaseClassMeta* meta, KnownUnknownClassPair pair,
-      robin_hood::unordered_map<std::string, uint8_t>& names);
+      robin_hood::unordered_map<std::string, uint8_t>& names,
+      std::vector<std::string>* guarded = nullptr);
   // `setters`, when given, records each accessor pair installed.
   static void RegisterInstanceProperties(
       v8::Local<v8::Context> context,
@@ -130,13 +152,15 @@ class MetadataBuilder {
       const BaseClassMeta* meta, std::string className,
       KnownUnknownClassPair pair,
       robin_hood::unordered_map<std::string, uint8_t>& names,
-      NativeSetters* setters = nullptr);
+      NativeSetters* setters = nullptr,
+      std::vector<std::string>* guarded = nullptr);
   static void RegisterAdditionalProtocols(
       v8::Local<v8::Context> context,
       v8::Local<v8::FunctionTemplate> ctorFuncTemplate,
       KnownUnknownClassPair pair,
       const std::vector<std::string>& additionalProtocols,
-      robin_hood::unordered_map<std::string, uint8_t>& names);
+      robin_hood::unordered_map<std::string, uint8_t>& names,
+      std::vector<std::string>* guarded = nullptr);
   static void RegisterStaticMethods(
       v8::Local<v8::Context> context, v8::Local<v8::Function> ctorFunc,
       const BaseClassMeta* meta, KnownUnknownClassPair pair,
@@ -199,6 +223,7 @@ class MetadataBuilder {
     Class klass_ = nil;
   };
 
+  friend struct NativeSetter;
   friend struct NativeSetters;
 
   static void SetNativeProperty(v8::Isolate* isolate,

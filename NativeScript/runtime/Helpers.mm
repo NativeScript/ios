@@ -16,6 +16,7 @@
 #include <sstream>
 #include <vector>
 #include "Caches.h"
+#include "Checks.h"
 #include "ErrorEvents.h"
 #include "NativeScriptException.h"
 #include "ObjectManager.h"
@@ -1166,45 +1167,44 @@ bool tns::LiveSync(Isolate* isolate) {
   return true;
 }
 
-void tns::Assert(bool condition, Isolate* isolate, std::string const& reason) {
-  if (!RuntimeConfig.IsDebug) {
-    assert(condition);
-    return;
+void tns::Fatal(const char* location, const std::string& message) {
+  // A check failing while this reports (say, inside the JS stack walk) must
+  // not recurse.
+  static thread_local bool reporting = false;
+  if (reporting) {
+    abort();
   }
+  reporting = true;
 
-  if (condition) {
-    return;
-  }
-
-  if (isolate == nullptr) {
-    Runtime* runtime = Runtime::GetCurrentRuntime();
-    if (runtime != nullptr) {
-      isolate = runtime->GetIsolate();
-    }
-  }
-
-  if (isolate == nullptr) {
-    Log(@"====== Assertion failed ======");
-    if (!reason.empty()) {
-      Log(@"Reason: %s", reason.c_str());
-    }
-    Log(@"Native stack trace:");
-    LogBacktrace();
-    assert(false);
-    return;
-  }
-
-  Log(@"====== Assertion failed ======");
+  Log(@"====== Fatal error ======");
+  Log(@"Location: %s", location != nullptr ? location : "<unknown location>");
+  Log(@"Message: %s", message.c_str());
   Log(@"Native stack trace:");
   LogBacktrace();
 
-  Log(@"JavaScript stack trace:");
-  std::string stack = tns::GetStackTrace(isolate);
-  Log(@"%s", stack.c_str());
-  assert(false);
+  // Reading the JS stack needs the isolate entered on this thread.
+  if (Isolate* isolate = v8::Isolate::TryGetCurrent()) {
+    HandleScope handleScope(isolate);
+    Log(@"JavaScript stack trace:");
+    std::string stack = tns::GetStackTrace(isolate);
+    Log(@"%s", stack.c_str());
+  }
+
+  // abort(), not assert(): this must stop the process whether or not NDEBUG
+  // is defined.
+  abort();
 }
 
-void tns::StopExecutionAndLogStackTrace(v8::Isolate* isolate) { Assert(false, isolate); }
+void tns::Assert(bool condition, Isolate* isolate, std::string const& reason, const char* file,
+                 int line) {
+  (void)isolate;
+  if (condition) [[likely]] {
+    return;
+  }
+  std::string location =
+      std::string(file != nullptr ? file : "<unknown location>") + ":" + std::to_string(line);
+  tns::Fatal(location.c_str(), reason.empty() ? "assertion failed" : reason);
+}
 
 namespace tns {
 Local<v8::FunctionTemplate> NewFunctionTemplate(v8::Isolate* isolate, v8::FunctionCallback callback,

@@ -78,6 +78,26 @@ bool ResolveProxyReceiver(Isolate* isolate, Local<Object>& receiver, const char*
   return true;
 }
 
+// The receiver an instance member dispatches on. A native class constructor
+// makes it a class-side call: the result is empty and `klass` becomes that
+// class. Any other receiver is returned as is, and ArgConverter::Invoke rejects
+// one that is not a native object.
+Local<Object> InstanceMemberReceiver(Isolate* isolate, Local<Object> receiver, Class& klass) {
+  if (receiver->InternalFieldCount() > 0 || !receiver->IsFunction()) {
+    return receiver;
+  }
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, receiver);
+  if (wrapper == nullptr || wrapper->Type() != WrapperType::ObjCClass) {
+    return receiver;
+  }
+  klass = static_cast<ObjCClassWrapper*>(wrapper)->Klass();
+  return Local<Object>();
+}
+
+void ThrowTypeError(Isolate* isolate, const std::string& message) {
+  isolate->ThrowException(Exception::TypeError(tns::ToV8String(isolate, message)));
+}
+
 // Internal field layout: see StructWrapper. The parent<->view cycle is plain
 // JS, so the collector can reclaim it.
 constexpr int kStructParentField = StructWrapper::kParentField;
@@ -89,30 +109,34 @@ constexpr int kStructViewSlotShift = 16;
 constexpr int32_t kStructFieldIndexMask = (1 << kStructViewSlotShift) - 1;
 }  // namespace
 
+// One native property setter a native class's prototype was built with
+// (NativeSetters). Lives as long as the isolate; `item` is emptied for good
+// once JS changes the name on that prototype.
+struct NativeSetter {
+  Global<v8::Name> name;
+  MetadataBuilder::CacheItem<PropertyMeta>* item;
+};
+
 // The native property setters a native class's prototype was built with, for
-// TrySetNativeProperty. JS can replace one only by defining the name on that
+// FindNativeSetter. JS can replace one only by defining the name on that
 // prototype, which its definer sees, and a name the prototype's own handlers
 // see defined or assigned is forgotten for good. A deleted accessor needs no
 // such care: the prototype then no longer has the property.
 struct NativeSetters {
-  struct Entry {
-    Global<v8::Name> name;
-    MetadataBuilder::CacheItem<PropertyMeta>* item;
-  };
-
   // In the order RegisterInstanceProperties installed them: a later accessor
   // of a name replaces the earlier one on the prototype.
   std::vector<std::pair<std::string, MetadataBuilder::CacheItem<PropertyMeta>*>> installed;
   // By the name's identity hash. Names reaching an interceptor are internalized,
-  // so a lookup compares identities.
-  robin_hood::unordered_map<int, std::vector<Entry>> byHash;
+  // so a lookup compares identities. Filled once by Index: entries never move
+  // afterwards, as FindNativeSetter hands out pointers to them.
+  robin_hood::unordered_map<int, std::vector<NativeSetter>> byHash;
 
-  Entry* Find(Local<v8::Name> name) {
+  NativeSetter* Find(Local<v8::Name> name) {
     auto it = byHash.find(name->GetIdentityHash());
     if (it == byHash.end()) {
       return nullptr;
     }
-    for (Entry& entry : it->second) {
+    for (NativeSetter& entry : it->second) {
       if (entry.name == name) {
         return &entry;
       }
@@ -127,7 +151,7 @@ struct NativeSetters {
           v8::String::NewFromUtf8(isolate, jsName.c_str(), NewStringType::kInternalized)
               .ToLocalChecked();
       MetadataBuilder::CacheItem<PropertyMeta>* setter = item->meta_->hasSetter() ? item : nullptr;
-      if (Entry* entry = Find(name)) {
+      if (NativeSetter* entry = Find(name)) {
         entry->item = setter;
       } else if (setter != nullptr) {
         byHash[name->GetIdentityHash()].push_back({Global<v8::Name>(isolate, name), setter});
@@ -142,7 +166,7 @@ struct NativeSetters {
     if (it == byHash.end()) {
       return;
     }
-    for (Entry& entry : it->second) {
+    for (NativeSetter& entry : it->second) {
       if (entry.name.Get(isolate)->StrictEquals(name)) {
         entry.item = nullptr;
       }
@@ -202,6 +226,191 @@ void ForgetNativeSetter(Isolate* isolate, Local<Object> prototype, Local<v8::Nam
   }
   if (NativeSetters* setters = NativeSettersOf(isolate, isolate->GetCurrentContext(), prototype)) {
     setters->Forget(isolate, property);
+  }
+}
+
+// The property the native member guard is defining on an object whose
+// handlers already saw the write: a native class prototype's handlers must
+// not swizzle twice, nor take a guard's accessor pair for a native property's.
+// Only that object and name: JS the definition runs, such as a Proxy's
+// defineProperty trap, can assign other members, which must still swizzle.
+class DefiningGuardedMember {
+ public:
+  DefiningGuardedMember(Isolate* isolate, Local<Object> object, Local<v8::Name> name)
+      : isolate_(isolate), object_(object), name_(name), previous_(current_) {
+    current_ = this;
+  }
+  ~DefiningGuardedMember() { current_ = previous_; }
+
+  // The innermost definition is `property` on `holder` itself.
+  static bool Defines(Isolate* isolate, Local<Object> holder, Local<v8::Name> property) {
+    const DefiningGuardedMember* defining = current_;
+    return defining != nullptr && defining->isolate_ == isolate && defining->object_ == holder &&
+           defining->name_->StrictEquals(property);
+  }
+
+ private:
+  static thread_local const DefiningGuardedMember* current_;
+  Isolate* isolate_;
+  Local<Object> object_;
+  Local<v8::Name> name_;
+  const DefiningGuardedMember* previous_;
+};
+
+thread_local const DefiningGuardedMember* DefiningGuardedMember::current_ = nullptr;
+
+struct NativeMemberGuardState {
+  // (function (f) { return function () { return f; }; }): the getter is a JS
+  // closure, since an API getter sends `super.m` loads to the slow path.
+  Global<v8::Function> getterFactory;
+  // Marks the getters MetadataBuilder::GuardNativeCalledMethods installs.
+  Global<Private> nativeCalledGetter;
+};
+
+NativeMemberGuardState* GuardState(Isolate* isolate, Local<Context> context) {
+  NativeMemberGuardState* state = Caches::StateFor<NativeMemberGuardState>(isolate);
+  if (state == nullptr || !state->getterFactory.IsEmpty()) {
+    return state;
+  }
+  Local<Script> script;
+  Local<Value> factory;
+  if (!Script::Compile(context, tns::ToV8String(isolate, "(function (f) { return function () { "
+                                                         "return f; }; })"))
+           .ToLocal(&script) ||
+      !script->Run(context).ToLocal(&factory) || !factory->IsFunction()) {
+    return nullptr;
+  }
+  state->getterFactory.Reset(isolate, factory.As<v8::Function>());
+  state->nativeCalledGetter.Reset(isolate, Private::New(isolate));
+  return state;
+}
+
+std::string DescribeMemberName(Isolate* isolate, Local<v8::Name> name) {
+  if (name->IsSymbol()) {
+    Local<Value> description = name.As<Symbol>()->Description(isolate);
+    return "[" + (description->IsString() ? tns::ToString(isolate, description) : "") + "]";
+  }
+  return tns::ToString(isolate, name);
+}
+
+// A wrapper of a native object, a released one included, or a Proxy or
+// `this.super` alias of one.
+bool IsNativeObject(Isolate* isolate, Local<Object> receiver) {
+  BaseDataWrapper* wrapper = tns::GetValue(isolate, receiver);
+  return wrapper != nullptr ? wrapper->Type() == WrapperType::ObjCObject ||
+                                  wrapper->Type() == WrapperType::ObjCAllocObject
+                            : tns::GetReleasedReason(receiver) != ReleasedReason::kNone;
+}
+
+// `reason` says why native code never sees the assignment.
+void ThrowShadowing(Isolate* isolate, Local<Object> receiver, Local<v8::Name> name,
+                    const char* reason) {
+  // The JS class name: the native one can be a private class cluster member.
+  std::string className;
+  Local<Value> target = tns::UnwrapProxy(receiver);
+  if (!target.IsEmpty() && target->IsObject()) {
+    className = tns::ToString(isolate, target.As<Object>()->GetConstructorName());
+  }
+  std::string message =
+      "Cannot assign '" + DescribeMemberName(isolate, name) + "' on an instance of " + className +
+      ": " + reason + " (wrapperLifetime mode \"" +
+      WrapperLifetimeModeName(GetWrapperLifetimeMode()) +
+      "\", debug builds). Override the method on a class instead (extend() or a subclass), "
+      "define a JS-only property with Object.defineProperty, or set \"wrapperLifetime\": { "
+      "\"allowShadowingNativeMembers\": true } in the app config.";
+  isolate->ThrowException(Exception::TypeError(tns::ToV8String(isolate, message)));
+}
+
+// The guard's setter: `info.Data()` is the member's name. An own property on a
+// native object never reaches native code, which calls the class's
+// implementation, so assigning a native method's name there throws. Any other
+// receiver, such as a class prototype (whose handlers have swizzled already)
+// or an object inheriting from a native one, gets the own data property an
+// ordinary assignment would create.
+void NativeMemberGuardSetter(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<v8::Name> name = info.Data().As<v8::Name>();
+  Local<Object> receiver = info.This();
+  if (IsNativeObject(isolate, receiver)) {
+    ThrowShadowing(isolate, receiver, name,
+                   "it would shadow the native method for JS callers only, since native code "
+                   "never calls JS own properties of a native object");
+    return;
+  }
+  DefiningGuardedMember defining(isolate, receiver, name);
+  (void)receiver->CreateDataProperty(isolate->GetCurrentContext(), name,
+                                     info.Length() > 0 ? info[0] : v8::Undefined(isolate));
+}
+
+// The setter of a JS-extended class's method native code calls
+// (GuardNativeCalledMethods): `info.Data()` is the method's name. Native code
+// calls the function the class captured when it was built, never an
+// instance's own property, so assigning the name on a native object throws.
+// Any other receiver, such as a subclass's prototype or an object inheriting
+// from an instance, gets the own data property an ordinary assignment would
+// create.
+void NativeCalledMethodSetter(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  Local<v8::Name> name = info.Data().As<v8::Name>();
+  Local<Object> receiver = info.This();
+  if (IsNativeObject(isolate, receiver)) {
+    ThrowShadowing(isolate, receiver, name,
+                   "native code calls the class's implementation of this method, so it would "
+                   "never see the instance's own property, which would change the method for JS "
+                   "callers only");
+    return;
+  }
+  DefiningGuardedMember defining(isolate, receiver, name);
+  (void)receiver->CreateDataProperty(isolate->GetCurrentContext(), name,
+                                     info.Length() > 0 ? info[0] : v8::Undefined(isolate));
+}
+
+// Turns `prototype`'s own writable, configurable, function-valued data
+// property `name` into an accessor pair whose getter returns that same
+// function and whose setter is `setter`, with `name` as its data. Keeps the
+// property's enumerability; configurable, so an assignment the setter allows
+// can replace it. The getter, or empty when `name` is no such property.
+Local<v8::Function> GuardMethod(Isolate* isolate, Local<Context> context,
+                                NativeMemberGuardState* state, Local<Object> prototype,
+                                Local<v8::Name> name, FunctionCallback setter) {
+  PropertyAttribute attributes = PropertyAttribute::None;
+  Local<Value> method;
+  if (!prototype->HasRealNamedProperty(context, name).FromMaybe(false) ||
+      prototype->HasRealNamedCallbackProperty(context, name).FromMaybe(true) ||
+      !prototype->GetRealNamedPropertyAttributes(context, name).To(&attributes) ||
+      (attributes & (ReadOnly | DontDelete)) != 0 ||
+      !prototype->GetRealNamedProperty(context, name).ToLocal(&method) || !method->IsFunction()) {
+    return Local<v8::Function>();
+  }
+  Local<Value> getter;
+  Local<v8::Function> setterFunction;
+  if (!state->getterFactory.Get(isolate)
+           ->Call(context, v8::Undefined(isolate), 1, &method)
+           .ToLocal(&getter) ||
+      !v8::Function::New(context, setter, name, 1, ConstructorBehavior::kThrow)
+           .ToLocal(&setterFunction)) {
+    return Local<v8::Function>();
+  }
+  DefiningGuardedMember defining(isolate, prototype, name);
+  prototype->SetAccessorProperty(name, getter.As<v8::Function>(), setterFunction,
+                                 static_cast<PropertyAttribute>(attributes & DontEnum));
+  return getter.As<v8::Function>();
+}
+
+// Turns each named own method of a native class prototype, and the symbol
+// `iterator` when given, into a guarded accessor pair (GuardMethod).
+void GuardNativeMembers(Isolate* isolate, Local<Context> context, Local<Object> prototype,
+                        const std::vector<std::string>& names, Local<v8::Name> iterator) {
+  NativeMemberGuardState* state = GuardState(isolate, context);
+  if (state == nullptr) {
+    return;
+  }
+  for (const std::string& name : names) {
+    GuardMethod(isolate, context, state, prototype, tns::ToV8String(isolate, name),
+                NativeMemberGuardSetter);
+  }
+  if (!iterator.IsEmpty()) {
+    GuardMethod(isolate, context, state, prototype, iterator, NativeMemberGuardSetter);
   }
 }
 
@@ -678,9 +887,8 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
 
   ctorFuncTemplate = FunctionTemplate::New(isolate, ClassConstructorCallback, ext);
   ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(1);
-  if (WrapperLifetimeCanary::NativeInstancesIntercept()) {
-    WrapperLifetimeCanary::ConfigureInstanceTemplate(ctorFuncTemplate->InstanceTemplate());
-  }
+  WrapperLifetimeCanary::ConfigureInstanceTemplate(ctorFuncTemplate->InstanceTemplate(),
+                                                   WrapperLifetimeCanary::NativeInstancesKind());
   ctorFuncTemplate->SetClassName(tns::ToV8String(isolate, meta->name()));
 
   Local<v8::Function> baseCtorFunc;
@@ -722,16 +930,26 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
   if (GetWrapperLifetimeMode() == WrapperLifetimeMode::kCanary) {
     setters = std::make_unique<NativeSetters>();
   }
+  std::vector<std::string> guardedMethods;
+  std::vector<std::string>* guarded = GuardsNativeMembers() ? &guardedMethods : nullptr;
   MetadataBuilder::RegisterInstanceProperties(context, ctorFuncTemplate, meta, meta->name(), pair,
                                               instanceMembers, setters.get());
-  MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, meta, pair, instanceMembers);
+  MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, meta, pair, instanceMembers,
+                                           guarded);
   MetadataBuilder::RegisterInstanceProtocols(context, ctorFuncTemplate, meta, meta->name(), pair,
-                                             instanceMembers, setters.get());
+                                             instanceMembers, setters.get(), guarded);
   ctorFuncTemplate->PrototypeTemplate()->Set(
       tns::ToV8String(isolate, "toString"),
       FunctionTemplate::New(isolate, MetadataBuilder::ToStringFunctionCallback));
+  if (guarded != nullptr) {
+    guarded->push_back("toString");
+  }
+  Local<v8::Name> guardedIterator;
   if (meta->type() == MetaType::Interface && strcmp(meta->name(), "NSArray") == 0) {
     SymbolIterator::Install(isolate, ctorFuncTemplate->PrototypeTemplate());
+    if (guarded != nullptr) {
+      guardedIterator = Symbol::GetIterator(isolate);
+    }
   }
 
   if (meta->type() == MetaType::Interface) {
@@ -774,6 +992,10 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateConstructorFunctionTemplateI
   success = ctorFunc->Get(context, tns::ToV8String(isolate, "prototype")).ToLocal(&prototypeValue);
   tns::Assert(success, isolate);
   Local<Object> prototype = prototypeValue.As<Object>();
+
+  if (guarded != nullptr) {
+    GuardNativeMembers(isolate, context, prototype, guardedMethods, guardedIterator);
+  }
 
   Persistent<Value>* poPrototype = new Persistent<Value>(isolate, prototype);
   cache->Prototypes.emplace(meta, poPrototype);
@@ -909,8 +1131,10 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateProtocolBindingTemplate(
   bindingTemplate->InstanceTemplate()->SetInternalFieldCount(1);
   bindingTemplate->SetClassName(tns::ToV8String(isolate, meta->name()));
   bindingTemplate->Inherit(classTemplate);
+  std::vector<std::string> guardedMethods;
   MetadataBuilder::RegisterAdditionalProtocols(context, bindingTemplate, pair, additionalProtocols,
-                                               names);
+                                               names,
+                                               GuardsNativeMembers() ? &guardedMethods : nullptr);
 
   Local<v8::Function> bindingFunc;
   Local<v8::Function> classFunc;
@@ -927,6 +1151,9 @@ Local<FunctionTemplate> MetadataBuilder::GetOrCreateProtocolBindingTemplate(
       ->DefineOwnProperty(context, tns::ToV8String(isolate, "constructor"), classFunc,
                           PropertyAttribute::DontEnum)
       .FromMaybe(false);
+  if (!guardedMethods.empty()) {
+    GuardNativeMembers(isolate, context, prototype.As<Object>(), guardedMethods, Local<v8::Name>());
+  }
 
   // Building the class's binding can wrap objects of this class first.
   cached = findBinding();
@@ -990,7 +1217,8 @@ void MetadataBuilder::RegisterAllocMethod(Isolate* isolate,
 
 void MetadataBuilder::RegisterInstanceMethods(
     Local<Context> context, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta,
-    KnownUnknownClassPair pair, robin_hood::unordered_map<std::string, uint8_t>& names) {
+    KnownUnknownClassPair pair, robin_hood::unordered_map<std::string, uint8_t>& names,
+    std::vector<std::string>* guarded) {
   Isolate* isolate = v8::Isolate::GetCurrent();
   Local<ObjectTemplate> proto = ctorFuncTemplate->PrototypeTemplate();
 
@@ -1007,8 +1235,11 @@ void MetadataBuilder::RegisterInstanceMethods(
       Caches::Get(isolate)->registerCacheBoundObject(item);
       Local<External> ext = External::New(isolate, item, v8::kExternalPointerTypeTagDefault);
       Local<FunctionTemplate> instanceMethodTemplate =
-          FunctionTemplate::New(isolate, MethodCallback, ext);
+          FunctionTemplate::New(isolate, InstanceMethodCallback, ext);
       proto->Set(tns::ToV8String(isolate, methodMeta->jsName()), instanceMethodTemplate);
+      if (guarded != nullptr) {
+        guarded->push_back(methodMeta->jsName());
+      }
       names.emplace(methodName, 0);
     }
   }
@@ -1056,9 +1287,10 @@ void MetadataBuilder::RegisterInstanceProperties(
 void MetadataBuilder::RegisterInstanceProtocols(
     Local<Context> context, Local<FunctionTemplate> ctorFuncTemplate, const BaseClassMeta* meta,
     const std::string className, KnownUnknownClassPair pair,
-    robin_hood::unordered_map<std::string, uint8_t>& names, NativeSetters* setters) {
+    robin_hood::unordered_map<std::string, uint8_t>& names, NativeSetters* setters,
+    std::vector<std::string>* guarded) {
   if (meta->type() == MetaType::ProtocolType) {
-    MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, meta, pair, names);
+    MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, meta, pair, names, guarded);
     MetadataBuilder::RegisterInstanceProperties(context, ctorFuncTemplate, meta, className, pair,
                                                 names, setters);
   }
@@ -1069,7 +1301,7 @@ void MetadataBuilder::RegisterInstanceProtocols(
     if (m != nullptr) {
       const BaseClassMeta* protoMeta = static_cast<const BaseClassMeta*>(m);
       MetadataBuilder::RegisterInstanceProtocols(context, ctorFuncTemplate, protoMeta, className,
-                                                 pair, names, setters);
+                                                 pair, names, setters, guarded);
     }
   }
 }
@@ -1077,12 +1309,13 @@ void MetadataBuilder::RegisterInstanceProtocols(
 void MetadataBuilder::RegisterAdditionalProtocols(
     Local<Context> context, Local<FunctionTemplate> ctorFuncTemplate, KnownUnknownClassPair pair,
     const std::vector<std::string>& additionalProtocols,
-    robin_hood::unordered_map<std::string, uint8_t>& names) {
+    robin_hood::unordered_map<std::string, uint8_t>& names, std::vector<std::string>* guarded) {
   for (std::string protocolName : additionalProtocols) {
     const Meta* meta = ArgConverter::GetMeta(protocolName.c_str());
     if (meta != nullptr) {
       const BaseClassMeta* baseMeta = static_cast<const BaseClassMeta*>(meta);
-      MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, baseMeta, pair, names);
+      MetadataBuilder::RegisterInstanceMethods(context, ctorFuncTemplate, baseMeta, pair, names,
+                                               guarded);
       MetadataBuilder::RegisterInstanceProperties(context, ctorFuncTemplate, baseMeta,
                                                   baseMeta->name(), pair, names);
 
@@ -1093,7 +1326,7 @@ void MetadataBuilder::RegisterAdditionalProtocols(
       }
 
       MetadataBuilder::RegisterAdditionalProtocols(context, ctorFuncTemplate, pair, metaProtocols,
-                                                   names);
+                                                   names, guarded);
     }
   }
 }
@@ -1208,15 +1441,29 @@ void MetadataBuilder::RegisterStaticProtocols(
 void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   Local<Context> context = isolate->GetCurrentContext();
-  tns::Assert(info.IsConstructCall(), isolate);
   try {
     CacheItem<BaseClassMeta>* item = static_cast<CacheItem<BaseClassMeta>*>(
         info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
-    Class klass = objc_getClass(item->meta_->name());
+    const BaseClassMeta* meta = item->meta_;
+    if (!info.IsConstructCall()) {
+      ThrowTypeError(isolate, std::string("Class constructor ") + meta->jsName() +
+                                  " cannot be invoked without 'new'");
+      return;
+    }
+    if (meta->type() == MetaType::ProtocolType) {
+      ThrowTypeError(isolate,
+                     std::string("Cannot construct ") + meta->jsName() + ": it is a protocol");
+      return;
+    }
+    Class klass = objc_getClass(meta->name());
+    if (klass == nil) {
+      throw NativeScriptException(std::string("Cannot construct ") + meta->jsName() +
+                                  ": the class is not available at runtime");
+    }
 
-    const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(item->meta_);
+    const InterfaceMeta* interfaceMeta = static_cast<const InterfaceMeta*>(meta);
     ArgConverter::ConstructObject(context, info, klass, interfaceMeta,
-                                  WrapperLifetimeCanary::NativeInstancesIntercept());
+                                  WrapperLifetimeCanary::NativeInstancesKind());
   } catch (NativeScriptException& ex) {
     ex.ReThrowToV8(isolate);
   }
@@ -1224,7 +1471,10 @@ void MetadataBuilder::ClassConstructorCallback(const FunctionCallbackInfo<Value>
 
 void MetadataBuilder::AllocCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
-  tns::Assert(info.Length() == 0, isolate);
+  if (info.Length() != 0) {
+    ThrowTypeError(isolate, "alloc() takes no arguments");
+    return;
+  }
 
   try {
     Local<Object> thiz = info.This();
@@ -1286,17 +1536,34 @@ void MetadataBuilder::MethodCallback(const FunctionCallbackInfo<Value>& info) {
   }
 }
 
+void MetadataBuilder::InstanceMethodCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  CacheItem<MethodMeta>* item = static_cast<CacheItem<MethodMeta>*>(
+      info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+
+  Local<Object> thiz = info.This();
+  if (!ResolveProxyReceiver(isolate, thiz, "call native method", item->meta_->jsName(), true)) {
+    return;
+  }
+
+  V8FunctionCallbackArgs args(info);
+  Class klass = item->ResolveClass();
+  Local<Object> receiver = InstanceMemberReceiver(isolate, thiz, klass);
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Value> result =
+      MetadataBuilder::InvokeMethod(context, item->meta_, receiver, args, klass, true);
+  if (!result.IsEmpty()) {
+    info.GetReturnValue().Set(result);
+  }
+}
+
 void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value>& info) {
   Isolate* isolate = info.GetIsolate();
   CacheItem<PropertyMeta>* item = static_cast<CacheItem<PropertyMeta>*>(
       info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
   Local<Object> receiver = info.This();
   if (!ResolveProxyReceiver(isolate, receiver, "read native property", item->meta_->jsName(),
-                            false)) {
-    return;
-  }
-
-  if (receiver->InternalFieldCount() < 1) {
+                            true)) {
     return;
   }
 
@@ -1307,9 +1574,11 @@ void MetadataBuilder::PropertyGetterCallback(const FunctionCallbackInfo<Value>& 
   }
 
   V8EmptyValueArgs args;
+  Class klass = item->ResolveClass();
+  Local<Object> target = InstanceMemberReceiver(isolate, receiver, klass);
   Local<Context> context = isolate->GetCurrentContext();
-  Local<Value> result = MetadataBuilder::InvokeMethod(context, item->meta_->getter(), receiver,
-                                                      args, item->ResolveClass(), true);
+  Local<Value> result =
+      MetadataBuilder::InvokeMethod(context, item->meta_->getter(), target, args, klass, true);
   if (!result.IsEmpty()) {
     info.GetReturnValue().Set(result);
   }
@@ -1331,27 +1600,80 @@ void MetadataBuilder::SetNativeProperty(Isolate* isolate, CacheItem<PropertyMeta
   }
 
   if (!ResolveProxyReceiver(isolate, receiver, "set native property", item->meta_->jsName(),
-                            false)) {
+                            true)) {
     return;
   }
   V8SimpleValueArgs args(value);
+  Class klass = item->ResolveClass();
+  Local<Object> target = InstanceMemberReceiver(isolate, receiver, klass);
   Local<Context> context = isolate->GetCurrentContext();
-  MetadataBuilder::InvokeMethod(context, item->meta_->setter(), receiver, args,
-                                item->ResolveClass(), true);
+  MetadataBuilder::InvokeMethod(context, item->meta_->setter(), target, args, klass, true);
 }
 
-bool MetadataBuilder::TrySetNativeProperty(Isolate* isolate, Local<Context> context,
-                                           Local<Object> owner, Local<v8::Name> property,
-                                           Local<Object> receiver, Local<Value> value) {
+void MetadataBuilder::GuardNativeCalledMethods(Local<Context> context, Local<Object> prototype,
+                                               const std::vector<std::string>& names,
+                                               bool iterator) {
+  if (!GuardsNativeMembers()) {
+    return;
+  }
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  NativeMemberGuardState* state = GuardState(isolate, context);
+  if (state == nullptr) {
+    return;
+  }
+  Local<Private> marker = state->nativeCalledGetter.Get(isolate);
+  auto guard = [&](Local<v8::Name> name) {
+    Local<v8::Function> getter =
+        GuardMethod(isolate, context, state, prototype, name, NativeCalledMethodSetter);
+    if (!getter.IsEmpty()) {
+      (void)getter->SetPrivate(context, marker, v8::True(isolate));
+    }
+  };
+  for (const std::string& name : names) {
+    guard(tns::ToV8String(isolate, name));
+  }
+  if (iterator) {
+    guard(Symbol::GetIterator(isolate));
+  }
+}
+
+Local<Value> MetadataBuilder::GuardedNativeCalledMethod(Local<Context> context,
+                                                        Local<Value> getter) {
+  Isolate* isolate = v8::Isolate::GetCurrent();
+  NativeMemberGuardState* state = Caches::ExistingStateFor<NativeMemberGuardState>(isolate);
+  Local<Value> marked;
+  Local<Value> method;
+  if (state == nullptr || state->nativeCalledGetter.IsEmpty() || !getter->IsFunction() ||
+      !getter.As<Object>()
+           ->GetPrivate(context, state->nativeCalledGetter.Get(isolate))
+           .ToLocal(&marked) ||
+      !marked->IsTrue() ||
+      !getter.As<v8::Function>()
+           ->Call(context, v8::Undefined(isolate), 0, nullptr)
+           .ToLocal(&method)) {
+    return Local<Value>();
+  }
+  return method;
+}
+
+NativeSetter* MetadataBuilder::FindNativeSetter(Isolate* isolate, Local<Context> context,
+                                                Local<Object> owner, Local<v8::Name> property) {
   NativeSetters* setters = NativeSettersOf(isolate, context, owner);
   if (setters == nullptr) {
+    return nullptr;
+  }
+  NativeSetter* entry = setters->Find(property);
+  return entry != nullptr && entry->item != nullptr ? entry : nullptr;
+}
+
+bool MetadataBuilder::RunNativeSetter(Isolate* isolate, NativeSetter* setter,
+                                      Local<Object> receiver, Local<Value> value) {
+  CacheItem<PropertyMeta>* item = setter->item;
+  if (item == nullptr) {
     return false;
   }
-  NativeSetters::Entry* entry = setters->Find(property);
-  if (entry == nullptr || entry->item == nullptr) {
-    return false;
-  }
-  SetNativeProperty(isolate, entry->item, receiver, value);
+  SetNativeProperty(isolate, item, receiver, value);
   return true;
 }
 
@@ -1468,21 +1790,6 @@ Local<Value> MetadataBuilder::InvokeMethod(Local<Context> context, const MethodM
   // TODO: Find out if the isMethodCallback property can be determined based on a
   // UITableViewController.prototype.viewDidLoad.call(this) or super.viewDidLoad() call
 
-#ifdef DEBUG
-  id value = Runtime::GetAppConfigValue("logRuntimeDetail");
-  bool logRuntimeDetail = value ? [value boolValue] : false;
-  if (logRuntimeDetail) {
-    // NOTE: stringWithFormat is slow, perhaps use different c string concatenation?
-    NSString* message = [NSString
-        stringWithFormat:@"MetadataBuilder::InvokeMethod: class {%s}, selector {%s}, "
-                         @"isInitializer {%s}, type {%s}, lib {%s}",
-                         klass ? class_getName(klass) : "<unknown>", meta->selectorAsString(),
-                         meta->isInitializer() ? "true" : "false", meta->typeName(),
-                         meta->topLevelModule()->getName()];
-    Log(@"%@", message);
-  }
-#endif
-
   try {
     return ArgConverter::Invoke(context, klass, receiver, args, meta, isMethodCallback);
   } catch (NativeScriptException& ex) {
@@ -1569,6 +1876,9 @@ void ReplaceKeepingOriginal(Class klass, SEL selector, const char* selectorName,
 v8::Intercepted MetadataBuilder::SwizzledInstanceMethodCallback(
     Local<v8::Name> property, Local<Value> value, const PropertyCallbackInfo<v8::Boolean>& info) {
   Isolate* isolate = info.GetIsolate();
+  if (DefiningGuardedMember::Defines(isolate, info.Holder(), property)) {
+    return v8::Intercepted::kNo;
+  }
   ForgetNativeSetter(isolate, info.Holder(), property);
   std::string methodName = tns::ToString(isolate, property);
 
@@ -1615,6 +1925,9 @@ v8::Intercepted MetadataBuilder::SwizzledPropertyCallback(
     Local<v8::Name> property, const PropertyDescriptor& desc,
     const PropertyCallbackInfo<v8::Boolean>& info) {
   Isolate* isolate = info.GetIsolate();
+  if (DefiningGuardedMember::Defines(isolate, info.Holder(), property)) {
+    return v8::Intercepted::kNo;
+  }
   ForgetNativeSetter(isolate, info.Holder(), property);
   std::string propertyName = tns::ToString(isolate, property);
 

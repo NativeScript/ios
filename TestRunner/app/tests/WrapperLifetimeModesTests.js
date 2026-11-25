@@ -9,6 +9,9 @@ describe("Wrapper lifetime modes", function () {
     var canary = mode === "canary";
     // JS state on a natively owned object survives its wrapper's death.
     var keepsState = rooted || canary;
+    // Assigning a native method's name on a native object throws (the native
+    // member guard; debug builds in these modes only).
+    var guardsNativeMembers = runtime.getConfig("wrapperLifetimeGuardsNativeMembers");
 
     var Extended = (function (_super) {
         __extends(Extended, _super);
@@ -79,6 +82,14 @@ describe("Wrapper lifetime modes", function () {
 
     function hasOwn(obj, name) {
         return Object.prototype.hasOwnProperty.call(obj, name);
+    }
+
+    // Outside the specs' closures: a shadow kept in an object's JS state must
+    // not capture that object.
+    function assignIsEqualShadow(obj) {
+        obj.isEqual = function () {
+            return "shadow";
+        };
     }
 
     var WithMethod = (function (_super) {
@@ -524,9 +535,11 @@ describe("Wrapper lifetime modes", function () {
     it("hands back a JS property that shadows a prototype member on a new wrapper", function (done) {
         rewrap(function () {
             var obj = WithMethod.new();
-            obj.isEqual = function () {
-                return "shadow";
-            };
+            if (guardsNativeMembers) {
+                expect(assignIsEqualShadow.bind(null, obj)).toThrowError(TypeError);
+            } else {
+                assignIsEqualShadow(obj);
+            }
             // Bound to another object: one bound to `obj` would keep it alive.
             obj.greet = obj.greet.bind({ greeting: "bound" });
             obj.tag = "kept";
@@ -534,7 +547,7 @@ describe("Wrapper lifetime modes", function () {
         }, function (obj) {
             if (keepsState) {
                 expect(obj.tag).toBe("kept");
-                expect(obj.isEqual(obj)).toBe("shadow");
+                expect(obj.isEqual(obj)).toBe(guardsNativeMembers ? true : "shadow");
                 expect(obj.greet()).toBe("bound");
                 expect(hasOwn(obj, "greet")).toBe(true);
             }
@@ -901,7 +914,8 @@ describe("Wrapper lifetime modes", function () {
 
     // Third-party code can strip a live object's associations. Where an
     // associated token reports native death, the record goes with it, and the
-    // next write seeds a new state from the canary's own properties.
+    // next write seeds a new state from the canary's own properties, or from
+    // the dead record's state for a plain canary that forwards.
     it("survives a live object's associations being removed", function (done) {
         if (typeof objc_removeAssociatedObjects !== "function") {
             done();
@@ -1436,6 +1450,419 @@ describe("Wrapper lifetime modes", function () {
             });
         });
 
+        // The handler caches the native setter a write ran, by the name and
+        // the receiver's prototype. Each spec fills that cache with a write,
+        // then changes what the write should reach, then checks the next
+        // write reached it.
+        describe("native setter cache", function () {
+            var allowShadowing = runtime.getConfig("wrapperLifetimeAllowShadowingNativeMembers");
+            // A plain canary's handlers see native property writes only when
+            // they mirror: forwarding ones are non-masking.
+            var maskingPlain = canary && scope === "all" && allowShadowing;
+            var forwardingPlain = canary && scope === "all" && !allowShadowing;
+            var depthOf = Object.getOwnPropertyDescriptor(TNSCanaryCacheBase.prototype, "depth").get;
+            var shadowDepthOf = Object.getOwnPropertyDescriptor(TNSCanaryCacheShadowBase.prototype, "depth").get;
+
+            function extend(Base) {
+                return (function (_super) {
+                    __extends(Sub, _super);
+                    function Sub() {
+                        return (_super !== null && _super.apply(this, arguments)) || this;
+                    }
+                    return Sub;
+                })(Base);
+            }
+
+            function cachedWrites() {
+                return stats().canaryCachedNativeWrites;
+            }
+
+            // An instance of a JS subclass of the extended class `Ext`, whose
+            // prototype has `properties`: native code cannot extend an
+            // extended class again.
+            function subclassed(Ext, properties) {
+                var obj = Ext.new();
+                Object.setPrototypeOf(obj, Object.create(Ext.prototype, properties));
+                return obj;
+            }
+
+            // Runs write() twice, expecting the cache to place at least one of
+            // them: a collection that moves a prototype turns a hit into a
+            // refill.
+            function expectCached(write, handled) {
+                var before = cachedWrites();
+                write();
+                write();
+                var hits = cachedWrites() - before;
+                if (canary && handled) {
+                    expect(hits).toBeGreaterThan(0);
+                } else {
+                    expect(hits).toBe(0);
+                }
+            }
+
+            // Fills the cache with a write of obj.depth, then writes it from
+            // the cache.
+            function warm(obj, read, handled) {
+                obj.depth = 10;
+                expectCached(function () {
+                    obj.depth = 11;
+                }, handled);
+                expect(read.call(obj)).toBe(11);
+                expect(hasOwn(obj, "depth")).toBe(false);
+            }
+
+            function loggingSetter(log, receiver) {
+                return {
+                    set: function (value) {
+                        log.push(this === receiver ? value : "wrong this");
+                    },
+                    configurable: true
+                };
+            }
+
+            it("writes a native property declared on the class or prototypes up from the cache", function () {
+                warm(extend(TNSCanaryCacheBase).new(), depthOf, true);
+                warm(extend(TNSCanaryCacheLeaf).new(), depthOf, true);
+                var Implemented = TNSCanaryCacheLeaf.extend({}, { name: "WrapperLifetimeCacheLeafImplemented" });
+                warm(Implemented.new(), depthOf, true);
+                warm(TNSCanaryCacheLeaf.new(), depthOf, maskingPlain);
+                warm(TNSCanaryCacheBase.new(), depthOf, maskingPlain);
+            });
+
+            it("writes one name through more prototypes than a cache set has ways", function () {
+                var objects = [
+                    [extend(TNSCanaryCacheBase).new(), true],
+                    [extend(TNSCanaryCacheMid).new(), true],
+                    [extend(TNSCanaryCacheLeaf).new(), true],
+                    [subclassed(extend(TNSCanaryCacheLeaf), {}), true],
+                    [TNSCanaryCacheBase.new(), maskingPlain],
+                    [TNSCanaryCacheMid.new(), maskingPlain],
+                    [TNSCanaryCacheLeaf.new(), maskingPlain]
+                ];
+                objects.forEach(function (pair) {
+                    pair[0].depth = 1;
+                });
+                var before = cachedWrites();
+                for (var pass = 0; pass < 2; pass++) {
+                    objects.forEach(function (pair, i) {
+                        pair[0].depth = 100 + i;
+                    });
+                }
+                objects.forEach(function (pair, i) {
+                    expect(depthOf.call(pair[0])).toBe(100 + i);
+                    expect(hasOwn(pair[0], "depth")).toBe(false);
+                });
+                var handled = objects.filter(function (pair) {
+                    return canary && pair[1];
+                }).length;
+                var hits = cachedWrites() - before;
+                if (handled > 0) {
+                    expect(hits).not.toBeLessThan(handled);
+                } else {
+                    expect(hits).toBe(0);
+                }
+            });
+
+            it("writes JS properties as before, whatever names the cache has", function () {
+                var obj = extend(TNSCanaryCacheLeaf).new();
+                warm(obj, depthOf, true);
+                var before = cachedWrites();
+                obj.fresh = 1;
+                obj.fresh = 2;
+                obj.depthLabel = "x";
+                var Plain = extend(NSObject);
+                var other = Plain.new();
+                // A name the cache has, on an object whose prototype it has no entry for.
+                other.depth = 3;
+                other.depth = 4;
+                expect(cachedWrites()).toBe(before);
+                expect(obj.fresh).toBe(2);
+                expect(hasOwn(obj, "fresh")).toBe(true);
+                expect(obj.depthLabel).toBe("x");
+                expect(other.depth).toBe(4);
+                expect(hasOwn(other, "depth")).toBe(true);
+            });
+
+            it("writes from the cache for an object with JS state", function () {
+                var obj = extend(TNSCanaryCacheLeaf).new();
+                obj.label = "state";
+                warm(obj, depthOf, true);
+                expect(obj.label).toBe("state");
+                var plain = TNSCanaryCacheLeaf.new();
+                plain.label = "state";
+                warm(plain, depthOf, maskingPlain);
+                expect(plain.label).toBe("state");
+            });
+
+            it("sends a write to an accessor defined later on a JS prototype between the object and the property", function () {
+                var Sub = extend(TNSCanaryCacheShadowLeaf);
+                var obj = Sub.new();
+                warm(obj, shadowDepthOf, true);
+                var log = [];
+                Object.defineProperty(Sub.prototype, "depth", loggingSetter(log, obj));
+                obj.depth = 20;
+                expect(log).toEqual([20]);
+                expect(shadowDepthOf.call(obj)).toBe(11);
+                delete Sub.prototype.depth;
+                expectCached(function () {
+                    obj.depth = 21;
+                }, true);
+                expect(shadowDepthOf.call(obj)).toBe(21);
+                expect(log).toEqual([20]);
+            });
+
+            it("sends a write to an accessor or a data property defined later on a native class prototype between", function () {
+                var proto = TNSCanaryCacheShadowMid.prototype;
+                [[extend(TNSCanaryCacheShadowLeaf).new(), true], [TNSCanaryCacheShadowLeaf.new(), maskingPlain]].forEach(function (pair) {
+                    var obj = pair[0];
+                    warm(obj, shadowDepthOf, pair[1]);
+                    var log = [];
+                    Object.defineProperty(proto, "depth", loggingSetter(log, obj));
+                    try {
+                        obj.depth = 30;
+                        expect(log).toEqual([30]);
+                    } finally {
+                        delete proto.depth;
+                    }
+                    Object.defineProperty(proto, "depth", { value: 0, writable: true, configurable: true });
+                    try {
+                        obj.depth = 31;
+                        expect(hasOwn(obj, "depth")).toBe(true);
+                        expect(obj.depth).toBe(31);
+                    } finally {
+                        delete proto.depth;
+                    }
+                    expect(shadowDepthOf.call(obj)).toBe(11);
+                    delete obj.depth;
+                    expectCached(function () {
+                        obj.depth = 32;
+                    }, pair[1]);
+                    expect(shadowDepthOf.call(obj)).toBe(32);
+                    expect(hasOwn(obj, "depth")).toBe(false);
+                    // A write that starts elsewhere and defines the name on the
+                    // prototype as its receiver.
+                    expect(Reflect.set({}, "depth", 0, proto)).toBe(true);
+                    try {
+                        expect(hasOwn(proto, "depth")).toBe(true);
+                        obj.depth = 33;
+                        expect(hasOwn(obj, "depth")).toBe(true);
+                        expect(obj.depth).toBe(33);
+                        expect(shadowDepthOf.call(obj)).toBe(32);
+                    } finally {
+                        delete proto.depth;
+                    }
+                    delete obj.depth;
+                    expectCached(function () {
+                        obj.depth = 34;
+                    }, pair[1]);
+                    expect(shadowDepthOf.call(obj)).toBe(34);
+                });
+            });
+
+            it("writes the native property from the cache after a native method is swizzled on a prototype between", function () {
+                var obj = extend(TNSCanaryCacheShadowLeaf).new();
+                warm(obj, shadowDepthOf, true);
+                TNSCanaryCacheShadowMid.prototype.swizzleTarget = function () {
+                    return 2;
+                };
+                expect(obj.swizzleTarget()).toBe(2);
+                expectCached(function () {
+                    obj.depth = 40;
+                }, true);
+                expect(shadowDepthOf.call(obj)).toBe(40);
+                expect(hasOwn(obj, "depth")).toBe(false);
+            });
+
+            it("writes an own property defined on the object, and the native property again once it is deleted", function () {
+                var objects = [[extend(TNSCanaryCacheLeaf).new(), true]];
+                // A forwarding canary's own properties live in its state, which
+                // native property writes never reach.
+                if (!forwardingPlain) {
+                    objects.push([TNSCanaryCacheLeaf.new(), maskingPlain]);
+                }
+                objects.forEach(function (pair) {
+                    var obj = pair[0];
+                    warm(obj, depthOf, pair[1]);
+                    Object.defineProperty(obj, "depth", { value: 50, writable: true, enumerable: true, configurable: true });
+                    obj.depth = 51;
+                    expect(Object.getOwnPropertyDescriptor(obj, "depth").value).toBe(51);
+                    expect(depthOf.call(obj)).toBe(11);
+                    delete obj.depth;
+                    expectCached(function () {
+                        obj.depth = 52;
+                    }, pair[1]);
+                    expect(depthOf.call(obj)).toBe(52);
+                    expect(hasOwn(obj, "depth")).toBe(false);
+                });
+            });
+
+            it("writes the own property of an object whose state went with its associations", function () {
+                if (typeof objc_removeAssociatedObjects !== "function" || forwardingPlain) {
+                    return;
+                }
+                var obj = TNSCanaryCacheLeaf.new();
+                Object.defineProperty(obj, "depth", { value: 60, writable: true, enumerable: true, configurable: true });
+                objc_removeAssociatedObjects(obj);
+                warm(TNSCanaryCacheLeaf.new(), depthOf, maskingPlain);
+                obj.depth = 61;
+                expect(obj.depth).toBe(61);
+                expect(hasOwn(obj, "depth")).toBe(true);
+                expect(depthOf.call(obj)).toBe(0);
+            });
+
+            it("follows a native accessor deleted from its prototype", function () {
+                var proto = TNSCanaryCacheShadowBase.prototype;
+                var dropped = Object.getOwnPropertyDescriptor(proto, "dropped").get;
+                var obj = extend(TNSCanaryCacheShadowLeaf).new();
+                obj.dropped = 1;
+                expectCached(function () {
+                    obj.dropped = 2;
+                }, true);
+                expect(dropped.call(obj)).toBe(2);
+                expect(delete proto.dropped).toBe(true);
+                obj.dropped = 3;
+                expect(hasOwn(obj, "dropped")).toBe(true);
+                expect(obj.dropped).toBe(3);
+                expect(dropped.call(obj)).toBe(2);
+            });
+
+            it("follows a write whose receiver is the native prototype that has the property", function () {
+                var proto = TNSCanaryCacheShadowBase.prototype;
+                var reflected = Object.getOwnPropertyDescriptor(proto, "reflected").get;
+                var obj = extend(TNSCanaryCacheShadowLeaf).new();
+                obj.reflected = 1;
+                expectCached(function () {
+                    obj.reflected = 2;
+                }, true);
+                Reflect.set({}, "reflected", 0, proto);
+                var descriptor = Object.getOwnPropertyDescriptor(proto, "reflected");
+                obj.reflected = 3;
+                if (descriptor !== undefined && typeof descriptor.set === "function") {
+                    expect(reflected.call(obj)).toBe(3);
+                    expect(hasOwn(obj, "reflected")).toBe(false);
+                } else {
+                    expect(reflected.call(obj)).toBe(2);
+                    expect(hasOwn(obj, "reflected")).toBe(true);
+                    expect(obj.reflected).toBe(3);
+                }
+            });
+
+            it("writes the native property without the cache after JS assigns its name on the prototype that has it", function () {
+                var proto = TNSCanaryCacheShadowBase.prototype;
+                var forgotten = Object.getOwnPropertyDescriptor(proto, "forgotten").get;
+                var obj = extend(TNSCanaryCacheShadowLeaf).new();
+                obj.forgotten = 1;
+                expectCached(function () {
+                    obj.forgotten = 2;
+                }, true);
+                expect(forgotten.call(obj)).toBe(2);
+                // The prototype is no native instance: its native setter may throw.
+                try {
+                    proto.forgotten = 5;
+                } catch (e) {}
+                expect(typeof Object.getOwnPropertyDescriptor(proto, "forgotten").set).toBe("function");
+                expectCached(function () {
+                    obj.forgotten = 3;
+                }, false);
+                expect(forgotten.call(obj)).toBe(3);
+                expect(hasOwn(obj, "forgotten")).toBe(false);
+            });
+
+            it("follows a prototype chain changed under a cached write", function () {
+                var obj = extend(TNSCanaryCacheShadowLeaf).new();
+                warm(obj, shadowDepthOf, true);
+                Object.setPrototypeOf(obj, Object.prototype);
+                obj.depth = 70;
+                expect(hasOwn(obj, "depth")).toBe(true);
+                expect(shadowDepthOf.call(obj)).toBe(11);
+
+                var Detached = extend(TNSCanaryCacheShadowLeaf);
+                var other = Detached.new();
+                warm(other, shadowDepthOf, true);
+                var log = [];
+                var inserted = Object.create(TNSCanaryCacheShadowLeaf.prototype, { depth: loggingSetter(log, other) });
+                Object.setPrototypeOf(Detached.prototype, inserted);
+                other.depth = 71;
+                expect(log).toEqual([71]);
+                expect(shadowDepthOf.call(other)).toBe(11);
+
+                var trapped = [];
+                // The target owns `depth`, so attribute queries find it at the proxy.
+                var target = Object.create(TNSCanaryCacheShadowLeaf.prototype);
+                Object.defineProperty(target, "depth", { value: "target", writable: true, configurable: true });
+                Object.setPrototypeOf(Detached.prototype, new Proxy(target, {
+                    set: function (target, key, value, receiver) {
+                        trapped.push(receiver === other ? value : "wrong receiver");
+                        return true;
+                    }
+                }));
+                other.depth = 72;
+                expect(trapped).toEqual([72]);
+                expect(shadowDepthOf.call(other)).toBe(11);
+
+                Object.setPrototypeOf(Detached.prototype, TNSCanaryCacheShadowLeaf.prototype);
+                expectCached(function () {
+                    other.depth = 73;
+                }, true);
+                expect(shadowDepthOf.call(other)).toBe(73);
+                expect(log).toEqual([71]);
+                expect(trapped).toEqual([72]);
+            });
+
+            it("keeps apart a class and its subclass whose prototype has its own accessor", function () {
+                var Parent = extend(TNSCanaryCacheLeaf);
+                var log = [];
+                var child = subclassed(Parent, {});
+                Object.defineProperty(Object.getPrototypeOf(child), "depth", loggingSetter(log, child));
+                warm(Parent.new(), depthOf, true);
+                child.depth = 80;
+                child.depth = 81;
+                var parent = Parent.new();
+                warm(parent, depthOf, true);
+                child.depth = 82;
+                expect(log).toEqual([80, 81, 82]);
+                expect(depthOf.call(child)).toBe(0);
+                expect(depthOf.call(parent)).toBe(11);
+
+                var later = subclassed(Parent, {});
+                warm(later, depthOf, true);
+                Object.defineProperty(Object.getPrototypeOf(later), "depth", loggingSetter(log, later));
+                later.depth = 83;
+                expect(log).toEqual([80, 81, 82, 83]);
+                expect(depthOf.call(later)).toBe(11);
+            });
+
+            it("writes from a worker, each isolate with its own cache", function (done) {
+                var wt = require("node:worker_threads");
+                var obj = extend(TNSCanaryCacheLeaf).new();
+                warm(obj, depthOf, true);
+                var worker = new wt.Worker("~/tests/canaryNativeWriteCacheWorker.js");
+                worker.on("message", function (result) {
+                    worker.terminate();
+                    expect(result.error).toBeUndefined();
+                    expect(result.values).toEqual([3]);
+                    expect(result.own).toBe(false);
+                    if (canary) {
+                        expect(result.hits).toBeGreaterThan(0);
+                    } else {
+                        expect(result.hits).toBe(0);
+                    }
+                    expectCached(function () {
+                        obj.depth = 12;
+                    }, true);
+                    expect(depthOf.call(obj)).toBe(12);
+                    done();
+                });
+                worker.on("error", function (error) {
+                    fail("worker error: " + error.message);
+                    worker.terminate();
+                    done();
+                });
+                worker.postMessage(0);
+            });
+        });
+
         it("handles writes to JS-extended instances only, under scope extended", function () {
             var Ext = TNSAllocLog.extend({}, { name: "WrapperLifetimeWriteHandlerExt" });
             var before = stats();
@@ -1514,6 +1941,298 @@ describe("Wrapper lifetime modes", function () {
                 }, function (obj) {
                     if (keepsState) {
                         expect(obj.other).toBe("new");
+                    }
+                    done();
+                });
+            });
+        });
+    });
+
+    // Under scope "all", a plain native object's canary keeps its JS
+    // properties in the state only (forwarding), unless the app config allows
+    // shadowing native members, which only the mirroring handlers capture.
+    describe("plain canaries", function () {
+        var allowShadowing = runtime.getConfig("wrapperLifetimeAllowShadowingNativeMembers");
+        var plainKeepsState = keepsState && scope === "all";
+        var forwarding = canary && scope === "all" && !allowShadowing;
+
+        // rewrap for a plain object, which only scope "all" makes a canary.
+        function rewrapPlain(make, callback) {
+            var owner = NSMutableArray.new();
+            var first;
+            (function () {
+                var obj = make();
+                owner.addObject(obj);
+                first = new WrapperWeakRef(obj);
+            })();
+            settle(2, function () {
+                if (canary && scope === "all") {
+                    expect(first.deref()).toBeUndefined();
+                }
+                callback(owner.objectAtIndex(0));
+            });
+        }
+
+        it("reports whether native members may be shadowed (" + allowShadowing + ")", function () {
+            expect(typeof allowShadowing).toBe("boolean");
+            expect(function () {
+                runtime.setConfig("wrapperLifetimeAllowShadowingNativeMembers", !allowShadowing);
+            }).toThrowError(TypeError, /read-only/);
+        });
+
+        it("keeps own-property semantics for JS properties on a plain native object", function () {
+            var key = Symbol("key");
+            var obj = TNSAllocLog.new();
+            obj.a = 1;
+            obj[key] = 2;
+            Object.defineProperty(obj, "hidden", { value: 3, enumerable: false, configurable: true });
+            Object.defineProperty(obj, "fixed", { value: 4, enumerable: true });
+            Object.defineProperty(obj, "me", {
+                get: function () {
+                    return this;
+                },
+                configurable: true
+            });
+
+            expect(Object.keys(obj)).toEqual(["a", "fixed"]);
+            expect(Object.getOwnPropertyNames(obj).sort()).toEqual(["a", "fixed", "hidden", "me"]);
+            expect(Object.getOwnPropertySymbols(obj)).toEqual([key]);
+            expect("a" in obj).toBe(true);
+            expect(hasOwn(obj, "hidden")).toBe(true);
+            expect(obj.hidden).toBe(3);
+            expect(obj[key]).toBe(2);
+            expect(obj.me).toBe(obj);
+            expect(Object.getOwnPropertyDescriptor(obj, "fixed")).toEqual({
+                value: 4, writable: false, enumerable: true, configurable: false
+            });
+            expect(strictAssignThrows(obj, "fixed", 5)).toBe(true);
+            expect(obj.fixed).toBe(4);
+            expect(strictAssignThrows(obj, "me", 5)).toBe(true);
+            var receiver;
+            Object.defineProperty(obj, "watched", {
+                set: function () {
+                    receiver = this;
+                },
+                configurable: true
+            });
+            obj.watched = 1;
+            expect(receiver).toBe(obj);
+            receiver = null;
+            expect(delete obj.fixed).toBe(false);
+            expect(JSON.parse(JSON.stringify(obj))).toEqual({ a: 1, fixed: 4 });
+
+            expect(delete obj.a).toBe(true);
+            expect("a" in obj).toBe(false);
+            expect(obj.a).toBeUndefined();
+            expect(hasOwn(obj, "isEqual")).toBe(false);
+        });
+
+        it("hands back a plain object's JS properties with their attributes on a new wrapper", function (done) {
+            var key = Symbol("key");
+            var payload = {};
+            rewrapPlain(function () {
+                var obj = TNSAllocLog.new();
+                obj.visible = 1;
+                obj.payload = payload;
+                obj[key] = 2;
+                Object.defineProperty(obj, "hidden", { value: 3, writable: true, configurable: true });
+                Object.defineProperty(obj, "me", {
+                    get: function () {
+                        return this;
+                    },
+                    configurable: true
+                });
+                return obj;
+            }, function (obj) {
+                if (plainKeepsState) {
+                    expect(Object.keys(obj)).toEqual(["visible", "payload"]);
+                    expect(Object.getOwnPropertyNames(obj).sort()).toEqual(["hidden", "me", "payload", "visible"]);
+                    expect(obj.payload).toBe(payload);
+                    expect(obj[key]).toBe(2);
+                    expect(obj.me).toBe(obj);
+                    expect(Object.getOwnPropertyDescriptor(obj, "hidden")).toEqual({
+                        value: 3, writable: true, enumerable: false, configurable: true
+                    });
+                    obj.visible = 5;
+                    expect(obj.visible).toBe(5);
+                }
+                done();
+            });
+        });
+
+        it("counts the writes of new names to a plain canary", function () {
+            var obj = TNSAllocLog.new();
+            var before = runtime.getWrapperLifetimeStats().canaryInterceptedWrites;
+            obj.first = 1;
+            obj.second = 2;
+            var writes = runtime.getWrapperLifetimeStats().canaryInterceptedWrites - before;
+            expect(writes).toBe(canary && scope === "all" ? 2 : 0);
+        });
+
+        // Names the prototype chain has never reach a forwarding canary's
+        // handlers: such writes and defines land on the canary and die with it.
+        it("keeps an instance write over an inherited data property on its wrapper only", function (done) {
+            TNSAllocLog.prototype.wrapperLifetimeJsMember = function () {
+                return "prototype";
+            };
+            rewrapPlain(function () {
+                var obj = TNSAllocLog.new();
+                obj.valueOf = function () {
+                    return 42;
+                };
+                obj.wrapperLifetimeJsMember = function () {
+                    return "shadow";
+                };
+                obj.tag = "kept";
+                expect(+obj).toBe(42);
+                expect(obj.wrapperLifetimeJsMember()).toBe("shadow");
+                expect(hasOwn(obj, "valueOf")).toBe(true);
+                return obj;
+            }, function (obj) {
+                var member = obj.wrapperLifetimeJsMember();
+                delete TNSAllocLog.prototype.wrapperLifetimeJsMember;
+                if (plainKeepsState) {
+                    expect(obj.tag).toBe("kept");
+                }
+                if (forwarding) {
+                    expect(hasOwn(obj, "valueOf")).toBe(false);
+                    expect(obj.valueOf()).toBe(obj);
+                    expect(member).toBe("prototype");
+                } else if (plainKeepsState) {
+                    expect(+obj).toBe(42);
+                    expect(member).toBe("shadow");
+                }
+                done();
+            });
+        });
+
+        it("keeps a property defined over an inherited name on its wrapper only", function (done) {
+            rewrapPlain(function () {
+                var obj = TNSAllocLog.new();
+                Object.defineProperty(obj, "isEqual", {
+                    value: function () {
+                        return "defined";
+                    },
+                    writable: true,
+                    configurable: true
+                });
+                obj.tag = "kept";
+                expect(obj.isEqual(obj)).toBe("defined");
+                return obj;
+            }, function (obj) {
+                if (plainKeepsState) {
+                    expect(obj.tag).toBe("kept");
+                }
+                if (forwarding) {
+                    expect(hasOwn(obj, "isEqual")).toBe(false);
+                    expect(obj.isEqual(obj)).toBe(true);
+                } else if (plainKeepsState) {
+                    expect(obj.isEqual(obj)).toBe("defined");
+                }
+                done();
+            });
+        });
+
+        it("deletes nothing when an inherited name is deleted", function () {
+            var obj = TNSAllocLog.new();
+            var isEqual = TNSAllocLog.prototype.isEqual;
+            expect(delete obj.isEqual).toBe(true);
+            expect(obj.isEqual).toBe(isEqual);
+            expect(TNSAllocLog.prototype.isEqual).toBe(isEqual);
+            expect(obj.isEqual(obj)).toBe(true);
+        });
+
+        it("keeps a released plain canary's JS properties", function () {
+            var payload = {};
+            var obj = TNSAllocLog.new();
+            obj.tag = "kept";
+            obj.payload = payload;
+            __releaseNativeCounterpart(obj);
+            expect(obj.tag).toBe("kept");
+            expect(obj.payload).toBe(payload);
+            expect(Object.keys(obj)).toEqual(["tag", "payload"]);
+        });
+
+        it("keeps a released plain canary's accessors and read-only properties with their attributes", function () {
+            var obj = TNSAllocLog.new();
+            Object.defineProperty(obj, "me", {
+                get: function () {
+                    return this;
+                },
+                configurable: true
+            });
+            Object.defineProperty(obj, "fixed", { value: 4, enumerable: true });
+            obj.plain = 5;
+            __releaseNativeCounterpart(obj);
+            expect(obj.me).toBe(obj);
+            var me = Object.getOwnPropertyDescriptor(obj, "me");
+            expect(me && typeof me.get).toBe("function");
+            expect(me && me.set).toBeUndefined();
+            expect(me && me.enumerable).toBe(false);
+            expect(me && me.configurable).toBe(true);
+            expect(Object.getOwnPropertyDescriptor(obj, "fixed")).toEqual({
+                value: 4, writable: false, enumerable: true, configurable: false
+            });
+            expect(Object.getOwnPropertyDescriptor(obj, "plain")).toEqual({
+                value: 5, writable: true, enumerable: true, configurable: true
+            });
+            expect(Object.keys(obj)).toEqual(["fixed", "plain"]);
+        });
+
+        // A name the prototype chain gained after the first write never reaches
+        // a forwarding canary's handlers again: later writes land on the canary.
+        it("keeps a released plain canary's latest write to a name its prototype gained", function () {
+            var obj = TNSAllocLog.new();
+            obj.wrapperLifetimeLateInherited = 1;
+            TNSAllocLog.prototype.wrapperLifetimeLateInherited = 0;
+            try {
+                obj.wrapperLifetimeLateInherited = 2;
+                expect(obj.wrapperLifetimeLateInherited).toBe(2);
+                __releaseNativeCounterpart(obj);
+                expect(obj.wrapperLifetimeLateInherited).toBe(2);
+            } finally {
+                delete TNSAllocLog.prototype.wrapperLifetimeLateInherited;
+            }
+        });
+
+        // Third-party code can strip a live object's associations, which ends
+        // its record. A forwarding canary keeps reading that record's state,
+        // and its next write carries it over to a new record.
+        it("keeps a live plain object's JS properties after its associations are removed", function (done) {
+            if (typeof objc_removeAssociatedObjects !== "function") {
+                done();
+                return;
+            }
+            var map = new WeakMap();
+            var value = {};
+            var obj = TNSAllocLog.new();
+            obj.tag = "first";
+            obj.other = "kept";
+            map.set(obj, value);
+            objc_removeAssociatedObjects(obj);
+            settle(2, function () {
+                expect(obj.tag).toBe("first");
+                expect(obj.other).toBe("kept");
+                expect(Object.keys(obj)).toEqual(["tag", "other"]);
+                obj.tag = "second";
+                expect(obj.tag).toBe("second");
+                expect(obj.other).toBe("kept");
+                // The new record took over the state, and the weak
+                // collections' key with it.
+                if (forwarding) {
+                    expect(map.get(obj)).toBe(value);
+                }
+                rewrapPlain(function () {
+                    var made = obj;
+                    obj = null;
+                    return made;
+                }, function (again) {
+                    if (plainKeepsState) {
+                        expect(again.tag).toBe("second");
+                        expect(again.other).toBe("kept");
+                    }
+                    if (forwarding) {
+                        expect(map.get(again)).toBe(value);
                     }
                     done();
                 });

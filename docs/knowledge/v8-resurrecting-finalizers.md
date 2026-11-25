@@ -272,10 +272,19 @@ to the canary without calling the definer: a name that resolves to an inherited 
 native property, a JS getter/setter) or a read-only data member never becomes state. When the
 first object on the chain with the name is a native class prototype that still records a
 native setter for it, the handler runs that setter itself
-(`MetadataBuilder::TrySetNativeProperty`, the same code as the accessor's setter callback).
+(`MetadataBuilder::FindNativeSetter`/`RunNativeSetter`, the same code as the accessor's setter
+callback).
 Everything else is left to V8: a JS accessor, a read-only member, a native property without a
 setter, and a name JS assigned or defined on that prototype, which its own setter and definer
-interceptors forget for good. The state is rooted from its first write until the native
+interceptors forget for good. The handler caches the setter it found by the name and the
+receiver's prototype (`NativeWriteCache`), so a later write of that name through an object with
+that prototype skips the chain lookup. A hit rechecks that the receiver and every prototype
+below the setter's owner still lack the name, that each prototype up to the owner is the one
+the entry was made with, and that the owner still has an accessor whose setter was not
+forgotten. Native class prototypes get the per-name recheck too: a `[[Set]]` that starts
+elsewhere and has the prototype as its receiver (`Reflect.set({}, name, v, proto)`) defines a
+data property there without reaching the prototype's interceptors. A name with no entry costs one read of
+a small table of name tags. The state is rooted from its first write until the native
 object is deallocated (or, with the default death signal below, until its
 token is released), and stays the source of truth: a canary built later
 for the same object, or the receiver a JS-implemented `-dealloc` runs with, gets the state's
@@ -289,7 +298,42 @@ of 125 (380 instead of 115 four prototypes up) while the handler left it to V8; 
 setter from the handler brings it from about 324 to 289 ns two prototypes up and from 396 to
 324 for a `UIButton` `tag` four up (323 to 292 and 392 to 334 under `"all"`, where a plain
 `UIButton`'s goes from 322 to 266). Building a canary for an object with state costs
-about 330 ns per state property. Instances of JS-extended classes report their own
+about 330 ns per state property.
+
+That masking handler is what JS-extended instances keep. Under `"scope": "all"`, wrappers of
+plain objects get a non-masking forwarding set instead (getter, setter, query, deleter,
+enumerator, definer and descriptor), unless `"allowShadowingNativeMembers": true` in the app
+config gives them the masking one: the state is the only copy of their properties, every access
+to one is answered from it, and a new canary needs no copy. V8 calls a non-masking interceptor
+only for names absent from the object and its whole prototype chain, own lookups included
+(WebIDL's named-property visibility, `LookupIterator::kSkipNonMaskingOwnProperty`), so native
+calls and native property stores never reach C++. ObjC prototypes carry the swizzle interceptor,
+which made an own lookup on such a canary stop at the prototype until the prebuilts' patch
+`v8_nonmasking_own_lookup` (v8-buildscripts #11): without it `delete obj.m` deleted `m` from the
+prototype. The holes are names the chain has: an instance write or `Object.defineProperty` over
+an inherited data property (a native method, `toString`, `valueOf`, `constructor`, a member JS put
+on a prototype) creates an own property of that canary only, and deleting such a name deletes
+nothing. `v8::Object::Set` reports success for a store `[[Set]]` rejects, so the setter checks a
+read-only property and a getter-only accessor in the state itself, and runs a state accessor's
+setter with the canary as `this`. A record that dies under a live forwarding canary
+(`objc_removeAssociatedObjects`) keeps its state while the canary holds it (`ReleaseStates` parks
+it in `orphaned`, which the leak probe also walks, and `DropRecord` sweeps once the canary is
+collected or released); the canary keeps reading it, and its next write moves the state object
+into a new record, so what the weak collections keyed on the object survives too. A released
+forwarding canary gets the state's properties copied onto it (`KeepWeakCollectionKey`), since its
+handlers no longer reach the state; the handlers answer nothing while that copy runs, or V8 would
+find each property already defined and skip it. An accessor kept in the state sees the canary as
+`this` whatever the receiver, and a write through a Proxy or an inheriting object never runs its
+setter: interceptors are given only the holder, and V8 consults only the query callback when the
+holder is not the receiver. Measured on a Release
+simulator build (iPhone 16 Pro simulator, jitless), forwarding vs masking for a plain `NSObject`:
+an expando read takes 64 ns instead of 19 and a miss 47 instead of 20, `in` 111 instead of 21, an
+expando rewrite 81 instead of 105, a first write creating the state 544 instead of 676, a native
+property store (`UIView` `tag`) 112 instead of 219, and wrapping an object with five state
+properties again costs what wrapping one without state does (903 vs 925 ns) instead of 2496;
+native method calls and native property reads are unchanged.
+
+Instances of JS-extended classes report their own
 deallocation: the runtime gives each extended class a `-dealloc` that marks the instance's
 records dying in every isolate, calls the superclass's (which can be a JS one the class
 inherits, whose receiver still reads the state), and then retires them. For other objects it is
@@ -317,7 +361,8 @@ documents it as not for general use. The alternative keeps an ObjC weak referenc
 references) and sweeps the records after every major collection, so state lingers until then.
 An instance of a class that refuses weak references and is not JS-extended gets no state
 under it, in the same way. With the default, `"scope": "all"` stays experimental because that
-check reads private runtime layout; `"extended"` attaches no tokens at all. It cannot be
+check reads private runtime layout; `"extended"` attaches no tokens at all (the key-only
+records below use the weak reference). It cannot be
 rooted at canary death instead, because a state reachable only through the canary is garbage in
 the same collection. The cost: state that references its own object (a closure over `this`)
 keeps it alive. A canary built after a death is a new object, but `===` cannot tell: only one
@@ -325,14 +370,59 @@ canary lives at a time, and anything still referencing the old one would have ke
 An explicit release is different: `__releaseNativeCounterpart` drops the object's
 `Caches::Instances` entry but not its state, so if the object lives on, the next native return
 of it builds a new canary with the state's properties while JS can still hold the released
-one, and `===` tells them apart. What could notice is whatever keys on the canary without keeping it. The weak collections
+one, and `===` tells them apart. What the weak collections keyed on the object follows the
+object: before the release, `WrapperLifetimeCanary::KeepWeakCollectionKey` copies the key onto
+the released canary (a private), so `unwrap` still returns it there, and marks the record
+released, so `wrap` returns the object's live canary only once native code handed the object
+back (a new canary adopted the record, which clears the mark) and `undefined` until then; it
+never builds a canary for a released record, and never returns the released one. A canary
+released with no key to copy gets `null` in that private instead, and `unwrap` reports each
+weak-collection operation that reaches it as a released-object access (`ReportReleasedObject`). The key
+lives while the state or the released canary does. A record whose token
+`objc_removeAssociatedObjects` already retired gets neither: the released canary then keys
+nothing, as that limitation describes. What could notice is whatever keys on the canary without keeping it. The weak collections
 don't: in canary mode a builtin (`js/weak-collections.js`) replaces `WeakMap`, `WeakSet`,
-`WeakRef` and `FinalizationRegistry` with subclasses that key an in-scope native object (a
-canary: not a plain object under `"extended"`, a tagged pointer, a block, or an object of a class
-refusing weak references or forbidding associated objects) by an opaque, frozen key held by its state, so entries and targets live
-exactly as long as the native object, and `WeakRef.prototype.deref` returns the live canary, a new
+`WeakRef` and `FinalizationRegistry` with subclasses that key a native object (a canary's, or
+under `"extended"` a plain object's; not a tagged pointer, a block, or an object of a class
+refusing weak references or, for a canary, forbidding associated objects) by an opaque, frozen key held by its state, so entries and targets live
+exactly as long as the native object, and `WeakRef.prototype.deref` returns the live wrapper, a new
 one, or `undefined` once the object is gone. Lookups never create that key, and a Proxy around a
-native object stays a key of its own. The cost is the other side of the same rooting: a `WeakMap`
+native object stays a key of its own. Under `"extended"` a plain object's wrapper is a phantom
+handle with no handlers and no state, which dies with its JS references just as a canary does, so
+the first keying of a plain object (`unwrap` with `create`) gives it a key-only record: a weak
+slot and a state holding nothing but the key, counted in `canaryStates` and in the registry's
+`records`, so the leak probe walks it like any other state. Nothing is attached to the object: no
+token, so no private class layout is read, a class forbidding associated objects is keyed like
+any other, and `objc_removeAssociatedObjects` leaves the record alone. Only a class refusing weak
+references keeps its wrapper as the key. The record is flagged `plain` and no wrapper holds it:
+wrapping a plain object never consults the registry, and `unwrap` finds the record by the
+object's address only after the canary lookups miss, behind an atomic count of plain records, so
+a weak-collection lookup costs nothing more while no plain object was ever keyed, and canary
+adoption skips the registry while every record is plain. `wrap` returns the object's `Instances`
+wrapper or builds a plain one (no adoption, no hydration). Death is the weak sweep, whatever
+`NS_CANARY_DEATH_SIGNAL` chooses for canaries: a major-GC epilogue posts `SweepPlain` (one atomic
+load while `plainRecords`, retired records included, is empty), which walks the registry's `plainRecords` list, not the
+map, and retires records whose weak slot was zeroed; a lookup that meets a zeroed slot retires
+the record at once (`RetireIfDead`). So entries keyed on a dead plain object, and its
+`FinalizationRegistry` callbacks, wait until the major collection after its deallocation (and the
+key's own collection after that). The sweep bumps no `deref` cache epoch: a live wrapper retains
+its object, so no cached wrapper outlives a swept object. Release semantics are the canary ones:
+`__releaseNativeCounterpart` on a plain wrapper copies the key, or `null`, onto it
+(`KeepPlainWeakCollectionKey`) and marks the record released; since no adoption looks the record
+up, `unwrap` or `wrap` meeting a live wrapper of the object clears the mark instead. Limitation:
+a native hand-back whose wrapper dies before any weak collection operation sees it leaves the
+record released, so `deref` returns `undefined` until a later hand-back reaches `unwrap` or
+`wrap`. Limitation: as for canaries, a `WeakMap` value referencing its plain key keeps the object
+alive while the map lives, where the wrapper key used to let it go. Measured on a Release
+simulator build (medians of launches, ns/op): a `WeakMap` hit on a keyed plain object 142 instead
+of 39 (the wrapper was the key), a miss on a never-keyed plain wrapper 124 instead of 106 once any
+plain object was keyed and unchanged (107) before, the first keying 870 instead of 154, a
+`new WeakRef` of a fresh plain object 1570 instead of 216, and a `deref` that rebuilds a dead
+plain wrapper about 1120. A major collection plus the next timer took about 500 µs with 1000
+keyed plain objects held against 370 with the same objects unkeyed, the same as a build that
+reported their deaths with tokens (540 against 385): the difference is the states and keys on the
+heap, and the sweep is below that noise. Creating plain wrappers, native calls, native property
+reads and stores, `Instances` lookups and a major collection with no plain record are unchanged. The cost is the other side of the same rooting: a `WeakMap`
 value that references its native key keeps the key, its state and so the native object alive for
 as long as the map lives, where in the other modes the entry would be collectable. Native `#private` fields are branded on the canary and do not carry over. Other
 limits: `Object.freeze`, `seal` and `preventExtensions` throw on a canary (V8 refuses them on
