@@ -141,9 +141,15 @@ std::string ReportedModuleUrl(const std::string& keyOrPath) {
   if (keyOrPath.empty()) {
     return "file:///app/";
   }
+  // Before the scheme test: the loader reads strings as http(s) URLs that the
+  // scheme test rejects (leading whitespace), and those must never be
+  // prefixed with file://.
+  const std::string http = NormalizeHttpModuleUrl(keyOrPath);
+  if (!http.empty()) {
+    return http;
+  }
   if (HasUrlScheme(keyOrPath)) {
-    const std::string http = NormalizeHttpModuleUrl(keyOrPath);
-    return http.empty() ? keyOrPath : http;
+    return keyOrPath;
   }
   // Every occurrence, as tns::ReplaceAll removes it everywhere else.
   std::string path = keyOrPath;
