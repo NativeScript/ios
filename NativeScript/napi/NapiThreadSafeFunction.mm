@@ -32,22 +32,14 @@
 
 struct napi_threadsafe_function__
     : public std::enable_shared_from_this<napi_threadsafe_function__> {
-  ~napi_threadsafe_function__() {
-    if (loop != nullptr) {
-      CFRelease(loop);
-    }
-  }
-
   // Read from producer threads, so they are fixed at construction and only
-  // cleared once the function is closed for good. The runloop is retained for
-  // the object's lifetime and used for thread-identity checks only: a producer
-  // may compare against it after the owning thread exits, and comparing a
-  // deallocated pointer is fine where calling into it would not be. Work is
-  // posted through the event loop, whose weak_ptr goes null once the runtime
-  // shuts it down.
+  // cleared once the function is closed for good. envThreadId is for
+  // thread-identity checks only (see NapiEnv::ThreadId); work is posted
+  // through the event loop, whose weak_ptr goes null once the runtime shuts
+  // it down.
   tns::NapiEnv* env = nullptr;
   v8::Isolate* isolate = nullptr;
-  CFRunLoopRef loop = nullptr;
+  uint64_t envThreadId = 0;
   std::weak_ptr<tns::EventLoop> eventLoop;
 
   // Touched on the env's thread only, which is where the abort path and every
@@ -344,14 +336,10 @@ napi_create_threadsafe_function(napi_env env,
   }
 
   tns::NapiEnv* tnsEnv = static_cast<tns::NapiEnv*>(env);
-  RETURN_STATUS_IF_FALSE(env, tnsEnv->RuntimeLoop() != nullptr,
-                         napi_generic_failure);
-
   TsfnRef tsfn = std::make_shared<napi_threadsafe_function__>();
   tsfn->env = tnsEnv;
   tsfn->isolate = env->isolate;
-  tsfn->loop = tnsEnv->RuntimeLoop();
-  CFRetain(tsfn->loop);
+  tsfn->envThreadId = tnsEnv->ThreadId();
   tsfn->eventLoop = tnsEnv->GetEventLoop();
   tsfn->callJs = call_js_cb;
   tsfn->finalizeCb = thread_finalize_cb;
@@ -407,7 +395,7 @@ napi_call_threadsafe_function(napi_threadsafe_function func,
       // this wait, so blocking on it there can only stall forever. Node blocks
       // regardless and leaves this status unused; wedging the runloop is worse
       // than a status an addon may not expect.
-      if (CFRunLoopGetCurrent() == func->loop) {
+      if (tns::NapiEnv::CurrentThreadId() == func->envThreadId) {
         return napi_would_deadlock;
       }
       func->spaceAvailable.wait(lock);

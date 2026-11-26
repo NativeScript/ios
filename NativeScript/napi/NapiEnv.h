@@ -10,7 +10,7 @@
 #define NODE_API_EXPERIMENTAL_NO_WARNING
 #endif
 
-#include <CoreFoundation/CoreFoundation.h>
+#include <pthread.h>
 
 #include <atomic>
 #include <memory>
@@ -58,9 +58,17 @@ class NapiEnv : public napi_env__ {
 
   v8::Local<v8::Private> PrivateKey(NapiPrivateKeySlot slot);
 
-  // The runloop of the thread that owns this env — identity checks only
-  // (is-this-the-env's-thread); work is posted through GetEventLoop().
-  CFRunLoopRef RuntimeLoop() const { return runtimeLoop_; }
+  // System-wide id of the thread that owns this env (pthread_threadid_np).
+  // Unlike a pthread_t it is never reused after the thread exits, so it stays
+  // safe to compare against from a producer that outlives the env's thread.
+  // Work is posted through GetEventLoop().
+  uint64_t ThreadId() const { return threadId_; }
+  bool IsOnEnvThread() const { return CurrentThreadId() == threadId_; }
+  static uint64_t CurrentThreadId() {
+    uint64_t id = 0;
+    pthread_threadid_np(nullptr, &id);
+    return id;
+  }
 
   // The runtime's event loop, or null once ~Runtime released it. Between
   // Shutdown and that release it is still returned, and posts to it are
@@ -88,7 +96,7 @@ class NapiEnv : public napi_env__ {
 
   void DrainFinalizers();
 
-  CFRunLoopRef runtimeLoop_ = nullptr;
+  uint64_t threadId_ = 0;
   std::weak_ptr<EventLoop> eventLoop_;
   bool tearingDown_ = false;
   v8::Eternal<v8::Private> privateKeys_[2];

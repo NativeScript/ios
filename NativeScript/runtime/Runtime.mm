@@ -854,12 +854,12 @@ napi_env Runtime::GetNapiEnvIfAlive(const Runtime* runtime) {
   SpinLock lock(isolatesMutex_);
   for (Isolate* isolate : Runtime::isolates_) {
     Runtime* candidate = GetRuntime(isolate);
-    // The home-loop comparison closes the allocator-reuse (ABA) hole: a stale
-    // thread-local can only exist on the dead runtime's home thread, and a
-    // recycled same-address Runtime homed on this thread would have
+    // The home-thread comparison closes the allocator-reuse (ABA) hole: a
+    // stale thread-local can only exist on the dead runtime's home thread, and
+    // a recycled same-address Runtime homed on this thread would have
     // overwritten that thread-local — so an address match with a foreign home
-    // loop can only be a recycled pointer.
-    if (candidate == runtime && candidate->RuntimeLoop() == CFRunLoopGetCurrent()) {
+    // thread can only be a recycled pointer.
+    if (candidate == runtime && candidate->IsOnRuntimeThread()) {
       return candidate->GetNapiEnv();
     }
   }
