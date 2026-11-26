@@ -1964,6 +1964,59 @@ describe("HTTP ESM Loader", function() {
         });
     });
 
+    describe("an import-map entry keyed by a file module's own URL", function () {
+        var nsModule = require("ns:module");
+
+        afterEach(function () {
+            nsModule.configureLoader({ importMap: { imports: {} } });
+        });
+
+        // `mapKey` derives the entry key from the loaded module's own URL; the
+        // entry points at the test server.
+        function expectStaysFileImporter(dir, mapKey, done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            import("~/tests/esm/" + dir + "/local.mjs").then(function (mod) {
+                var imports = {};
+                var key = mapKey(mod.url);
+                imports[key] = origin + "/esm/resolve/" + dir + "/" +
+                               (key.charAt(key.length - 1) === "/" ? "" : "local.mjs");
+                nsModule.configureLoader({ importMap: { imports: imports } });
+                return Promise.all([
+                    mod.load("~/tests/esm/" + dir + "/tilde-dep.mjs"),
+                    mod.load("tests/esm/" + dir + "/bare-dep.mjs"),
+                    mod.load("./sibling.mjs"),
+                ]);
+            }).then(function (namespaces) {
+                expect(namespaces.map(function (ns) { return ns.name; })).toEqual([
+                    dir + "-tilde",
+                    dir + "-bare",
+                    dir + "-sibling",
+                ]);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        }
+
+        it("leaves an exact entry out of the module's import() resolution", function (done) {
+            expectStaysFileImporter("self-mapped-file", function (url) {
+                return url;
+            }, done);
+        });
+
+        it("leaves a prefix entry out of the module's import() resolution", function (done) {
+            expectStaysFileImporter("self-mapped-prefix", function (url) {
+                return url.substring(0, url.lastIndexOf("/") + 1);
+            }, done);
+        });
+    });
+
     describe("import-map lookup of a query from a file module", function () {
         var nsModule = require("ns:module");
 

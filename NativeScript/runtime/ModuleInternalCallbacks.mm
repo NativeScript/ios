@@ -1704,10 +1704,16 @@ static std::string HttpUrlEmbeddedInPath(const std::string& p) {
   return tail;
 }
 
+enum class ImportMapLookup {
+  kApply,
+  kSkip,  // the specifier is an existing module's origin, which the map never rewrites
+};
+
 // `referrerKey` is the registry key of the importing module — empty when the
 // importer is unknown (a dynamic import with no compiled referrer).
-static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
-                                               const std::string& referrerKey) {
+static ModuleResolution ResolveSpecifierToPath(
+    const std::string& rawSpec, const std::string& referrerKey,
+    ImportMapLookup importMap = ImportMapLookup::kApply) {
   ModuleResolution result;
   if (rawSpec.empty()) {
     return result;
@@ -1731,9 +1737,10 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
   // resolve through it to vendor or HTTP URLs. A client that rewrites
   // specifiers must map every form it emits — keys are matched literally.
   const LoaderVocabulary* vocabulary = VocabularyForCurrentIsolate();
+  const bool consultImportMap = importMap == ImportMapLookup::kApply;
   const bool hasImportMap = vocabulary != nullptr && !vocabulary->importMap.empty();
   bool mappedByImportMap = false;
-  if (hasImportMap) {
+  if (consultImportMap && hasImportMap) {
     std::string mapped = LookupImportMap(spec, referrerKey);
     if (!mapped.empty()) {
       TNS_DEBUG(Esm, "[resolver][import-map] rewrite: %s -> %s", spec.c_str(), mapped.c_str());
@@ -1752,7 +1759,7 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
                   vocabulary->importMap.empty() ? 1 : 0);
       }
     }
-  } else if (tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
+  } else if (consultImportMap && tns::LogCategoryEnabled(tns::LogCategory::Esm)) {
     // Map completely empty — distinct from "populated but no entry".
     bool looksBare = spec[0] != '/' && spec[0] != '.' && spec.find("://") == std::string::npos &&
                      spec.find('\\') == std::string::npos;
@@ -3151,19 +3158,17 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   if (!resource_name.IsEmpty() && resource_name->IsString()) {
     v8::String::Utf8Value resourceUtf8(isolate, resource_name);
     if (*resourceUtf8) {
-      // The host names the referrer by its script origin — `file:///app/…` for
-      // a local module — while scopes are matched against the registry key, an
-      // absolute app path. Canonicalizing the origin alone stops at `/app/…`
-      // and matches no scope, so the origin goes through the same resolution
-      // the registry keys by first. An HTTP module's origin is its URL
-      // already, and an identity: it must not go through the import map.
+      // A module's origin is its identity and never goes through the import
+      // map. A local origin (`file:///app/…`) still has to become the absolute
+      // app path the registry keys by, or no scope would match it.
       const std::string resourceName(*resourceUtf8);
       const std::string resourceUrl = RepairCollapsedUrlScheme(resourceName);
       const auto parsedResource = ada::parse<ada::url_aggregator>(resourceUrl, nullptr);
       if (parsedResource && HasHttpScheme(*parsedResource)) {
         dynamicReferrerKey = CanonicalizeRegistryKey(resourceUrl);
       } else {
-        const ModuleResolution referrer = ResolveSpecifierToPath(resourceName, std::string());
+        const ModuleResolution referrer =
+            ResolveSpecifierToPath(resourceName, std::string(), ImportMapLookup::kSkip);
         if (referrer.kind == ModuleResolution::Kind::kFile) {
           dynamicReferrerKey = CanonicalizeRegistryKey(referrer.path);
         } else if (referrer.kind == ModuleResolution::Kind::kHttp) {

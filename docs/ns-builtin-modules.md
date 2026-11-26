@@ -662,7 +662,8 @@ consults the most specific matching scope first (longest prefix wins), then
 progressively less specific ones, then `imports` — so a scope can override a
 global mapping for one subtree and fall through to it everywhere else. The
 synchronous resolver, the graph walk, and `import()` all resolve through the
-same cascade.
+same cascade. The map rewrites only the specifiers a module imports, never the
+importing module's own URL.
 
 The whole map is parsed and validated before any of it is installed: a
 rejected map throws a `TypeError` out of `configureLoader` and the previously
