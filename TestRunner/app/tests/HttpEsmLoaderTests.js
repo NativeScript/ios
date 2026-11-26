@@ -1935,6 +1935,41 @@ describe("HTTP ESM Loader", function() {
             });
         });
 
+        it("matches an http(s) scope the way the URL parser spells it", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var base = origin + "/esm/resolve/scope-norm";
+            var scopes = {};
+            scopes[base + "/x/../dots/"] = { "ns-scope-norm": base + "/target.mjs?k=dots" };
+            scopes[base + "/mödir/"] = { "ns-scope-norm": base + "/target.mjs?k=nonascii" };
+            // No trailing slash: still a plain prefix, here inside a segment.
+            scopes[base + "/pla"] = { "ns-scope-norm": base + "/target.mjs?k=plain" };
+            scopes[origin] = { "ns-scope-norm-origin": base + "/target.mjs?k=origin" };
+            nsModule.configureLoader({ importMap: { imports: {}, scopes: scopes } });
+            function load(dir, spec) {
+                return importer(origin, "scope-norm/" + dir).then(function (mod) {
+                    return mod.load(spec);
+                });
+            }
+            Promise.all([
+                load("dots", "ns-scope-norm"),
+                load("mödir", "ns-scope-norm"),
+                load("plain", "ns-scope-norm"),
+                load("dots", "ns-scope-norm-origin"),
+            ]).then(function (mods) {
+                expect(mods.map(function (m) { return m.query; }))
+                    .toEqual(["k=dots", "k=nonascii", "k=plain", "k=origin"]);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
         it("rejects an import() whose import-map target resolves to nothing", function (done) {
             var origin = getHostOrigin();
             if (!origin) {

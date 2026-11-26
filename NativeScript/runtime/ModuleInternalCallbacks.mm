@@ -937,6 +937,21 @@ static bool ParseImportMapEntries(NSDictionary* source, const std::string& secti
   return true;
 }
 
+// A scope key matches referrer registry keys by plain prefix, and an http(s)
+// referrer key is spelled by NormalizeHttpModuleUrl, so an http(s) scope key
+// is spelled the same way. Whether it ends in '/' stays as written: the parser
+// gives a path-less URL the path "/", which would narrow the prefix.
+static std::string ImportMapScopePrefix(const std::string& scopeKey) {
+  std::string prefix = NormalizeHttpModuleUrl(scopeKey);
+  if (prefix.empty()) {
+    return scopeKey;
+  }
+  if (scopeKey.back() != '/' && prefix.back() == '/') {
+    prefix.pop_back();
+  }
+  return prefix;
+}
+
 // Parse without touching the live map. On any failure `error` explains what is
 // wrong and `out` is meaningless — the caller keeps whatever it already had.
 static bool ParseImportMap(const std::string& json, ParsedImportMap* out, std::string* error) {
@@ -1009,7 +1024,7 @@ static bool ParseImportMap(const std::string& json, ParsedImportMap* out, std::s
                                    error)) {
           return false;
         }
-        out->scopes.emplace_back(scopePrefix, std::move(entries));
+        out->scopes.emplace_back(ImportMapScopePrefix(scopePrefix), std::move(entries));
       }
     }
   }

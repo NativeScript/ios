@@ -660,7 +660,9 @@ A **scope key is matched as a plain prefix of the importing module's canonical
 registry key** — an absolute `http(s)` URL for a served module, or a canonical
 absolute path for a file on disk. That key is this runtime's analogue of the
 web's resolved referrer URL, which is what scope prefixes match in a browser.
-End a scope key with
+An `http(s)` scope key is spelled the way registry keys are (see
+[Registry canonicalization](#registry-canonicalization)) when the map is
+installed, ending in `/` exactly when it is written so. End a scope key with
 `/` to keep it on a directory boundary. Resolution
 consults the most specific matching scope first (longest prefix wins), then
 progressively less specific ones, then `imports` — so a scope can override a
