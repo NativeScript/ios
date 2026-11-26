@@ -1547,8 +1547,8 @@ static std::string UnresolvedModuleMessage(const ModuleResolution& resolution) {
   return "Cannot find module '" + resolution.specifier + "' (tried " + resolution.attempted + ")";
 }
 
-static bool IsHttpHref(const std::string& href) {
-  return StartsWith(href, "http://") || StartsWith(href, "https://");
+static bool HasHttpScheme(const ada::url_aggregator& url) {
+  return url.type == ada::scheme::type::HTTP || url.type == ada::scheme::type::HTTPS;
 }
 
 // The authority (userinfo, host, port) of an absolute or scheme-relative URL
@@ -1574,47 +1574,56 @@ static std::string WrittenAuthority(const std::string& url) {
   return authority;
 }
 
+struct ModuleUrl {
+  bool parsed = false;
+  bool http = false;  // the scheme is http or https
+  std::string href;
+};
+
 // `input` parsed with the WHATWG URL parser (the one behind JS `new URL()`):
 // as an absolute URL when `base` is empty, otherwise as a path- or
-// scheme-relative reference against `base`. Empty when it does not parse.
+// scheme-relative reference against `base`.
 //
 // An http(s) result keeps its authority as written by whichever string
 // supplied it: tooling compares module URLs against the origin string it was
 // configured with, so that spelling is part of a module's identity until every
 // loader entry point canonicalizes. The parser's own href is used whenever the
 // written authority would not name the same URL.
-static std::string ParseUrlHref(const std::string& input, const std::string& base) {
+static ModuleUrl ParseModuleUrl(const std::string& input, const std::string& base) {
+  ModuleUrl result;
   ada::result<ada::url_aggregator> url;
   if (base.empty()) {
     url = ada::parse<ada::url_aggregator>(input, nullptr);
   } else {
     auto baseUrl = ada::parse<ada::url_aggregator>(base, nullptr);
     if (!baseUrl) {
-      return std::string();
+      return result;
     }
     url = ada::parse<ada::url_aggregator>(input, &baseUrl.value());
   }
   if (!url) {
-    return std::string();
+    return result;
   }
-  const std::string href(url->get_href());
-  if (!IsHttpHref(href)) {
-    return href;
+  result.parsed = true;
+  result.http = HasHttpScheme(*url);
+  result.href = std::string(url->get_href());
+  if (!result.http) {
+    return result;
   }
 
   const std::string authority =
       WrittenAuthority(base.empty() || StartsWith(input, "//") ? input : base);
   if (authority.empty()) {
-    return href;
+    return result;
   }
   const std::string written = std::string(url->get_protocol()) + "//" + authority +
                               std::string(url->get_pathname()) + std::string(url->get_search()) +
                               std::string(url->get_hash());
   auto reparsed = ada::parse<ada::url_aggregator>(written, nullptr);
-  if (!reparsed || reparsed->get_href() != url->get_href()) {
-    return href;
+  if (reparsed && reparsed->get_href() == url->get_href()) {
+    result.href = written;
   }
-  return written;
+  return result;
 }
 
 struct UrlSpecifier {
@@ -1635,12 +1644,12 @@ static UrlSpecifier ResolveModuleSpecifierAgainstUrl(const std::string& spec,
                                                      const std::string& baseUrl) {
   UrlSpecifier result;
   const bool relative = StartsWith(spec, "/") || StartsWith(spec, "./") || StartsWith(spec, "../");
-  result.href = ParseUrlHref(spec, relative ? baseUrl : std::string());
-  if (result.href.empty()) {
+  const ModuleUrl url = ParseModuleUrl(spec, relative ? baseUrl : std::string());
+  result.href = url.href;
+  if (!url.parsed) {
     result.kind = relative ? UrlSpecifier::Kind::kInvalid : UrlSpecifier::Kind::kBare;
   } else {
-    result.kind =
-        IsHttpHref(result.href) ? UrlSpecifier::Kind::kHttpUrl : UrlSpecifier::Kind::kOtherUrl;
+    result.kind = url.http ? UrlSpecifier::Kind::kHttpUrl : UrlSpecifier::Kind::kOtherUrl;
   }
   return result;
 }
@@ -1809,12 +1818,12 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
   // An HTTP importer's relative or root-absolute import-map target resolves
   // against the importer's URL.
   if (referrerIsHttp && (specIsRelative || specIsRootAbs)) {
-    const std::string resolvedHttp = ParseUrlHref(spec, referrerKey);
-    if (IsHttpHref(resolvedHttp)) {
+    const ModuleUrl resolved = ParseModuleUrl(spec, referrerKey);
+    if (resolved.http) {
       TNS_DEBUG(Esm, "[resolver][http-rel] base=%s spec=%s -> %s", referrerKey.c_str(),
-                spec.c_str(), resolvedHttp.c_str());
+                spec.c_str(), resolved.href.c_str());
       result.kind = ModuleResolution::Kind::kHttp;
-      result.url = resolvedHttp;
+      result.url = resolved.href;
       return result;
     }
   }
@@ -3138,7 +3147,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // already, and an identity: it must not go through the import map.
       const std::string resourceName(*resourceUtf8);
       const std::string resourceUrl = RepairCollapsedUrlScheme(resourceName);
-      if (IsHttpHref(resourceUrl)) {
+      const auto parsedResource = ada::parse<ada::url_aggregator>(resourceUrl, nullptr);
+      if (parsedResource && HasHttpScheme(*parsedResource)) {
         dynamicReferrerKey = CanonicalizeRegistryKey(resourceUrl);
       } else {
         const ModuleResolution referrer = ResolveSpecifierToPath(resourceName, std::string());
