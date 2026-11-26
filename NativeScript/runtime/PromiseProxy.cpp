@@ -2,6 +2,7 @@
 
 #include "BuiltinLoader.h"
 #include "Caches.h"
+#include "Checks.h"
 #include "EventLoop.h"
 #include "Helpers.h"
 #include "Runtime.h"
@@ -55,7 +56,7 @@ void SetFunction(Isolate* isolate, Local<Context> context, Local<Object> binding
   Local<v8::Function> fn;
   bool success = v8::Function::New(context, callback).ToLocal(&fn) &&
                  binding->Set(context, tns::ToV8String(isolate, name), fn).FromMaybe(false);
-  tns::Assert(success, isolate);
+  NS_CHECK(success, std::string("cannot install the Promise proxy binding ") + name);
 }
 
 }  // namespace
@@ -68,13 +69,12 @@ void PromiseProxy::Init(v8::Local<v8::Context> context) {
   SetFunction(isolate, context, binding, "postToRuntimeThread", PostToRuntimeThreadCallback);
 
   Local<Value> runNext;
-  bool success =
-      BuiltinLoader::RunBuiltin(context, BuiltinId::kPromiseProxy, binding).ToLocal(&runNext) &&
-      runNext->IsFunction();
-  tns::Assert(success, isolate);
+  NS_CHECK(BuiltinLoader::RunBuiltin(context, BuiltinId::kPromiseProxy, binding).ToLocal(&runNext),
+           "the promise-proxy builtin threw");
+  NS_CHECK(runNext->IsFunction(), "the promise-proxy builtin must export a function");
 
   PromiseProxyState* state = Caches::StateFor<PromiseProxyState>(isolate);
-  tns::Assert(state != nullptr, isolate);
+  NS_CHECK(state != nullptr, "Promise proxy initialized on an isolate that is tearing down");
   state->runNext.Reset(isolate, runNext.As<v8::Function>());
 }
 
