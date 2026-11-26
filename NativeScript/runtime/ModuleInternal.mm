@@ -963,9 +963,7 @@ Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::str
   }
 
   auto context = isolate->GetCurrentContext();
-  // build URL
-  std::string base = ReplaceAll(canonicalPath, RuntimeConfig.BaseDir, "");
-  std::string url = "file://" + base;
+  const std::string url = ReportedModuleUrl(canonicalPath);
 
   // wrap & cache lookup
   Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
@@ -1019,8 +1017,7 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
     throw NativeScriptException("Cannot find module " + canonicalPath);
   }
 
-  std::string base = ReplaceAll(canonicalPath, RuntimeConfig.BaseDir, "");
-  std::string url = "file://" + base;
+  const std::string url = ReportedModuleUrl(canonicalPath);
 
   Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
   auto* cacheData = ModuleInternal::LoadScriptCache(canonicalPath, ScriptCacheKind::kEsModule);

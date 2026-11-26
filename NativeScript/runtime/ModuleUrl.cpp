@@ -2,6 +2,7 @@
 
 #include <string_view>
 
+#include "RuntimeConfig.h"
 #include "ada/ada.h"
 
 namespace tns {
@@ -114,6 +115,46 @@ std::string NormalizeHttpModuleUrl(const std::string& input) {
     return url.http ? url.href : std::string();
   }
   return IsHttpRegistryKey(input) ? input : std::string();
+}
+
+bool HasUrlScheme(const std::string& s) {
+  const size_t colon = s.find(':');
+  if (colon == 0 || colon == std::string::npos) {
+    return false;
+  }
+  const size_t slash = s.find('/');
+  if (slash != std::string::npos && slash < colon) {
+    return false;
+  }
+  for (size_t i = 0; i < colon; i++) {
+    const char c = s[i];
+    const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                    (c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.';
+    if (!ok) {
+      return false;
+    }
+  }
+  return true;
+}
+
+std::string ReportedModuleUrl(const std::string& keyOrPath) {
+  if (keyOrPath.empty()) {
+    return "file:///app/";
+  }
+  if (HasUrlScheme(keyOrPath)) {
+    const std::string http = NormalizeHttpModuleUrl(keyOrPath);
+    return http.empty() ? keyOrPath : http;
+  }
+  // Every occurrence, as tns::ReplaceAll removes it everywhere else.
+  std::string path = keyOrPath;
+  const std::string& baseDir = RuntimeConfig.BaseDir;
+  if (!baseDir.empty()) {
+    for (size_t pos = path.find(baseDir); pos != std::string::npos;
+         pos = path.find(baseDir, pos)) {
+      path.erase(pos, baseDir.size());
+    }
+  }
+  return "file://" + path;
 }
 
 }  // namespace tns

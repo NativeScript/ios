@@ -2738,7 +2738,7 @@ static v8::MaybeLocal<v8::Module> CompileJsonAsEsModule(v8::Isolate* isolate,
                                                         const std::string& absPath,
                                                         const std::string& registryAbsPath) {
   const std::string jsonText = tns::ReadText(absPath);
-  const std::string url = "file://" + ReplaceAll(absPath, RuntimeConfig.BaseDir, "");
+  const std::string url = ReportedModuleUrl(absPath);
   return CompileJsonTextAsEsModule(isolate, context, jsonText, registryAbsPath, url);
 }
 

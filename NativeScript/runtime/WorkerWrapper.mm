@@ -485,9 +485,7 @@ void WorkerWrapper::CreateInspector(Isolate* isolate, const std::string& scriptP
   }
 
   // Same url scheme the module loader reports in Debugger.scriptParsed.
-  std::string url = NormalizeHttpModuleUrl(scriptPath).empty()
-                        ? "file://" + ReplaceAll(scriptPath, RuntimeConfig.BaseDir, "")
-                        : scriptPath;
+  std::string url = ReportedModuleUrl(scriptPath);
 
   auto* client =
       new v8_inspector::WorkerInspectorClient(this->workerId_, isolate, CFRunLoopGetCurrent(), url);

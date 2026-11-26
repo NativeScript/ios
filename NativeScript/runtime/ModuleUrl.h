@@ -34,4 +34,16 @@ ModuleUrl ParseModuleUrl(const std::string& input, const std::string& base);
 // not an http(s) URL.
 std::string NormalizeHttpModuleUrl(const std::string& input);
 
+// Whether `s` starts with a URL scheme and ':' (`node:fs`, `blob:…`,
+// `http://…`) rather than being a filesystem path.
+bool HasUrlScheme(const std::string& s);
+
+// The URL a module or script is reported under (script origin,
+// import.meta.url, inspector target), from its registry key or path: an
+// http(s) URL as NormalizeHttpModuleUrl spells it; any other string that
+// carries a URL scheme unchanged; a filesystem path as `file://` plus the path
+// with RuntimeConfig.BaseDir removed, `file:///app/` for an empty one. The only
+// place a `file://` URL is built from a path.
+std::string ReportedModuleUrl(const std::string& keyOrPath);
+
 }  // namespace tns
