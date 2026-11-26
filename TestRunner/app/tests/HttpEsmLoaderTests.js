@@ -1934,6 +1934,32 @@ describe("HTTP ESM Loader", function() {
             });
         });
 
+        it("rejects an import() whose import-map target resolves to nothing", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            nsModule.configureLoader({
+                importMap: {
+                    imports: {
+                        "ns-tail-a": "ns-tail-b",
+                        "ns-tail-b": "~/tests/esm/query-map/literal.mjs",
+                    },
+                },
+            });
+            importer(origin, "tail").then(function (mod) {
+                return rejectionMessage(mod.load("ns-tail-a"));
+            }).then(function (message) {
+                expect(message).toContain("Cannot find module 'ns-tail-b'");
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
         it("keeps the importer's origin as written when the query or fragment is empty",
            function (done) {
             var origin = getHostOrigin();
@@ -2346,6 +2372,30 @@ describe("HTTP ESM Loader", function() {
             });
         });
 
+        it("are not unwrapped from a file:// URL", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var target = "/esm/resolve/file-abs/wrapped.mjs";
+            import("file://" + origin + target).then(function () {
+                expect("resolved").toBe("rejected");
+            }, function (error) {
+                expect(String((error && error.message) || error)).toContain("Cannot find module");
+            }).then(function () {
+                return import(origin + "/esm/request-stats.json?target=" +
+                              encodeURIComponent(target));
+            }).then(function (stats) {
+                expect(stats.default.count).toBe(0);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
         it("are refused by require() whatever their scheme's case", function () {
             ["http://h/x.js", "HTTP://h/x.js"].forEach(function (url) {
                 var message = "";
@@ -2473,26 +2523,19 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
                      "https://cdn.example.com/lib.js?token=abc");
         });
 
-        // Upstream path joins collapse `http://` to `http:/`. Every key
-        // derivation repairs that before it tests the scheme, so a key that
-        // arrives collapsed — through invalidateModules or a cache-bust mark —
-        // lands on the same identity the resolver produces.
+        // The URL parser reads `http:/host` as `http://host`, so a key that
+        // arrives collapsed, through invalidateModules say, lands on the same
+        // identity the resolver produces.
         it("repairs a collapsed scheme to one identity", function () {
             checkKey("http:/h/ns/core", "http://h/ns/core");
             checkKey("https:/h/ns/core", "https://h/ns/core");
-            // Already well-formed keys are untouched by the repair.
             checkKey("http://h/ns/core", "http://h/ns/core");
         });
 
-        // Some loaders hand the URL over wrapped as file://http(s)://…, and a
-        // path join can collapse the scheme inside that wrapper too. Unwrapping
-        // and repairing have to compose, or the wrapped-collapsed form becomes
-        // a third identity for the same module.
-        it("repairs a collapsed scheme inside a file:// wrapper", function () {
-            checkKey("file://http:/h/ns/core", "http://h/ns/core");
-            checkKey("file://https:/h/ns/core", "https://h/ns/core");
-            // The well-formed wrapper still unwraps to the same key.
-            checkKey("file://http://h/ns/core", "http://h/ns/core");
+        it("does not read an http URL inside a file:// URL as an http key", function () {
+            checkKey("file://http:/h/ns/core", "file://http:/h/ns/core");
+            checkKey("file://https:/h/ns/core", "file://https:/h/ns/core");
+            checkKey("file://http://h/ns/core", "file://http://h/ns/core");
         });
 
         it("treats module identity as literally the URL — no path-tag collapses", function () {

@@ -128,40 +128,14 @@ bool IsRemoteUrlAllowed(const std::string& url) {
 // URLs touched before the client configures anything (the local trampoline's
 // clean `/ns/core/*` imports) carry no query, so they canonicalize identically
 // under any vocabulary.
-std::string RepairCollapsedUrlScheme(const std::string& url) {
-  if (StartsWith(url, "http:/") && !StartsWith(url, "http://")) {
-    std::string repaired = url;
-    repaired.insert(5, "/");
-    return repaired;
-  }
-  if (StartsWith(url, "https:/") && !StartsWith(url, "https://")) {
-    std::string repaired = url;
-    repaired.insert(6, "/");
-    return repaired;
-  }
-  return url;
-}
-
 std::string CanonicalizeHttpUrlKey(const std::string& url) {
   // Per-isolate vocabulary, so this runs on the isolate's own thread. Fetch
   // threads never reach here — they carry keys computed for them.
   const CanonicalizationConfig* canonConfig = CanonicalizationConfigForCurrentIsolate();
-  // Some loaders wrap HTTP module URLs as file://http(s)://...
-  // Repaired before any scheme test, so a collapsed `http:/host` keys the same
-  // as the URL it means rather than passing through untouched.
-  std::string normalizedUrl = RepairCollapsedUrlScheme(url);
-  // The wrapper is tested on the one-slash forms as well: a path join can
-  // collapse the scheme INSIDE the wrapper (`file://http:/host/x`), which
-  // matches neither the two-slash unwrap nor the repair above (whose prefix is
-  // `file://`, not `http:/`) and would otherwise key as its own identity.
-  if (StartsWith(normalizedUrl, "file://http:/") || StartsWith(normalizedUrl, "file://https:/")) {
-    normalizedUrl = RepairCollapsedUrlScheme(normalizedUrl.substr(strlen("file://")));
+  const std::string normalizedUrl = NormalizeHttpModuleUrl(url);
+  if (normalizedUrl.empty()) {
+    return url;
   }
-  const std::string httpUrl = NormalizeHttpModuleUrl(normalizedUrl);
-  if (httpUrl.empty()) {
-    return normalizedUrl;
-  }
-  normalizedUrl = httpUrl;
   // Drop fragment entirely
   size_t hashPos = normalizedUrl.find('#');
   std::string noHash =

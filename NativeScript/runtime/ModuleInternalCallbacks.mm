@@ -765,22 +765,19 @@ static bool ShouldTraceRegistryKey(const std::string& rawKey, const std::string&
   return StartsWith(registryKey, "node:") || StartsWith(registryKey, "blob:");
 }
 
-static std::string CanonicalizeRegistryKey(const std::string& rawKey) {
-  if (rawKey.empty()) {
-    return rawKey;
+static std::string CanonicalizeRegistryKey(const std::string& key) {
+  if (key.empty()) {
+    return key;
   }
-
-  // Before any scheme test: a collapsed `http:/host` would otherwise fail the
-  // http tests below, fall through as a custom scheme, and give the module a
-  // second identity that never matches the resolver's.
-  const std::string key = RepairCollapsedUrlScheme(rawKey);
 
   std::string registryKey;
   const char* classification = "path";
   bool traceEvenWithoutChange = false;
 
-  if (!NormalizeHttpModuleUrl(key).empty() || StartsWith(key, "file://http://") ||
-      StartsWith(key, "file://https://")) {
+  // Before any other scheme test: an http(s) URL in a spelling other than the
+  // key's (`HTTP://`, `http:/host`) must not fall through as a custom scheme
+  // and give the module a second identity.
+  if (!NormalizeHttpModuleUrl(key).empty()) {
     registryKey = CanonicalizeHttpUrlKey(key);
     classification = "http";
   } else if (StartsWith(key, "file://")) {
@@ -1592,28 +1589,6 @@ static bool IsRegularFile(const std::string& p) {
   return (st.st_mode & S_IFMT) == S_IFREG;
 }
 
-// Rebuild an HTTP URL a path join swallowed ('/app/http:/host/x' →
-// 'http://host/x'), or empty when the path embeds none.
-static std::string HttpUrlEmbeddedInPath(const std::string& p) {
-  size_t pos1 = p.find("/http:/");
-  size_t pos2 = p.find("/https:/");
-  size_t pos = std::min(pos1 == std::string::npos ? SIZE_MAX : pos1,
-                        pos2 == std::string::npos ? SIZE_MAX : pos2);
-  if (pos == SIZE_MAX) {
-    return "";
-  }
-  std::string tail = p.substr(pos + 1);
-  if (StartsWith(tail, "http:/") && !StartsWith(tail, "http://")) {
-    tail.insert(5, "/");
-  } else if (StartsWith(tail, "https:/") && !StartsWith(tail, "https://")) {
-    tail.insert(6, "/");
-  }
-  if (!IsHttpRegistryKey(tail)) {
-    return "";
-  }
-  return tail;
-}
-
 enum class ImportMapLookup {
   kApply,
   kSkip,  // the specifier is an existing module's origin, which the map never rewrites
@@ -1636,10 +1611,7 @@ static ModuleResolution ResolveSpecifierToPath(
     return result;
   }
 
-  // Repair 'http:/host' (single slash) left by upstream path joins, so the URL
-  // takes the HTTP path instead of becoming '/app/http:/host'. Shared with the
-  // key derivations, so the resolver and the registry agree on one identity.
-  std::string spec = RepairCollapsedUrlScheme(rawSpec);
+  std::string spec = rawSpec;
 
   TNS_DEBUG(Esm, "[resolver][spec] %s", spec.c_str());
 
@@ -1849,14 +1821,6 @@ static ModuleResolution ResolveSpecifierToPath(
   std::string absPath;
   for (const std::string& baseCandidate : candidateBases) {
     absPath = NormalizePath(baseCandidate);
-
-    std::string embedded = HttpUrlEmbeddedInPath(absPath);
-    if (!embedded.empty()) {
-      TNS_DEBUG(Esm, "[resolver][http-embedded] %s -> %s", absPath.c_str(), embedded.c_str());
-      result.kind = ModuleResolution::Kind::kHttp;
-      result.url = embedded;
-      return result;
-    }
 
     bool existsNow = IsRegularFile(absPath);
     TNS_DEBUG(Esm, "[resolver] %s -> %s", absPath.c_str(), existsNow ? "file" : "missing");
@@ -3074,9 +3038,8 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // map. A local origin (`file:///app/…`) still has to become the absolute
       // app path the registry keys by, or no scope would match it.
       const std::string resourceName(*resourceUtf8);
-      const std::string resourceUrl = RepairCollapsedUrlScheme(resourceName);
-      if (!NormalizeHttpModuleUrl(resourceUrl).empty()) {
-        dynamicReferrerKey = CanonicalizeRegistryKey(resourceUrl);
+      if (!NormalizeHttpModuleUrl(resourceName).empty()) {
+        dynamicReferrerKey = CanonicalizeRegistryKey(resourceName);
       } else {
         const ModuleResolution referrer =
             ResolveSpecifierToPath(resourceName, std::string(), ImportMapLookup::kSkip);
@@ -3669,12 +3632,12 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       return scope.Escape(resolver->GetPromise());
     }
 
-    // The tail below re-resolves with no referrer, which would let an HTTP
-    // importer's unmapped other-scheme specifier ('data:', 'file:/x') reach
-    // '<app>/<spec>' on disk. Only explicit file:// URLs and import-map
-    // targets may continue into it.
+    // The tail below re-resolves with no referrer and joins relative
+    // specifiers onto the referrer as a path, which would let an HTTP
+    // importer's specifier reach '<app>/<spec>' on disk or path-join an http
+    // URL. Only explicit file:// URLs may continue into it.
     if (importerIsHttp && dynamicResolution.kind == ModuleResolution::Kind::kUnresolved &&
-        normalizedSpec == rawSpec && !StartsWith(normalizedSpec, "file://")) {
+        !StartsWith(normalizedSpec, "file://")) {
       resolver
           ->Reject(context, v8::Exception::Error(tns::ToV8String(
                                 isolate, UnresolvedModuleMessage(dynamicResolution))))
@@ -3745,9 +3708,6 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       TNS_DEBUG(Esm, "[dyn-import][resolver-call] raw=%s normalized=%s adjusted=%s",
                 rawSpec.c_str(), normalizedSpec.c_str(), cAdj);
     }
-    v8::String::Utf8Value adjustedSpecUtf8(isolate, adjustedSpecifier);
-    std::string adjustedRegistryKey =
-        *adjustedSpecUtf8 ? CanonicalizeRegistryKey(*adjustedSpecUtf8) : std::string();
     if (maybeModule.IsEmpty()) {
       if (resolveTc.HasCaught()) {
         // Reject the promise with the thrown exception so callers don't hang

@@ -76,23 +76,12 @@ static ModuleEvaluationOptions RequireEvaluationOptions(ModuleEvaluationPolicy p
   return options;
 }
 
-static inline bool StartsWith(const std::string& value, const char* prefix) {
-  size_t n = strlen(prefix);
-  return value.size() >= n && value.compare(0, n, prefix) == 0;
+static bool IsHttpModulePath(const std::string& path) {
+  return !NormalizeHttpModuleUrl(path).empty();
 }
-
-// `path` as an http(s) module URL, or empty when it names none.
-static std::string HttpModuleUrl(const std::string& path) {
-  if (StartsWith(path, "file://http://") || StartsWith(path, "file://https://")) {
-    return NormalizeHttpModuleUrl(path.substr(strlen("file://")));
-  }
-  return NormalizeHttpModuleUrl(path);
-}
-
-static bool IsHttpModulePath(const std::string& path) { return !HttpModuleUrl(path).empty(); }
 
 static std::string CanonicalizeModulePath(const std::string& path) {
-  const std::string url = HttpModuleUrl(path);
+  const std::string url = NormalizeHttpModuleUrl(path);
   if (!url.empty()) {
     return CanonicalizeHttpUrlKey(url);
   }
@@ -238,7 +227,7 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
   if (IsESModule(path) || isHttpModule) {
     Local<Value> moduleNamespace;
     if (isHttpModule) {
-      TNS_DEBUG(Esm, "run-module http-esm begin %s", HttpModuleUrl(path).c_str());
+      TNS_DEBUG(Esm, "run-module http-esm begin %s", NormalizeHttpModuleUrl(path).c_str());
     }
     try {
       // The entry runs before this thread's event loop does, so its graph can
@@ -265,7 +254,7 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
           "console for the matching [esm][evaluate][promise-timeout] entry.");
     }
     if (isHttpModule) {
-      TNS_DEBUG(Esm, "run-module http-esm ok %s", HttpModuleUrl(path).c_str());
+      TNS_DEBUG(Esm, "run-module http-esm ok %s", NormalizeHttpModuleUrl(path).c_str());
     }
     return;
   }
@@ -1479,7 +1468,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                                           const ModuleEvaluationOptions& options) {
   bool isHttpModule = IsHttpModulePath(path);
   std::string canonicalPath = CanonicalizeModulePath(path);
-  std::string requestPath = isHttpModule ? HttpModuleUrl(path) : canonicalPath;
+  std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : canonicalPath;
   auto context = isolate->GetCurrentContext();
   auto* registryPtr = ModuleRegistryFor(isolate);
   if (registryPtr == nullptr) {

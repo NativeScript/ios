@@ -4,6 +4,7 @@
 #include "DataWrapper.h"
 #include "ErrorEvents.h"
 #include "Helpers.h"
+#include "ModuleUrl.h"
 #include "ObjectManager.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
@@ -484,7 +485,9 @@ void WorkerWrapper::CreateInspector(Isolate* isolate, const std::string& scriptP
   }
 
   // Same url scheme the module loader reports in Debugger.scriptParsed.
-  std::string url = "file://" + ReplaceAll(scriptPath, RuntimeConfig.BaseDir, "");
+  std::string url = NormalizeHttpModuleUrl(scriptPath).empty()
+                        ? "file://" + ReplaceAll(scriptPath, RuntimeConfig.BaseDir, "")
+                        : scriptPath;
 
   auto* client =
       new v8_inspector::WorkerInspectorClient(this->workerId_, isolate, CFRunLoopGetCurrent(), url);
