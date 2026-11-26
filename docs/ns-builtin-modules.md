@@ -695,7 +695,13 @@ Inside either section — labelled `imports` or `scope '<scope>'`:
 
 #### Registry canonicalization
 
-The registry keys modules by a canonical URL. The mechanism — fragment strip,
+The registry keys modules by a canonical URL. Before the vocabulary applies,
+an absolute http(s) URL is spelled by the WHATWG URL parser with its authority
+as written, whichever way it arrives — a specifier from any importer, an
+import-map target, or `invalidateModules` — so `HTTP://host/a/../x.js` and
+`http:/host/x.js` key as `http://host/x.js`. A `file://http://…` string is not
+an http(s) URL: it keys as itself, and `import()` of it fails with
+`Cannot find module` without fetching anything. The mechanism — fragment strip,
 cache-buster param drop, param sort — is the runtime's; the *vocabulary* is
 server policy, supplied here:
 
