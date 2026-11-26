@@ -76,31 +76,7 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
 
   std::string modulePath = tns::LookupModuleKeyForModule(isolate, module);
 
-  auto hasUrlScheme = [](const std::string& s) -> bool {
-    if (s.empty()) return false;
-    size_t colonPos = s.find(':');
-    if (colonPos == 0 || colonPos == std::string::npos) return false;
-    size_t slashPos = s.find('/');
-    if (slashPos != std::string::npos && slashPos < colonPos) return false;
-    for (size_t i = 0; i < colonPos; i++) {
-      char c = s[i];
-      const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-                      c == '+' || c == '-' || c == '.';
-      if (!ok) return false;
-    }
-    return true;
-  };
-
-  // Compute import.meta.url.
-  std::string moduleUrl;
-  if (modulePath.empty()) {
-    moduleUrl = "file:///app/";
-  } else if (hasUrlScheme(modulePath)) {
-    moduleUrl = modulePath;
-  } else {
-    std::string base = tns::ReplaceAll(modulePath, RuntimeConfig.BaseDir, "");
-    moduleUrl = "file://" + base;
-  }
+  std::string moduleUrl = tns::ImportMetaUrlForModuleKey(modulePath);
 
   Local<String> url =
       String::NewFromUtf8(isolate, moduleUrl.c_str(), NewStringType::kNormal).ToLocalChecked();
@@ -127,7 +103,7 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
   std::string dirname;
   if (modulePath.empty()) {
     dirname = "/app";
-  } else if (hasUrlScheme(modulePath)) {
+  } else if (tns::ModuleKeyHasUrlScheme(modulePath)) {
     size_t schemeEnd = modulePath.find("://");
     size_t pathStart =
         (schemeEnd == std::string::npos) ? std::string::npos : modulePath.find('/', schemeEnd + 3);

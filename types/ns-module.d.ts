@@ -110,6 +110,9 @@ declare module "ns:module" {
    *
    * `require.resolve`, `require.cache` and `require.main` are not
    * implemented and are absent from the returned function.
+   *
+   * In an ES module, `createRequire(import.meta.url)` is the module-relative
+   * `require`: the global one resolves relative specifiers against the app root.
    */
   export function createRequire(
     filenameOrURL: string | URL,

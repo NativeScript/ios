@@ -196,8 +196,21 @@ ModuleInternal::ModuleInternal(Local<Context> context) {
   // Use shortened path for global require function to avoid V8 parsing issues
   std::string globalRequirePath = "/app";
 
+  // The bound directory cannot tell the global require apart (a CommonJS
+  // module in the app root is bound to "/app" too), so debug builds give it a
+  // native half of its own.
+  Local<v8::Function> globalRequireInternal;
+  if (RuntimeConfig.IsDebug) {
+    globalRequireInternal =
+        FunctionTemplate::New(isolate, DebugGlobalRequireCallback,
+                              External::New(isolate, this, v8::kExternalPointerTypeTagDefault))
+            ->GetFunction(context)
+            .ToLocalChecked();
+  }
+
   Local<v8::Function> globalRequire = GetRequireFunction(
-      isolate, globalRequirePath, RequireEvaluationOptions(ModuleEvaluationPolicy::kSyncStrict));
+      isolate, globalRequirePath, RequireEvaluationOptions(ModuleEvaluationPolicy::kSyncStrict),
+      globalRequireInternal);
   bool success =
       global->Set(context, tns::ToV8String(isolate, "require"), globalRequire).FromMaybe(false);
   if (!success) {
@@ -383,10 +396,12 @@ bool ModuleInternal::InstallCreateRequireBinding(Local<Context> context, Local<O
 }
 
 Local<v8::Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const std::string& dirName,
-                                                       const ModuleEvaluationOptions& options) {
+                                                       const ModuleEvaluationOptions& options,
+                                                       Local<v8::Function> requireInternal) {
   Local<v8::Function> requireFuncFactory = requireFactoryFunction_->Get(isolate);
   Local<Context> context = isolate->GetCurrentContext();
-  Local<v8::Function> requireInternalFunc = this->requireFunction_->Get(isolate);
+  Local<v8::Function> requireInternalFunc =
+      requireInternal.IsEmpty() ? this->requireFunction_->Get(isolate) : requireInternal;
   Local<Value> args[6]{
       requireInternalFunc,
       tns::ToV8String(isolate, dirName.c_str()),
@@ -474,6 +489,75 @@ static std::string DescribeValueForTypeError(Isolate* isolate, Local<Value> valu
     rendered = rendered.substr(0, 25) + "...";
   }
   return "type " + std::string(typeName) + " (" + rendered + ")";
+}
+
+namespace {
+// The ES modules (by registry key) already warned about a relative specifier
+// passed to the global require. Keyed by registry key rather than script id so
+// an HMR recompile of the same module does not warn again.
+struct GlobalRequireWarningState {
+  robin_hood::unordered_set<std::string> warnedModuleKeys;
+};
+}  // namespace
+
+// The specifiers the resolver joins onto the bound directory. Exactly "./" is
+// left out: every require resolves it to the app's main entry.
+static bool IsDirectoryRelativeSpecifier(const std::string& specifier) {
+  return specifier == "." || specifier == ".." || StartsWith(specifier, "../") ||
+         (StartsWith(specifier, "./") && specifier != "./");
+}
+
+// Never runs JS and never throws: it may only add a log line to a require().
+static void WarnIfRelativeGlobalRequireFromEsModule(Isolate* isolate, Local<Value> specifierValue,
+                                                    int requireFactoryScriptId) {
+  if (!specifierValue->IsString()) {
+    return;
+  }
+  const std::string specifier = tns::ToString(isolate, specifierValue);
+  if (!IsDirectoryRelativeSpecifier(specifier)) {
+    return;
+  }
+
+  // The require() closure is the top frame; the caller is the first frame
+  // from any other script.
+  HandleScope handleScope(isolate);
+  Local<StackTrace> stack = StackTrace::CurrentStackTrace(isolate, 3);
+  int callerScriptId = v8::Message::kNoScriptIdInfo;
+  for (int i = 0; i < stack->GetFrameCount(); i++) {
+    int scriptId = stack->GetFrame(isolate, i)->GetScriptId();
+    if (scriptId != requireFactoryScriptId) {
+      callerScriptId = scriptId;
+      break;
+    }
+  }
+  if (callerScriptId == v8::Message::kNoScriptIdInfo) {
+    return;
+  }
+
+  const std::string moduleKey = LookupModuleKeyForScriptId(isolate, callerScriptId);
+  if (moduleKey.empty()) {
+    return;
+  }
+  auto* state = Caches::StateFor<GlobalRequireWarningState>(isolate);
+  if (state == nullptr || !state->warnedModuleKeys.insert(moduleKey).second) {
+    return;
+  }
+
+  Log(@"NativeScript: require(\"%s\") in ES module %s resolves against the app root, not the "
+      @"module's folder. Use createRequire(import.meta.url) from \"ns:module\" (from a module "
+      @"loaded over http(s): createRequire with an app file path).",
+      specifier.c_str(), ImportMetaUrlForModuleKey(moduleKey).c_str());
+}
+
+void ModuleInternal::DebugGlobalRequireCallback(const FunctionCallbackInfo<Value>& info) {
+  Isolate* isolate = info.GetIsolate();
+  if (info.Length() > 0) {
+    ModuleInternal* moduleInternal = static_cast<ModuleInternal*>(
+        info.Data().As<External>()->Value(v8::kExternalPointerTypeTagDefault));
+    WarnIfRelativeGlobalRequireFromEsModule(
+        isolate, info[0], moduleInternal->requireFactoryFunction_->Get(isolate)->ScriptId());
+  }
+  RequireCallback(info);
 }
 
 void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
