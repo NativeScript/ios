@@ -996,8 +996,9 @@ CommonJS or ES modules on disk.
 
 From a file module, a static `import 'pkg?x'` looks `pkg?x` up in the import
 map, while `import('pkg?x')` drops the query and looks up `pkg`. An import-map
-target should not itself be a key of the map: `import()` may look a target up
-a second time.
+target should not itself be a key of the map: a file module's `import()` may
+look a target up a second time (an HTTP module's follows one entry, as its
+static import does).
 
 ### The `require()` specifier
 
