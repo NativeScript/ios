@@ -1,0 +1,30 @@
+// Type-checked by the TypeScriptUsageCompiles test against types/index.d.ts and
+// the generated swift!SwiftDemo.d.ts snapshot. Every @ts-expect-error line
+// must fail to compile: an unused directive is itself an error.
+import * as swift from "ns:swift";
+import { Demo, Point, Flavor, Polygon, Square, Tracker, shout, globalCounter } from "ns:swift/SwiftDemo";
+
+const SwiftDemo = swift.module("SwiftDemo");
+const demo: Demo = new SwiftDemo.Demo();
+const greeting: string = demo.greet("NativeScript");
+const twice: string = demo.greet("a", 2n);
+const point = new Point({ x: 2, y: 3 });
+const x: number = point.x;
+point.y = 4;
+const flavor: Flavor = Flavor.init(1) ?? Flavor.vanilla;
+const text: string = Flavor.description(flavor);
+const square: Polygon = new Square(3);
+square["scale(by: Int)"](2);
+const maybe: string | null = shout(null);
+const live: number = Tracker.liveCount;
+const counter: number = globalCounter;
+
+// @ts-expect-error  description is read-only
+point.description = "x";
+// @ts-expect-error  ambiguous overloads are not callable by base name
+square.scale(2);
+// @ts-expect-error  Flavor is a union of case names
+const bad: Flavor = "mint";
+// @ts-expect-error  Canvas has no initializer callable from JavaScript
+new SwiftDemo.Canvas();
+void [greeting, twice, x, text, maybe, live, counter, bad];
