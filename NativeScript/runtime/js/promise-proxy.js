@@ -1,15 +1,24 @@
 // Run a Promise's callbacks on the thread that created it, but only when
-// that thread is the runtime loop. A Promise created on a background
+// that thread is the runtime thread. A Promise created on a background
 // thread settles on whichever thread resolves it, because the background
 // run loop may be dormant and marshaling a resolution to it would hang.
-const { isRuntimeRunloop } = binding;
+//
+// Never call CFRunLoopGetCurrent() off the runtime thread: it creates a run
+// loop for any thread that lacks one.
+const { isRuntimeThread } = binding;
 const { FunctionPrototypeBind, Proxy } = primordials;
+
+// The runtime loop never changes for an isolate, so it is fetched once, on
+// the runtime thread, the first time a Promise is created there.
+let runtimeLoop;
 
 global.Promise = new Proxy(global.Promise, {
     construct: function(target, args) {
         let origFunc = args[0];
-        let runloop = CFRunLoopGetCurrent();
-        let originIsRuntimeLoop = isRuntimeRunloop();
+        const originIsRuntimeThread = isRuntimeThread();
+        if (originIsRuntimeThread && runtimeLoop === undefined) {
+            runtimeLoop = CFRunLoopGetCurrent();
+        }
 
         let promise = new target(function(resolve, reject) {
             function isFulfilled() {
@@ -25,12 +34,12 @@ global.Promise = new Proxy(global.Promise, {
                     return;
                 }
                 const resolveCall = FunctionPrototypeBind(resolve, this, value);
-                if (!originIsRuntimeLoop || runloop === CFRunLoopGetCurrent()) {
+                if (!originIsRuntimeThread || isRuntimeThread()) {
                     markFulfilled();
                     resolveCall();
                 } else {
-                    CFRunLoopPerformBlock(runloop, kCFRunLoopDefaultMode, resolveCall);
-                    CFRunLoopWakeUp(runloop);
+                    CFRunLoopPerformBlock(runtimeLoop, kCFRunLoopDefaultMode, resolveCall);
+                    CFRunLoopWakeUp(runtimeLoop);
                     markFulfilled();
                 }
             }, reason => {
@@ -38,12 +47,12 @@ global.Promise = new Proxy(global.Promise, {
                     return;
                 }
                 const rejectCall = FunctionPrototypeBind(reject, this, reason);
-                if (!originIsRuntimeLoop || runloop === CFRunLoopGetCurrent()) {
+                if (!originIsRuntimeThread || isRuntimeThread()) {
                     markFulfilled();
                     rejectCall();
                 } else {
-                    CFRunLoopPerformBlock(runloop, kCFRunLoopDefaultMode, rejectCall);
-                    CFRunLoopWakeUp(runloop);
+                    CFRunLoopPerformBlock(runtimeLoop, kCFRunLoopDefaultMode, rejectCall);
+                    CFRunLoopWakeUp(runtimeLoop);
                     markFulfilled();
                 }
             });
