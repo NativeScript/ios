@@ -50,8 +50,6 @@ class Runtime {
 
   inline bool IsRuntimeWorker() { return workerId_ > 0; }
 
-  inline CFRunLoopRef RuntimeLoop() { return runtimeLoop_; }
-
   inline bool IsOnRuntimeThread() const { return pthread_equal(runtimeThread_, pthread_self()) != 0; }
 
   /*

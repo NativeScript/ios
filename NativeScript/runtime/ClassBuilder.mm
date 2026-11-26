@@ -380,7 +380,6 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
             }
             if ([self retainCount] == 1) {
               auto runtime = Runtime::GetRuntime(isolate);
-              auto runtimeLoop = runtime->RuntimeLoop();
               void* weakSelf = (__bridge void*)self;
               auto gcProtect = [isolateWrapper, weakSelf, isolate]() {
                 auto innerCache = isolateWrapper.GetCache();
@@ -403,7 +402,7 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
               };
               // After the retain: reconciling reads the new retain count.
               id result = retain(self, @selector(retain));
-              if (CFRunLoopGetCurrent() != runtimeLoop) {
+              if (!runtime->IsOnRuntimeThread()) {
                 // bare entry: the closure does its own Locker ceremony, exactly
                 // like the performed block it replaces
                 runtime->GetEventLoop()->PostInternalBare(gcProtect);
@@ -449,11 +448,10 @@ void ClassBuilder::RegisterNativeTypeScriptExtendsFunction(Local<Context> contex
                 }
               };
               auto runtime = Runtime::GetRuntime(isolate);
-              auto runtimeLoop = runtime->RuntimeLoop();
               // After the release: reconciling reads the new retain count, and
               // the Instances entry still holds the object.
               release(self, @selector(release));
-              if (CFRunLoopGetCurrent() != runtimeLoop) {
+              if (!runtime->IsOnRuntimeThread()) {
                 // bare entry: the closure does its own Locker ceremony, exactly
                 // like the performed block it replaces
                 runtime->GetEventLoop()->PostInternalBare(gcUnprotect);

@@ -15,7 +15,7 @@ namespace tns {
 
 NapiEnv::NapiEnv(Local<Context> context)
     : napi_env__(context, NODE_API_DEFAULT_MODULE_API_VERSION),
-      runtimeLoop_(CFRunLoopGetCurrent()),
+      threadId_(CurrentThreadId()),
       eventLoop_(Runtime::GetCurrentRuntime()->GetEventLoop()) {}
 
 NapiEnv::~NapiEnv() = default;

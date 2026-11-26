@@ -133,6 +133,37 @@ describe("Promise scheduling", function () {
         });
     });
 
+    it("settles promises resolved back-to-back on a background thread in resolution order", done => {
+        const expectedHash = NSThread.currentThread.hash;
+        const count = 5;
+        const resolvers = [];
+        const order = [];
+        const settled = [];
+        for (let i = 0; i < count; i++) {
+            settled.push(new Promise((resolve, reject) => {
+                resolvers.push(i % 2 === 0 ? () => resolve(i) : () => reject(i));
+            }).then(value => {
+                expect(NSThread.currentThread.hash).toBe(expectedHash);
+                order.push(value);
+            }, reason => {
+                expect(NSThread.currentThread.hash).toBe(expectedHash);
+                order.push(reason);
+            }));
+        }
+
+        const queue = NSOperationQueue.alloc().init();
+        queue.addOperationWithBlock(() => {
+            for (let i = count - 1; i >= 0; i--) {
+                resolvers[i]();
+            }
+        });
+
+        Promise.all(settled).then(() => {
+            expect(order).toEqual([4, 3, 2, 1, 0]);
+            done();
+        });
+    });
+
     it("the 'then' callback runs for a Promise created on a background thread and resolved on the runtime loop", done => {
         // https://github.com/NativeScript/ios/issues/330
         // The promise is constructed on a background dispatch queue whose run

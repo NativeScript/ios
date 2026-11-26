@@ -448,10 +448,8 @@ napi_status NAPI_CDECL napi_make_callback(napi_env env,
 
   // Entering the isolate is only ever legal from the thread that owns it;
   // reaching JS from anywhere else is what threadsafe functions are for.
-  RETURN_STATUS_IF_FALSE(
-      env,
-      CFRunLoopGetCurrent() == static_cast<tns::NapiEnv*>(env)->RuntimeLoop(),
-      napi_generic_failure);
+  RETURN_STATUS_IF_FALSE(env, static_cast<tns::NapiEnv*>(env)->IsOnEnvThread(),
+                         napi_generic_failure);
 
   (void)async_context;
 
@@ -559,9 +557,6 @@ napi_create_async_work(napi_env env,
   (void)async_resource;
 
   tns::NapiEnv* tnsEnv = static_cast<tns::NapiEnv*>(env);
-  RETURN_STATUS_IF_FALSE(env, tnsEnv->RuntimeLoop() != nullptr,
-                         napi_generic_failure);
-
   napi_async_work__* work = new napi_async_work__();
   work->env = tnsEnv;
   work->isolate = env->isolate;
