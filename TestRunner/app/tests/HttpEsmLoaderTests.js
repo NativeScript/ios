@@ -2296,6 +2296,68 @@ describe("HTTP ESM Loader", function() {
             });
         });
     });
+
+    describe("absolute http(s) URLs from a file module", function () {
+        var nsModule = require("ns:module");
+
+        afterEach(function () {
+            nsModule.configureLoader({ importMap: { imports: {} } });
+        });
+
+        it("are spelled by the URL parser, keeping the authority as written", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var hostport = origin.replace(/^http:\/\//, "");
+            var base = origin + "/esm/resolve/file-abs";
+            nsModule.configureLoader({
+                importMap: { imports: { "ns-file-abs-mapped": base + "/mapped/../mapped.mjs" } },
+            });
+            Promise.all([
+                import("HTTP://" + hostport + "/esm/resolve/file-abs/upper.mjs"),
+                import("http:/" + hostport + "/esm/resolve/file-abs/collapsed.mjs?k=1"),
+                import(base + "/sub/../dots.mjs"),
+                import(base + "/mödule.mjs"),
+                import("ns-file-abs-mapped"),
+            ]).then(function (mods) {
+                expect(mods.map(function (m) { return m.url; })).toEqual([
+                    base + "/upper.mjs",
+                    base + "/collapsed.mjs?k=1",
+                    base + "/dots.mjs",
+                    base + "/m%C3%B6dule.mjs",
+                    base + "/mapped.mjs",
+                ]);
+                expect(mods.map(function (m) { return m.path + "?" + m.query; })).toEqual([
+                    "/esm/resolve/file-abs/upper.mjs?",
+                    "/esm/resolve/file-abs/collapsed.mjs?k=1",
+                    "/esm/resolve/file-abs/dots.mjs?",
+                    "/esm/resolve/file-abs/m%C3%B6dule.mjs?",
+                    "/esm/resolve/file-abs/mapped.mjs?",
+                ]);
+                nsModule.invalidateModules(["HTTP://" + hostport + "/esm/resolve/file-abs/upper.mjs"]);
+                expect(nsModule.getLoadedModuleUrls()).not.toContain(base + "/upper.mjs");
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("are refused by require() whatever their scheme's case", function () {
+            ["http://h/x.js", "HTTP://h/x.js"].forEach(function (url) {
+                var message = "";
+                try {
+                    require(url);
+                } catch (e) {
+                    message = String((e && e.message) || e);
+                }
+                expect(message).toContain("require() of URL module is not supported: " + url);
+            });
+        });
+    });
 });
 
 // Focused, deterministic coverage for the native HTTP canonical-key function.
@@ -2443,6 +2505,20 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
             checkKey("http://h/ns/m/foo.js#frag", "http://h/ns/m/foo.js");
             checkKey("https://cdn.example.com/lib.js?token=abc#frag",
                      "https://cdn.example.com/lib.js?token=abc");
+        });
+
+        it("spells a URL the way the URL parser does, authority aside", function () {
+            checkKey("HTTP://h/x", "http://h/x");
+            checkKey("http:h/x", "http://h/x");
+            checkKey(" http://h/x", "http://h/x");
+            checkKey("http://h", "http://h/");
+            checkKey("http://h?x", "http://h/?x");
+            checkKey("http://h/a/../b.js", "http://h/b.js");
+            checkKey("http://h/%2e%2e/b.js", "http://h/b.js");
+            checkKey("http://h\\x\\y.js", "http://h/x/y.js");
+            checkKey("http://h/mödule.js", "http://h/m%C3%B6dule.js");
+            checkKey("http://h/a b.js?q=a b", "http://h/a%20b.js?q=a%20b");
+            checkKey("http://H:80/x?", "http://H:80/x?");
         });
 
         it("keeps the URLs dev tooling emits as written", function () {

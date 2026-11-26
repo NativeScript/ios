@@ -11,6 +11,7 @@
 #include "Helpers.h"
 #include "HttpLoader.h"
 #include "ModuleInternalCallbacks.h"  // for ResolveModuleCallback
+#include "ModuleUrl.h"
 #include "NativeScriptException.h"
 #include "NsBuiltinModules.h"
 #include "Runtime.h"
@@ -80,33 +81,20 @@ static inline bool StartsWith(const std::string& value, const char* prefix) {
   return value.size() >= n && value.compare(0, n, prefix) == 0;
 }
 
-static std::string NormalizeHttpModuleUrl(const std::string& path) {
-  if (path.empty()) {
-    return path;
+// `path` as an http(s) module URL, or empty when it names none.
+static std::string HttpModuleUrl(const std::string& path) {
+  if (StartsWith(path, "file://http://") || StartsWith(path, "file://https://")) {
+    return NormalizeHttpModuleUrl(path.substr(strlen("file://")));
   }
-
-  std::string normalized = path;
-  if (StartsWith(normalized, "file://http://") || StartsWith(normalized, "file://https://")) {
-    normalized = normalized.substr(strlen("file://"));
-  }
-
-  if (normalized.rfind("http:/", 0) == 0 && normalized.rfind("http://", 0) != 0) {
-    normalized.insert(5, "/");
-  } else if (normalized.rfind("https:/", 0) == 0 && normalized.rfind("https://", 0) != 0) {
-    normalized.insert(6, "/");
-  }
-
-  return normalized;
+  return NormalizeHttpModuleUrl(path);
 }
 
-static bool IsHttpModulePath(const std::string& path) {
-  std::string normalized = NormalizeHttpModuleUrl(path);
-  return StartsWith(normalized, "http://") || StartsWith(normalized, "https://");
-}
+static bool IsHttpModulePath(const std::string& path) { return !HttpModuleUrl(path).empty(); }
 
 static std::string CanonicalizeModulePath(const std::string& path) {
-  if (IsHttpModulePath(path)) {
-    return CanonicalizeHttpUrlKey(NormalizeHttpModuleUrl(path));
+  const std::string url = HttpModuleUrl(path);
+  if (!url.empty()) {
+    return CanonicalizeHttpUrlKey(url);
   }
 
   return NormalizePath(path);
@@ -250,7 +238,7 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
   if (IsESModule(path) || isHttpModule) {
     Local<Value> moduleNamespace;
     if (isHttpModule) {
-      TNS_DEBUG(Esm, "run-module http-esm begin %s", NormalizeHttpModuleUrl(path).c_str());
+      TNS_DEBUG(Esm, "run-module http-esm begin %s", HttpModuleUrl(path).c_str());
     }
     try {
       // The entry runs before this thread's event loop does, so its graph can
@@ -277,7 +265,7 @@ void ModuleInternal::RunModule(Isolate* isolate, std::string path) {
           "console for the matching [esm][evaluate][promise-timeout] entry.");
     }
     if (isHttpModule) {
-      TNS_DEBUG(Esm, "run-module http-esm ok %s", NormalizeHttpModuleUrl(path).c_str());
+      TNS_DEBUG(Esm, "run-module http-esm ok %s", HttpModuleUrl(path).c_str());
     }
     return;
   }
@@ -534,7 +522,7 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
   try {
     // Guard: URL-based modules must be loaded via dynamic import() in dev HTTP ESM mode.
     moduleName = tns::ToString(isolate, info[0]);
-    if (moduleName.rfind("http://", 0) == 0 || moduleName.rfind("https://", 0) == 0) {
+    if (!NormalizeHttpModuleUrl(moduleName).empty()) {
       std::string msg = std::string("NativeScript: require() of URL module is not supported: ") +
                         moduleName + ". Use dynamic import() instead.";
       throw NativeScriptException(msg.c_str());
@@ -1491,7 +1479,7 @@ Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& p
                                           const ModuleEvaluationOptions& options) {
   bool isHttpModule = IsHttpModulePath(path);
   std::string canonicalPath = CanonicalizeModulePath(path);
-  std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : canonicalPath;
+  std::string requestPath = isHttpModule ? HttpModuleUrl(path) : canonicalPath;
   auto context = isolate->GetCurrentContext();
   auto* registryPtr = ModuleRegistryFor(isolate);
   if (registryPtr == nullptr) {

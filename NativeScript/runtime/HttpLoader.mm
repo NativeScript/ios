@@ -12,6 +12,7 @@
 #include "Helpers.h"
 #include "ModuleInternal.h"
 #include "ModuleInternalCallbacks.h"
+#include "ModuleUrl.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
 #include "robin_hood.h"
@@ -156,9 +157,11 @@ std::string CanonicalizeHttpUrlKey(const std::string& url) {
   if (StartsWith(normalizedUrl, "file://http:/") || StartsWith(normalizedUrl, "file://https:/")) {
     normalizedUrl = RepairCollapsedUrlScheme(normalizedUrl.substr(strlen("file://")));
   }
-  if (!(StartsWith(normalizedUrl, "http://") || StartsWith(normalizedUrl, "https://"))) {
+  const std::string httpUrl = NormalizeHttpModuleUrl(normalizedUrl);
+  if (httpUrl.empty()) {
     return normalizedUrl;
   }
+  normalizedUrl = httpUrl;
   // Drop fragment entirely
   size_t hashPos = normalizedUrl.find('#');
   std::string noHash =

@@ -779,7 +779,7 @@ static std::string CanonicalizeRegistryKey(const std::string& rawKey) {
   const char* classification = "path";
   bool traceEvenWithoutChange = false;
 
-  if (IsHttpRegistryKey(key) || StartsWith(key, "file://http://") ||
+  if (!NormalizeHttpModuleUrl(key).empty() || StartsWith(key, "file://http://") ||
       StartsWith(key, "file://https://")) {
     registryKey = CanonicalizeHttpUrlKey(key);
     classification = "http";
@@ -815,12 +815,14 @@ static std::string CanonicalizeRegistryKey(const std::string& rawKey) {
 
 v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
                                                 v8::Local<v8::Context> context,
-                                                const std::string& requestedUrl) {
+                                                const std::string& requestedUrlArg) {
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) {
     return v8::MaybeLocal<v8::Module>();
   }
   auto& registry = moduleState->registry;
+  const std::string normalizedUrl = NormalizeHttpModuleUrl(requestedUrlArg);
+  const std::string& requestedUrl = normalizedUrl.empty() ? requestedUrlArg : normalizedUrl;
   const std::string registryKey = CanonicalizeHttpUrlKey(requestedUrl);
 
   TNS_DEBUG(Esm, "[http-esm][load][begin] request=%s key=%s", requestedUrl.c_str(),
@@ -1722,9 +1724,10 @@ static ModuleResolution ResolveSpecifierToPath(
     }
   }
 
-  if (IsHttpRegistryKey(spec)) {
+  const std::string httpUrl = NormalizeHttpModuleUrl(spec);
+  if (!httpUrl.empty()) {
     result.kind = ModuleResolution::Kind::kHttp;
-    result.url = spec;
+    result.url = httpUrl;
     return result;
   }
 
@@ -2207,9 +2210,10 @@ static void AsyncGraphEnqueue(const std::shared_ptr<AsyncGraphLoad>& load,
 static ModuleResolution ResolutionForRoot(const std::string& root) {
   ModuleResolution resolution;
   resolution.specifier = root;
-  if (IsHttpRegistryKey(root)) {
+  const std::string httpUrl = NormalizeHttpModuleUrl(root);
+  if (!httpUrl.empty()) {
     resolution.kind = ModuleResolution::Kind::kHttp;
-    resolution.url = root;
+    resolution.url = httpUrl;
   } else if (IsRegularFile(root)) {
     resolution.kind = ModuleResolution::Kind::kFile;
     resolution.path = root;
@@ -3071,7 +3075,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // app path the registry keys by, or no scope would match it.
       const std::string resourceName(*resourceUtf8);
       const std::string resourceUrl = RepairCollapsedUrlScheme(resourceName);
-      if (ParseModuleUrl(resourceUrl, std::string()).http) {
+      if (!NormalizeHttpModuleUrl(resourceUrl).empty()) {
         dynamicReferrerKey = CanonicalizeRegistryKey(resourceUrl);
       } else {
         const ModuleResolution referrer =
@@ -3091,7 +3095,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
   // A file importer's query/fragment never names part of a file, so it is
   // dropped up front; an absolute http(s) specifier keeps it as identity. For
   // an HTTP importer the seam resolves the specifier as a URL, query included.
-  const bool isHttpLike = IsHttpRegistryKey(normalizedSpec);
+  const bool isHttpLike = !NormalizeHttpModuleUrl(normalizedSpec).empty();
   if (!isHttpLike && !importerIsHttp) {
     size_t qpos = normalizedSpec.find_first_of("?#");
     if (qpos != std::string::npos) {
@@ -3121,9 +3125,9 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       TNS_DEBUG(Esm, "[dyn-import][import-map] rewrite: %s -> %s", rawSpec.c_str(),
                 normalizedSpec.c_str());
     }
-    // An HTTP importer's relative, root-relative and scheme-relative imports
-    // continue as the absolute URL the seam resolved, through the HTTP path.
-    if (importerIsHttp && dynamicResolution.kind == ModuleResolution::Kind::kHttp &&
+    // Whatever resolves to an http(s) URL continues as the URL the resolver
+    // spelled, through the HTTP path.
+    if (dynamicResolution.kind == ModuleResolution::Kind::kHttp &&
         dynamicResolution.url != normalizedSpec) {
       normalizedSpec = dynamicResolution.url;
       specifier = tns::ToV8String(isolate, normalizedSpec.c_str());
@@ -3478,7 +3482,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
     // If spec is an HTTP(S) URL, try HTTP fetch+compile directly
     // Security: HttpFetchModule gates remote module access centrally.
-    if (!normalizedSpec.empty() && IsHttpRegistryKey(normalizedSpec)) {
+    if (dynamicResolution.kind == ModuleResolution::Kind::kHttp) {
       TNS_DEBUG(Esm, "[dyn-import][http-loader] trying URL %s", normalizedSpec.c_str());
       std::string key = CanonicalizeHttpUrlKey(normalizedSpec);
       // Volatile pattern check: if the URL matches any configured volatile
