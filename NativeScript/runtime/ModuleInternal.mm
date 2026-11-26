@@ -11,6 +11,7 @@
 #include "Helpers.h"
 #include "HttpLoader.h"
 #include "ModuleInternalCallbacks.h"  // for ResolveModuleCallback
+#include "ModuleUrl.h"
 #include "NativeScriptException.h"
 #include "NsBuiltinModules.h"
 #include "Runtime.h"
@@ -75,38 +76,14 @@ static ModuleEvaluationOptions RequireEvaluationOptions(ModuleEvaluationPolicy p
   return options;
 }
 
-static inline bool StartsWith(const std::string& value, const char* prefix) {
-  size_t n = strlen(prefix);
-  return value.size() >= n && value.compare(0, n, prefix) == 0;
-}
-
-static std::string NormalizeHttpModuleUrl(const std::string& path) {
-  if (path.empty()) {
-    return path;
-  }
-
-  std::string normalized = path;
-  if (StartsWith(normalized, "file://http://") || StartsWith(normalized, "file://https://")) {
-    normalized = normalized.substr(strlen("file://"));
-  }
-
-  if (normalized.rfind("http:/", 0) == 0 && normalized.rfind("http://", 0) != 0) {
-    normalized.insert(5, "/");
-  } else if (normalized.rfind("https:/", 0) == 0 && normalized.rfind("https://", 0) != 0) {
-    normalized.insert(6, "/");
-  }
-
-  return normalized;
-}
-
 static bool IsHttpModulePath(const std::string& path) {
-  std::string normalized = NormalizeHttpModuleUrl(path);
-  return StartsWith(normalized, "http://") || StartsWith(normalized, "https://");
+  return !NormalizeHttpModuleUrl(path).empty();
 }
 
 static std::string CanonicalizeModulePath(const std::string& path) {
-  if (IsHttpModulePath(path)) {
-    return CanonicalizeHttpUrlKey(NormalizeHttpModuleUrl(path));
+  const std::string url = NormalizeHttpModuleUrl(path);
+  if (!url.empty()) {
+    return CanonicalizeNormalizedHttpUrlKey(url);
   }
 
   return NormalizePath(path);
@@ -618,7 +595,7 @@ void ModuleInternal::RequireCallback(const FunctionCallbackInfo<Value>& info) {
   try {
     // Guard: URL-based modules must be loaded via dynamic import() in dev HTTP ESM mode.
     moduleName = tns::ToString(isolate, info[0]);
-    if (moduleName.rfind("http://", 0) == 0 || moduleName.rfind("https://", 0) == 0) {
+    if (!NormalizeHttpModuleUrl(moduleName).empty()) {
       std::string msg = std::string("NativeScript: require() of URL module is not supported: ") +
                         moduleName + ". Use dynamic import() instead.";
       throw NativeScriptException(msg.c_str());
@@ -1070,9 +1047,7 @@ Local<Script> ModuleInternal::LoadClassicScript(Isolate* isolate, const std::str
   }
 
   auto context = isolate->GetCurrentContext();
-  // build URL
-  std::string base = ReplaceAll(canonicalPath, RuntimeConfig.BaseDir, "");
-  std::string url = "file://" + base;
+  const std::string url = ReportedModuleUrl(canonicalPath);
 
   // wrap & cache lookup
   Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
@@ -1126,8 +1101,7 @@ MaybeLocal<Module> ModuleInternal::CompileFileEsModule(Isolate* isolate, const s
     throw NativeScriptException("Cannot find module " + canonicalPath);
   }
 
-  std::string base = ReplaceAll(canonicalPath, RuntimeConfig.BaseDir, "");
-  std::string url = "file://" + base;
+  const std::string url = ReportedModuleUrl(canonicalPath);
 
   Local<v8::String> sourceText = ModuleInternal::WrapModuleContent(isolate, canonicalPath);
   auto* cacheData = ModuleInternal::LoadScriptCache(canonicalPath, ScriptCacheKind::kEsModule);
@@ -1573,9 +1547,11 @@ static void ThrowIfLoadInterruptedByTermination(Isolate* isolate,
 
 Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path,
                                           const ModuleEvaluationOptions& options) {
-  bool isHttpModule = IsHttpModulePath(path);
-  std::string canonicalPath = CanonicalizeModulePath(path);
-  std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : canonicalPath;
+  const std::string httpUrl = NormalizeHttpModuleUrl(path);
+  bool isHttpModule = !httpUrl.empty();
+  std::string canonicalPath =
+      isHttpModule ? CanonicalizeNormalizedHttpUrlKey(httpUrl) : NormalizePath(path);
+  std::string requestPath = isHttpModule ? httpUrl : canonicalPath;
   auto context = isolate->GetCurrentContext();
   auto* registryPtr = ModuleRegistryFor(isolate);
   if (registryPtr == nullptr) {

@@ -43,10 +43,11 @@
 #include "HttpLoader.h"
 #include "ModuleBinding.hpp"
 #include "ModuleInternalCallbacks.h"
-#include "napi/NapiEnv.h"
+#include "ModuleUrl.h"
 #include "URLImpl.h"
 #include "URLPatternImpl.h"
 #include "URLSearchParamsImpl.h"
+#include "napi/NapiEnv.h"
 
 using namespace v8;
 using namespace std;
@@ -76,7 +77,7 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
 
   std::string modulePath = tns::LookupModuleKeyForModule(isolate, module);
 
-  std::string moduleUrl = tns::ImportMetaUrlForModuleKey(modulePath);
+  const std::string moduleUrl = tns::ReportedModuleUrl(modulePath);
 
   Local<String> url =
       String::NewFromUtf8(isolate, moduleUrl.c_str(), NewStringType::kNormal).ToLocalChecked();
@@ -103,7 +104,7 @@ static void InitializeImportMetaObject(Local<Context> context, Local<Module> mod
   std::string dirname;
   if (modulePath.empty()) {
     dirname = "/app";
-  } else if (tns::ModuleKeyHasUrlScheme(modulePath)) {
+  } else if (tns::HasUrlScheme(modulePath)) {
     size_t schemeEnd = modulePath.find("://");
     size_t pathStart =
         (schemeEnd == std::string::npos) ? std::string::npos : modulePath.find('/', schemeEnd + 3);

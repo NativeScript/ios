@@ -12,6 +12,7 @@
 #include "Helpers.h"
 #include "ModuleInternal.h"
 #include "ModuleInternalCallbacks.h"
+#include "ModuleUrl.h"
 #include "Runtime.h"
 #include "RuntimeConfig.h"
 #include "robin_hood.h"
@@ -54,6 +55,20 @@ static bool RemoteUrlMatchesAllowlistEntry(const std::string& url, const std::st
   return next == '/' || next == '?' || next == '#';
 }
 
+std::string NormalizeRemoteModuleAllowlistEntry(const std::string& entry) {
+  const std::string url = NormalizeHttpModuleUrl(entry);
+  return url.empty() ? entry : url;
+}
+
+bool RemoteUrlMatchesAllowlist(const std::string& url, const std::vector<std::string>& entries) {
+  for (const std::string& entry : entries) {
+    if (RemoteUrlMatchesAllowlistEntry(url, entry)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static void InitializeSecurityConfig() {
   std::call_once(s_securityConfigInitFlag, []() {
     @autoreleasepool {
@@ -76,7 +91,8 @@ static void InitializeSecurityConfig() {
           if ([item isKindOfClass:[NSString class]]) {
             NSString* str = (NSString*)item;
             if (str.length > 0) {
-              s_remoteModuleAllowlist.push_back(std::string([str UTF8String]));
+              s_remoteModuleAllowlist.push_back(
+                  NormalizeRemoteModuleAllowlistEntry(std::string([str UTF8String])));
             }
           }
         }
@@ -109,13 +125,7 @@ bool IsRemoteUrlAllowed(const std::string& url) {
     return true;
   }
 
-  for (const std::string& entry : s_remoteModuleAllowlist) {
-    if (RemoteUrlMatchesAllowlistEntry(url, entry)) {
-      return true;
-    }
-  }
-
-  return false;
+  return RemoteUrlMatchesAllowlist(url, s_remoteModuleAllowlist);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -127,38 +137,15 @@ bool IsRemoteUrlAllowed(const std::string& url) {
 // URLs touched before the client configures anything (the local trampoline's
 // clean `/ns/core/*` imports) carry no query, so they canonicalize identically
 // under any vocabulary.
-std::string RepairCollapsedUrlScheme(const std::string& url) {
-  if (StartsWith(url, "http:/") && !StartsWith(url, "http://")) {
-    std::string repaired = url;
-    repaired.insert(5, "/");
-    return repaired;
-  }
-  if (StartsWith(url, "https:/") && !StartsWith(url, "https://")) {
-    std::string repaired = url;
-    repaired.insert(6, "/");
-    return repaired;
-  }
-  return url;
+std::string CanonicalizeHttpUrlKey(const std::string& url) {
+  const std::string normalizedUrl = NormalizeHttpModuleUrl(url);
+  return normalizedUrl.empty() ? url : CanonicalizeNormalizedHttpUrlKey(normalizedUrl);
 }
 
-std::string CanonicalizeHttpUrlKey(const std::string& url) {
+std::string CanonicalizeNormalizedHttpUrlKey(const std::string& normalizedUrl) {
   // Per-isolate vocabulary, so this runs on the isolate's own thread. Fetch
   // threads never reach here — they carry keys computed for them.
   const CanonicalizationConfig* canonConfig = CanonicalizationConfigForCurrentIsolate();
-  // Some loaders wrap HTTP module URLs as file://http(s)://...
-  // Repaired before any scheme test, so a collapsed `http:/host` keys the same
-  // as the URL it means rather than passing through untouched.
-  std::string normalizedUrl = RepairCollapsedUrlScheme(url);
-  // The wrapper is tested on the one-slash forms as well: a path join can
-  // collapse the scheme INSIDE the wrapper (`file://http:/host/x`), which
-  // matches neither the two-slash unwrap nor the repair above (whose prefix is
-  // `file://`, not `http:/`) and would otherwise key as its own identity.
-  if (StartsWith(normalizedUrl, "file://http:/") || StartsWith(normalizedUrl, "file://https:/")) {
-    normalizedUrl = RepairCollapsedUrlScheme(normalizedUrl.substr(strlen("file://")));
-  }
-  if (!(StartsWith(normalizedUrl, "http://") || StartsWith(normalizedUrl, "https://"))) {
-    return normalizedUrl;
-  }
   // Drop fragment entirely
   size_t hashPos = normalizedUrl.find('#');
   std::string noHash =

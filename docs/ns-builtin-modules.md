@@ -622,8 +622,11 @@ works; adding them is a change to this specification first.
 
 Debug builds additionally carry `canonicalizeHttpUrlKey(url)`, a pure test
 diagnostic that takes a string and throws
-`canonicalizeHttpUrlKey expects a URL string` otherwise; release builds omit
-it. Missing members are simply absent — never
+`canonicalizeHttpUrlKey expects a URL string` otherwise, and
+`remoteUrlMatchesAllowlist(url, entries)`, which applies the release
+`security.remoteModuleAllowlist` rule to `url` against `entries` and throws
+`remoteUrlMatchesAllowlist expects a URL string and an array of strings`
+otherwise; release builds omit both. Missing members are simply absent — never
 present-but-throwing — so feature checks work. The module is registered in
 every build: the security boundary for remote module loading sits at the
 network layer (`security.allowRemoteModules` in nativescript.config, enforced
@@ -657,7 +660,10 @@ A **scope key is matched as a plain prefix of the importing module's canonical
 registry key** — an absolute `http(s)` URL for a served module, or a canonical
 absolute path for a file on disk. That key is this runtime's analogue of the
 web's resolved referrer URL, which is what scope prefixes match in a browser.
-End a scope key with `/` to keep it on a directory boundary. Resolution
+An `http(s)` scope key is spelled the way registry keys are (see
+[Registry canonicalization](#registry-canonicalization)) when the map is
+installed, ending in `/` exactly when it is written so. End a scope key with
+`/` to keep it on a directory boundary. Resolution
 consults the most specific matching scope first (longest prefix wins), then
 progressively less specific ones, then `imports` — so a scope can override a
 global mapping for one subtree and fall through to it everywhere else. The
@@ -695,7 +701,11 @@ Inside either section — labelled `imports` or `scope '<scope>'`:
 
 #### Registry canonicalization
 
-The registry keys modules by a canonical URL. The mechanism — fragment strip,
+The registry keys modules by a canonical URL. Before the vocabulary applies,
+an absolute http(s) URL is spelled by the WHATWG URL parser with its authority
+as written, whichever way it arrives — a specifier from any importer, an
+import-map target, or `invalidateModules` — so `HTTP://host/a/../x.js` and
+`http:/host/x.js` key as `http://host/x.js`. The mechanism — fragment strip,
 cache-buster param drop, param sort — is the runtime's; the *vocabulary* is
 server policy, supplied here:
 
@@ -986,8 +996,9 @@ CommonJS or ES modules on disk.
 
 From a file module, a static `import 'pkg?x'` looks `pkg?x` up in the import
 map, while `import('pkg?x')` drops the query and looks up `pkg`. An import-map
-target should not itself be a key of the map: `import()` may look a target up
-a second time.
+target should not itself be a key of the map: a file module's `import()` may
+look a target up a second time (an HTTP module's follows one entry, as its
+static import does).
 
 ### The `require()` specifier
 
