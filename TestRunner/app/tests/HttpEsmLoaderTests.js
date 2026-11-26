@@ -1934,6 +1934,27 @@ describe("HTTP ESM Loader", function() {
             });
         });
 
+        it("keeps the importer's origin as written when the query or fragment is empty",
+           function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var written = origin.replace("127.0.0.1", "LOCALHOST");
+            importer(written, "authority-empty").then(function (mod) {
+                return Promise.all([mod.load("./query.mjs?"), mod.load("./hash.mjs#")]);
+            }).then(function (mods) {
+                expect(mods[0].url).toBe(written + "/esm/resolve/authority-empty/query.mjs?");
+                expect(mods[1].url).toBe(written + "/esm/resolve/authority-empty/hash.mjs");
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
         it("normalizes a specifier the way the WHATWG URL parser does", function (done) {
             var origin = getHostOrigin();
             if (!origin) {

@@ -28,12 +28,12 @@
 #include "Helpers.h"  // for tns::Exists
 #include "HttpLoader.h"
 #include "ModuleInternal.h"  // for CompileFileEsModule / EvaluateModuleGraph
+#include "ModuleUrl.h"
 #include "NativeScriptException.h"
 #include "NativeScriptPlatform.h"
 #include "NsBuiltinModules.h"
 #include "Runtime.h"  // for GetAppConfigValue
 #include "RuntimeConfig.h"
-#include "ada/ada.h"
 
 // Do NOT pull all v8 symbols into namespace here; String would clash with
 // other typedefs inside the NativeScript codebase. We refer to v8 symbols
@@ -88,19 +88,6 @@ static std::string FileURLToPath(const std::string& url) {
 static inline bool StartsWith(const std::string& s, const char* prefix) {
   size_t n = strlen(prefix);
   return s.size() >= n && s.compare(0, n, prefix) == 0;
-}
-
-// Whether `key` is spelled the way the loader keys an HTTP module: a lowercase
-// `http://` or `https://` prefix, file modules being keyed by absolute paths.
-// Deliberately not a URL parse: it gates the rule that an HTTP importer never
-// reaches the filesystem implicitly, so a key the URL parser would reject (an
-// IPv6 zone id, say) must still count as HTTP.
-static bool IsHttpRegistryKey(const std::string& key) {
-  if (key.compare(0, 4, "http") != 0) {
-    return false;
-  }
-  const size_t schemeEnd = key.size() > 4 && key[4] == 's' ? 5 : 4;
-  return key.compare(schemeEnd, 3, "://") == 0;
 }
 
 static bool ShouldTraceRegistryKey(const std::string& rawKey, const std::string& registryKey);
@@ -1558,85 +1545,6 @@ static std::string UnresolvedModuleMessage(const ModuleResolution& resolution) {
     return resolution.blocked;
   }
   return "Cannot find module '" + resolution.specifier + "' (tried " + resolution.attempted + ")";
-}
-
-static bool HasHttpScheme(const ada::url_aggregator& url) {
-  return url.type == ada::scheme::type::HTTP || url.type == ada::scheme::type::HTTPS;
-}
-
-// The authority (userinfo, host, port) of an absolute or scheme-relative URL
-// exactly as written, or empty when `url` does not spell one plainly.
-static std::string WrittenAuthority(const std::string& url) {
-  size_t start = 0;
-  if (StartsWith(url, "//")) {
-    start = 2;
-  } else {
-    const size_t colon = url.find(':');
-    if (colon == std::string::npos || url.compare(colon, 3, "://") != 0) {
-      return std::string();
-    }
-    start = colon + 3;
-  }
-  const size_t end = url.find_first_of("/?#", start);
-  std::string authority = url.substr(start, end == std::string::npos ? end : end - start);
-  for (const char c : authority) {
-    if (static_cast<unsigned char>(c) <= 0x20 || c == '\\') {
-      return std::string();
-    }
-  }
-  return authority;
-}
-
-struct ModuleUrl {
-  bool parsed = false;
-  bool http = false;  // the scheme is http or https
-  std::string href;
-};
-
-// `input` parsed with the WHATWG URL parser (the one behind JS `new URL()`):
-// as an absolute URL when `base` is empty, otherwise as a path- or
-// scheme-relative reference against `base`.
-//
-// An http(s) result keeps its authority as written by whichever string
-// supplied it: tooling compares module URLs against the origin string it was
-// configured with, so that spelling is part of a module's identity until every
-// loader entry point canonicalizes. The parser's own href is used whenever the
-// written authority would not name the same URL.
-static ModuleUrl ParseModuleUrl(const std::string& input, const std::string& base) {
-  ModuleUrl result;
-  ada::result<ada::url_aggregator> url;
-  if (base.empty()) {
-    url = ada::parse<ada::url_aggregator>(input, nullptr);
-  } else {
-    auto baseUrl = ada::parse<ada::url_aggregator>(base, nullptr);
-    if (!baseUrl) {
-      return result;
-    }
-    url = ada::parse<ada::url_aggregator>(input, &baseUrl.value());
-  }
-  if (!url) {
-    return result;
-  }
-  result.parsed = true;
-  result.http = HasHttpScheme(*url);
-  result.href = std::string(url->get_href());
-  if (!result.http) {
-    return result;
-  }
-
-  const std::string authority =
-      WrittenAuthority(base.empty() || StartsWith(input, "//") ? input : base);
-  if (authority.empty()) {
-    return result;
-  }
-  const std::string written = std::string(url->get_protocol()) + "//" + authority +
-                              std::string(url->get_pathname()) + std::string(url->get_search()) +
-                              std::string(url->get_hash());
-  auto reparsed = ada::parse<ada::url_aggregator>(written, nullptr);
-  if (reparsed && reparsed->get_href() == url->get_href()) {
-    result.href = written;
-  }
-  return result;
 }
 
 struct UrlSpecifier {
@@ -3163,8 +3071,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       // app path the registry keys by, or no scope would match it.
       const std::string resourceName(*resourceUtf8);
       const std::string resourceUrl = RepairCollapsedUrlScheme(resourceName);
-      const auto parsedResource = ada::parse<ada::url_aggregator>(resourceUrl, nullptr);
-      if (parsedResource && HasHttpScheme(*parsedResource)) {
+      if (ParseModuleUrl(resourceUrl, std::string()).http) {
         dynamicReferrerKey = CanonicalizeRegistryKey(resourceUrl);
       } else {
         const ModuleResolution referrer =
