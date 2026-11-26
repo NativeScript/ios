@@ -2172,6 +2172,109 @@ describe("HTTP ESM Loader", function() {
                 });
         });
     });
+
+    // The spelling of these URLs is what dev tooling compares module URLs
+    // against, so it must survive every route into the loader byte for byte.
+    describe("module URLs in the shapes dev tooling emits", function () {
+        var nsModule = require("ns:module");
+
+        afterEach(function () {
+            nsModule.configureLoader({ importMap: { imports: {} } });
+        });
+
+        // Each module reports the request target the server saw and its own
+        // import.meta.url.
+        function expectSpelledAsWritten(ns, url) {
+            var target = url.slice(url.indexOf("/", url.indexOf("://") + 3));
+            var q = target.indexOf("?");
+            expect(ns.url).toBe(url);
+            expect(ns.path).toBe(q < 0 ? target : target.slice(0, q));
+            expect(ns.query).toBe(q < 0 ? "" : target.slice(q + 1));
+            expect(nsModule.getLoadedModuleUrls()).toContain(url);
+        }
+
+        function expectEvicted(urls) {
+            nsModule.invalidateModules(urls);
+            var loaded = nsModule.getLoadedModuleUrls();
+            urls.forEach(function (url) {
+                expect(loaded).not.toContain(url);
+            });
+        }
+
+        it("keeps them as written when a file module imports them", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var written = origin.replace("127.0.0.1", "LOCALHOST");
+            var base = origin + "/esm/resolve/tooling-direct";
+            var urls = [
+                base + "/ns/m/src/app.ts?v=abc",
+                base + "/ns/core/index.js",
+                base + "/ns/node/x",
+                base + "/ns/m/node_modules/pkg/index.js",
+                base + "/ns/asm?path=%2Fsrc%2FApp.vue&mode=inline",
+                base + "/ns/asm?path=/src/App.vue&mode=inline",
+                base + "/ns/sfc/src/App.vue?vue&type=script",
+                base + "/ns/m/q.js?b=2&a=1",
+                base + "/@ng/component?c=x&t=1",
+                base + "/@id/__x00__virtual:thing",
+                base + "/@fs/Users/me/proj/x.ts",
+                written + "/esm/resolve/tooling-direct/ns/m/upper.js?v=1",
+            ];
+            Promise.all(urls.map(function (url) {
+                return import(url);
+            })).then(function (namespaces) {
+                namespaces.forEach(function (ns, i) {
+                    expectSpelledAsWritten(ns, urls[i]);
+                });
+                expectEvicted(urls);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("keeps them as written when an import-map entry targets them", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var written = origin.replace("127.0.0.1", "LOCALHOST");
+            var base = origin + "/esm/resolve/tooling-mapped";
+            var dynamicUrl = base + "/ns/m/src/dynamic.ts?v=abc";
+            var staticUrl = base + "/ns/asm?path=%2Fsrc%2FApp.vue&mode=inline";
+            var upperUrl = written + "/esm/resolve/tooling-mapped/ns/m/upper.js?b=2&a=1";
+            nsModule.configureLoader({
+                importMap: {
+                    imports: {
+                        "ns-tooling-url-dynamic": dynamicUrl,
+                        "ns-tooling-url-static": staticUrl,
+                        "ns-tooling-url-upper": upperUrl,
+                    },
+                },
+            });
+            Promise.all([
+                import("ns-tooling-url-dynamic"),
+                import("~/tests/esm/tooling-url/static-importer.mjs"),
+                import("ns-tooling-url-upper"),
+            ]).then(function (namespaces) {
+                expectSpelledAsWritten(namespaces[0], dynamicUrl);
+                expectSpelledAsWritten(namespaces[1].dep, staticUrl);
+                expectSpelledAsWritten(namespaces[2], upperUrl);
+                expectEvicted([dynamicUrl, staticUrl, upperUrl]);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+    });
 });
 
 // Focused, deterministic coverage for the native HTTP canonical-key function.
@@ -2184,6 +2287,8 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
         return require("ns:module").canonicalizeHttpUrlKey;
     }
 
+    // A registered key is canonicalized again whenever it is looked up, so a key
+    // must be a fixed point.
     function checkKey(input, expected) {
         var canon = getCanon();
         if (typeof canon !== "function") {
@@ -2191,7 +2296,76 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
             return;
         }
         expect(canon(input)).toBe(expected);
+        expect(canon(expected)).toBe(expected);
     }
+
+    // [input, key with no vocabulary, key under TOOLING_VOCABULARY]
+    var TOOLING_URLS = [
+        ["http://h:5173/ns/m/src/app.ts?v=abc",
+         "http://h:5173/ns/m/src/app.ts?v=abc",
+         "http://h:5173/ns/m/src/app.ts"],
+        ["http://h:5173/ns/core/index.js",
+         "http://h:5173/ns/core/index.js",
+         "http://h:5173/ns/core/index.js"],
+        ["http://h:5173/ns/node/x",
+         "http://h:5173/ns/node/x",
+         "http://h:5173/ns/node/x"],
+        ["http://h:5173/ns/m/node_modules/pkg/index.js?v=abc",
+         "http://h:5173/ns/m/node_modules/pkg/index.js?v=abc",
+         "http://h:5173/ns/m/node_modules/pkg/index.js"],
+        ["http://h:5173/ns/asm?path=%2Fsrc%2FApp.vue&mode=inline",
+         "http://h:5173/ns/asm?path=%2Fsrc%2FApp.vue&mode=inline",
+         "http://h:5173/ns/asm?mode=inline&path=%2Fsrc%2FApp.vue"],
+        ["http://h:5173/ns/asm?path=/src/App.vue&mode=inline",
+         "http://h:5173/ns/asm?path=/src/App.vue&mode=inline",
+         "http://h:5173/ns/asm?mode=inline&path=/src/App.vue"],
+        ["http://h:5173/ns/sfc/src/App.vue?vue&type=script",
+         "http://h:5173/ns/sfc/src/App.vue?vue&type=script",
+         "http://h:5173/ns/sfc/src/App.vue?type=script&vue"],
+        ["http://h:5173/ns/m/q.js?b=2&a=1",
+         "http://h:5173/ns/m/q.js?b=2&a=1",
+         "http://h:5173/ns/m/q.js?a=1&b=2"],
+        ["http://h:5173/@ng/component?c=x&t=1",
+         "http://h:5173/@ng/component?c=x&t=1",
+         "http://h:5173/@ng/component?c=x&t=1"],
+        ["http://h:5173/@id/__x00__virtual:thing?import",
+         "http://h:5173/@id/__x00__virtual:thing?import",
+         "http://h:5173/@id/__x00__virtual:thing"],
+        ["http://h:5173/@fs/Users/me/proj/x.ts?t=1",
+         "http://h:5173/@fs/Users/me/proj/x.ts?t=1",
+         "http://h:5173/@fs/Users/me/proj/x.ts"],
+        ["http://h:5173/node_modules/.vite/deps/pkg.js?v=abc",
+         "http://h:5173/node_modules/.vite/deps/pkg.js?v=abc",
+         "http://h:5173/node_modules/.vite/deps/pkg.js"],
+        ["http://MyMac.local:5173/ns/m/app.js?v=1",
+         "http://MyMac.local:5173/ns/m/app.js?v=1",
+         "http://MyMac.local:5173/ns/m/app.js"],
+        ["http://MyMac.local:5173/ns/m/app.js?",
+         "http://MyMac.local:5173/ns/m/app.js?",
+         "http://MyMac.local:5173/ns/m/app.js"],
+        ["http://MyMac.local:5173/ns/m/app.js#",
+         "http://MyMac.local:5173/ns/m/app.js",
+         "http://MyMac.local:5173/ns/m/app.js"],
+        ["http://h:80/ns/m/app.js?v=1",
+         "http://h:80/ns/m/app.js?v=1",
+         "http://h:80/ns/m/app.js"],
+        ["http://192.168.1.20:5173/ns/m/app.js?v=1",
+         "http://192.168.1.20:5173/ns/m/app.js?v=1",
+         "http://192.168.1.20:5173/ns/m/app.js"],
+        ["http://[::1]:5173/ns/m/app.js?v=1",
+         "http://[::1]:5173/ns/m/app.js?v=1",
+         "http://[::1]:5173/ns/m/app.js"],
+        // The URL parser rejects a zone id; the key keeps the URL as written.
+        ["http://[fe80::1%25en0]:5173/ns/m/app.js?v=1#x",
+         "http://[fe80::1%25en0]:5173/ns/m/app.js?v=1",
+         "http://[fe80::1%25en0]:5173/ns/m/app.js"],
+    ];
+
+    var TOOLING_VOCABULARY = {
+        stripParams: ["t", "v", "import"],
+        forPathPrefixes: ["/ns/", "/@id/", "/@fs/", "/node_modules/.vite/"],
+        preserveQueryFor: ["/@ng/component"],
+    };
 
     it("is exposed as a function in debug builds", function () {
         var canon = getCanon();
@@ -2248,6 +2422,38 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
             checkKey("http://h/ns/m/foo.js#frag", "http://h/ns/m/foo.js");
             checkKey("https://cdn.example.com/lib.js?token=abc#frag",
                      "https://cdn.example.com/lib.js?token=abc");
+        });
+
+        it("keeps the URLs dev tooling emits as written", function () {
+            TOOLING_URLS.forEach(function (row) {
+                checkKey(row[0], row[1]);
+            });
+        });
+    });
+
+    describe("with a tooling-shaped vocabulary", function () {
+        beforeEach(function () {
+            var nsModule = require("ns:module");
+            if (typeof nsModule.canonicalizeHttpUrlKey !== "function") {
+                return;
+            }
+            nsModule.configureLoader({ canonicalization: TOOLING_VOCABULARY });
+        });
+
+        afterEach(function () {
+            var nsModule = require("ns:module");
+            if (typeof nsModule.canonicalizeHttpUrlKey !== "function") {
+                return;
+            }
+            nsModule.configureLoader({
+                canonicalization: { stripParams: [], forPathPrefixes: [], preserveQueryFor: [] },
+            });
+        });
+
+        it("keys the URLs dev tooling emits", function () {
+            TOOLING_URLS.forEach(function (row) {
+                checkKey(row[0], row[2]);
+            });
         });
     });
 
