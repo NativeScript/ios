@@ -662,7 +662,8 @@ consults the most specific matching scope first (longest prefix wins), then
 progressively less specific ones, then `imports` — so a scope can override a
 global mapping for one subtree and fall through to it everywhere else. The
 synchronous resolver, the graph walk, and `import()` all resolve through the
-same cascade.
+same cascade. The map rewrites only the specifiers a module imports, never the
+importing module's own URL.
 
 The whole map is parsed and validated before any of it is installed: a
 rejected map throws a `TypeError` out of `configureLoader` and the previously
@@ -943,6 +944,50 @@ unmodified where a shim exists:
 | `node:worker_threads` | the messaging and thread surface — see [worker-threads.md](worker-threads.md) | The channel half (`MessagePort`, `MessageChannel`, `BroadcastChannel`, `receiveMessageOnPort`) is the real implementation, the same objects the globals of those names hold; the thread half is a bridge over the `Worker` that `ns:worker_threads` exports. The channel half has no `ns:` counterpart — its surface tracks Node's, so there is nothing for a standard module to own. The one place it breaks the absent-not-throwing rule below is deliberate: `postMessageToThread` and `moveMessagePortToContext` are present and throw an `Error` naming themselves, because silently missing thread-addressed messaging reads as a delivery bug rather than as an unsupported call. Documented as partial. |
 
 ## Loading ES modules
+
+### Specifier resolution
+
+A module loaded over http(s) resolves the specifiers it imports, with `import`
+and `import()` alike, as below. `ns:`/`node:` builtins resolve first, and the
+[import map](#import-maps-and-scopes) is consulted next; the table covers a
+specifier the map does not match.
+
+| specifier | from an http(s) importer |
+|---|---|
+| `./x`, `../x` | the importer's URL, query kept |
+| `/x` | the importer's origin, query kept |
+| `//host/x` | the importer's scheme, query kept |
+| `http(s)://…` | that URL |
+| `file:///app/x` | the app root, on disk |
+| `~/x` | refused |
+| bare (`pkg`, `pkg/x`) | refused: it needs an import-map entry |
+
+Only `/`, `./` and `../` prefixes are relative: `.x`, `.` and `..` are bare
+specifiers and are refused without an import-map entry. Specifiers follow the
+HTML module-specifier rules: the WHATWG URL parser, the one behind
+`new URL()`, decides whether a specifier is relative, an absolute URL or bare,
+and produces the path, query and fragment, so dot segments and `\` resolve and
+the scheme is lowercased as in a browser. The authority (userinfo, host and
+port) keeps its spelling from the importer's URL, or from the specifier when it
+names one (`//host/x`, `http(s)://…`). A specifier that resolves to an http(s)
+URL therefore names the same module as `new URL(specifier, importerUrl).href`
+whenever that authority is already spelled the way `new URL()` spells it (a
+lowercase host, no default port).
+
+An import-map entry is never refused — it is explicit configuration, so it may
+point an HTTP module at a `~/` path — though a relative or root-relative target
+still resolves against the importer's URL. A specifier with any other URL
+scheme (`data:`, `file:/x`) is never looked up on disk, and `import()` of a
+`blob:nativescript/…` URL loads from the blob store. A refused specifier fails
+before anything is fetched or read from disk, with an `Error` whose message
+names the specifier, the importer and what to use instead;
+`createRequire(<file path>)` is the explicit way for an HTTP module to reach
+CommonJS or ES modules on disk.
+
+From a file module, a static `import 'pkg?x'` looks `pkg?x` up in the import
+map, while `import('pkg?x')` drops the query and looks up `pkg`. An import-map
+target should not itself be a key of the map: `import()` may look a target up
+a second time.
 
 ### The `require()` specifier
 

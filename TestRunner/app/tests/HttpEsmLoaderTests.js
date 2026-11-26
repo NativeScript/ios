@@ -1459,6 +1459,594 @@ describe("HTTP ESM Loader", function() {
         });
     });
 
+    // A module served over HTTP resolves specifiers the way a browser does,
+    // against its own URL, and reaches the filesystem only explicitly. The
+    // bundled fixtures named by refused specifiers exist, so an implicit
+    // filesystem fallback would have loaded them.
+    describe("specifier resolution from an HTTP importer", function () {
+        var nsModule = require("ns:module");
+
+        afterEach(function () {
+            nsModule.configureLoader({ importMap: { imports: {} } });
+        });
+
+        function importer(origin, dir) {
+            return import(origin + "/esm/resolve/" + dir + "/importer.mjs");
+        }
+
+        function expectRefused(promise, done, check) {
+            promise.then(function () {
+                expect("resolved").toBe("rejected");
+                done();
+            }, function (error) {
+                check(String((error && error.message) || error));
+                done();
+            });
+        }
+
+        it("resolves ./, ../, root- and scheme-relative import() against the importer's URL",
+           function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var schemeRelative = origin.replace(/^https?:/, "") + "/esm/resolve/rel/scheme.mjs";
+            importer(origin, "rel/dir").then(function (mod) {
+                return Promise.all([
+                    mod.load("./sibling.mjs"),
+                    mod.load("../parent.mjs"),
+                    mod.load("/esm/resolve/rel/rooted.mjs"),
+                    mod.load(schemeRelative),
+                ]);
+            }).then(function (mods) {
+                expect(mods.map(function (m) { return m.path; })).toEqual([
+                    "/esm/resolve/rel/dir/sibling.mjs",
+                    "/esm/resolve/rel/parent.mjs",
+                    "/esm/resolve/rel/rooted.mjs",
+                    "/esm/resolve/rel/scheme.mjs",
+                ]);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("keeps an import()'s query as part of the module's identity", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            importer(origin, "query").then(function (mod) {
+                return Promise.all([mod.load("./target.mjs?k=1"), mod.load("./target.mjs?k=2")]);
+            }).then(function (mods) {
+                expect([mods[0].query, mods[1].query]).toEqual(["k=1", "k=2"]);
+                expect(mods[0]).not.toBe(mods[1]);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("refuses a static bare import the import map does not cover", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var spec = "tests/esm/http-importer/bare-static.mjs";
+            expectRefused(
+                import(origin + "/esm/resolve/static.mjs?spec=" + encodeURIComponent(spec)),
+                done,
+                function (message) {
+                    expect(message).toContain("\"" + spec + "\"");
+                    expect(message).toContain("not in the import map");
+                    expect(globalThis.__nsHttpImporterDiskRead_bareStatic).toBeUndefined();
+                });
+        });
+
+        it("refuses a dynamic bare import the import map does not cover", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var spec = "tests/esm/http-importer/bare-dynamic.mjs";
+            expectRefused(importer(origin, "bare").then(function (mod) {
+                return mod.load(spec);
+            }), done, function (message) {
+                expect(message).toContain("\"" + spec + "\"");
+                expect(message).toContain(origin + "/esm/resolve/bare/importer.mjs");
+                expect(message).toContain("not in the import map");
+                expect(globalThis.__nsHttpImporterDiskRead_bareDynamic).toBeUndefined();
+            });
+        });
+
+        it("refuses an app-relative ~/ import", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var spec = "~/tests/esm/http-importer/tilde.mjs";
+            expectRefused(importer(origin, "tilde").then(function (mod) {
+                return mod.load(spec);
+            }), done, function (message) {
+                expect(message).toContain("\"" + spec + "\"");
+                expect(message).toContain("\"~/\" paths are not available");
+                expect(globalThis.__nsHttpImporterDiskRead_tilde).toBeUndefined();
+            });
+        });
+
+        // The fixture is written at run time: a colon in a checked-in file
+        // name cannot be checked out on Windows.
+        describe("with a module at the app root named like an other-scheme URL", function () {
+            var spec = "x-ns-test:other-scheme.mjs";
+            var fixturePath = NSBundle.mainBundle.resourcePath + "/app/" + spec;
+
+            afterEach(function () {
+                var fileManager = NSFileManager.defaultManager;
+                if (fileManager.fileExistsAtPath(fixturePath)) {
+                    fileManager.removeItemAtPathError(fixturePath);
+                }
+            });
+
+            it("refuses the import() instead of reading the app root", function (done) {
+                var origin = getHostOrigin();
+                if (!origin) {
+                    pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                    done();
+                    return;
+                }
+                var body = "globalThis.__nsHttpImporterDiskRead_otherScheme = true;\n" +
+                           "export const name = \"other-scheme\";\n";
+                var data = NSString.stringWithString(body).dataUsingEncoding(NSUTF8StringEncoding);
+                var written = NSFileManager.defaultManager
+                    .createFileAtPathContentsAttributes(fixturePath, data, null);
+                expect(written).toBe(true);
+                expect(NSFileManager.defaultManager.fileExistsAtPath(fixturePath)).toBe(true);
+                expectRefused(importer(origin, "other-scheme").then(function (mod) {
+                    return mod.load(spec);
+                }), done, function (message) {
+                    expect(message).toContain(spec);
+                    expect(globalThis.__nsHttpImporterDiskRead_otherScheme).toBeUndefined();
+                });
+            });
+        });
+
+        it("imports a builtin", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            importer(origin, "builtin").then(function (mod) {
+                return mod.load("ns:module");
+            }).then(function (ns) {
+                expect(ns.createRequire).toBe(nsModule.createRequire);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("imports a bundled module named by an explicit file:// URL", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            importer(origin, "file-url").then(function (mod) {
+                return mod.load("file:///app/tests/esm/http-importer/file-url.mjs");
+            }).then(function (ns) {
+                expect(ns.name).toBe("file-url");
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("imports a bare specifier through its import-map entry, whatever the target",
+           function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            nsModule.configureLoader({
+                importMap: {
+                    imports: { "ns-http-importer-mapped": "~/tests/esm/http-importer/mapped.mjs" },
+                },
+            });
+            importer(origin, "mapped").then(function (mod) {
+                return mod.load("ns-http-importer-mapped");
+            }).then(function (ns) {
+                expect(ns.name).toBe("mapped");
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("resolves a relative import-map target against the importer's URL", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            nsModule.configureLoader({
+                importMap: { imports: { "ns-http-importer-relative": "./mapped-target.mjs?k=map" } },
+            });
+            Promise.all([
+                importer(origin, "map-relative").then(function (mod) {
+                    return mod.load("ns-http-importer-relative");
+                }),
+                import(origin + "/esm/resolve/static.mjs?spec=ns-http-importer-relative"),
+            ]).then(function (namespaces) {
+                expect([namespaces[0].path, namespaces[0].query])
+                    .toEqual(["/esm/resolve/map-relative/mapped-target.mjs", "k=map"]);
+                expect([namespaces[1].dep.path, namespaces[1].dep.query])
+                    .toEqual(["/esm/resolve/mapped-target.mjs", "k=map"]);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("imports a blob:nativescript URL", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            // The bare test realm has no Blob; createObjectURL needs an
+            // instance carrying `type`, and the loader only calls `.text()`.
+            var previousBlob = globalThis.Blob;
+            globalThis.Blob = function Blob(parts, options) {
+                this._text = (parts || []).join("");
+                this.type = (options && options.type) || "";
+            };
+            globalThis.Blob.prototype.text = function () {
+                return Promise.resolve(this._text);
+            };
+            var url = URL.createObjectURL(
+                new Blob(["export const name = 'http-importer-blob';\n"],
+                         { type: "text/javascript" }),
+                { ext: ".mjs" });
+            function cleanUp() {
+                URL.revokeObjectURL(url);
+                if (typeof previousBlob === "undefined") {
+                    delete globalThis.Blob;
+                } else {
+                    globalThis.Blob = previousBlob;
+                }
+            }
+            importer(origin, "blob").then(function (mod) {
+                return mod.load(url);
+            }).then(function (ns) {
+                cleanUp();
+                expect(ns.name).toBe("http-importer-blob");
+                done();
+            }).catch(function (error) {
+                cleanUp();
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        function rejectionMessage(promise) {
+            return promise.then(function () {
+                return "resolved";
+            }, function (error) {
+                return String((error && error.message) || error);
+            });
+        }
+
+        it("stays an HTTP importer when the import map maps its own URL to a file",
+           function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var importerUrl = origin + "/esm/resolve/self-mapped/importer.mjs";
+            var mod;
+            import(importerUrl).then(function (loaded) {
+                mod = loaded;
+                var imports = {};
+                imports[importerUrl] = "~/tests/esm/http-importer/self-mapped.mjs";
+                nsModule.configureLoader({ importMap: { imports: imports } });
+                return mod.load("./target.mjs?k=self");
+            }).then(function (target) {
+                expect([target.path, target.query])
+                    .toEqual(["/esm/resolve/self-mapped/target.mjs", "k=self"]);
+                return rejectionMessage(mod.load("tests/esm/http-importer/self-mapped-bare.mjs"));
+            }).then(function (bareMessage) {
+                expect(bareMessage).toContain("not in the import map");
+                return rejectionMessage(mod.load("~/tests/esm/http-importer/self-mapped-tilde.mjs"));
+            }).then(function (tildeMessage) {
+                expect(tildeMessage).toContain("\"~/\" paths are not available");
+                expect(globalThis.__nsHttpImporterDiskRead_selfMappedBare).toBeUndefined();
+                expect(globalThis.__nsHttpImporterDiskRead_selfMappedTilde).toBeUndefined();
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("refuses a static import of a dot-prefixed bare specifier", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var spec = ".hidden/dep.mjs";
+            expectRefused(
+                import(origin + "/esm/resolve/static.mjs?spec=" + encodeURIComponent(spec)),
+                done,
+                function (message) {
+                    expect(message).toContain("\"" + spec + "\"");
+                    expect(message).toContain("not in the import map");
+                });
+        });
+
+        it("refuses a dynamic import of '.x', '.' and '..' as bare specifiers", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            importer(origin, "dot-bare/dir").then(function (mod) {
+                return Promise.all([".hidden/dynamic.mjs", ".", ".."].map(function (spec) {
+                    return rejectionMessage(mod.load(spec));
+                }));
+            }).then(function (messages) {
+                messages.forEach(function (message) {
+                    expect(message).toContain("not in the import map");
+                });
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        // `new URL()` and the loader share the WHATWG URL parser, so every
+        // spelling of one URL names one module.
+        it("imports one module for every spelling of its URL from import()", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var importerUrl = origin + "/esm/resolve/identity/importer.mjs";
+            import(importerUrl).then(function (mod) {
+                return Promise.all([
+                    mod.load("./x.mjs?v=1"),
+                    mod.load("./sub/../x.mjs?v=1"),
+                    mod.load("/esm/resolve/identity/./x.mjs?v=1"),
+                    import(origin + "/esm/resolve/identity/x.mjs?v=1"),
+                    import(new URL("./x.mjs?v=1", importerUrl).href),
+                ]);
+            }).then(function (namespaces) {
+                expect(namespaces[0].query).toBe("v=1");
+                namespaces.forEach(function (ns) {
+                    expect(ns).toBe(namespaces[0]);
+                });
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("imports one module for every spelling of its URL from a static import", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            function staticImporter(spec) {
+                return import(origin + "/esm/resolve/static.mjs?spec=" + encodeURIComponent(spec));
+            }
+            Promise.all([
+                staticImporter("./identity-static/x.mjs?v=1"),
+                staticImporter("/esm/resolve/identity-static/./x.mjs?v=1"),
+                import(origin + "/esm/resolve/identity-static/x.mjs?v=1"),
+            ]).then(function (namespaces) {
+                expect(namespaces[2].query).toBe("v=1");
+                expect(namespaces[0].dep).toBe(namespaces[2]);
+                expect(namespaces[1].dep).toBe(namespaces[2]);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        // `LOCALHOST` reaches the same server as the canonical origin but is
+        // spelled the way the parser would not spell it.
+        it("keeps the importer's origin as written in the URLs it resolves", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var written = origin.replace("127.0.0.1", "LOCALHOST");
+            var childUrl = written + "/esm/resolve/authority/x.mjs";
+            var direct;
+            import(childUrl).then(function (ns) {
+                direct = ns;
+                return Promise.all([
+                    importer(written, "authority").then(function (mod) {
+                        return Promise.all([
+                            mod.load("./x.mjs"),
+                            mod.load("/esm/resolve/authority/x.mjs"),
+                        ]);
+                    }),
+                    import(written + "/esm/resolve/authority/static.mjs?spec=" +
+                           encodeURIComponent("./x.mjs")),
+                    importer(origin, "authority-own").then(function (mod) {
+                        return Promise.all([
+                            mod.load(childUrl.replace(/^http:/, "")),
+                            mod.load(childUrl.replace(/^http:/, "HTTP:")),
+                        ]);
+                    }),
+                ]);
+            }).then(function (results) {
+                expect(results[0][0]).toBe(direct);
+                expect(results[0][1]).toBe(direct);
+                expect(results[1].dep).toBe(direct);
+                expect(results[2][0]).toBe(direct);
+                expect(results[2][1]).toBe(direct);
+                expect(direct.url).toBe(childUrl);
+                expect(nsModule.getLoadedModuleUrls()).toContain(childUrl);
+                nsModule.invalidateModules([childUrl]);
+                expect(nsModule.getLoadedModuleUrls()).not.toContain(childUrl);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("normalizes a specifier the way the WHATWG URL parser does", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            importer(origin, "norm").then(function (mod) {
+                return Promise.all([
+                    mod.load("/esm/resolve/norm/./a/../dots.mjs"),
+                    mod.load("../../../../../esm/resolve/norm/climb.mjs"),
+                    mod.load("./sub\\back.mjs"),
+                    mod.load(origin.replace(/^http:/, "HTTP:") + "/esm/resolve/norm/upper.mjs"),
+                ]);
+            }).then(function (mods) {
+                expect(mods.map(function (m) { return m.path; })).toEqual([
+                    "/esm/resolve/norm/dots.mjs",
+                    "/esm/resolve/norm/climb.mjs",
+                    "/esm/resolve/norm/sub/back.mjs",
+                    "/esm/resolve/norm/upper.mjs",
+                ]);
+                expect(mods[3].url).toBe(origin + "/esm/resolve/norm/upper.mjs");
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+    });
+
+    describe("an import-map entry keyed by a file module's own URL", function () {
+        var nsModule = require("ns:module");
+
+        afterEach(function () {
+            nsModule.configureLoader({ importMap: { imports: {} } });
+        });
+
+        // `mapKey` derives the entry key from the loaded module's own URL; the
+        // entry points at the test server.
+        function expectStaysFileImporter(dir, mapKey, done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            import("~/tests/esm/" + dir + "/local.mjs").then(function (mod) {
+                var imports = {};
+                var key = mapKey(mod.url);
+                imports[key] = origin + "/esm/resolve/" + dir + "/" +
+                               (key.charAt(key.length - 1) === "/" ? "" : "local.mjs");
+                nsModule.configureLoader({ importMap: { imports: imports } });
+                return Promise.all([
+                    mod.load("~/tests/esm/" + dir + "/tilde-dep.mjs"),
+                    mod.load("tests/esm/" + dir + "/bare-dep.mjs"),
+                    mod.load("./sibling.mjs"),
+                ]);
+            }).then(function (namespaces) {
+                expect(namespaces.map(function (ns) { return ns.name; })).toEqual([
+                    dir + "-tilde",
+                    dir + "-bare",
+                    dir + "-sibling",
+                ]);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        }
+
+        it("leaves an exact entry out of the module's import() resolution", function (done) {
+            expectStaysFileImporter("self-mapped-file", function (url) {
+                return url;
+            }, done);
+        });
+
+        it("leaves a prefix entry out of the module's import() resolution", function (done) {
+            expectStaysFileImporter("self-mapped-prefix", function (url) {
+                return url.substring(0, url.lastIndexOf("/") + 1);
+            }, done);
+        });
+    });
+
+    describe("import-map lookup of a query from a file module", function () {
+        var nsModule = require("ns:module");
+
+        afterEach(function () {
+            nsModule.configureLoader({ importMap: { imports: {} } });
+        });
+
+        it("looks a static import's query up in the map and drops an import()'s", function (done) {
+            nsModule.configureLoader({
+                importMap: {
+                    imports: {
+                        "ns-query-map-pkg": "~/tests/esm/query-map/stripped.mjs",
+                        "ns-query-map-pkg?x": "~/tests/esm/query-map/literal.mjs",
+                    },
+                },
+            });
+            Promise.all([
+                import("~/tests/esm/query-map/static-importer.mjs"),
+                import("ns-query-map-pkg?x"),
+            ]).then(function (namespaces) {
+                expect(namespaces[0].dep.name).toBe("literal");
+                expect(namespaces[1].name).toBe("stripped");
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+    });
+
     describe("URL Key Canonicalization", function () {
         it("preserves query for non-dev/public URLs", function (done) {
             var origin = getHostOrigin();
