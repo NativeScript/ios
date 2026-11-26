@@ -90,6 +90,19 @@ static inline bool StartsWith(const std::string& s, const char* prefix) {
   return s.size() >= n && s.compare(0, n, prefix) == 0;
 }
 
+// Whether `key` is spelled the way the loader keys an HTTP module: a lowercase
+// `http://` or `https://` prefix, file modules being keyed by absolute paths.
+// Deliberately not a URL parse: it gates the rule that an HTTP importer never
+// reaches the filesystem implicitly, so a key the URL parser would reject (an
+// IPv6 zone id, say) must still count as HTTP.
+static bool IsHttpRegistryKey(const std::string& key) {
+  if (key.compare(0, 4, "http") != 0) {
+    return false;
+  }
+  const size_t schemeEnd = key.size() > 4 && key[4] == 's' ? 5 : 4;
+  return key.compare(schemeEnd, 3, "://") == 0;
+}
+
 static bool ShouldTraceRegistryKey(const std::string& rawKey, const std::string& registryKey);
 static std::string CanonicalizeRegistryKey(const std::string& key);
 static const char* ModuleStatusToString(v8::Module::Status status);
@@ -779,8 +792,8 @@ static std::string CanonicalizeRegistryKey(const std::string& rawKey) {
   const char* classification = "path";
   bool traceEvenWithoutChange = false;
 
-  if (StartsWith(key, "http://") || StartsWith(key, "https://") ||
-      StartsWith(key, "file://http://") || StartsWith(key, "file://https://")) {
+  if (IsHttpRegistryKey(key) || StartsWith(key, "file://http://") ||
+      StartsWith(key, "file://https://")) {
     registryKey = CanonicalizeHttpUrlKey(key);
     classification = "http";
   } else if (StartsWith(key, "file://")) {
@@ -1685,7 +1698,7 @@ static std::string HttpUrlEmbeddedInPath(const std::string& p) {
   } else if (StartsWith(tail, "https:/") && !StartsWith(tail, "https://")) {
     tail.insert(6, "/");
   }
-  if (!(StartsWith(tail, "http://") || StartsWith(tail, "https://"))) {
+  if (!IsHttpRegistryKey(tail)) {
     return "";
   }
   return tail;
@@ -1757,8 +1770,7 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
   // filesystem only explicitly: through an import-map entry (whatever its
   // target, handled below) or a file:// URL. Every other form is refused
   // here, before anything is probed on disk.
-  const bool referrerIsHttp =
-      StartsWith(referrerKey, "http://") || StartsWith(referrerKey, "https://");
+  const bool referrerIsHttp = IsHttpRegistryKey(referrerKey);
   if (referrerIsHttp && !mappedByImportMap) {
     const UrlSpecifier url = ResolveModuleSpecifierAgainstUrl(spec, referrerKey);
     switch (url.kind) {
@@ -1795,7 +1807,7 @@ static ModuleResolution ResolveSpecifierToPath(const std::string& rawSpec,
     }
   }
 
-  if (StartsWith(spec, "http://") || StartsWith(spec, "https://")) {
+  if (IsHttpRegistryKey(spec)) {
     result.kind = ModuleResolution::Kind::kHttp;
     result.url = spec;
     return result;
@@ -2280,7 +2292,7 @@ static void AsyncGraphEnqueue(const std::shared_ptr<AsyncGraphLoad>& load,
 static ModuleResolution ResolutionForRoot(const std::string& root) {
   ModuleResolution resolution;
   resolution.specifier = root;
-  if (StartsWith(root, "http://") || StartsWith(root, "https://")) {
+  if (IsHttpRegistryKey(root)) {
     resolution.kind = ModuleResolution::Kind::kHttp;
     resolution.url = root;
   } else if (IsRegularFile(root)) {
@@ -2397,7 +2409,7 @@ void RemoveModuleFromRegistry(v8::Isolate* isolate, const std::string& canonical
 
   // Classification helper for diagnostics
   auto classify = [](const std::string& s) -> const char* {
-    bool http = StartsWith(s, "http://") || StartsWith(s, "https://");
+    bool http = IsHttpRegistryKey(s);
     if (http) {
       return IsVolatileUrl(s) ? "http:volatile" : "http:other";
     }
@@ -2420,7 +2432,7 @@ void RemoveModuleFromRegistry(v8::Isolate* isolate, const std::string& canonical
   auto it = registry.find(registryKey);
   if (it != registry.end()) {
     // Only log stale removal for non-HTTP keys to avoid noisy dev HTTP churn.
-    bool isHttpKey = StartsWith(registryKey, "http://") || StartsWith(registryKey, "https://");
+    bool isHttpKey = IsHttpRegistryKey(registryKey);
     if (tns::LogCategoryEnabled(tns::LogCategory::Esm) && !isHttpKey) {
       TNS_DEBUG(Esm, "[resolver] removing stale module %s", registryKey.c_str());
     }
@@ -3162,14 +3174,12 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
       }
     }
   }
-  const bool importerIsHttp =
-      StartsWith(dynamicReferrerKey, "http://") || StartsWith(dynamicReferrerKey, "https://");
+  const bool importerIsHttp = IsHttpRegistryKey(dynamicReferrerKey);
 
   // A file importer's query/fragment never names part of a file, so it is
   // dropped up front; an absolute http(s) specifier keeps it as identity. For
   // an HTTP importer the seam resolves the specifier as a URL, query included.
-  const bool isHttpLike =
-      StartsWith(normalizedSpec, "http://") || StartsWith(normalizedSpec, "https://");
+  const bool isHttpLike = IsHttpRegistryKey(normalizedSpec);
   if (!isHttpLike && !importerIsHttp) {
     size_t qpos = normalizedSpec.find_first_of("?#");
     if (qpos != std::string::npos) {
@@ -3556,8 +3566,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
 
     // If spec is an HTTP(S) URL, try HTTP fetch+compile directly
     // Security: HttpFetchModule gates remote module access centrally.
-    if (!normalizedSpec.empty() &&
-        (StartsWith(normalizedSpec, "http://") || StartsWith(normalizedSpec, "https://"))) {
+    if (!normalizedSpec.empty() && IsHttpRegistryKey(normalizedSpec)) {
       TNS_DEBUG(Esm, "[dyn-import][http-loader] trying URL %s", normalizedSpec.c_str());
       std::string key = CanonicalizeHttpUrlKey(normalizedSpec);
       // Volatile pattern check: if the URL matches any configured volatile
