@@ -55,6 +55,20 @@ static bool RemoteUrlMatchesAllowlistEntry(const std::string& url, const std::st
   return next == '/' || next == '?' || next == '#';
 }
 
+std::string NormalizeRemoteModuleAllowlistEntry(const std::string& entry) {
+  const std::string url = NormalizeHttpModuleUrl(entry);
+  return url.empty() ? entry : url;
+}
+
+bool RemoteUrlMatchesAllowlist(const std::string& url, const std::vector<std::string>& entries) {
+  for (const std::string& entry : entries) {
+    if (RemoteUrlMatchesAllowlistEntry(url, entry)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static void InitializeSecurityConfig() {
   std::call_once(s_securityConfigInitFlag, []() {
     @autoreleasepool {
@@ -77,7 +91,8 @@ static void InitializeSecurityConfig() {
           if ([item isKindOfClass:[NSString class]]) {
             NSString* str = (NSString*)item;
             if (str.length > 0) {
-              s_remoteModuleAllowlist.push_back(std::string([str UTF8String]));
+              s_remoteModuleAllowlist.push_back(
+                  NormalizeRemoteModuleAllowlistEntry(std::string([str UTF8String])));
             }
           }
         }
@@ -110,13 +125,7 @@ bool IsRemoteUrlAllowed(const std::string& url) {
     return true;
   }
 
-  for (const std::string& entry : s_remoteModuleAllowlist) {
-    if (RemoteUrlMatchesAllowlistEntry(url, entry)) {
-      return true;
-    }
-  }
-
-  return false;
+  return RemoteUrlMatchesAllowlist(url, s_remoteModuleAllowlist);
 }
 
 // ─────────────────────────────────────────────────────────────

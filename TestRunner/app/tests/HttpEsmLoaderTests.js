@@ -1433,14 +1433,15 @@ describe("HTTP ESM Loader", function() {
 
         // The export set is public API, declared in types/ns-module.d.ts and
         // docs/ns-builtin-modules.md — all three must change together.
-        // `canonicalizeHttpUrlKey` is a debug-only diagnostic (absent from the
-        // .d.ts and from release builds), so the expected set varies by build.
+        // `canonicalizeHttpUrlKey` and `remoteUrlMatchesAllowlist` are
+        // debug-only diagnostics (absent from the .d.ts and from release
+        // builds), so the expected set varies by build.
         it("exposes exactly the declared surface", function () {
             var nsModule = require("ns:module");
             var expected = ["configureLoader", "createPumpingRequire", "createRequire",
                             "getLoadedModuleUrls", "invalidateModules"];
             if (typeof nsModule.canonicalizeHttpUrlKey === "function") {
-                expected.push("canonicalizeHttpUrlKey");
+                expected.push("canonicalizeHttpUrlKey", "remoteUrlMatchesAllowlist");
             }
             expect(Object.keys(nsModule).sort()).toEqual(expected.sort());
         });

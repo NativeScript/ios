@@ -143,4 +143,16 @@ bool IsRemoteModulesAllowed();
 // (or all URLs if the allowlist is empty).
 bool IsRemoteUrlAllowed(const std::string& url);
 
+// An allowlist entry spelled the way the loader spells the URLs it fetches
+// (NormalizeHttpModuleUrl), so path-scoped entries compare against resolved
+// paths; an entry that is not an http(s) URL is kept verbatim. Applied once,
+// when the allowlist is loaded.
+std::string NormalizeRemoteModuleAllowlistEntry(const std::string& entry);
+
+// The allowlist rule IsRemoteUrlAllowed applies: `url`, as fetched, matches
+// one of `entries` (each already normalized) by prefix, the match ending at a
+// URL-component boundary.
+bool RemoteUrlMatchesAllowlist(const std::string& url,
+                               const std::vector<std::string>& entries);
+
 }  // namespace tns

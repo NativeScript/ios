@@ -236,6 +236,8 @@ void SetVolatilePatterns(const std::vector<std::string>& patterns);
 //                                      filename/URL and splits the two
 //                                      exported flavors)
 //   - canonicalizeHttpUrlKey(url)     (debug builds only; test diagnostic)
+//   - remoteUrlMatchesAllowlist(url, entries)
+//                                     (debug builds only; test diagnostic)
 //
 // Worker teardown across HMR cycles is userland: the dev client intercepts
 // the global `Worker` constructor and terminates tracked instances
