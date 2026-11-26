@@ -480,8 +480,8 @@ struct GlobalRequireWarningState {
 // The specifiers the resolver joins onto the bound directory. Exactly "./" is
 // left out: every require resolves it to the app's main entry.
 static bool IsDirectoryRelativeSpecifier(const std::string& specifier) {
-  return specifier == "." || specifier == ".." || StartsWith(specifier, "../") ||
-         (StartsWith(specifier, "./") && specifier != "./");
+  return specifier == "." || specifier == ".." || specifier.rfind("../", 0) == 0 ||
+         (specifier.rfind("./", 0) == 0 && specifier != "./");
 }
 
 // Never runs JS and never throws: it may only add a log line to a require().
@@ -523,7 +523,7 @@ static void WarnIfRelativeGlobalRequireFromEsModule(Isolate* isolate, Local<Valu
   Log(@"NativeScript: require(\"%s\") in ES module %s resolves against the app root, not the "
       @"module's folder. Use createRequire(import.meta.url) from \"ns:module\" (from a module "
       @"loaded over http(s): createRequire with an app file path).",
-      specifier.c_str(), ImportMetaUrlForModuleKey(moduleKey).c_str());
+      specifier.c_str(), tns::ReportedModuleUrl(moduleKey).c_str());
 }
 
 void ModuleInternal::DebugGlobalRequireCallback(const FunctionCallbackInfo<Value>& info) {

@@ -375,36 +375,6 @@ std::string LookupModuleKeyForScriptId(v8::Isolate* isolate, int scriptId) {
   return std::string();
 }
 
-bool ModuleKeyHasUrlScheme(const std::string& key) {
-  size_t colonPos = key.find(':');
-  if (colonPos == 0 || colonPos == std::string::npos) {
-    return false;
-  }
-  size_t slashPos = key.find('/');
-  if (slashPos != std::string::npos && slashPos < colonPos) {
-    return false;
-  }
-  for (size_t i = 0; i < colonPos; i++) {
-    char c = key[i];
-    const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-                    c == '+' || c == '-' || c == '.';
-    if (!ok) {
-      return false;
-    }
-  }
-  return true;
-}
-
-std::string ImportMetaUrlForModuleKey(const std::string& key) {
-  if (key.empty()) {
-    return "file:///app/";
-  }
-  if (ModuleKeyHasUrlScheme(key)) {
-    return key;
-  }
-  return "file://" + tns::ReplaceAll(key, RuntimeConfig.BaseDir, "");
-}
-
 namespace {
 // The single module request in the facade source, and the source itself. Both
 // match Node's required_module_facade_source_string so the semantics (live
