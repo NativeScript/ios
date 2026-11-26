@@ -58,6 +58,9 @@ struct CanonicalizationConfig {
 // module under exactly one URL and never varies it for freshness.
 std::string CanonicalizeHttpUrlKey(const std::string& url);
 
+// CanonicalizeHttpUrlKey for a URL already spelled by NormalizeHttpModuleUrl.
+std::string CanonicalizeNormalizedHttpUrlKey(const std::string& normalizedUrl);
+
 // What a module response turned out to be. Decided once, by the shared
 // classifier, for whichever transport produced the response.
 enum class ModuleResponseKind {

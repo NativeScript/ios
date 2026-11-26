@@ -83,7 +83,7 @@ static bool IsHttpModulePath(const std::string& path) {
 static std::string CanonicalizeModulePath(const std::string& path) {
   const std::string url = NormalizeHttpModuleUrl(path);
   if (!url.empty()) {
-    return CanonicalizeHttpUrlKey(url);
+    return CanonicalizeNormalizedHttpUrlKey(url);
   }
 
   return NormalizePath(path);
@@ -1466,9 +1466,11 @@ static void ThrowIfLoadInterruptedByTermination(Isolate* isolate,
 
 Local<Value> ModuleInternal::LoadESModule(Isolate* isolate, const std::string& path,
                                           const ModuleEvaluationOptions& options) {
-  bool isHttpModule = IsHttpModulePath(path);
-  std::string canonicalPath = CanonicalizeModulePath(path);
-  std::string requestPath = isHttpModule ? NormalizeHttpModuleUrl(path) : canonicalPath;
+  const std::string httpUrl = NormalizeHttpModuleUrl(path);
+  bool isHttpModule = !httpUrl.empty();
+  std::string canonicalPath =
+      isHttpModule ? CanonicalizeNormalizedHttpUrlKey(httpUrl) : NormalizePath(path);
+  std::string requestPath = isHttpModule ? httpUrl : canonicalPath;
   auto context = isolate->GetCurrentContext();
   auto* registryPtr = ModuleRegistryFor(isolate);
   if (registryPtr == nullptr) {

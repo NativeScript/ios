@@ -777,8 +777,9 @@ static std::string CanonicalizeRegistryKey(const std::string& key) {
   // Before any other scheme test: an http(s) URL in a spelling other than the
   // key's (`HTTP://`, `http:/host`) must not fall through as a custom scheme
   // and give the module a second identity.
-  if (!NormalizeHttpModuleUrl(key).empty()) {
-    registryKey = CanonicalizeHttpUrlKey(key);
+  const std::string httpUrl = NormalizeHttpModuleUrl(key);
+  if (!httpUrl.empty()) {
+    registryKey = CanonicalizeNormalizedHttpUrlKey(httpUrl);
     classification = "http";
   } else if (StartsWith(key, "file://")) {
     registryKey = NormalizePath(FileURLToPath(key));
@@ -812,15 +813,13 @@ static std::string CanonicalizeRegistryKey(const std::string& key) {
 
 v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(v8::Isolate* isolate,
                                                 v8::Local<v8::Context> context,
-                                                const std::string& requestedUrlArg) {
+                                                const std::string& requestedUrl) {
   auto* moduleState = ModuleLoaderStateFor(isolate);
   if (moduleState == nullptr) {
     return v8::MaybeLocal<v8::Module>();
   }
   auto& registry = moduleState->registry;
-  const std::string normalizedUrl = NormalizeHttpModuleUrl(requestedUrlArg);
-  const std::string& requestedUrl = normalizedUrl.empty() ? requestedUrlArg : normalizedUrl;
-  const std::string registryKey = CanonicalizeHttpUrlKey(requestedUrl);
+  const std::string registryKey = CanonicalizeNormalizedHttpUrlKey(requestedUrl);
 
   TNS_DEBUG(Esm, "[http-esm][load][begin] request=%s key=%s", requestedUrl.c_str(),
             registryKey.c_str());
@@ -1974,7 +1973,7 @@ static void AsyncGraphOnFetchCompleted(const std::shared_ptr<AsyncGraphLoad>& lo
 
   load->pendingFetches--;
 
-  const std::string key = CanonicalizeHttpUrlKey(url);
+  const std::string key = CanonicalizeNormalizedHttpUrlKey(url);
   const bool isRoot = (key == load->rootKey);
 
   if (!load->failed) {
@@ -2096,10 +2095,11 @@ static void AsyncGraphEnqueue(const std::shared_ptr<AsyncGraphLoad>& load,
                               const ModuleResolution& resolution) {
   const bool isHttp = resolution.kind == ModuleResolution::Kind::kHttp;
   const std::string& target = isHttp ? resolution.url : resolution.path;
-  // One keying function for both schemes: it dispatches to the HTTP canonical
-  // key for URLs and to the normalized path otherwise, so the walk registers
-  // every module under the exact key the resolver will look up.
-  const std::string key = CanonicalizeRegistryKey(target);
+  // The keys CanonicalizeRegistryKey gives these targets, so the walk registers
+  // every module under the exact key the resolver will look up; a resolved
+  // URL is already spelled, so only its vocabulary is applied.
+  const std::string key =
+      isHttp ? CanonicalizeNormalizedHttpUrlKey(target) : CanonicalizeRegistryKey(target);
   if (!load->visited.insert(key).second) {
     return;
   }
@@ -2207,10 +2207,13 @@ void StartModuleGraphLoad(
     double fetchDeadline,
     std::function<void(bool ok, const std::string& errorMessage, v8::Local<v8::Context> context)>
         onComplete) {
+  const ModuleResolution rootResolution = ResolutionForRoot(root);
   auto load = std::make_shared<AsyncGraphLoad>();
   load->isolate = isolate;
   load->context.Reset(isolate, context);
-  load->rootKey = CanonicalizeRegistryKey(root);
+  load->rootKey = rootResolution.kind == ModuleResolution::Kind::kHttp
+                      ? CanonicalizeNormalizedHttpUrlKey(rootResolution.url)
+                      : CanonicalizeRegistryKey(root);
   load->startUs = (uint64_t)(CFAbsoluteTimeGetCurrent() * 1000.0 * 1000.0);
   load->fetchDeadline = fetchDeadline;
   load->onComplete = std::move(onComplete);
@@ -2220,7 +2223,6 @@ void StartModuleGraphLoad(
 
   TNS_DEBUG(Esm, "[graph][start] root=%s key=%s", root.c_str(), load->rootKey.c_str());
 
-  const ModuleResolution rootResolution = ResolutionForRoot(root);
   if (rootResolution.kind != ModuleResolution::Kind::kUnresolved) {
     AsyncGraphEnqueue(load, rootResolution);
   }
@@ -3462,7 +3464,7 @@ v8::MaybeLocal<v8::Promise> ImportModuleDynamicallyCallback(
     // Security: HttpFetchModule gates remote module access centrally.
     if (dynamicResolution.kind == ModuleResolution::Kind::kHttp) {
       TNS_DEBUG(Esm, "[dyn-import][http-loader] trying URL %s", normalizedSpec.c_str());
-      std::string key = CanonicalizeHttpUrlKey(normalizedSpec);
+      std::string key = CanonicalizeNormalizedHttpUrlKey(normalizedSpec);
       // Volatile pattern check: if the URL matches any configured volatile
       // pattern, evict the cached module so we always re-fetch. The pattern
       // list is policy and is supplied exclusively by the dev client via

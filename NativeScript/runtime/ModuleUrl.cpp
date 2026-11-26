@@ -79,12 +79,18 @@ ModuleUrl ParseModuleUrl(const std::string& input, const std::string& base) {
   if (authority.empty()) {
     return result;
   }
+  const std::string_view href = url->get_href();
+  const size_t authorityStart = url->get_protocol().size() + 2;
+  const size_t pathnameStart = url->get_components().pathname_start;
+  if (href.substr(authorityStart, pathnameStart - authorityStart) ==
+      authority) {
+    return result;
+  }
   // Everything after the authority comes from the parser's own href: its
   // getters drop an empty query's '?' and an empty fragment's '#'.
-  const std::string_view href = url->get_href();
-  const std::string written =
-      std::string(url->get_protocol()) + "//" + authority +
-      std::string(href.substr(url->get_components().pathname_start));
+  const std::string written = std::string(url->get_protocol()) + "//" +
+                              authority +
+                              std::string(href.substr(pathnameStart));
   auto reparsed = ada::parse<ada::url_aggregator>(written, nullptr);
   if (reparsed && reparsed->get_href() == href) {
     result.href = written;
@@ -93,6 +99,16 @@ ModuleUrl ParseModuleUrl(const std::string& input, const std::string& base) {
 }
 
 std::string NormalizeHttpModuleUrl(const std::string& input) {
+  // Fast reject only: the parser drops leading C0 controls and spaces, after
+  // which an http(s) URL (or an HTTP key) starts with 'h' or 'H'.
+  size_t first = 0;
+  while (first < input.size() &&
+         static_cast<unsigned char>(input[first]) <= 0x20) {
+    first++;
+  }
+  if (first == input.size() || (input[first] != 'h' && input[first] != 'H')) {
+    return std::string();
+  }
   const ModuleUrl url = ParseModuleUrl(input, std::string());
   if (url.parsed) {
     return url.http ? url.href : std::string();

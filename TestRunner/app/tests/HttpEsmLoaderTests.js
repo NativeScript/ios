@@ -2590,6 +2590,8 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
             checkKey("HTTP://h/x", "http://h/x");
             checkKey("http:h/x", "http://h/x");
             checkKey(" http://h/x", "http://h/x");
+            checkKey("\t\n HTTPS://h/x", "https://h/x");
+            checkKey("h\tttp://h/x", "http://h/x");
             checkKey("http://h", "http://h/");
             checkKey("http://h?x", "http://h/?x");
             checkKey("http://h/a/../b.js", "http://h/b.js");

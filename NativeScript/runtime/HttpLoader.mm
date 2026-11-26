@@ -138,13 +138,14 @@ bool IsRemoteUrlAllowed(const std::string& url) {
 // clean `/ns/core/*` imports) carry no query, so they canonicalize identically
 // under any vocabulary.
 std::string CanonicalizeHttpUrlKey(const std::string& url) {
+  const std::string normalizedUrl = NormalizeHttpModuleUrl(url);
+  return normalizedUrl.empty() ? url : CanonicalizeNormalizedHttpUrlKey(normalizedUrl);
+}
+
+std::string CanonicalizeNormalizedHttpUrlKey(const std::string& normalizedUrl) {
   // Per-isolate vocabulary, so this runs on the isolate's own thread. Fetch
   // threads never reach here — they carry keys computed for them.
   const CanonicalizationConfig* canonConfig = CanonicalizationConfigForCurrentIsolate();
-  const std::string normalizedUrl = NormalizeHttpModuleUrl(url);
-  if (normalizedUrl.empty()) {
-    return url;
-  }
   // Drop fragment entirely
   size_t hashPos = normalizedUrl.find('#');
   std::string noHash =
