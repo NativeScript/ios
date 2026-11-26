@@ -1003,6 +1003,14 @@ The "id" argument must be of type string. Received <what>
 `<what>` follows Node's `determineSpecificType`: `undefined`, `null`,
 `type number (42)`, `an instance of Object`, `function foo`, and so on.
 
+An ES module has no `require` of its own; the global `require` is available
+there for compatibility and resolves a relative specifier (`./x`, `../x`)
+against the app root, whichever module calls it. An ES module that needs
+module-relative resolution uses `createRequire(import.meta.url)`, or, when it
+was loaded over http(s), `createRequire` with an app file path. Debug builds
+log a warning once per ES module that passes a relative specifier to the
+global `require`.
+
 ### `require()` of an ES module
 
 `require()` of an ES module works, under Node's `require(esm)` rule: the graph
