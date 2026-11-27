@@ -70,6 +70,8 @@
 		AA5DBFD42EC191F8008D12F9 /* HttpLoader.h in Headers */ = {isa = PBXBuildFile; fileRef = AA5DBFD12EC191F8008D12F9 /* HttpLoader.h */; };
 		AA8C47B12E27114300649BF5 /* ModuleInternalCallbacks.h in Headers */ = {isa = PBXBuildFile; fileRef = AA8C47AF2E27114300649BF5 /* ModuleInternalCallbacks.h */; };
 		AA8C47B22E27114300649BF5 /* ModuleInternalCallbacks.mm in Sources */ = {isa = PBXBuildFile; fileRef = AA8C47B02E27114300649BF5 /* ModuleInternalCallbacks.mm */; };
+		B0E1A0032F0A000100000001 /* ModuleUrl.h in Headers */ = {isa = PBXBuildFile; fileRef = B0E1A0012F0A000100000001 /* ModuleUrl.h */; };
+		B0E1A0042F0A000100000001 /* ModuleUrl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B0E1A0022F0A000100000001 /* ModuleUrl.cpp */; };
 		C205257F2577D6F900C12A5C /* NativeScript.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; };
 		C20525802577D6F900C12A5C /* NativeScript.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = C2DDEB32229EAB3B00345BFE /* NativeScript.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C20AB5E626E1015300E2B41D /* OneByteStringResource.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */; };
@@ -550,6 +552,8 @@
 		AA5DBFD22EC191F8008D12F9 /* HttpLoader.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = HttpLoader.mm; sourceTree = "<group>"; };
 		AA8C47AF2E27114300649BF5 /* ModuleInternalCallbacks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ModuleInternalCallbacks.h; sourceTree = "<group>"; };
 		AA8C47B02E27114300649BF5 /* ModuleInternalCallbacks.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ModuleInternalCallbacks.mm; sourceTree = "<group>"; };
+		B0E1A0012F0A000100000001 /* ModuleUrl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ModuleUrl.h; sourceTree = "<group>"; };
+		B0E1A0022F0A000100000001 /* ModuleUrl.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ModuleUrl.cpp; sourceTree = "<group>"; };
 		C2003F9E23FA78CD0043B815 /* TNSDerivedClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TNSDerivedClass.h; sourceTree = "<group>"; };
 		C20525A72577D86600C12A5C /* TNSWidgets.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = TNSWidgets.xcframework; sourceTree = "<group>"; };
 		C20AB5E426E1015200E2B41D /* OneByteStringResource.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = OneByteStringResource.cpp; sourceTree = "<group>"; };
@@ -1561,6 +1565,8 @@
 				C2DDEB89229EAC8300345BFE /* ModuleInternal.h */,
 				AA8C47AF2E27114300649BF5 /* ModuleInternalCallbacks.h */,
 				AA8C47B02E27114300649BF5 /* ModuleInternalCallbacks.mm */,
+				B0E1A0012F0A000100000001 /* ModuleUrl.h */,
+				B0E1A0022F0A000100000001 /* ModuleUrl.cpp */,
 				C2DDEB81229EAC8200345BFE /* ModuleInternal.mm */,
 				2B7EA6AE2353477000E5184E /* NativeScriptException.h */,
 				2B7EA6AD2353476F00E5184E /* NativeScriptException.mm */,
@@ -1820,6 +1826,7 @@
 				C247C16822F82842001D2CA2 /* libplatform-export.h in Headers */,
 				F1F30E762B58FC74006A62C0 /* URLSearchParamsImpl.h in Headers */,
 				AA8C47B12E27114300649BF5 /* ModuleInternalCallbacks.h in Headers */,
+				B0E1A0032F0A000100000001 /* ModuleUrl.h in Headers */,
 				C2DDEBA7229EAC8300345BFE /* ClassBuilder.h in Headers */,
 				6573B9ED291FE5B700B0ED7C /* JSIRuntime.h in Headers */,
 				AA5DBFD42EC191F8008D12F9 /* HttpLoader.h in Headers */,
@@ -2484,6 +2491,7 @@
 				4A5C201A2E2B000100000007 /* RuntimeBuiltins.cpp in Sources */,
 				C2A5F86A2359AEB600074AFA /* ExtVector.cpp in Sources */,
 				AA8C47B22E27114300649BF5 /* ModuleInternalCallbacks.mm in Sources */,
+				B0E1A0042F0A000100000001 /* ModuleUrl.cpp in Sources */,
 				C2DDEBAF229EAC8300345BFE /* ObjectManager.mm in Sources */,
 				1DE238EF3BDD0EF221E13C44 /* WrapperLifetime.mm in Sources */,
 				2A9D21FFAFE7419B7E69B585 /* WrapperLifetimeCanary.mm in Sources */,

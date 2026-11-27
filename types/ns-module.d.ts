@@ -158,9 +158,10 @@ declare module "ns:module" {
     options?: PumpingRequireOptions,
   ): (specifier: string) => any;
 
-  // Debug builds additionally carry `canonicalizeHttpUrlKey(url)`, a pure
-  // test diagnostic; release builds omit the member entirely. It is
-  // deliberately not declared here: it is not public API, and declaring it
-  // unconditionally would misrepresent release builds, where feature checks
-  // must observe it as absent.
+  // Debug builds additionally carry `canonicalizeHttpUrlKey(url)` and
+  // `remoteUrlMatchesAllowlist(url, entries)`, pure test diagnostics; release
+  // builds omit both members entirely. They are deliberately not declared
+  // here: they are not public API, and declaring them unconditionally would
+  // misrepresent release builds, where feature checks must observe them as
+  // absent.
 }

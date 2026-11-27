@@ -58,13 +58,8 @@ struct CanonicalizationConfig {
 // module under exactly one URL and never varies it for freshness.
 std::string CanonicalizeHttpUrlKey(const std::string& url);
 
-// Repairs `http:/host` (one slash) back to `http://host`. Upstream path joins
-// collapse the double slash, and every key derivation has to undo it BEFORE it
-// tests the scheme — otherwise the collapsed form fails the test, is passed
-// through verbatim, and the same module ends up with two registry identities:
-// one from the resolver (which repairs) and one from whatever came in through
-// invalidateModules or a cache-bust mark (which did not).
-std::string RepairCollapsedUrlScheme(const std::string& url);
+// CanonicalizeHttpUrlKey for a URL already spelled by NormalizeHttpModuleUrl.
+std::string CanonicalizeNormalizedHttpUrlKey(const std::string& normalizedUrl);
 
 // What a module response turned out to be. Decided once, by the shared
 // classifier, for whichever transport produced the response.
@@ -150,5 +145,28 @@ bool IsRemoteModulesAllowed();
 // allow. Production requires allowRemoteModules, then an allowlist match
 // (or all URLs if the allowlist is empty).
 bool IsRemoteUrlAllowed(const std::string& url);
+
+// The allowlist IsRemoteUrlAllowed applies once remote modules are enabled.
+struct RemoteModuleAllowlist {
+  // False only when `security.remoteModuleAllowlist` is absent, not an array,
+  // or an empty array: then every URL is allowed.
+  bool inForce = false;
+  // The usable items, each spelled the way the loader spells the URLs it
+  // fetches (NormalizeHttpModuleUrl) so path-scoped entries compare against
+  // resolved paths, or kept verbatim when it is not an http(s) URL. An item
+  // that is not a string, is empty or has no exact UTF-8 form is not here: it
+  // matches nothing but still keeps the list in force.
+  std::vector<std::string> entries;
+};
+
+#ifdef __OBJC__
+// The allowlist for the raw `security.remoteModuleAllowlist` config value.
+RemoteModuleAllowlist RemoteModuleAllowlistFromConfig(id value);
+#endif
+
+// Whether `url` (as fetched) passes `allowlist`: always when it is not in
+// force, otherwise when one entry matches it by prefix with the match ending
+// at a URL-component boundary.
+bool RemoteUrlAllowedByAllowlist(const std::string& url, const RemoteModuleAllowlist& allowlist);
 
 }  // namespace tns

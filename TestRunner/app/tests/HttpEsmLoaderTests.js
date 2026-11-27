@@ -794,6 +794,37 @@ describe("HTTP ESM Loader", function() {
                 }).toThrowError(TypeError, /must be a string/);
             });
 
+            it("rejects a target containing U+0000 and keeps the previous map", function (done) {
+                setMap({ imports: { "ns-nul-prev": "~/tests/esm/query-map/stripped.mjs" } });
+                expect(function () {
+                    setMap({
+                        imports: {
+                            "ns-nul-target": "~/tests/esm/query-map/literal.mjs\u0000/../../x.mjs",
+                        },
+                    });
+                }).toThrowError(TypeError,
+                                "configureLoader: imports: the target for 'ns-nul-target' " +
+                                "must not contain U+0000");
+                import("ns-nul-prev").then(function (ns) {
+                    expect(ns.name).toBe("stripped");
+                    done();
+                }).catch(function (error) {
+                    expect("rejected: " + formatError(error)).toBe("resolved");
+                    done();
+                });
+            });
+
+            it("matches a specifier key containing U+0000 whole", function (done) {
+                setMap({ imports: { "ns-nul-key\u0000x": "~/tests/esm/query-map/literal.mjs" } });
+                import("ns-nul-key").then(function () {
+                    expect("resolved").toBe("rejected");
+                    done();
+                }, function (error) {
+                    expect(String((error && error.message) || error)).toContain("Cannot find module");
+                    done();
+                });
+            });
+
             it("rejects a non-object scope map", function () {
                 expect(function () {
                     setMap({ scopes: { "/a/": "not-an-object" } });
@@ -1433,14 +1464,15 @@ describe("HTTP ESM Loader", function() {
 
         // The export set is public API, declared in types/ns-module.d.ts and
         // docs/ns-builtin-modules.md — all three must change together.
-        // `canonicalizeHttpUrlKey` is a debug-only diagnostic (absent from the
-        // .d.ts and from release builds), so the expected set varies by build.
+        // `canonicalizeHttpUrlKey` and `remoteUrlMatchesAllowlist` are
+        // debug-only diagnostics (absent from the .d.ts and from release
+        // builds), so the expected set varies by build.
         it("exposes exactly the declared surface", function () {
             var nsModule = require("ns:module");
             var expected = ["configureLoader", "createPumpingRequire", "createRequire",
                             "getLoadedModuleUrls", "invalidateModules"];
             if (typeof nsModule.canonicalizeHttpUrlKey === "function") {
-                expected.push("canonicalizeHttpUrlKey");
+                expected.push("canonicalizeHttpUrlKey", "remoteUrlMatchesAllowlist");
             }
             expect(Object.keys(nsModule).sort()).toEqual(expected.sort());
         });
@@ -1934,6 +1966,110 @@ describe("HTTP ESM Loader", function() {
             });
         });
 
+        it("matches an http(s) scope the way the URL parser spells it", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var base = origin + "/esm/resolve/scope-norm";
+            var scopes = {};
+            scopes[base + "/x/../dots/"] = { "ns-scope-norm": base + "/target.mjs?k=dots" };
+            scopes[base + "/mödir/"] = { "ns-scope-norm": base + "/target.mjs?k=nonascii" };
+            // No trailing slash: still a plain prefix, here inside a segment.
+            scopes[base + "/pla"] = { "ns-scope-norm": base + "/target.mjs?k=plain" };
+            scopes[origin] = { "ns-scope-norm-origin": base + "/target.mjs?k=origin" };
+            nsModule.configureLoader({ importMap: { imports: {}, scopes: scopes } });
+            function load(dir, spec) {
+                return importer(origin, "scope-norm/" + dir).then(function (mod) {
+                    return mod.load(spec);
+                });
+            }
+            Promise.all([
+                load("dots", "ns-scope-norm"),
+                load("mödir", "ns-scope-norm"),
+                load("plain", "ns-scope-norm"),
+                load("dots", "ns-scope-norm-origin"),
+            ]).then(function (mods) {
+                expect(mods.map(function (m) { return m.query; }))
+                    .toEqual(["k=dots", "k=nonascii", "k=plain", "k=origin"]);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("keeps an http(s) scope key containing U+0000 whole", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var base = origin + "/esm/resolve/nul-scope";
+            var scopes = {};
+            scopes[base + "/a\u0000/b/"] = { "ns-nul-scope": base + "/target.mjs?k=nul" };
+            nsModule.configureLoader({ importMap: { imports: {}, scopes: scopes } });
+            importer(origin, "nul-scope/a").then(function (mod) {
+                return rejectionMessage(mod.load("ns-nul-scope"));
+            }).then(function (message) {
+                expect(message).toContain("not in the import map");
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("rejects an import() whose import-map target resolves to nothing", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            nsModule.configureLoader({
+                importMap: {
+                    imports: {
+                        "ns-tail-a": "ns-tail-b",
+                        "ns-tail-b": "~/tests/esm/query-map/literal.mjs",
+                    },
+                },
+            });
+            importer(origin, "tail").then(function (mod) {
+                return rejectionMessage(mod.load("ns-tail-a"));
+            }).then(function (message) {
+                expect(message).toContain("Cannot find module 'ns-tail-b'");
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("keeps the importer's origin as written when the query or fragment is empty",
+           function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var written = origin.replace("127.0.0.1", "LOCALHOST");
+            importer(written, "authority-empty").then(function (mod) {
+                return Promise.all([mod.load("./query.mjs?"), mod.load("./hash.mjs#")]);
+            }).then(function (mods) {
+                expect(mods[0].url).toBe(written + "/esm/resolve/authority-empty/query.mjs?");
+                expect(mods[1].url).toBe(written + "/esm/resolve/authority-empty/hash.mjs");
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
         it("normalizes a specifier the way the WHATWG URL parser does", function (done) {
             var origin = getHostOrigin();
             if (!origin) {
@@ -2172,6 +2308,195 @@ describe("HTTP ESM Loader", function() {
                 });
         });
     });
+
+    // The spelling of these URLs is what dev tooling compares module URLs
+    // against, so it must survive every route into the loader byte for byte.
+    describe("module URLs in the shapes dev tooling emits", function () {
+        var nsModule = require("ns:module");
+
+        afterEach(function () {
+            nsModule.configureLoader({ importMap: { imports: {} } });
+        });
+
+        // Each module reports the request target the server saw and its own
+        // import.meta.url.
+        function expectSpelledAsWritten(ns, url) {
+            var target = url.slice(url.indexOf("/", url.indexOf("://") + 3));
+            var q = target.indexOf("?");
+            expect(ns.url).toBe(url);
+            expect(ns.path).toBe(q < 0 ? target : target.slice(0, q));
+            expect(ns.query).toBe(q < 0 ? "" : target.slice(q + 1));
+            expect(nsModule.getLoadedModuleUrls()).toContain(url);
+        }
+
+        function expectEvicted(urls) {
+            nsModule.invalidateModules(urls);
+            var loaded = nsModule.getLoadedModuleUrls();
+            urls.forEach(function (url) {
+                expect(loaded).not.toContain(url);
+            });
+        }
+
+        it("keeps them as written when a file module imports them", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var written = origin.replace("127.0.0.1", "LOCALHOST");
+            var base = origin + "/esm/resolve/tooling-direct";
+            var urls = [
+                base + "/ns/m/src/app.ts?v=abc",
+                base + "/ns/core/index.js",
+                base + "/ns/node/x",
+                base + "/ns/m/node_modules/pkg/index.js",
+                base + "/ns/asm?path=%2Fsrc%2FApp.vue&mode=inline",
+                base + "/ns/asm?path=/src/App.vue&mode=inline",
+                base + "/ns/sfc/src/App.vue?vue&type=script",
+                base + "/ns/m/q.js?b=2&a=1",
+                base + "/@ng/component?c=x&t=1",
+                base + "/@id/__x00__virtual:thing",
+                base + "/@fs/Users/me/proj/x.ts",
+                written + "/esm/resolve/tooling-direct/ns/m/upper.js?v=1",
+            ];
+            Promise.all(urls.map(function (url) {
+                return import(url);
+            })).then(function (namespaces) {
+                namespaces.forEach(function (ns, i) {
+                    expectSpelledAsWritten(ns, urls[i]);
+                });
+                expectEvicted(urls);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("keeps them as written when an import-map entry targets them", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var written = origin.replace("127.0.0.1", "LOCALHOST");
+            var base = origin + "/esm/resolve/tooling-mapped";
+            var dynamicUrl = base + "/ns/m/src/dynamic.ts?v=abc";
+            var staticUrl = base + "/ns/asm?path=%2Fsrc%2FApp.vue&mode=inline";
+            var upperUrl = written + "/esm/resolve/tooling-mapped/ns/m/upper.js?b=2&a=1";
+            nsModule.configureLoader({
+                importMap: {
+                    imports: {
+                        "ns-tooling-url-dynamic": dynamicUrl,
+                        "ns-tooling-url-static": staticUrl,
+                        "ns-tooling-url-upper": upperUrl,
+                    },
+                },
+            });
+            Promise.all([
+                import("ns-tooling-url-dynamic"),
+                import("~/tests/esm/tooling-url/static-importer.mjs"),
+                import("ns-tooling-url-upper"),
+            ]).then(function (namespaces) {
+                expectSpelledAsWritten(namespaces[0], dynamicUrl);
+                expectSpelledAsWritten(namespaces[1].dep, staticUrl);
+                expectSpelledAsWritten(namespaces[2], upperUrl);
+                expectEvicted([dynamicUrl, staticUrl, upperUrl]);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+    });
+
+    describe("absolute http(s) URLs from a file module", function () {
+        var nsModule = require("ns:module");
+
+        afterEach(function () {
+            nsModule.configureLoader({ importMap: { imports: {} } });
+        });
+
+        it("are spelled by the URL parser, keeping the authority as written", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var hostport = origin.replace(/^http:\/\//, "");
+            var base = origin + "/esm/resolve/file-abs";
+            nsModule.configureLoader({
+                importMap: { imports: { "ns-file-abs-mapped": base + "/mapped/../mapped.mjs" } },
+            });
+            Promise.all([
+                import("HTTP://" + hostport + "/esm/resolve/file-abs/upper.mjs"),
+                import("http:/" + hostport + "/esm/resolve/file-abs/collapsed.mjs?k=1"),
+                import(base + "/sub/../dots.mjs"),
+                import(base + "/mödule.mjs"),
+                import("ns-file-abs-mapped"),
+            ]).then(function (mods) {
+                expect(mods.map(function (m) { return m.url; })).toEqual([
+                    base + "/upper.mjs",
+                    base + "/collapsed.mjs?k=1",
+                    base + "/dots.mjs",
+                    base + "/m%C3%B6dule.mjs",
+                    base + "/mapped.mjs",
+                ]);
+                expect(mods.map(function (m) { return m.path + "?" + m.query; })).toEqual([
+                    "/esm/resolve/file-abs/upper.mjs?",
+                    "/esm/resolve/file-abs/collapsed.mjs?k=1",
+                    "/esm/resolve/file-abs/dots.mjs?",
+                    "/esm/resolve/file-abs/m%C3%B6dule.mjs?",
+                    "/esm/resolve/file-abs/mapped.mjs?",
+                ]);
+                nsModule.invalidateModules(["HTTP://" + hostport + "/esm/resolve/file-abs/upper.mjs"]);
+                expect(nsModule.getLoadedModuleUrls()).not.toContain(base + "/upper.mjs");
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("are not unwrapped from a file:// URL", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var target = "/esm/resolve/file-abs/wrapped.mjs";
+            import("file://" + origin + target).then(function () {
+                expect("resolved").toBe("rejected");
+            }, function (error) {
+                expect(String((error && error.message) || error)).toContain("Cannot find module");
+            }).then(function () {
+                return import(origin + "/esm/request-stats.json?target=" +
+                              encodeURIComponent(target));
+            }).then(function (stats) {
+                expect(stats.default.count).toBe(0);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("are refused by require() whatever their scheme's case", function () {
+            ["http://h/x.js", "HTTP://h/x.js"].forEach(function (url) {
+                var message = "";
+                try {
+                    require(url);
+                } catch (e) {
+                    message = String((e && e.message) || e);
+                }
+                expect(message).toContain("require() of URL module is not supported: " + url);
+            });
+        });
+    });
 });
 
 // Focused, deterministic coverage for the native HTTP canonical-key function.
@@ -2184,6 +2509,8 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
         return require("ns:module").canonicalizeHttpUrlKey;
     }
 
+    // A registered key is canonicalized again whenever it is looked up, so a key
+    // must be a fixed point.
     function checkKey(input, expected) {
         var canon = getCanon();
         if (typeof canon !== "function") {
@@ -2191,7 +2518,76 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
             return;
         }
         expect(canon(input)).toBe(expected);
+        expect(canon(expected)).toBe(expected);
     }
+
+    // [input, key with no vocabulary, key under TOOLING_VOCABULARY]
+    var TOOLING_URLS = [
+        ["http://h:5173/ns/m/src/app.ts?v=abc",
+         "http://h:5173/ns/m/src/app.ts?v=abc",
+         "http://h:5173/ns/m/src/app.ts"],
+        ["http://h:5173/ns/core/index.js",
+         "http://h:5173/ns/core/index.js",
+         "http://h:5173/ns/core/index.js"],
+        ["http://h:5173/ns/node/x",
+         "http://h:5173/ns/node/x",
+         "http://h:5173/ns/node/x"],
+        ["http://h:5173/ns/m/node_modules/pkg/index.js?v=abc",
+         "http://h:5173/ns/m/node_modules/pkg/index.js?v=abc",
+         "http://h:5173/ns/m/node_modules/pkg/index.js"],
+        ["http://h:5173/ns/asm?path=%2Fsrc%2FApp.vue&mode=inline",
+         "http://h:5173/ns/asm?path=%2Fsrc%2FApp.vue&mode=inline",
+         "http://h:5173/ns/asm?mode=inline&path=%2Fsrc%2FApp.vue"],
+        ["http://h:5173/ns/asm?path=/src/App.vue&mode=inline",
+         "http://h:5173/ns/asm?path=/src/App.vue&mode=inline",
+         "http://h:5173/ns/asm?mode=inline&path=/src/App.vue"],
+        ["http://h:5173/ns/sfc/src/App.vue?vue&type=script",
+         "http://h:5173/ns/sfc/src/App.vue?vue&type=script",
+         "http://h:5173/ns/sfc/src/App.vue?type=script&vue"],
+        ["http://h:5173/ns/m/q.js?b=2&a=1",
+         "http://h:5173/ns/m/q.js?b=2&a=1",
+         "http://h:5173/ns/m/q.js?a=1&b=2"],
+        ["http://h:5173/@ng/component?c=x&t=1",
+         "http://h:5173/@ng/component?c=x&t=1",
+         "http://h:5173/@ng/component?c=x&t=1"],
+        ["http://h:5173/@id/__x00__virtual:thing?import",
+         "http://h:5173/@id/__x00__virtual:thing?import",
+         "http://h:5173/@id/__x00__virtual:thing"],
+        ["http://h:5173/@fs/Users/me/proj/x.ts?t=1",
+         "http://h:5173/@fs/Users/me/proj/x.ts?t=1",
+         "http://h:5173/@fs/Users/me/proj/x.ts"],
+        ["http://h:5173/node_modules/.vite/deps/pkg.js?v=abc",
+         "http://h:5173/node_modules/.vite/deps/pkg.js?v=abc",
+         "http://h:5173/node_modules/.vite/deps/pkg.js"],
+        ["http://MyMac.local:5173/ns/m/app.js?v=1",
+         "http://MyMac.local:5173/ns/m/app.js?v=1",
+         "http://MyMac.local:5173/ns/m/app.js"],
+        ["http://MyMac.local:5173/ns/m/app.js?",
+         "http://MyMac.local:5173/ns/m/app.js?",
+         "http://MyMac.local:5173/ns/m/app.js"],
+        ["http://MyMac.local:5173/ns/m/app.js#",
+         "http://MyMac.local:5173/ns/m/app.js",
+         "http://MyMac.local:5173/ns/m/app.js"],
+        ["http://h:80/ns/m/app.js?v=1",
+         "http://h:80/ns/m/app.js?v=1",
+         "http://h:80/ns/m/app.js"],
+        ["http://192.168.1.20:5173/ns/m/app.js?v=1",
+         "http://192.168.1.20:5173/ns/m/app.js?v=1",
+         "http://192.168.1.20:5173/ns/m/app.js"],
+        ["http://[::1]:5173/ns/m/app.js?v=1",
+         "http://[::1]:5173/ns/m/app.js?v=1",
+         "http://[::1]:5173/ns/m/app.js"],
+        // The URL parser rejects a zone id; the key keeps the URL as written.
+        ["http://[fe80::1%25en0]:5173/ns/m/app.js?v=1#x",
+         "http://[fe80::1%25en0]:5173/ns/m/app.js?v=1",
+         "http://[fe80::1%25en0]:5173/ns/m/app.js"],
+    ];
+
+    var TOOLING_VOCABULARY = {
+        stripParams: ["t", "v", "import"],
+        forPathPrefixes: ["/ns/", "/@id/", "/@fs/", "/node_modules/.vite/"],
+        preserveQueryFor: ["/@ng/component"],
+    };
 
     it("is exposed as a function in debug builds", function () {
         var canon = getCanon();
@@ -2216,26 +2612,19 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
                      "https://cdn.example.com/lib.js?token=abc");
         });
 
-        // Upstream path joins collapse `http://` to `http:/`. Every key
-        // derivation repairs that before it tests the scheme, so a key that
-        // arrives collapsed — through invalidateModules or a cache-bust mark —
-        // lands on the same identity the resolver produces.
+        // The URL parser reads `http:/host` as `http://host`, so a key that
+        // arrives collapsed, through invalidateModules say, lands on the same
+        // identity the resolver produces.
         it("repairs a collapsed scheme to one identity", function () {
             checkKey("http:/h/ns/core", "http://h/ns/core");
             checkKey("https:/h/ns/core", "https://h/ns/core");
-            // Already well-formed keys are untouched by the repair.
             checkKey("http://h/ns/core", "http://h/ns/core");
         });
 
-        // Some loaders hand the URL over wrapped as file://http(s)://…, and a
-        // path join can collapse the scheme inside that wrapper too. Unwrapping
-        // and repairing have to compose, or the wrapped-collapsed form becomes
-        // a third identity for the same module.
-        it("repairs a collapsed scheme inside a file:// wrapper", function () {
-            checkKey("file://http:/h/ns/core", "http://h/ns/core");
-            checkKey("file://https:/h/ns/core", "https://h/ns/core");
-            // The well-formed wrapper still unwraps to the same key.
-            checkKey("file://http://h/ns/core", "http://h/ns/core");
+        it("does not read an http URL inside a file:// URL as an http key", function () {
+            checkKey("file://http:/h/ns/core", "file://http:/h/ns/core");
+            checkKey("file://https:/h/ns/core", "file://https:/h/ns/core");
+            checkKey("file://http://h/ns/core", "file://http://h/ns/core");
         });
 
         it("treats module identity as literally the URL — no path-tag collapses", function () {
@@ -2248,6 +2637,54 @@ describe("HTTP canonical key (ns:module canonicalizeHttpUrlKey)", function () {
             checkKey("http://h/ns/m/foo.js#frag", "http://h/ns/m/foo.js");
             checkKey("https://cdn.example.com/lib.js?token=abc#frag",
                      "https://cdn.example.com/lib.js?token=abc");
+        });
+
+        it("spells a URL the way the URL parser does, authority aside", function () {
+            checkKey("HTTP://h/x", "http://h/x");
+            checkKey("http:h/x", "http://h/x");
+            checkKey(" http://h/x", "http://h/x");
+            checkKey("\t\n HTTPS://h/x", "https://h/x");
+            checkKey("h\tttp://h/x", "http://h/x");
+            checkKey("http://h", "http://h/");
+            checkKey("http://h?x", "http://h/?x");
+            checkKey("http://h/a/../b.js", "http://h/b.js");
+            checkKey("http://h/%2e%2e/b.js", "http://h/b.js");
+            checkKey("http://h\\x\\y.js", "http://h/x/y.js");
+            checkKey("http://h/mödule.js", "http://h/m%C3%B6dule.js");
+            checkKey("http://h/a b.js?q=a b", "http://h/a%20b.js?q=a%20b");
+            checkKey("http://H:80/x?", "http://H:80/x?");
+        });
+
+        it("keeps the URLs dev tooling emits as written", function () {
+            TOOLING_URLS.forEach(function (row) {
+                checkKey(row[0], row[1]);
+            });
+        });
+    });
+
+    describe("with a tooling-shaped vocabulary", function () {
+        beforeEach(function () {
+            var nsModule = require("ns:module");
+            if (typeof nsModule.canonicalizeHttpUrlKey !== "function") {
+                return;
+            }
+            nsModule.configureLoader({ canonicalization: TOOLING_VOCABULARY });
+        });
+
+        afterEach(function () {
+            var nsModule = require("ns:module");
+            if (typeof nsModule.canonicalizeHttpUrlKey !== "function") {
+                return;
+            }
+            nsModule.configureLoader({
+                canonicalization: { stripParams: [], forPathPrefixes: [], preserveQueryFor: [] },
+            });
+        });
+
+        it("keys the URLs dev tooling emits", function () {
+            TOOLING_URLS.forEach(function (row) {
+                checkKey(row[0], row[2]);
+            });
         });
     });
 

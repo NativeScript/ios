@@ -115,6 +115,8 @@ v8::MaybeLocal<v8::Module> GetOrCreateRequireFacade(
 
 // Authoritative HTTP URL loader for dev-served ESM. This compiles and
 // registers the module under its canonical URL key without evaluating it.
+// `requestedUrl` must be spelled by NormalizeHttpModuleUrl: it is fetched as is
+// and its key derives from it without spelling it again.
 v8::MaybeLocal<v8::Module> LoadHttpModuleForUrl(
     v8::Isolate* isolate, v8::Local<v8::Context> context,
     const std::string& requestedUrl);
@@ -236,6 +238,8 @@ void SetVolatilePatterns(const std::vector<std::string>& patterns);
 //                                      filename/URL and splits the two
 //                                      exported flavors)
 //   - canonicalizeHttpUrlKey(url)     (debug builds only; test diagnostic)
+//   - remoteUrlMatchesAllowlist(url, entries)
+//                                     (debug builds only; test diagnostic)
 //
 // Worker teardown across HMR cycles is userland: the dev client intercepts
 // the global `Worker` constructor and terminates tracked instances

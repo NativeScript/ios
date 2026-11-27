@@ -6,7 +6,8 @@
 // and freezes the exports.
 //
 // Membership varies by build:
-//   - `canonicalizeHttpUrlKey` exists only in debug builds (test diagnostic).
+//   - `canonicalizeHttpUrlKey` and `remoteUrlMatchesAllowlist` exist only in
+//     debug builds (test diagnostics).
 // Missing members are simply absent — never present-but-throwing — so
 // feature checks work.
 
@@ -178,6 +179,9 @@ const surface = {
 };
 if (binding.canonicalizeHttpUrlKey !== undefined) {
   surface.canonicalizeHttpUrlKey = binding.canonicalizeHttpUrlKey;
+}
+if (binding.remoteUrlMatchesAllowlist !== undefined) {
+  surface.remoteUrlMatchesAllowlist = binding.remoteUrlMatchesAllowlist;
 }
 
 module.exports = ObjectFreeze(surface);

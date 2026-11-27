@@ -227,6 +227,135 @@ describe("Remote Module Security", function() {
             });
         });
     });
+
+    // The release allowlist rule, through the debug-only diagnostic that runs
+    // it: debug builds never gate a fetch on it.
+    describe("Allowlist rule (ns:module remoteUrlMatchesAllowlist)", function() {
+        function matches(url, entries) {
+            var fn = require("ns:module").remoteUrlMatchesAllowlist;
+            if (typeof fn !== "function") {
+                pending("ns:module.remoteUrlMatchesAllowlist not exposed (release build)");
+                return undefined;
+            }
+            return fn(url, entries);
+        }
+
+        function expectRows(entry, rows) {
+            rows.forEach(function (row) {
+                var actual = matches(row[0], [entry]);
+                if (actual === undefined) {
+                    return;
+                }
+                expect(entry + " vs " + row[0] + ": " + actual).toBe(entry + " vs " + row[0] + ": " + row[1]);
+            });
+        }
+
+        it("matches a plain entry by prefix at a component boundary", function() {
+            expectRows("https://cdn.example", [
+                ["https://cdn.example/x.js", true],
+                ["https://cdn.example", true],
+                ["https://cdn.example.evil/x.js", false],
+                ["https://cdn.example@evil/x.js", false],
+                ["https://cdn.example:9999/x.js", false],
+            ]);
+        });
+
+        it("keeps a path-scoped entry from being escaped by dot segments", function() {
+            expectRows("https://cdn.example/modules/", [
+                ["https://cdn.example/modules/x.js", true],
+                ["https://cdn.example/modules/../../x.js", false],
+                ["https://cdn.example/modules/%2e%2e/x.js", false],
+                ["https://cdn.example/other/../modules/x.js", true],
+            ]);
+        });
+
+        it("treats an entry with and without a trailing slash by the boundary rule", function() {
+            expectRows("https://cdn.example/modules", [
+                ["https://cdn.example/modules/x.js", true],
+                ["https://cdn.example/modules?v=1", true],
+                ["https://cdn.example/modulesx/y.js", false],
+            ]);
+            expectRows("https://cdn.example/modules/", [
+                ["https://cdn.example/modules", false],
+                ["https://cdn.example/modulesx/y.js", false],
+            ]);
+        });
+
+        it("compares the host as written", function() {
+            expectRows("https://CDN.example/modules/", [
+                ["https://CDN.example/modules/x.js", true],
+                ["https://cdn.example/modules/x.js", false],
+            ]);
+            expectRows("HTTPS://cdn.example/modules/", [
+                ["https://cdn.example/modules/x.js", true],
+            ]);
+        });
+
+        it("spells an entry's path the way fetched URLs are spelled", function() {
+            expectRows("https://cdn.example/mödule/", [
+                ["https://cdn.example/mödule/x.js", true],
+                ["https://cdn.example/m%C3%B6dule/x.js", true],
+            ]);
+        });
+
+        it("keeps an entry that is not a parseable http(s) URL verbatim", function() {
+            expectRows("https://[fe80::1%25en0]/", [
+                ["https://[fe80::1%25en0]/x.js", true],
+            ]);
+            expectRows("cdn.example/", [
+                ["https://cdn.example/x.js", false],
+            ]);
+        });
+
+        function expectLists(url, rows) {
+            rows.forEach(function (row) {
+                var actual = matches(url, row[0]);
+                if (actual === undefined) {
+                    return;
+                }
+                var label = JSON.stringify(row[0]) + " vs " + JSON.stringify(url) + ": ";
+                expect(label + actual).toBe(label + row[1]);
+            });
+        }
+
+        it("allows every URL only when the list is empty", function() {
+            expectLists("https://cdn.example/x.js", [
+                [[], true],
+                [[""], false],
+                [["", "https://cdn.example/"], true],
+                [["", "https://other.example/"], false],
+                [["https://other.example/", "https://cdn.example/lib/"], false],
+            ]);
+        });
+
+        it("lets an item with no exact UTF-8 form match nothing", function() {
+            expectLists("https://cdn.example/x.js", [
+                [["\uD800"], false],
+                [["\uD800", "https://cdn.example/"], true],
+            ]);
+        });
+
+        it("keeps an entry with an embedded U+0000 whole", function() {
+            var entry = "https://cdn.example\u0000/private/";
+            expectLists("https://cdn.example/other.js", [[[entry], false]]);
+            expectLists("https://cdn.example/private/x.js", [[[entry], false]]);
+            expectLists(entry + "x.js", [[[entry], true]]);
+        });
+
+        it("rejects arguments that are not a URL string and an array of strings", function() {
+            var fn = require("ns:module").remoteUrlMatchesAllowlist;
+            if (typeof fn !== "function") {
+                pending("ns:module.remoteUrlMatchesAllowlist not exposed (release build)");
+                return;
+            }
+            [[], ["https://h/x.js"], ["https://h/x.js", "https://h/"], [1, []],
+             ["https://h/x.js", [1]]].forEach(function (args) {
+                expect(function () { fn.apply(null, args); })
+                    .toThrowError(TypeError,
+                                  "remoteUrlMatchesAllowlist expects a URL string and an array of strings");
+            });
+        });
+    });
 });
 
 console.log("Remote Module Security tests loaded");
