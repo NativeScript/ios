@@ -296,6 +296,10 @@ v8::Local<v8::Context> GetCreationContextOrCurrent(v8::Isolate* isolate,
 // field instead of the wrapper it read.
 void SetValue(v8::Isolate* isolate, const v8::Local<v8::Object>& obj, BaseDataWrapper* value);
 BaseDataWrapper* GetValue(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
+// Acquires an autoreleased reference for an adapter claim. A claim whose
+// adapter's last release has started is detached and reads as null, so the
+// value gets a fresh adapter that attaches its own claim.
+BaseDataWrapper* GetValueForMarshalling(v8::Isolate* isolate, const v8::Local<v8::Value>& val);
 
 // A tagged pointer carries its value in the pointer itself: it is never
 // retained, released or deallocated, and its retain count means nothing. Only
@@ -332,8 +336,8 @@ enum class ReleasedObjectPolicy {
 ReleasedObjectPolicy GetReleasedObjectPolicy();
 void SetReleasedObjectPolicy(ReleasedObjectPolicy policy);
 
-// Like GetValue, but applies ReleasedObjectPolicy when the object carries no
-// wrapper: throws (kThrow) or schedules a `releasednativeaccess` event
+// Like GetValueForMarshalling, but applies ReleasedObjectPolicy when the object
+// carries no wrapper: throws (kThrow) or schedules a `releasednativeaccess` event
 // (kReport, deduplicated per object), returning nullptr either way.
 // `operation` names the API surface for the event payload / error message.
 // Callers must no-op on nullptr; paths that would otherwise read the internal

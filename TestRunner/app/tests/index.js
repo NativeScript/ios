@@ -147,6 +147,7 @@ require("./WrapperLifetimeWeakCollectionsTests");
 require("./WrapperLifetimeLeaksTests");
 require("./NativeMemberGuardTests");
 require("./BlockCacheRaceTests");
+require("./IsolateTeardownCallbackTests");
 require("./WorkerConcurrentStartupTests");
 require("./WorkerOptionsTests");
 require("./WorkerResourceLimitsTests");

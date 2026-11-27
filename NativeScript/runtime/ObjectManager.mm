@@ -645,6 +645,9 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
       return true;
     case WrapperType::ObjCObject: {
       ObjCDataWrapper* objCObjectWrapper = static_cast<ObjCDataWrapper*>(wrapper);
+      if (objCObjectWrapper->IsAdapterClaim()) {
+        return true;
+      }
       id target = objCObjectWrapper->Data();
       if (target != nil) {
         // Instances is keyed on the raw address, so an entry rebuilt for a
@@ -670,12 +673,7 @@ bool ObjectManager::DisposeValue(Isolate* isolate, Local<Value> value, bool isFi
             }
           }
         }
-        if (objCObjectWrapper->IsAdapterClaim()) {
-          // The adapter's -dealloc retires this wrapper; it must run first.
-          [target release];
-        } else {
-          ReleaseOnRuntimeThread(isolate, target, objCObjectWrapper->BornOnRuntimeThread());
-        }
+        ReleaseOnRuntimeThread(isolate, target, objCObjectWrapper->BornOnRuntimeThread());
       }
       break;
     }
@@ -827,6 +825,9 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
     }
     return;
   }
+  if (objcWrapper->IsAdapterClaim()) {
+    return;
+  }
 
   id data = objcWrapper->Data();
   if (data != nil) {
@@ -904,7 +905,7 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
       }
     }
 
-    if (!canary && !objcWrapper->IsAdapterClaim()) {
+    if (!canary) {
       // Before the release below, which can run the object's -dealloc. The
       // write can allocate, and the finalizers of the collection that
       // triggers can run JS that calls this builtin on the same wrapper: a
@@ -922,23 +923,10 @@ void ObjectManager::ReleaseNativeCounterpartCallback(const FunctionCallbackInfo<
     // token) the remaining owners keep it alive.
     // Calling [data dealloc] here, as this used to do, destroyed objects that
     // were still referenced elsewhere and caused use-after-free crashes.
-    // Read before the release below: an adapter claim's -dealloc frees the
-    // wrapper, so it must not be touched afterwards.
-    bool adapterClaim = objcWrapper->IsAdapterClaim();
+    ReleaseOnRuntimeThread(isolate, data, objcWrapper->BornOnRuntimeThread());
 
-    if (adapterClaim) {
-      [data release];
-    } else {
-      ReleaseOnRuntimeThread(isolate, data, objcWrapper->BornOnRuntimeThread());
-    }
-
-    // The release above can run a -dealloc that detaches this wrapper; the
-    // internal field owns it, so free only what is still attached. An
-    // adapter's claim is exempt: the adapter owns it exclusively and deletes
-    // it from its own -dealloc even after isolate teardown, so retiring it
-    // here would leave the adapter holding a stale pointer it later frees
-    // again.
-    if (!adapterClaim && tns::GetValue(isolate, value) == wrapper) {
+    // A native -dealloc may detach the wrapper through a nested callback.
+    if (tns::GetValue(isolate, value) == wrapper) {
       delete wrapper;
       tns::MarkReleased(isolate, value.As<Object>(), tns::ReleasedReason::kExplicit);
     }
