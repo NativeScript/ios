@@ -216,8 +216,8 @@ let releaseBase = "https://github.com/NativeScript/ios/releases/download/v\\(nsV
 let package = Package(
     name: "NativeScriptSDK",
     platforms: [
-        .iOS(.v13),
-        .macCatalyst(.v13),${visionPlatform}
+        .iOS(.v15),
+        .macCatalyst(.v15),${visionPlatform}
     ],
     products: [
         // iOS family (iphoneos + iphonesimulator + Mac Catalyst). Apps built by
