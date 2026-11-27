@@ -146,16 +146,27 @@ bool IsRemoteModulesAllowed();
 // (or all URLs if the allowlist is empty).
 bool IsRemoteUrlAllowed(const std::string& url);
 
-// An allowlist entry spelled the way the loader spells the URLs it fetches
-// (NormalizeHttpModuleUrl), so path-scoped entries compare against resolved
-// paths; an entry that is not an http(s) URL is kept verbatim. Applied once,
-// when the allowlist is loaded.
-std::string NormalizeRemoteModuleAllowlistEntry(const std::string& entry);
+// The allowlist IsRemoteUrlAllowed applies once remote modules are enabled.
+struct RemoteModuleAllowlist {
+  // False only when `security.remoteModuleAllowlist` is absent, not an array,
+  // or an empty array: then every URL is allowed.
+  bool inForce = false;
+  // The usable items, each spelled the way the loader spells the URLs it
+  // fetches (NormalizeHttpModuleUrl) so path-scoped entries compare against
+  // resolved paths, or kept verbatim when it is not an http(s) URL. An item
+  // that is not a string, is empty or has no exact UTF-8 form is not here: it
+  // matches nothing but still keeps the list in force.
+  std::vector<std::string> entries;
+};
 
-// The allowlist rule IsRemoteUrlAllowed applies: `url`, as fetched, matches
-// one of `entries` (each already normalized) by prefix, the match ending at a
-// URL-component boundary.
-bool RemoteUrlMatchesAllowlist(const std::string& url,
-                               const std::vector<std::string>& entries);
+#ifdef __OBJC__
+// The allowlist for the raw `security.remoteModuleAllowlist` config value.
+RemoteModuleAllowlist RemoteModuleAllowlistFromConfig(id value);
+#endif
+
+// Whether `url` (as fetched) passes `allowlist`: always when it is not in
+// force, otherwise when one entry matches it by prefix with the match ending
+// at a URL-component boundary.
+bool RemoteUrlAllowedByAllowlist(const std::string& url, const RemoteModuleAllowlist& allowlist);
 
 }  // namespace tns

@@ -918,12 +918,14 @@ static bool ParseImportMapEntries(NSDictionary* source, const std::string& secti
       *error = sectionLabel + ": every key must be a string";
       return false;
     }
-    const char* keyUtf8 = [(NSString*)key UTF8String];
-    if (keyUtf8 == nullptr) {
+    // NSJSONSerialization rejects lone surrogates, so a map that parsed always
+    // has an exact UTF-8 form; the nullopt checks keep that an error, not a crash.
+    const std::optional<std::string> keyUtf8 = ToExactUtf8((NSString*)key);
+    if (!keyUtf8.has_value()) {
       *error = sectionLabel + ": every key must be a string";
       return false;
     }
-    const std::string specifier(keyUtf8);
+    const std::string& specifier = *keyUtf8;
     if (specifier.empty()) {
       *error = sectionLabel + ": a specifier key must not be empty";
       return false;
@@ -934,14 +936,20 @@ static bool ParseImportMapEntries(NSDictionary* source, const std::string& secti
       *error = sectionLabel + ": the target for '" + specifier + "' must be a string";
       return false;
     }
-    const char* valueUtf8 = [(NSString*)value UTF8String];
-    if (valueUtf8 == nullptr) {
+    const std::optional<std::string> valueUtf8 = ToExactUtf8((NSString*)value);
+    if (!valueUtf8.has_value()) {
       *error = sectionLabel + ": the target for '" + specifier + "' must be a string";
       return false;
     }
-    const std::string target(valueUtf8);
+    const std::string& target = *valueUtf8;
     if (target.empty()) {
       *error = sectionLabel + ": the target for '" + specifier + "' must not be empty";
+      return false;
+    }
+    // A target resolves as a filesystem path or is fetched as a URL, and both
+    // go through C-string APIs that would end it at U+0000.
+    if (target.find('\0') != std::string::npos) {
+      *error = sectionLabel + ": the target for '" + specifier + "' must not contain U+0000";
       return false;
     }
 
@@ -999,9 +1007,10 @@ static bool ParseImportMap(const std::string& json, ParsedImportMap* out, std::s
       if (![section isKindOfClass:[NSString class]] ||
           (![(NSString*)section isEqualToString:@"imports"] &&
            ![(NSString*)section isEqualToString:@"scopes"])) {
-        const char* name =
-            [section isKindOfClass:[NSString class]] ? [(NSString*)section UTF8String] : "";
-        *error = std::string("unsupported import-map section '") + (name ? name : "") +
+        const std::optional<std::string> name = [section isKindOfClass:[NSString class]]
+                                                    ? ToExactUtf8((NSString*)section)
+                                                    : std::nullopt;
+        *error = "unsupported import-map section '" + name.value_or(std::string()) +
                  "'; only \"imports\" and \"scopes\" are supported";
         return false;
       }
@@ -1029,8 +1038,12 @@ static bool ParseImportMap(const std::string& json, ParsedImportMap* out, std::s
           *error = "scopes: every scope key must be a string";
           return false;
         }
-        const char* scopeUtf8 = [(NSString*)scopeKey UTF8String];
-        const std::string scopePrefix(scopeUtf8 ? scopeUtf8 : "");
+        const std::optional<std::string> scopeUtf8 = ToExactUtf8((NSString*)scopeKey);
+        if (!scopeUtf8.has_value()) {
+          *error = "scopes: every scope key must be a string";
+          return false;
+        }
+        const std::string& scopePrefix = *scopeUtf8;
         if (scopePrefix.empty()) {
           *error = "scopes: a scope key must not be empty";
           return false;
@@ -4236,33 +4249,37 @@ bool BuildNsModuleBinding(v8::Local<v8::Context> context, v8::Local<v8::Object> 
 
     // Debug-only diagnostic: the release allowlist rule, which debug builds
     // never apply to fetches. `url` is spelled as the loader spells the URL it
-    // fetches and `entries` as the allowlist is loaded.
+    // fetches, and `entries` goes through the same loading as the
+    // `security.remoteModuleAllowlist` config array.
     auto allowlistCb = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
       v8::Isolate* iso = info.GetIsolate();
       v8::Local<v8::Context> ctx = iso->GetCurrentContext();
-      std::vector<std::string> entries;
-      bool valid = info.Length() >= 2 && info[0]->IsString() && info[1]->IsArray();
-      if (valid) {
-        v8::Local<v8::Array> list = info[1].As<v8::Array>();
-        for (uint32_t i = 0; valid && i < list->Length(); i++) {
-          v8::Local<v8::Value> item;
-          if (!list->Get(ctx, i).ToLocal(&item)) {
-            return;  // the element getter threw
-          }
-          valid = item->IsString();
-          if (valid) {
-            entries.push_back(NormalizeRemoteModuleAllowlistEntry(tns::ToString(iso, item)));
+      @autoreleasepool {
+        NSMutableArray* entries = [NSMutableArray array];
+        bool valid = info.Length() >= 2 && info[0]->IsString() && info[1]->IsArray();
+        if (valid) {
+          v8::Local<v8::Array> list = info[1].As<v8::Array>();
+          for (uint32_t i = 0; valid && i < list->Length(); i++) {
+            v8::Local<v8::Value> item;
+            if (!list->Get(ctx, i).ToLocal(&item)) {
+              return;  // the element getter threw
+            }
+            valid = item->IsString();
+            if (valid) {
+              [entries addObject:tns::ToNSString(iso, item)];
+            }
           }
         }
+        if (!valid) {
+          iso->ThrowException(v8::Exception::TypeError(tns::ToV8String(
+              iso, "remoteUrlMatchesAllowlist expects a URL string and an array of strings")));
+          return;
+        }
+        const std::string raw = tns::ToString(iso, info[0]);
+        const std::string url = NormalizeHttpModuleUrl(raw);
+        info.GetReturnValue().Set(RemoteUrlAllowedByAllowlist(
+            url.empty() ? raw : url, RemoteModuleAllowlistFromConfig(entries)));
       }
-      if (!valid) {
-        iso->ThrowException(v8::Exception::TypeError(tns::ToV8String(
-            iso, "remoteUrlMatchesAllowlist expects a URL string and an array of strings")));
-        return;
-      }
-      const std::string raw = tns::ToString(iso, info[0]);
-      const std::string url = NormalizeHttpModuleUrl(raw);
-      info.GetReturnValue().Set(RemoteUrlMatchesAllowlist(url.empty() ? raw : url, entries));
     };
     v8::Local<v8::Function> allowlistFn;
     if (v8::Function::New(context, allowlistCb).ToLocal(&allowlistFn)) {

@@ -623,14 +623,21 @@ works; adding them is a change to this specification first.
 Debug builds additionally carry `canonicalizeHttpUrlKey(url)`, a pure test
 diagnostic that takes a string and throws
 `canonicalizeHttpUrlKey expects a URL string` otherwise, and
-`remoteUrlMatchesAllowlist(url, entries)`, which applies the release
-`security.remoteModuleAllowlist` rule to `url` against `entries` and throws
+`remoteUrlMatchesAllowlist(url, entries)`, which returns whether a release
+build with `allowRemoteModules` on would fetch `url` under a
+`security.remoteModuleAllowlist` of `entries` (`true` for `[]`) and throws
 `remoteUrlMatchesAllowlist expects a URL string and an array of strings`
 otherwise; release builds omit both. Missing members are simply absent — never
 present-but-throwing — so feature checks work. The module is registered in
 every build: the security boundary for remote module loading sits at the
 network layer (`security.allowRemoteModules` in nativescript.config, enforced
 by the HTTP loader), not at the module registry and not at `ns:runtime`.
+
+A `security.remoteModuleAllowlist` array with at least one item is in force:
+a URL is fetched only when an entry matches it as a prefix ending at `/`, `?`,
+`#` or the end of the URL. When the key is absent, not an array, or an empty
+array, every URL is allowed. An item that is not a string, is empty, or is not
+valid Unicode matches nothing but still keeps the list in force.
 
 #### Import maps and scopes
 
@@ -697,6 +704,7 @@ Inside either section — labelled `imports` or `scope '<scope>'`:
 | empty specifier key | `<section>: a specifier key must not be empty` |
 | non-string target | `<section>: the target for '<specifier>' must be a string` |
 | empty target | `<section>: the target for '<specifier>' must not be empty` |
+| target containing U+0000 | `<section>: the target for '<specifier>' must not contain U+0000` |
 | trailing-slash key, non-trailing-slash target | `<section>: the target for '<specifier>' must end with '/' because the specifier key does` |
 
 #### Registry canonicalization

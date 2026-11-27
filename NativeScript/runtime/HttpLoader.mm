@@ -33,7 +33,7 @@ static inline bool StartsWith(const std::string& s, const char* prefix) {
 
 static std::once_flag s_securityConfigInitFlag;
 static bool s_allowRemoteModules = false;
-static std::vector<std::string> s_remoteModuleAllowlist;
+static RemoteModuleAllowlist s_remoteModuleAllowlist;
 
 // Returns true when `url` is authorized by allowlist `entry`.
 //
@@ -55,13 +55,34 @@ static bool RemoteUrlMatchesAllowlistEntry(const std::string& url, const std::st
   return next == '/' || next == '?' || next == '#';
 }
 
-std::string NormalizeRemoteModuleAllowlistEntry(const std::string& entry) {
+static std::string NormalizeRemoteModuleAllowlistEntry(const std::string& entry) {
   const std::string url = NormalizeHttpModuleUrl(entry);
   return url.empty() ? entry : url;
 }
 
-bool RemoteUrlMatchesAllowlist(const std::string& url, const std::vector<std::string>& entries) {
-  for (const std::string& entry : entries) {
+RemoteModuleAllowlist RemoteModuleAllowlistFromConfig(id value) {
+  RemoteModuleAllowlist allowlist;
+  if (![value isKindOfClass:[NSArray class]] || [(NSArray*)value count] == 0) {
+    return allowlist;
+  }
+  allowlist.inForce = true;
+  for (id item in (NSArray*)value) {
+    if (![item isKindOfClass:[NSString class]]) {
+      continue;
+    }
+    const std::optional<std::string> entry = ToExactUtf8((NSString*)item);
+    if (entry.has_value() && !entry->empty()) {
+      allowlist.entries.push_back(NormalizeRemoteModuleAllowlistEntry(*entry));
+    }
+  }
+  return allowlist;
+}
+
+bool RemoteUrlAllowedByAllowlist(const std::string& url, const RemoteModuleAllowlist& allowlist) {
+  if (!allowlist.inForce) {
+    return true;
+  }
+  for (const std::string& entry : allowlist.entries) {
     if (RemoteUrlMatchesAllowlistEntry(url, entry)) {
       return true;
     }
@@ -84,19 +105,7 @@ static void InitializeSecurityConfig() {
         s_allowRemoteModules = [allowRemote boolValue];
       }
 
-      id allowlist = security[@"remoteModuleAllowlist"];
-      if (allowlist && [allowlist isKindOfClass:[NSArray class]]) {
-        NSArray* list = (NSArray*)allowlist;
-        for (id item in list) {
-          if ([item isKindOfClass:[NSString class]]) {
-            NSString* str = (NSString*)item;
-            if (str.length > 0) {
-              s_remoteModuleAllowlist.push_back(
-                  NormalizeRemoteModuleAllowlistEntry(std::string([str UTF8String])));
-            }
-          }
-        }
-      }
+      s_remoteModuleAllowlist = RemoteModuleAllowlistFromConfig(security[@"remoteModuleAllowlist"]);
     }
   });
 }
@@ -120,12 +129,7 @@ bool IsRemoteUrlAllowed(const std::string& url) {
     return false;
   }
 
-  // If no allowlist is configured, allow all URLs (user explicitly enabled remote modules)
-  if (s_remoteModuleAllowlist.empty()) {
-    return true;
-  }
-
-  return RemoteUrlMatchesAllowlist(url, s_remoteModuleAllowlist);
+  return RemoteUrlAllowedByAllowlist(url, s_remoteModuleAllowlist);
 }
 
 // ─────────────────────────────────────────────────────────────
