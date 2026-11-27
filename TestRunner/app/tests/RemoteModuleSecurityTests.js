@@ -307,6 +307,41 @@ describe("Remote Module Security", function() {
             ]);
         });
 
+        function expectLists(url, rows) {
+            rows.forEach(function (row) {
+                var actual = matches(url, row[0]);
+                if (actual === undefined) {
+                    return;
+                }
+                var label = JSON.stringify(row[0]) + " vs " + JSON.stringify(url) + ": ";
+                expect(label + actual).toBe(label + row[1]);
+            });
+        }
+
+        it("allows every URL only when the list is empty", function() {
+            expectLists("https://cdn.example/x.js", [
+                [[], true],
+                [[""], false],
+                [["", "https://cdn.example/"], true],
+                [["", "https://other.example/"], false],
+                [["https://other.example/", "https://cdn.example/lib/"], false],
+            ]);
+        });
+
+        it("lets an item with no exact UTF-8 form match nothing", function() {
+            expectLists("https://cdn.example/x.js", [
+                [["\uD800"], false],
+                [["\uD800", "https://cdn.example/"], true],
+            ]);
+        });
+
+        it("keeps an entry with an embedded U+0000 whole", function() {
+            var entry = "https://cdn.example\u0000/private/";
+            expectLists("https://cdn.example/other.js", [[[entry], false]]);
+            expectLists("https://cdn.example/private/x.js", [[[entry], false]]);
+            expectLists(entry + "x.js", [[[entry], true]]);
+        });
+
         it("rejects arguments that are not a URL string and an array of strings", function() {
             var fn = require("ns:module").remoteUrlMatchesAllowlist;
             if (typeof fn !== "function") {

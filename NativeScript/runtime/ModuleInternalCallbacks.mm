@@ -4214,33 +4214,37 @@ bool BuildNsModuleBinding(v8::Local<v8::Context> context, v8::Local<v8::Object> 
 
     // Debug-only diagnostic: the release allowlist rule, which debug builds
     // never apply to fetches. `url` is spelled as the loader spells the URL it
-    // fetches and `entries` as the allowlist is loaded.
+    // fetches, and `entries` goes through the same loading as the
+    // `security.remoteModuleAllowlist` config array.
     auto allowlistCb = [](const v8::FunctionCallbackInfo<v8::Value>& info) {
       v8::Isolate* iso = info.GetIsolate();
       v8::Local<v8::Context> ctx = iso->GetCurrentContext();
-      std::vector<std::string> entries;
-      bool valid = info.Length() >= 2 && info[0]->IsString() && info[1]->IsArray();
-      if (valid) {
-        v8::Local<v8::Array> list = info[1].As<v8::Array>();
-        for (uint32_t i = 0; valid && i < list->Length(); i++) {
-          v8::Local<v8::Value> item;
-          if (!list->Get(ctx, i).ToLocal(&item)) {
-            return;  // the element getter threw
-          }
-          valid = item->IsString();
-          if (valid) {
-            entries.push_back(NormalizeRemoteModuleAllowlistEntry(tns::ToString(iso, item)));
+      @autoreleasepool {
+        NSMutableArray* entries = [NSMutableArray array];
+        bool valid = info.Length() >= 2 && info[0]->IsString() && info[1]->IsArray();
+        if (valid) {
+          v8::Local<v8::Array> list = info[1].As<v8::Array>();
+          for (uint32_t i = 0; valid && i < list->Length(); i++) {
+            v8::Local<v8::Value> item;
+            if (!list->Get(ctx, i).ToLocal(&item)) {
+              return;  // the element getter threw
+            }
+            valid = item->IsString();
+            if (valid) {
+              [entries addObject:tns::ToNSString(iso, item)];
+            }
           }
         }
+        if (!valid) {
+          iso->ThrowException(v8::Exception::TypeError(tns::ToV8String(
+              iso, "remoteUrlMatchesAllowlist expects a URL string and an array of strings")));
+          return;
+        }
+        const std::string raw = tns::ToString(iso, info[0]);
+        const std::string url = NormalizeHttpModuleUrl(raw);
+        info.GetReturnValue().Set(RemoteUrlAllowedByAllowlist(
+            url.empty() ? raw : url, RemoteModuleAllowlistFromConfig(entries)));
       }
-      if (!valid) {
-        iso->ThrowException(v8::Exception::TypeError(tns::ToV8String(
-            iso, "remoteUrlMatchesAllowlist expects a URL string and an array of strings")));
-        return;
-      }
-      const std::string raw = tns::ToString(iso, info[0]);
-      const std::string url = NormalizeHttpModuleUrl(raw);
-      info.GetReturnValue().Set(RemoteUrlMatchesAllowlist(url.empty() ? raw : url, entries));
     };
     v8::Local<v8::Function> allowlistFn;
     if (v8::Function::New(context, allowlistCb).ToLocal(&allowlistFn)) {

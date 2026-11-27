@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -169,6 +170,26 @@ inline std::string ToString(v8::Isolate* isolate, const v8::Local<v8::Value>& va
 // The unpaired half becomes U+FFFD, since it has no UTF-8 spelling.
 inline std::string ToString(v8::Isolate* isolate, const NSString* value) {
   return tns::ToString(isolate, tns::ToV8String(isolate, value));
+}
+
+// The exact UTF-8 bytes of `value`, sized by length so an embedded U+0000 is
+// kept (a C-string conversion stops there); nullopt for nil or for a string
+// with a lone surrogate, which has no UTF-8 spelling (-UTF8String returns NULL).
+inline std::optional<std::string> ToExactUtf8(const NSString* value) {
+  if (value == nil) {
+    return std::nullopt;
+  }
+  CFStringRef str = (__bridge CFStringRef)value;
+  const CFRange range = CFRangeMake(0, CFStringGetLength(str));
+  CFIndex byteCount = 0;
+  if (CFStringGetBytes(str, range, kCFStringEncodingUTF8, 0, false, nullptr, 0, &byteCount) !=
+      range.length) {
+    return std::nullopt;
+  }
+  std::string bytes(static_cast<size_t>(byteCount), '\0');
+  CFStringGetBytes(str, range, kCFStringEncodingUTF8, 0, false,
+                   reinterpret_cast<UInt8*>(bytes.data()), byteCount, nullptr);
+  return bytes;
 }
 
 inline NSString* ToNSString(const std::string& v) {
