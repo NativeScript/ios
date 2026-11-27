@@ -552,28 +552,35 @@ void JsV8InspectorClient::EnqueueMessage(const std::string& message) {
 
 void JsV8InspectorClient::ScheduleMessageDrain() {
   tns::ExecuteOnMainThread([this]() {
-    dispatch_sync(this->messageLoopQueue_, ^{
-      // prevent execution if we're already pumping messages
-      if (runningNestedLoops_ && !terminated_) {
-        return;
-      };
+    // messageLoopQueue_ must not be held across dispatchMessage: the message
+    // may pause, and runMessageLoopOnPause/quitMessageLoopOnPause sync on it
+    // from this thread. A pause inside a dispatch can end in a deferred
+    // session reset, so the checks run before every pop.
+    while (true) {
+      __block bool pauseLoopRunning = false;
+      __block bool pauseLoopPumping = false;
+      dispatch_sync(this->messageLoopQueue_, ^{
+        pauseLoopRunning = runningNestedLoops_;
+        pauseLoopPumping = runningNestedLoops_ && !terminated_;
+      });
+      if (pauseLoopPumping) {
+        break;
+      }
       if (this->pendingSessionReset_) {
         // A pause loop (possibly on another thread) is still winding down;
         // it schedules another drain once it has exited.
-        if (runningNestedLoops_) {
-          return;
+        if (pauseLoopRunning) {
+          break;
         }
         this->pendingSessionReset_ = false;
         this->SyncSessionWithFrontend();
       }
-      std::string message;
-      do {
-        message = this->PumpMessage();
-        if (!message.empty()) {
-          this->dispatchMessage(message);
-        }
-      } while (!message.empty());
-    });
+      std::string message = this->PumpMessage();
+      if (message.empty()) {
+        break;
+      }
+      this->dispatchMessage(message);
+    }
   });
 }
 
