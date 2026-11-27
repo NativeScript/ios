@@ -157,6 +157,14 @@ class TestRunnerTests: XCTestCase {
                     return
                 }
 
+                // A served ES module whose `load(spec)` calls the global require.
+                if path == "/esm/global-require.mjs" {
+                    let body = "export function load(spec) { return require(spec); }\n"
+                    startResponse("200 OK", [("Content-Type", "application/javascript; charset=utf-8")])
+                    sendBody(body.data(using: .utf8) ?? Data())
+                    return
+                }
+
                 // ── MIME-gate routes ──────────────────────────────
                 if path == "/esm/html-fallback.mjs" {
                     // The SPA-fallback shape: an unknown path answered with the

@@ -323,6 +323,86 @@ describe("createRequire", function () {
     });
 });
 
+// An ES module has no require of its own, so a bare `require` in one is the
+// global require, bound to the app root. Debug builds log a one-time warning
+// per ES module for a relative specifier passed to it; the fixtures split the
+// callers so each one's warning (or its absence) shows up separately in the
+// device log.
+describe("the global require in an ES module", function () {
+    var fixtures = "~/tests/esm/global-require/sub/";
+
+    function withModule(name, done, fn) {
+        import(fixtures + name).then(function (mod) {
+            fn(mod);
+            done();
+        }).catch(function (e) {
+            expect("rejected: " + ((e && e.message) || e)).toBe("resolved");
+            done();
+        });
+    }
+
+    function errorOf(fn) {
+        try {
+            fn();
+        } catch (e) {
+            return String((e && e.message) || e);
+        }
+        return "<no error thrown>";
+    }
+
+    function expectResolvedAgainstAppRoot(message, specifier) {
+        expect(message).toContain("Cannot find module '" + specifier + "'");
+        expect(message).toMatch(/Base directory: [^\n]*\/app\n/);
+        expect(message).not.toContain("global-require/sub");
+    }
+
+    it("resolves a relative specifier against the app root, not the module's folder",
+       function (done) {
+        withModule("relative.mjs", done, function (mod) {
+            expectResolvedAgainstAppRoot(
+                errorOf(function () { mod.load("./global-require-sibling.js"); }),
+                "global-require-sibling.js");
+            // Repeated and different relative specifiers behave the same.
+            expectResolvedAgainstAppRoot(
+                errorOf(function () { mod.load("./global-require-sibling.js"); }),
+                "global-require-sibling.js");
+            expect(errorOf(function () { mod.load("../sub/global-require-sibling.js"); }))
+                .toContain("Cannot find module");
+        });
+    });
+
+    it("resolves a non-relative specifier as any other require does", function (done) {
+        withModule("non-relative.mjs", done, function (mod) {
+            expect(mod.load("~/tests/esm/global-require/sub/global-require-sibling.js").tag)
+                .toBe("global-require-sibling");
+            expect(mod.load("ns:module")).toBe(require("ns:module"));
+        });
+    });
+
+    it("leaves createRequire(import.meta.url) resolving against the module's folder",
+       function (done) {
+        withModule("create-require.mjs", done, function (mod) {
+            expect(mod.load("./global-require-sibling.js").tag).toBe("global-require-sibling");
+        });
+    });
+
+    it("resolves against the app root from a classic script an ES module created",
+       function (done) {
+        withModule("classic-caller.mjs", done, function (mod) {
+            expectResolvedAgainstAppRoot(
+                errorOf(function () { mod.load("./global-require-from-classic.js"); }),
+                "global-require-from-classic.js");
+        });
+    });
+
+    it("resolves against the app root from a CommonJS module", function () {
+        var caller = require("./esm/global-require/sub/commonjs-caller.js");
+        expectResolvedAgainstAppRoot(
+            errorOf(function () { caller.load("./global-require-from-commonjs.js"); }),
+            "global-require-from-commonjs.js");
+    });
+});
+
 // `~` marks the app root; the separator after it is optional.
 describe("app-root specifiers", function () {
     it("resolves ~/path", function () {

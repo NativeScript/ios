@@ -2098,6 +2098,32 @@ describe("HTTP ESM Loader", function() {
                 done();
             });
         });
+
+        it("leaves the global require resolving relative specifiers against the app root",
+           function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            import(origin + "/esm/global-require.mjs").then(function (mod) {
+                var message = "<no error thrown>";
+                try {
+                    mod.load("./global-require-from-http.js");
+                } catch (e) {
+                    message = String((e && e.message) || e);
+                }
+                expect(message).toContain("Cannot find module 'global-require-from-http.js'");
+                expect(message).toMatch(/Base directory: [^\n]*\/app\n/);
+                expect(mod.load("~/tests/esm/global-require/sub/global-require-sibling.js").tag)
+                    .toBe("global-require-sibling");
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
     });
 
     describe("an import-map entry keyed by a file module's own URL", function () {

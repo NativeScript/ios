@@ -353,6 +353,28 @@ std::string LookupModuleKeyForModule(v8::Isolate* isolate, v8::Local<v8::Module>
   return FindKeyForModule(*state, isolate, mod);
 }
 
+std::string LookupModuleKeyForScriptId(v8::Isolate* isolate, int scriptId) {
+  auto* state = ModuleLoaderStateFor(isolate);
+  if (state == nullptr) {
+    return std::string();
+  }
+  for (const auto& entry : state->registry) {
+    if (entry.second.IsEmpty()) {
+      continue;
+    }
+    v8::Local<v8::Module> mod = entry.second.Get(isolate);
+    // ScriptId() aborts on anything else.
+    if (!mod->IsSourceTextModule() || mod->GetStatus() == v8::Module::kErrored) {
+      continue;
+    }
+    if (mod->ScriptId() == scriptId) {
+      std::string key = FindKeyForModule(*state, isolate, mod);
+      return key.empty() ? entry.first : key;
+    }
+  }
+  return std::string();
+}
+
 namespace {
 // The single module request in the facade source, and the source itself. Both
 // match Node's required_module_facade_source_string so the semantics (live

@@ -96,6 +96,11 @@ void RemoveModuleFromRegistry(v8::Isolate* isolate,
 std::string LookupModuleKeyForModule(v8::Isolate* isolate,
                                      v8::Local<v8::Module> mod);
 
+// The registry key of the live source-text module compiled as script
+// `scriptId` (a StackFrame's GetScriptId()), or empty when no registered ES
+// module has that script. A linear scan of the registry: diagnostics only.
+std::string LookupModuleKeyForScriptId(v8::Isolate* isolate, int scriptId);
+
 // Record `mod` in the identity-hash index under `canonicalKey`. Call alongside
 // every registry insert performed outside ModuleInternalCallbacks.mm.
 void IndexModuleForIsolate(v8::Isolate* isolate,

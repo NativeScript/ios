@@ -101,15 +101,21 @@ class ModuleInternal {
 
  private:
   static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+  // The global require's native half in debug builds: RequireCallback plus a
+  // one-time warning per ES module that passes it a relative specifier.
+  static void DebugGlobalRequireCallback(
+      const v8::FunctionCallbackInfo<v8::Value>& info);
   static void CreateRequireCallback(
       const v8::FunctionCallbackInfo<v8::Value>& info);
   // A require bound to `dirName`, whose ES module loads evaluate under
   // `options`. The options ride along as trailing arguments to the require
   // factory, so nothing about them is ambient — and they are resolved once at
-  // mint time, never per require() call.
+  // mint time, never per require() call. `requireInternal` defaults to the
+  // RequireCallback function every module-scoped require shares.
   v8::Local<v8::Function> GetRequireFunction(
       v8::Isolate* isolate, const std::string& dirName,
-      const ModuleEvaluationOptions& options);
+      const ModuleEvaluationOptions& options,
+      v8::Local<v8::Function> requireInternal = v8::Local<v8::Function>());
   v8::Local<v8::Object> LoadImpl(v8::Isolate* isolate,
                                  const std::string& moduleName,
                                  const std::string& baseDir, bool& isData,
