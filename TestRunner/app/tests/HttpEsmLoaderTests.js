@@ -794,6 +794,37 @@ describe("HTTP ESM Loader", function() {
                 }).toThrowError(TypeError, /must be a string/);
             });
 
+            it("rejects a target containing U+0000 and keeps the previous map", function (done) {
+                setMap({ imports: { "ns-nul-prev": "~/tests/esm/query-map/stripped.mjs" } });
+                expect(function () {
+                    setMap({
+                        imports: {
+                            "ns-nul-target": "~/tests/esm/query-map/literal.mjs\u0000/../../x.mjs",
+                        },
+                    });
+                }).toThrowError(TypeError,
+                                "configureLoader: imports: the target for 'ns-nul-target' " +
+                                "must not contain U+0000");
+                import("ns-nul-prev").then(function (ns) {
+                    expect(ns.name).toBe("stripped");
+                    done();
+                }).catch(function (error) {
+                    expect("rejected: " + formatError(error)).toBe("resolved");
+                    done();
+                });
+            });
+
+            it("matches a specifier key containing U+0000 whole", function (done) {
+                setMap({ imports: { "ns-nul-key\u0000x": "~/tests/esm/query-map/literal.mjs" } });
+                import("ns-nul-key").then(function () {
+                    expect("resolved").toBe("rejected");
+                    done();
+                }, function (error) {
+                    expect(String((error && error.message) || error)).toContain("Cannot find module");
+                    done();
+                });
+            });
+
             it("rejects a non-object scope map", function () {
                 expect(function () {
                     setMap({ scopes: { "/a/": "not-an-object" } });
@@ -1963,6 +1994,28 @@ describe("HTTP ESM Loader", function() {
             ]).then(function (mods) {
                 expect(mods.map(function (m) { return m.query; }))
                     .toEqual(["k=dots", "k=nonascii", "k=plain", "k=origin"]);
+                done();
+            }).catch(function (error) {
+                expect("rejected: " + formatError(error)).toBe("resolved");
+                done();
+            });
+        });
+
+        it("keeps an http(s) scope key containing U+0000 whole", function (done) {
+            var origin = getHostOrigin();
+            if (!origin) {
+                pending("REPORT_BASEURL not set; skipping host HTTP tests");
+                done();
+                return;
+            }
+            var base = origin + "/esm/resolve/nul-scope";
+            var scopes = {};
+            scopes[base + "/a\u0000/b/"] = { "ns-nul-scope": base + "/target.mjs?k=nul" };
+            nsModule.configureLoader({ importMap: { imports: {}, scopes: scopes } });
+            importer(origin, "nul-scope/a").then(function (mod) {
+                return rejectionMessage(mod.load("ns-nul-scope"));
+            }).then(function (message) {
+                expect(message).toContain("not in the import map");
                 done();
             }).catch(function (error) {
                 expect("rejected: " + formatError(error)).toBe("resolved");

@@ -896,12 +896,14 @@ static bool ParseImportMapEntries(NSDictionary* source, const std::string& secti
       *error = sectionLabel + ": every key must be a string";
       return false;
     }
-    const char* keyUtf8 = [(NSString*)key UTF8String];
-    if (keyUtf8 == nullptr) {
+    // NSJSONSerialization rejects lone surrogates, so a map that parsed always
+    // has an exact UTF-8 form; the nullopt checks keep that an error, not a crash.
+    const std::optional<std::string> keyUtf8 = ToExactUtf8((NSString*)key);
+    if (!keyUtf8.has_value()) {
       *error = sectionLabel + ": every key must be a string";
       return false;
     }
-    const std::string specifier(keyUtf8);
+    const std::string& specifier = *keyUtf8;
     if (specifier.empty()) {
       *error = sectionLabel + ": a specifier key must not be empty";
       return false;
@@ -912,14 +914,20 @@ static bool ParseImportMapEntries(NSDictionary* source, const std::string& secti
       *error = sectionLabel + ": the target for '" + specifier + "' must be a string";
       return false;
     }
-    const char* valueUtf8 = [(NSString*)value UTF8String];
-    if (valueUtf8 == nullptr) {
+    const std::optional<std::string> valueUtf8 = ToExactUtf8((NSString*)value);
+    if (!valueUtf8.has_value()) {
       *error = sectionLabel + ": the target for '" + specifier + "' must be a string";
       return false;
     }
-    const std::string target(valueUtf8);
+    const std::string& target = *valueUtf8;
     if (target.empty()) {
       *error = sectionLabel + ": the target for '" + specifier + "' must not be empty";
+      return false;
+    }
+    // A target resolves as a filesystem path or is fetched as a URL, and both
+    // go through C-string APIs that would end it at U+0000.
+    if (target.find('\0') != std::string::npos) {
+      *error = sectionLabel + ": the target for '" + specifier + "' must not contain U+0000";
       return false;
     }
 
@@ -977,9 +985,10 @@ static bool ParseImportMap(const std::string& json, ParsedImportMap* out, std::s
       if (![section isKindOfClass:[NSString class]] ||
           (![(NSString*)section isEqualToString:@"imports"] &&
            ![(NSString*)section isEqualToString:@"scopes"])) {
-        const char* name =
-            [section isKindOfClass:[NSString class]] ? [(NSString*)section UTF8String] : "";
-        *error = std::string("unsupported import-map section '") + (name ? name : "") +
+        const std::optional<std::string> name = [section isKindOfClass:[NSString class]]
+                                                    ? ToExactUtf8((NSString*)section)
+                                                    : std::nullopt;
+        *error = "unsupported import-map section '" + name.value_or(std::string()) +
                  "'; only \"imports\" and \"scopes\" are supported";
         return false;
       }
@@ -1007,8 +1016,12 @@ static bool ParseImportMap(const std::string& json, ParsedImportMap* out, std::s
           *error = "scopes: every scope key must be a string";
           return false;
         }
-        const char* scopeUtf8 = [(NSString*)scopeKey UTF8String];
-        const std::string scopePrefix(scopeUtf8 ? scopeUtf8 : "");
+        const std::optional<std::string> scopeUtf8 = ToExactUtf8((NSString*)scopeKey);
+        if (!scopeUtf8.has_value()) {
+          *error = "scopes: every scope key must be a string";
+          return false;
+        }
+        const std::string& scopePrefix = *scopeUtf8;
         if (scopePrefix.empty()) {
           *error = "scopes: a scope key must not be empty";
           return false;

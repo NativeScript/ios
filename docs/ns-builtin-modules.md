@@ -704,6 +704,7 @@ Inside either section — labelled `imports` or `scope '<scope>'`:
 | empty specifier key | `<section>: a specifier key must not be empty` |
 | non-string target | `<section>: the target for '<specifier>' must be a string` |
 | empty target | `<section>: the target for '<specifier>' must not be empty` |
+| target containing U+0000 | `<section>: the target for '<specifier>' must not contain U+0000` |
 | trailing-slash key, non-trailing-slash target | `<section>: the target for '<specifier>' must end with '/' because the specifier key does` |
 
 #### Registry canonicalization
